@@ -13,16 +13,14 @@ export function ViewSwitcher({
     <div className="flex gap-2 mb-4">
       <button
         onClick={() => onChange("grid")}
-        className={`btn btn-sm ${
-          view === "grid" ? "btn-primary" : "btn-ghost"
-        }`}
+        className={`btn btn-sm ${view === "grid" ? "btn-accent" : "btn-ghost"}`}
       >
         Grid
       </button>
       <button
         onClick={() => onChange("table")}
         className={`btn btn-sm ${
-          view === "table" ? "btn-primary" : "btn-ghost"
+          view === "table" ? "btn-accent" : "btn-ghost"
         }`}
       >
         Table

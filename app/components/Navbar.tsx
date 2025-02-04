@@ -97,18 +97,16 @@ export function Navbar() {
 
           {/* Desktop Menu */}
           <div className="hidden lg:flex items-center gap-6">
+            <Link href="/launch" className="btn btn-primary">
+              Launch a Token
+            </Link>
             <button
               onClick={() => setIsHowItWorksOpen(true)}
               className="btn btn-ghost"
             >
               How It Works
             </button>
-            <Link href="/launch" className="btn btn-primary">
-              Launch a Token
-            </Link>
-            {/* <Link href="/about" className="text-sm btn btn-ghost">
-              About
-            </Link> */}
+
             {authenticated ? (
               <button onClick={logout} className="btn btn-ghost">
                 Logout
