@@ -7,8 +7,11 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Pagination } from "./Pagination";
 
 type Token = {
+  address: string;
   name: string;
   symbol: string;
   marketCap: number;
@@ -67,16 +70,29 @@ const AnimatedReward = ({
 
 const columns = [
   columnHelper.accessor("name", {
-    header: "Token",
+    header: () => (
+      <div className="flex items-center gap-2 cursor-pointer hover:text-primary">
+        Token
+        <span className="opacity-50">▼</span>
+      </div>
+    ),
     cell: (info) => (
-      <div className="flex items-center gap-2">
+      <Link
+        href={`/token/${info.row.original.address}`}
+        className="flex items-center gap-2 hover:underline"
+      >
         <span className="font-semibold">{info.getValue()}</span>
         <span className="text-gray-500">{info.row.original.symbol}</span>
-      </div>
+      </Link>
     ),
   }),
   columnHelper.accessor("price", {
-    header: () => <div className="text-right">Price</div>,
+    header: () => (
+      <div className="text-right cursor-pointer hover:text-primary">
+        Price
+        <span className="opacity-50 ml-2">▼</span>
+      </div>
+    ),
     cell: (info) => {
       const price = info.getValue();
       const decimals = price < 0.01 ? 6 : price < 1 ? 4 : 2;
@@ -138,6 +154,7 @@ const columns = [
 
 const defaultData: Token[] = [
   {
+    address: "0x1234567890123456789012345678901234567890",
     name: "StreamPepe",
     symbol: "SPEPE",
     marketCap: 15800000,
@@ -151,6 +168,7 @@ const defaultData: Token[] = [
     rewardRate: 3.17,
   },
   {
+    address: "0x2345678901234567890123456789012345678901",
     name: "FlowDoge",
     symbol: "FLOWG",
     marketCap: 8500000,
@@ -164,6 +182,7 @@ const defaultData: Token[] = [
     rewardRate: 2.15,
   },
   {
+    address: "0x3456789012345678901234567890123456789012",
     name: "RiverRocket",
     symbol: "RVRKT",
     marketCap: 22500000,
@@ -177,6 +196,7 @@ const defaultData: Token[] = [
     rewardRate: 4.28,
   },
   {
+    address: "0x4567890123456789012345678901234567890123",
     name: "WaterfallInu",
     symbol: "WFINU",
     marketCap: 4200000,
@@ -190,6 +210,7 @@ const defaultData: Token[] = [
     rewardRate: 1.82,
   },
   {
+    address: "0x5678901234567890123456789012345678901234",
     name: "StreamShiba",
     symbol: "STRSHIB",
     marketCap: 12500000,
@@ -203,6 +224,7 @@ const defaultData: Token[] = [
     rewardRate: 2.45,
   },
   {
+    address: "0x6789012345678901234567890123456789012345",
     name: "TorrentMoon",
     symbol: "TRMOON",
     marketCap: 3800000,
@@ -216,6 +238,7 @@ const defaultData: Token[] = [
     rewardRate: 1.23,
   },
   {
+    address: "0x7890123456789012345678901234567890123456",
     name: "FluxFloki",
     symbol: "FLXFLK",
     marketCap: 6700000,
@@ -229,6 +252,7 @@ const defaultData: Token[] = [
     rewardRate: 2.78,
   },
   {
+    address: "0x8901234567890123456789012345678901234567",
     name: "RapidRabbit",
     symbol: "RPDRBT",
     marketCap: 9100000,
@@ -242,6 +266,7 @@ const defaultData: Token[] = [
     rewardRate: 2.91,
   },
   {
+    address: "0x9012345678901234567890123456789012345678",
     name: "CascadeCat",
     symbol: "CSCAT",
     marketCap: 5400000,
@@ -255,6 +280,7 @@ const defaultData: Token[] = [
     rewardRate: 1.95,
   },
   {
+    address: "0xA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0",
     name: "VelocityVibe",
     symbol: "VVIBE",
     marketCap: 18900000,
@@ -268,6 +294,7 @@ const defaultData: Token[] = [
     rewardRate: 3.84,
   },
   {
+    address: "0xB2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0A1",
     name: "StreamStonks",
     symbol: "STRNK",
     marketCap: 7200000,
@@ -281,6 +308,7 @@ const defaultData: Token[] = [
     rewardRate: 2.34,
   },
   {
+    address: "0xC3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0A1B2",
     name: "FlowFren",
     symbol: "FLFREN",
     marketCap: 4900000,
@@ -294,6 +322,7 @@ const defaultData: Token[] = [
     rewardRate: 1.67,
   },
   {
+    address: "0xD4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0A1B2C3",
     name: "RiverRise",
     symbol: "RVRISE",
     marketCap: 11200000,
@@ -307,6 +336,7 @@ const defaultData: Token[] = [
     rewardRate: 2.89,
   },
   {
+    address: "0xE5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0A1B2C3D4",
     name: "TsunamiTendies",
     symbol: "TSTEND",
     marketCap: 8900000,
@@ -320,6 +350,7 @@ const defaultData: Token[] = [
     rewardRate: 2.56,
   },
   {
+    address: "0xF6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0A1B2C3D4E5",
     name: "CurrentCoin",
     symbol: "CRCOIN",
     marketCap: 13600000,
@@ -333,6 +364,7 @@ const defaultData: Token[] = [
     rewardRate: 3.12,
   },
   {
+    address: "0xG7H8I9J0K1L2M3N4O5P6Q7R8S9T0A1B2C3D4E5F6",
     name: "WaveWen",
     symbol: "WVWEN",
     marketCap: 6100000,
@@ -346,6 +378,7 @@ const defaultData: Token[] = [
     rewardRate: 2.23,
   },
   {
+    address: "0xH8I9J0K1L2M3N4O5P6Q7R8S9T0A1B2C3D4E5F6G7",
     name: "StreamStack",
     symbol: "SSTACK",
     marketCap: 16400000,
@@ -359,6 +392,7 @@ const defaultData: Token[] = [
     rewardRate: 3.45,
   },
   {
+    address: "0xI9J0K1L2M3N4O5P6Q7R8S9T0A1B2C3D4E5F6G7H8",
     name: "FlowFomo",
     symbol: "FLFOMO",
     marketCap: 5800000,
@@ -372,6 +406,7 @@ const defaultData: Token[] = [
     rewardRate: 2.12,
   },
   {
+    address: "0xJ0K1L2M3N4O5P6Q7R8S9T0A1B2C3D4E5F6G7H8I9",
     name: "RapidsRebase",
     symbol: "RPRBS",
     marketCap: 10300000,
@@ -385,6 +420,7 @@ const defaultData: Token[] = [
     rewardRate: 2.67,
   },
   {
+    address: "0xK1L2M3N4O5P6Q7R8S9T0A1B2C3D4E5F6G7H8I9J0",
     name: "TidalChad",
     symbol: "TDCHAD",
     marketCap: 7800000,
@@ -409,45 +445,48 @@ export function TokenTable() {
   });
 
   return (
-    <div className="w-full overflow-x-auto">
-      <table className="w-full min-w-[800px] border-separate border-spacing-0">
-        <thead>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <th
-                  key={header.id}
-                  className="border-b border-black/[.1] dark:border-white/[.1] h-12 px-4 text-left font-[family-name:var(--font-geist-mono)] text-sm"
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.id}
-              className="hover:bg-black/[.02] dark:hover:bg-white/[.02]"
-            >
-              {row.getVisibleCells().map((cell) => (
-                <td
-                  key={cell.id}
-                  className="border-b border-black/[.1] dark:border-white/[.1] h-12 px-4 text-sm"
-                >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div>
+      <div className="w-full overflow-x-auto">
+        <table className="w-full min-w-[800px] border-separate border-spacing-0">
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <th
+                    key={header.id}
+                    className="border-b border-black/[.1] dark:border-white/[.1] h-12 px-4 text-left font-[family-name:var(--font-geist-mono)] text-sm"
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.id}
+                className="hover:bg-black/[.02] dark:hover:bg-white/[.02]"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td
+                    key={cell.id}
+                    className="border-b border-black/[.1] dark:border-white/[.1] h-12 px-4 text-sm"
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination />
     </div>
   );
 }
