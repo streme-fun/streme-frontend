@@ -1,4 +1,5 @@
 import { TokensResponse, Token } from "@/app/types/token";
+import { mockTokens } from "@/app/lib/mockTokens";
 
 const mockCreator = {
   name: "zeni",
@@ -38,10 +39,10 @@ export async function GET() {
     const response = await fetch("https://api.streme.fun/api/tokens");
     const data: TokensResponse = await response.json();
 
-    // Add mock data to each token
+    // Add mock data to each token and prepend our mock tokens
     const enrichedData = {
       ...data,
-      data: data.data.map(addMockData),
+      data: [...mockTokens, ...data.data.map(addMockData)],
     };
 
     return Response.json(enrichedData);
