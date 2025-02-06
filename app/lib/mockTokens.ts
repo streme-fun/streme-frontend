@@ -52,7 +52,7 @@ export const mockTokens: Token[] = [
     "Based Fwog",
     "FWOG",
     459510,
-    -1.77,
+    12.77,
     12420,
     "/tokens/skimochi.avif"
   ),
