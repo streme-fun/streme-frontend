@@ -9,6 +9,7 @@ const PrivyProviderWrapper = ({ children }: { children: React.ReactNode }) => {
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || ""}
       config={{
         defaultChain: base,
+        supportedChains: [base],
         appearance: {
           theme: "light", // or 'light'
           accentColor: "#676FFF", // Customize this to match your app's theme
