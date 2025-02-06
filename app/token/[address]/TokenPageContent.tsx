@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { TokenActions } from "./TokenActions";
 import { Token } from "@/app/types/token";
 
@@ -22,7 +23,7 @@ const mockToken: Token = {
   type: "token",
   pair: "WETH",
   chain_id: 8453,
-  metadata: null,
+  metadata: {},
   price: 0.0001,
   marketCap: 459510,
   marketCapChange: 12.77,
@@ -41,11 +42,10 @@ const mockToken: Token = {
   },
 };
 
-interface TokenPageContentProps {
-  address: string;
-}
+export function TokenPageContent() {
+  const params = useParams();
+  const address = params.address as string;
 
-export function TokenPageContent({ address }: TokenPageContentProps) {
   const [token, setToken] = useState<Token | null>(null);
   const [loading, setLoading] = useState(true);
 

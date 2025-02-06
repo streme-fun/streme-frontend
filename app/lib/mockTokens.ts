@@ -31,7 +31,7 @@ const createToken = (
   type: "token",
   pair: "WETH",
   chain_id: 8453,
-  metadata: null,
+  metadata: {},
   price: marketCap / 1000000,
   marketCap,
   marketCapChange,

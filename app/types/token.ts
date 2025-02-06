@@ -12,7 +12,7 @@ export interface Token {
   type: string;
   pair: string;
   chain_id: number;
-  metadata: any;
+  metadata: Record<string, unknown>;
 
   price?: number;
   marketCap?: number;
