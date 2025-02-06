@@ -11,12 +11,13 @@ import {
 import { parseUnits, formatUnits, BaseError } from "viem";
 import qs from "qs";
 import { QuoteResponse } from "@/lib/types/zerox";
+import { Token } from "@/app/types/token";
 
 // Using one of the mock tokens from TokenGrid
 const tokenInfo = {
-  name: "Moxie",
-  symbol: "MOXIE",
-  address: "0x8c9037d1ef5c6d1f6816278c7aaf5491d24cd527",
+  name: "Based FWOG",
+  symbol: "FWOG",
+  address: "0x1035ae3f87a91084c6c5084d0615cc6121c5e228",
   decimals: 18,
   marketCap: 20258149,
   marketCapChange: 15.0,
@@ -56,7 +57,11 @@ const formatBalance = (value: bigint, decimals: number) => {
   return parseFloat(formatUnits(value, decimals)).toFixed(4);
 };
 
-export function TokenActions() {
+interface TokenActionsProps {
+  token: Token;
+}
+
+export function TokenActions({}: TokenActionsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("buy");
   const [amount, setAmount] = useState<string>("");
   const [rewards, setRewards] = useState(tokenInfo.staking.rewardsDistributed);
