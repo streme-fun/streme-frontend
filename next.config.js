@@ -14,6 +14,7 @@ const nextConfig = {
     domains: [
       "utfs.io",
       "imagedelivery.net", // For the other image URLs in the API response
+      "media.tenor.com",
     ],
   },
 };

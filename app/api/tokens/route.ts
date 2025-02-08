@@ -1,4 +1,4 @@
-import { TokensResponse, Token } from "@/app/types/token";
+import { Token } from "@/app/types/token";
 import { mockTokens } from "@/app/lib/mockTokens";
 
 const mockCreator = {
@@ -8,8 +8,8 @@ const mockCreator = {
   likes: 62,
 };
 
-function addMockData(token: Token): Token {
-  const seed = token.id;
+function addMockData(token: Token, index: number): Token {
+  const seed = index;
   const randomInRange = (min: number, max: number) => {
     const rand = Math.sin(seed) * 10000;
     return min + (rand - Math.floor(rand)) * (max - min);
@@ -20,6 +20,7 @@ function addMockData(token: Token): Token {
 
   return {
     ...token,
+    id: index + 1000,
     price,
     marketCap,
     marketCapChange: randomInRange(-10, 10),
@@ -36,13 +37,14 @@ function addMockData(token: Token): Token {
 
 export async function GET() {
   try {
-    const response = await fetch("https://api.streme.fun/api/tokens");
-    const data: TokensResponse = await response.json();
+    const response = await fetch("https://api.streme.fun/api/test/tokens");
+    const tokens: Token[] = await response.json();
 
-    // Add mock data to each token and prepend our mock tokens
     const enrichedData = {
-      ...data,
-      data: [...mockTokens, ...data.data.map(addMockData)],
+      data: [
+        ...mockTokens,
+        ...tokens.map((token, index) => addMockData(token, index)),
+      ],
     };
 
     return Response.json(enrichedData);
