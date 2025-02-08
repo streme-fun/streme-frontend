@@ -25,6 +25,7 @@ export interface Token {
   change7d?: number;
   rewardDistributed?: number;
   rewardRate?: number;
+  decimals: number;
   creator?: {
     name: string;
     score: number;

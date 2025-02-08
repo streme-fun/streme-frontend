@@ -16,6 +16,7 @@ export const enrichTokenWithMarketData = (
 
   return {
     ...token,
+    decimals: 18,
     price,
     marketCap,
     marketCapChange: randomInRange(-10, 10),

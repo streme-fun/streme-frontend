@@ -7,39 +7,15 @@ import {
   useSendTransaction,
   useWaitForTransactionReceipt,
   useBalance,
+  useWriteContract,
+  useReadContract,
+  useSignTypedData,
 } from "wagmi";
-import { parseUnits, formatUnits, BaseError } from "viem";
+import { parseUnits, formatUnits, BaseError, erc20Abi } from "viem";
 import qs from "qs";
 import { QuoteResponse } from "@/lib/types/zerox";
 import { Token } from "@/app/types/token";
-
-// Using one of the mock tokens from TokenGrid
-const tokenInfo = {
-  name: "Based FWOG",
-  symbol: "FWOG",
-  address: "0x1035ae3f87a91084c6c5084d0615cc6121c5e228",
-  decimals: 18,
-  marketCap: 20258149,
-  marketCapChange: 15.0,
-  volume24h: 12420,
-  imageUrl: "/tokens/skimochi.avif",
-  creator: {
-    name: "zeni",
-    score: 79,
-    recasts: 17,
-    likes: 62,
-  },
-  createdAt: "2 months ago",
-  staking: {
-    apy: 156.8,
-    stakers: 1247,
-    totalStaked: 245690,
-    rewardsDistributed: 123456.78,
-    rewardRate: 1.85, // Per second
-  },
-};
-
-type Tab = "buy" | "sell" | "stake";
+import { concat, numberToHex, size, type Hex } from "viem";
 
 const ETH = {
   symbol: "ETH",
@@ -52,24 +28,37 @@ const ETH = {
 const AFFILIATE_FEE = 25;
 const PROTOCOL_GUILD_ADDRESS = "0x32e3C7fD24e175701A35c224f2238d18439C7dBC";
 
-// Add a helper function at the top of the file
-const formatBalance = (value: bigint, decimals: number) => {
-  return parseFloat(formatUnits(value, decimals)).toFixed(4);
+const formatBalance = (value: bigint, decimals: number, forInput = false) => {
+  // Get the raw string value with full precision
+  const rawFormatted = formatUnits(value, decimals);
+
+  // For input values, return the raw formatted string without commas
+  if (forInput) {
+    return rawFormatted;
+  }
+
+  // Split into whole and decimal parts for display
+  const [whole, decimal] = rawFormatted.split(".");
+  const formattedWhole = parseInt(whole).toLocaleString();
+
+  // Return with appropriate decimal places
+  return decimal ? `${formattedWhole}.${decimal.slice(0, 8)}` : formattedWhole;
 };
+
+type Tab = "buy" | "sell" | "stake";
 
 interface TokenActionsProps {
   token: Token;
 }
 
-export function TokenActions({}: TokenActionsProps) {
+export function TokenActions({ token }: TokenActionsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("buy");
   const [amount, setAmount] = useState<string>("");
-  const [rewards, setRewards] = useState(tokenInfo.staking.rewardsDistributed);
+  const [rewards, setRewards] = useState(token.rewardDistributed ?? 0);
   const [quote, setQuote] = useState<QuoteResponse>();
   const [fetchPriceError, setFetchPriceError] = useState([]);
   const [isPriceLoading, setIsPriceLoading] = useState(false);
 
-  // More realistic ETH amounts (0.1, 0.5, 1.0)
   const presetAmounts = ["0.01", "0.05", "0.1"];
 
   const { user, login, ready } = usePrivy();
@@ -88,27 +77,47 @@ export function TokenActions({}: TokenActionsProps) {
       hash,
     });
 
-  // Update the ETH balance check
   const { data: ethBalance } = useBalance({
     address: address as `0x${string}`,
   });
 
   const { data: tokenBalance } = useBalance({
     address: address as `0x${string}`,
-    token: tokenInfo.address as `0x${string}`,
+    token: token.contract_address as `0x${string}`,
   });
 
-  // Helper to check if user has enough balance
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
+    address: token.contract_address as `0x${string}`,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: [address as `0x${string}`, quote?.transaction?.to as `0x${string}`],
+    query: {
+      enabled: !!address && !!quote?.transaction?.to,
+    },
+  });
+
+  const { writeContractAsync: approve } = useWriteContract();
+  const { signTypedDataAsync } = useSignTypedData();
+
   const hasEnoughBalance = useCallback(() => {
     if (!amount) return false;
-    const parsedAmount = parseUnits(amount, 18);
+    const parsedAmount = parseUnits(
+      amount,
+      activeTab === "buy" ? ETH.decimals : token.decimals
+    );
 
     if (activeTab === "buy") {
       return ethBalance?.value ? parsedAmount <= ethBalance.value : false;
     } else {
       return tokenBalance?.value ? parsedAmount <= tokenBalance.value : false;
     }
-  }, [amount, activeTab, ethBalance?.value, tokenBalance?.value]);
+  }, [
+    amount,
+    activeTab,
+    ethBalance?.value,
+    tokenBalance?.value,
+    token.decimals,
+  ]);
 
   const handlePresetClick = (value: string) => {
     setAmount(value);
@@ -132,20 +141,70 @@ export function TokenActions({}: TokenActionsProps) {
     [setIsPriceLoading, setQuote]
   );
 
-  const executeSwap = useCallback(() => {
+  const handlePlaceTrade = async () => {
+    if (activeTab === "sell" && quote?.transaction) {
+      const spenderAddress = quote.allowanceTarget as `0x${string}`;
+      const sellAmount = parseUnits(amount, token.decimals);
+
+      if (!allowance || allowance < sellAmount) {
+        try {
+          console.log("Approving token spend...");
+          await approve({
+            address: token.contract_address as `0x${string}`,
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [spenderAddress, sellAmount],
+          });
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          await refetchAllowance();
+        } catch (error) {
+          console.error("Approval failed:", error);
+          return;
+        }
+      }
+    }
+
     if (quote?.transaction) {
+      if (activeTab === "sell" && quote.permit2?.eip712) {
+        try {
+          const signature = await signTypedDataAsync(quote.permit2.eip712);
+          console.log("Signed permit2 message");
+
+          const signatureLengthInHex = numberToHex(size(signature), {
+            signed: false,
+            size: 32,
+          });
+
+          const transactionData = quote.transaction.data as Hex;
+          const sigLengthHex = signatureLengthInHex as Hex;
+          const sig = signature as Hex;
+
+          quote.transaction.data = concat([transactionData, sigLengthHex, sig]);
+        } catch (error) {
+          console.error("Error signing permit2:", error);
+          return;
+        }
+      }
+
+      const value = activeTab === "buy" ? quote.transaction.value : "0";
+      console.log("Executing swap with:", {
+        to: quote.transaction.to,
+        value,
+        gas: quote.transaction.gas,
+        data: quote.transaction.data,
+      });
+
       sendTransaction({
-        gas: quote.transaction.gas ? BigInt(quote.transaction.gas) : undefined,
         to: quote.transaction.to as `0x${string}`,
         data: quote.transaction.data as `0x${string}`,
-        value: BigInt(quote.transaction.value),
+        value: BigInt(value),
+        gas: quote.transaction.gas ? BigInt(quote.transaction.gas) : undefined,
       });
     }
-  }, [quote, sendTransaction]);
+  };
 
   useEffect(() => {
     if (!amount || !address) {
-      // Clear quote and errors when amount is empty
       setQuote(undefined);
       setFetchPriceError([]);
       return;
@@ -153,58 +212,71 @@ export function TokenActions({}: TokenActionsProps) {
 
     const parsedAmount = parseUnits(
       amount,
-      activeTab === "buy" ? ETH.decimals : tokenInfo.decimals
+      activeTab === "buy" ? ETH.decimals : token.decimals
     ).toString();
 
     const params = {
       chainId: 8453,
-      sellToken: activeTab === "buy" ? ETH.address : tokenInfo.address,
-      buyToken: activeTab === "buy" ? tokenInfo.address : ETH.address,
+      sellToken: activeTab === "buy" ? ETH.address : token.contract_address,
+      buyToken: activeTab === "buy" ? token.contract_address : ETH.address,
       sellAmount: parsedAmount,
       taker: address,
       swapFeeRecipient: PROTOCOL_GUILD_ADDRESS,
       swapFeeBps: AFFILIATE_FEE,
-      swapFeeToken: activeTab === "buy" ? tokenInfo.address : ETH.address,
+      swapFeeToken: activeTab === "buy" ? token.contract_address : ETH.address,
       tradeSurplusRecipient: PROTOCOL_GUILD_ADDRESS,
     };
 
     const timeoutId = setTimeout(() => {
       if (amount !== "") {
+        console.log("Fetching quote with params:", params);
         fetchQuote(params);
       }
     }, 200);
 
     return () => clearTimeout(timeoutId);
-  }, [address, amount, activeTab, fetchQuote]);
-
-  const handlePlaceTrade = () => {
-    if (!isConnected) {
-      login();
-      return;
-    }
-
-    executeSwap();
-  };
+  }, [
+    address,
+    amount,
+    activeTab,
+    fetchQuote,
+    token.contract_address,
+    token.decimals,
+  ]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setRewards((prev) => prev + tokenInfo.staking.rewardRate / 20);
+      setRewards((prev) => prev + (token.rewardRate ?? 0) / 20);
     }, 50);
     return () => clearInterval(interval);
-  }, []);
+  }, [token.rewardRate]);
 
-  // Only show preset amounts for buy tab
+  useEffect(() => {
+    if (tokenBalance?.value) {
+      console.log("Token Debug:", {
+        rawBalance: tokenBalance.value.toString(),
+        decimals: token.decimals,
+        withDecimals: {
+          d10: formatUnits(tokenBalance.value, 10),
+          d18: formatUnits(tokenBalance.value, 18),
+          dToken: formatUnits(tokenBalance.value, token.decimals),
+        },
+        formatted: formatBalance(tokenBalance.value, token.decimals),
+        token: token.contract_address,
+      });
+    }
+  }, [token.decimals, tokenBalance?.value, token.contract_address]);
+
   const showPresets = activeTab === "buy";
 
-  // Update the quote display in the JSX
   const displayQuoteAmount = quote?.minBuyAmount && !isPriceLoading && (
     <div className="text-sm opacity-60 mt-2">
       You will receive:{" "}
       {formatUnits(
         BigInt(quote.minBuyAmount),
-        activeTab === "buy" ? tokenInfo.decimals : ETH.decimals
+        activeTab === "buy" ? token.decimals : ETH.decimals
       )}{" "}
-      {activeTab === "buy" ? tokenInfo.symbol : "ETH"}
+      {activeTab === "buy" ? token.symbol : "ETH"}
     </div>
   );
 
@@ -215,35 +287,33 @@ export function TokenActions({}: TokenActionsProps) {
         <div className="mb-8 space-y-6">
           {/* Token Header */}
           <div className="flex items-center gap-4">
-            {tokenInfo.imageUrl ? (
+            {token.img_url ? (
               <div className="relative w-16 h-16">
                 <Image
-                  src={tokenInfo.imageUrl}
-                  alt={tokenInfo.name}
+                  src={token.img_url}
+                  alt={token.name}
                   fill
                   className="object-cover rounded-full"
                 />
               </div>
             ) : (
               <div className="w-16 h-16 bg-primary flex items-center justify-center text-primary-content font-mono font-bold rounded-full">
-                ${tokenInfo.symbol}
+                ${token.symbol}
               </div>
             )}
             <div>
-              <h2 className="text-2xl font-bold mb-1">{tokenInfo.name}</h2>
+              <h2 className="text-2xl font-bold mb-1">{token.name}</h2>
               <div className="flex items-center gap-3">
-                <span className="text-base opacity-60">
-                  ${tokenInfo.symbol}
-                </span>
+                <span className="text-base opacity-60">${token.symbol}</span>
                 <span
                   className={`text-base ${
-                    tokenInfo.marketCapChange >= 0
+                    (token.marketCapChange ?? 0) >= 0
                       ? "text-green-500"
                       : "text-red-500"
                   }`}
                 >
-                  {tokenInfo.marketCapChange >= 0 ? "+" : ""}
-                  {tokenInfo.marketCapChange.toFixed(2)}%
+                  {(token.marketCapChange ?? 0) >= 0 ? "+" : ""}
+                  {(token.marketCapChange ?? 0).toFixed(2)}%
                 </span>
               </div>
             </div>
@@ -255,13 +325,13 @@ export function TokenActions({}: TokenActionsProps) {
               <div>
                 <div className="text-base opacity-60 mb-2">Market Cap</div>
                 <div className="font-mono text-xl">
-                  ${tokenInfo.marketCap.toLocaleString()}
+                  ${(token.marketCap ?? 0).toLocaleString()}
                 </div>
               </div>
               <div>
                 <div className="text-base opacity-60 mb-2">24h Volume</div>
                 <div className="font-mono text-xl">
-                  ${tokenInfo.volume24h.toLocaleString()}
+                  ${(token.volume24h ?? 0).toLocaleString()}
                 </div>
               </div>
             </div>
@@ -270,14 +340,12 @@ export function TokenActions({}: TokenActionsProps) {
               <div>
                 <div className="text-base opacity-60 mb-2">Staking APY</div>
                 <div className="font-mono text-xl text-green-500">
-                  {tokenInfo.staking.apy.toFixed(1)}%
+                  {(token.stakingAPY ?? 0).toFixed(1)}%
                 </div>
               </div>
               <div>
                 <div className="text-base opacity-60 mb-2">Total Stakers</div>
-                <div className="font-mono text-xl">
-                  {tokenInfo.staking.stakers.toLocaleString()}
-                </div>
+                <div className="font-mono text-xl">-</div>
               </div>
             </div>
           </div>
@@ -293,30 +361,36 @@ export function TokenActions({}: TokenActionsProps) {
               })}
             </div>
             <div className="text-sm opacity-40 mt-1">
-              {tokenInfo.staking.rewardRate.toFixed(2)} $FWOG/sec
+              {(token.rewardRate ?? 0).toFixed(2)} ${token.symbol}/sec
             </div>
           </div>
 
           {/* Creator Info */}
-          <div className="flex items-center gap-2">
-            <div className="avatar">
-              <div className="w-6 h-6 rounded-full">
-                <Image
-                  src={`/avatars/${tokenInfo.creator.name}.avif`}
-                  alt={tokenInfo.creator.name}
-                  width={24}
-                  height={24}
-                />
+          {token.creator && (
+            <div className="flex items-center gap-2">
+              <div className="avatar">
+                <div className="w-6 h-6 rounded-full">
+                  {token.creator.profileImage ? (
+                    <Image
+                      src={token.creator.profileImage}
+                      alt={token.creator.name}
+                      width={24}
+                      height={24}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-primary/10 flex items-center justify-center text-xs font-mono">
+                      {token.creator.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <span className="text-base opacity-60">{token.creator.name}</span>
+              <div className="flex items-center gap-3 ml-auto opacity-60">
+                <span>🔄 {token.creator.recasts}</span>
+                <span>❤️ {token.creator.likes}</span>
               </div>
             </div>
-            <span className="text-base opacity-60">
-              {tokenInfo.creator.name}
-            </span>
-            <div className="flex items-center gap-3 ml-auto opacity-60">
-              <span>🔄 {tokenInfo.creator.recasts}</span>
-              <span>❤️ {tokenInfo.creator.likes}</span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Action Tabs */}
@@ -327,7 +401,10 @@ export function TokenActions({}: TokenActionsProps) {
                 ? "btn-primary"
                 : "btn-ghost bg-black/[.02] dark:bg-white/[.02]"
             }`}
-            onClick={() => setActiveTab("buy")}
+            onClick={() => {
+              setActiveTab("buy");
+              setAmount("");
+            }}
           >
             BUY
           </button>
@@ -337,7 +414,10 @@ export function TokenActions({}: TokenActionsProps) {
                 ? "btn-primary"
                 : "btn-ghost bg-black/[.02] dark:bg-white/[.02]"
             }`}
-            onClick={() => setActiveTab("sell")}
+            onClick={() => {
+              setActiveTab("sell");
+              setAmount("");
+            }}
           >
             SELL
           </button>
@@ -347,7 +427,10 @@ export function TokenActions({}: TokenActionsProps) {
                 ? "btn-primary"
                 : "btn-ghost bg-black/[.02] dark:bg-white/[.02]"
             }`}
-            onClick={() => setActiveTab("stake")}
+            onClick={() => {
+              setActiveTab("stake");
+              setAmount("");
+            }}
           >
             STAKE
           </button>
@@ -362,17 +445,30 @@ export function TokenActions({}: TokenActionsProps) {
         <div className="relative mb-4">
           <div className="flex justify-between mb-2 text-sm opacity-60">
             <span>Amount</span>
-            <span>
-              Balance:{" "}
-              {activeTab === "buy"
-                ? ethBalance
-                  ? formatBalance(ethBalance.value, ETH.decimals)
-                  : "0.0000"
-                : tokenBalance
-                ? formatBalance(tokenBalance.value, tokenInfo.decimals)
-                : "0.0000"}{" "}
-              {activeTab === "buy" ? "ETH" : tokenInfo.symbol}
-            </span>
+            <div className="flex items-center gap-2">
+              {activeTab === "sell" && tokenBalance && (
+                <button
+                  className="btn btn-xs btn-ghost"
+                  onClick={() => {
+                    // Use raw formatUnits for the input value
+                    setAmount(formatUnits(tokenBalance.value, token.decimals));
+                  }}
+                >
+                  Max
+                </button>
+              )}
+              <span>
+                Balance:{" "}
+                {activeTab === "buy"
+                  ? ethBalance
+                    ? formatBalance(ethBalance.value, ETH.decimals)
+                    : "0.0000"
+                  : tokenBalance
+                  ? formatBalance(tokenBalance.value, token.decimals)
+                  : "0.0000"}{" "}
+                {activeTab === "buy" ? "ETH" : token.symbol}
+              </span>
+            </div>
           </div>
           <input
             type="number"
@@ -384,7 +480,7 @@ export function TokenActions({}: TokenActionsProps) {
           />
           <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
             <span className="font-mono">
-              {activeTab === "buy" ? "ETH" : tokenInfo.symbol}
+              {activeTab === "buy" ? "ETH" : token.symbol}
             </span>
           </div>
           {isPriceLoading && (
@@ -418,13 +514,18 @@ export function TokenActions({}: TokenActionsProps) {
         {/* Place Trade Button */}
         <button
           className="btn btn-primary w-full"
-          onClick={handlePlaceTrade}
+          onClick={() => {
+            if (!isConnected) {
+              login();
+              return;
+            }
+            handlePlaceTrade();
+          }}
           disabled={
             !ready ||
-            (!isConnected && !login) ||
-            !amount ||
             isPending ||
-            !hasEnoughBalance()
+            (!isConnected && !login) ||
+            (isConnected && (!amount || !hasEnoughBalance()))
           }
         >
           {!isConnected
