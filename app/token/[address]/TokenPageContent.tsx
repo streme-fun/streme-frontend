@@ -34,11 +34,13 @@ const mockToken: Token = {
   change7d: 45.2,
   rewardDistributed: 123456.78,
   rewardRate: 1.85,
+  profileImage: null,
   creator: {
     name: "zeni",
     score: 79,
     recasts: 17,
     likes: 62,
+    profileImage: "/avatars/zeni.avif",
   },
 };
 
