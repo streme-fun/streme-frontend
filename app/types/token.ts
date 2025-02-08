@@ -13,6 +13,7 @@ export interface Token {
   pair: string;
   chain_id: number;
   metadata: Record<string, unknown>;
+  profileImage: string | null;
 
   price?: number;
   marketCap?: number;
@@ -29,6 +30,7 @@ export interface Token {
     score: number;
     recasts: number;
     likes: number;
+    profileImage: string;
   };
 }
 

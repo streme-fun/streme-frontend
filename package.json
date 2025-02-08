@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@airstack/node": "^0.0.7",
     "@privy-io/react-auth": "^2.2.1",
     "@tailwindcss/postcss": "^4.0.3",
     "@tanstack/react-query": "^5.66.0",

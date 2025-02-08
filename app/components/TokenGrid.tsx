@@ -69,7 +69,10 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
               <div className="avatar transition-transform duration-300 group-hover:scale-110">
                 <div className="rounded-full w-4 h-4">
                   <Image
-                    src={`/avatars/${token.creator?.name ?? "default"}.avif`}
+                    src={
+                      token.creator?.profileImage ??
+                      `/avatars/${token.creator?.name ?? "default"}.avif`
+                    }
                     alt={token.creator?.name ?? "Unknown Creator"}
                     width={16}
                     height={16}
