@@ -38,6 +38,39 @@ const formatBalance = (value: bigint, decimals: number = 18) => {
   return parseFloat(formatUnits(value, decimals)).toFixed(4);
 };
 
+const AnimatedNumber = ({
+  value,
+  symbol,
+}: {
+  value: string;
+  symbol: string;
+}) => {
+  const [current, setCurrent] = useState(0);
+  const target = parseFloat(value);
+
+  useEffect(() => {
+    // Reset to 0 when value changes
+    setCurrent(0);
+
+    // Constant slow increase
+    const interval = setInterval(() => {
+      setCurrent((prev) => prev + target * 0.005); // Just keep increasing!
+    }, 0.5);
+
+    return () => clearInterval(interval);
+  }, [target]);
+
+  return (
+    <div className="font-mono text-2xl text-center">
+      {current.toLocaleString(undefined, {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4,
+      })}{" "}
+      <span className="text-base opacity-60">{symbol}</span>
+    </div>
+  );
+};
+
 export function StakeModal({
   isOpen,
   onClose,
@@ -162,6 +195,8 @@ export function StakeModal({
               }
             `}</style>
           </div>
+          <AnimatedNumber value={amount} symbol={symbol} />
+
           <p className="text-center">
             Token rewards are now being streamed directly to you.
           </p>
