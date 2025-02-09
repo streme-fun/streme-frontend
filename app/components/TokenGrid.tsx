@@ -35,6 +35,10 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
     return () => clearInterval(interval);
   }, []);
 
+  // Get the real market change from token data
+  const marketChange = token.change24h ?? token.marketCapChange ?? 0;
+  const isPositive = marketChange >= 0;
+
   // Helper function to shorten hash
   const shortenHash = (hash: string | undefined) => {
     if (!hash) return "";
@@ -87,13 +91,13 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
             <div className="flex items-center justify-between">
               <div
                 className={`transition-all duration-300 ${
-                  (token.marketCapChange ?? 0) >= 0
+                  isPositive
                     ? "text-green-500 group-hover:text-green-400"
                     : "text-red-500 group-hover:text-red-400"
                 } gap-1 rounded-none text-xs`}
               >
-                {(token.marketCapChange ?? 0) >= 0 ? "+" : ""}
-                {(token.marketCapChange ?? 0).toFixed(2)}%
+                {isPositive ? "+" : ""}
+                {marketChange.toFixed(2)}%
               </div>
             </div>
 

@@ -10,18 +10,21 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Token } from "../types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
+import { fetchPoolData } from "@/app/lib/geckoterminal";
 
 const columnHelper = createColumnHelper<Token>();
 
 const PriceChange = ({ value }: { value: number | undefined }) => {
-  const isPositive = (value ?? 0) >= 0;
+  const marketChange = value ?? 0;
+  const isPositive = marketChange >= 0;
   return (
     <div
       className={`font-mono text-right ${
         isPositive ? "text-green-500" : "text-red-500"
       }`}
     >
-      {(value ?? 0).toFixed(1)}%
+      {isPositive ? "+" : ""}
+      {marketChange.toFixed(2)}%
     </div>
   );
 };
@@ -62,11 +65,40 @@ export function TokenTable({ tokens }: TokenTableProps) {
       {
         rewards: number;
         stakers: number;
+        price?: number;
+        change1h?: number;
+        change24h?: number;
+        volume24h?: number;
+        marketCap?: number;
       }
     >
   >(new Map());
 
-  // Move columns inside component to access tokenData
+  useEffect(() => {
+    tokens.forEach(async (token) => {
+      // Fetch rewards data
+      const { totalStreamed, totalStakers } = await calculateRewards(
+        token.created_at,
+        token.contract_address,
+        token.staking_pool
+      );
+
+      // Only fetch market data if we have a pool address
+      const marketData = token.pool_address
+        ? await fetchPoolData(token.pool_address)
+        : null;
+
+      setTokenData((prev) =>
+        new Map(prev).set(token.contract_address, {
+          rewards: totalStreamed,
+          stakers: totalStakers,
+          ...marketData,
+        })
+      );
+    });
+  }, [tokens]);
+
+  // Update column cells to use the new data
   const columns = [
     columnHelper.accessor("name", {
       header: () => (
@@ -93,14 +125,13 @@ export function TokenTable({ tokens }: TokenTableProps) {
         </div>
       ),
       cell: (info) => {
-        const price = info.getValue() ?? 0;
-        const decimals = price < 0.01 ? 6 : price < 1 ? 4 : 2;
+        const data = tokenData.get(info.row.original.contract_address);
         return (
           <div className="font-mono text-right">
             $
-            {price.toLocaleString(undefined, {
-              minimumFractionDigits: decimals,
-              maximumFractionDigits: decimals,
+            {(data?.price ?? 0).toLocaleString(undefined, {
+              minimumFractionDigits: 6,
+              maximumFractionDigits: 6,
             })}
           </div>
         );
@@ -112,7 +143,10 @@ export function TokenTable({ tokens }: TokenTableProps) {
     }),
     columnHelper.accessor("change24h", {
       header: () => <div className="text-right">24h</div>,
-      cell: (info) => <PriceChange value={info.getValue()} />,
+      cell: (info) => {
+        const data = tokenData.get(info.row.original.contract_address);
+        return <PriceChange value={data?.change24h ?? info.getValue()} />;
+      },
     }),
     columnHelper.accessor("change7d", {
       header: () => <div className="text-right">7d</div>,
@@ -146,24 +180,6 @@ export function TokenTable({ tokens }: TokenTableProps) {
       },
     }),
   ];
-
-  useEffect(() => {
-    // Fetch rewards data for all tokens
-    tokens.forEach(async (token) => {
-      const { totalStreamed, totalStakers } = await calculateRewards(
-        token.created_at,
-        token.contract_address,
-        token.staking_pool
-      );
-
-      setTokenData((prev) =>
-        new Map(prev).set(token.contract_address, {
-          rewards: totalStreamed,
-          stakers: totalStakers,
-        })
-      );
-    });
-  }, [tokens]);
 
   const table = useReactTable({
     data: tokens,

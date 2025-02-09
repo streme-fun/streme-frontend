@@ -64,3 +64,44 @@ export async function fetchTokensData(addresses: string[]) {
     return {};
   }
 }
+
+export interface GeckoTerminalResponse {
+  data: {
+    attributes: {
+      price_in_usd: string;
+      price_percent_changes: {
+        last_1h: string;
+        last_24h: string;
+        last_7d?: string;
+      };
+      volume_in_usd: string;
+      fully_diluted_valuation: string;
+    };
+  };
+}
+
+export async function fetchPoolData(poolAddress: string) {
+  if (!poolAddress) {
+    console.warn("No pool address provided for GeckoTerminal API");
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      `https://app.geckoterminal.com/api/p1/base/pools/${poolAddress}`
+    );
+    const data: GeckoTerminalResponse = await response.json();
+    return {
+      price: parseFloat(data.data.attributes.price_in_usd),
+      change1h: parseFloat(data.data.attributes.price_percent_changes.last_1h),
+      change24h: parseFloat(
+        data.data.attributes.price_percent_changes.last_24h
+      ),
+      volume24h: parseFloat(data.data.attributes.volume_in_usd),
+      marketCap: parseFloat(data.data.attributes.fully_diluted_valuation),
+    };
+  } catch (error) {
+    console.error("Error fetching pool data for address:", poolAddress, error);
+    return null;
+  }
+}

@@ -1,6 +1,6 @@
 import { Token } from "@/app/types/token";
 import { enrichTokenWithMarketData } from "@/app/lib/mockTokens";
-import { fetchTokensData } from "@/app/lib/geckoterminal";
+import { fetchTokensData, fetchPoolData } from "@/app/lib/geckoterminal";
 
 // Use Token's creator type
 type CreatorProfile = NonNullable<Token["creator"]>;
@@ -60,13 +60,42 @@ export async function GET() {
         ) ?? {};
     }
 
+    // Fetch both token and pool data
     const addresses = tokens.map((t) => t.contract_address);
     const geckoData = await fetchTokensData(addresses);
 
-    // Enrich tokens with profile data and market data
+    // Log pool addresses for debugging
+    console.log(
+      "Pool Addresses:",
+      tokens.map((t) => ({
+        name: t.name,
+        pool_address: t.pool_address,
+      }))
+    );
+
+    // Fetch detailed pool data for each token
+    const poolDataPromises = tokens.map((token) =>
+      token.pool_address ? fetchPoolData(token.pool_address) : null
+    );
+    const poolData = await Promise.all(poolDataPromises);
+
+    // Enrich tokens with all data
     const enrichedTokens = await Promise.all(
-      tokens.map(async (token) => {
+      tokens.map(async (token, index) => {
+        // Start with existing market data
         const enrichedToken = await enrichTokenWithMarketData(token, geckoData);
+
+        // Add pool data if available, but don't override existing values unless null
+        if (poolData[index]) {
+          const pool = poolData[index];
+          enrichedToken.price = enrichedToken.price ?? pool?.price;
+          enrichedToken.change1h = enrichedToken.change1h ?? pool?.change1h;
+          enrichedToken.change24h = enrichedToken.change24h ?? pool?.change24h;
+          enrichedToken.volume24h = enrichedToken.volume24h ?? pool?.volume24h;
+          enrichedToken.marketCap = enrichedToken.marketCap ?? pool?.marketCap;
+        }
+
+        // Add creator profile
         if (token.requestor_fid && creatorProfiles[token.requestor_fid]) {
           const profile = creatorProfiles[token.requestor_fid];
           enrichedToken.creator = {
