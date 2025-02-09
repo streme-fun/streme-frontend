@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { formatUnits, parseUnits } from "viem";
 import { Modal } from "./Modal";
+import ReactConfetti from "react-confetti";
+import { useWindowSize } from "react-use";
 
 interface StakeModalProps {
   isOpen: boolean;
@@ -87,11 +89,66 @@ export function StakeModal({
   };
 
   if (isSuccess) {
+    const { width, height } = useWindowSize();
+
     return (
       <Modal isOpen={isOpen} onClose={handleClose}>
+        <ReactConfetti
+          width={width}
+          height={height}
+          recycle={false}
+          numberOfPieces={200}
+          gravity={0.3}
+        />
         <div className="p-6 space-y-4">
           <h3 className="text-lg font-bold">Stake Successful! 🎉</h3>
-          <p>Your tokens are now earning rewards.</p>
+          <div className="relative h-32 w-full overflow-hidden rounded-lg bg-black/5">
+            <svg
+              width="100%"
+              height="100%"
+              viewBox="0 0 400 100"
+              preserveAspectRatio="xMidYMid meet"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M0 50 Q100 50 200 50 T400 50"
+                stroke="hsl(220 13% 91%)"
+                strokeWidth="2"
+              />
+              <g
+                className="reward-particle"
+                style={{ offsetPath: "path('M0 50 Q100 50 200 50 T400 50')" }}
+              >
+                <circle r="4" fill="currentColor" className="text-primary" />
+              </g>
+              <g
+                className="reward-particle"
+                style={{
+                  offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                  animationDelay: "-1s",
+                }}
+              >
+                <circle r="4" fill="currentColor" className="text-primary" />
+              </g>
+            </svg>
+            <style jsx>{`
+              .reward-particle {
+                animation: flow 2s linear infinite;
+              }
+              @keyframes flow {
+                from {
+                  offset-distance: 0%;
+                }
+                to {
+                  offset-distance: 100%;
+                }
+              }
+            `}</style>
+          </div>
+          <p className="text-center">
+            Token rewards are now being streamed directly to you
+          </p>
           <a
             href={`https://explorer.superfluid.finance/base-mainnet/accounts/${user?.wallet?.address}?tab=pools`}
             target="_blank"
