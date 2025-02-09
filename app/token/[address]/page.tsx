@@ -19,6 +19,8 @@ export const metadata: Metadata = {
     "fc:frame:button:2:action": "link",
     "fc:frame:button:2:target":
       "https://warpcast.com/~/compose?text=Check%20out%20$%3Csymbol%3E%20deployed%20by%20@%3Cdeployer%3E%20on%20Streme.fun!&embeds[]=https://streme.fun/token/0x340d15c2930805f47e946b934252b25406f365ac",
+    "og:image":
+      "https://imagedelivery.net/BXluQx4ige9GuW0Ia56BHw/d47990cc-e752-4f47-fcf7-0fe278286400/original",
   },
   openGraph: {
     title: "The Streme Team",
