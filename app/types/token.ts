@@ -16,6 +16,7 @@ export interface Token {
   profileImage: string | null;
   pool_id: string;
   staking_pool: string;
+  staking_address: string;
 
   price?: number;
   marketCap?: number;

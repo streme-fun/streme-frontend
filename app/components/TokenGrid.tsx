@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import FarcasterIcon from "@/public/farcaster.svg";
 import { SearchBar } from "./SearchBar";
-import { SortMenu } from "./SortMenu";
+// import { SortMenu } from "./SortMenu";
 import { Token } from "../types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
 
@@ -36,8 +36,16 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
   }, []);
 
   // Get the real market change from token data
-  const marketChange = token.change24h ?? token.marketCapChange ?? 0;
-  const isPositive = marketChange >= 0;
+  const marketChange = token.change24h ?? token.marketCapChange;
+  const changeDisplay =
+    marketChange === undefined ? (
+      <span className="opacity-50">-</span>
+    ) : (
+      <>
+        {marketChange >= 0 ? "+" : ""}
+        {marketChange.toFixed(2)}%
+      </>
+    );
 
   // Helper function to shorten hash
   const shortenHash = (hash: string | undefined) => {
@@ -56,6 +64,27 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
       "noopener,noreferrer"
     );
   };
+
+  // Add the same helper function
+  // const formatPrice = (price: number | undefined) => {
+  //   if (!price || isNaN(price)) return "-";
+
+  //   if (price < 0.000001) {
+  //     const scientificStr = price.toExponential(2);
+  //     const [base, exponent] = scientificStr.split("e");
+  //     return (
+  //       <span className="whitespace-nowrap">
+  //         ${base}
+  //         <span className="text-xs opacity-60">×10{exponent}</span>
+  //       </span>
+  //     );
+  //   }
+
+  //   return `$${price.toLocaleString(undefined, {
+  //     minimumFractionDigits: 6,
+  //     maximumFractionDigits: 6,
+  //   })}`;
+  // };
 
   return (
     <Link href={`/token/${token.contract_address}`} className="block group">
@@ -91,13 +120,14 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
             <div className="flex items-center justify-between">
               <div
                 className={`transition-all duration-300 ${
-                  isPositive
+                  marketChange === undefined
+                    ? ""
+                    : marketChange >= 0
                     ? "text-green-500 group-hover:text-green-400"
                     : "text-red-500 group-hover:text-red-400"
                 } gap-1 rounded-none text-xs`}
               >
-                {isPositive ? "+" : ""}
-                {marketChange.toFixed(2)}%
+                {changeDisplay}
               </div>
             </div>
 
@@ -143,7 +173,7 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
                 Rewards ({totalStakers}{" "}
                 {totalStakers === 1 ? "staker" : "stakers"})
               </div>
-              <div className="font-mono text-base font-bold group-hover:text-primary transition-colors duration-300">
+              <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
                 {rewards.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
@@ -193,7 +223,8 @@ export function TokenGrid({ tokens: initialTokens }: TokenGridProps) {
   return (
     <div>
       <div className="flex items-center gap-4 mb-4">
-        <SortMenu />
+        {/* Temporarily disable sorting */}
+        {/* <SortMenu /> */}
         <div className="flex-1">
           <SearchBar value={searchQuery} onChange={setSearchQuery} />
         </div>

@@ -70,11 +70,14 @@ export interface GeckoTerminalResponse {
     attributes: {
       price_in_usd: string;
       price_percent_changes: {
+        last_5m: string;
+        last_15m: string;
+        last_30m: string;
         last_1h: string;
+        last_6h: string;
         last_24h: string;
-        last_7d?: string;
       };
-      volume_in_usd: string;
+      from_volume_in_usd: string;
       fully_diluted_valuation: string;
     };
   };
@@ -87,17 +90,31 @@ export async function fetchPoolData(poolAddress: string) {
   }
 
   try {
+    // Add base URL for API calls
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
     const response = await fetch(
-      `https://app.geckoterminal.com/api/p1/base/pools/${poolAddress}`
+      `${baseUrl}/api/geckoterminal?poolAddress=${poolAddress}`
     );
     const data: GeckoTerminalResponse = await response.json();
+
+    console.log("GeckoTerminal raw response:", {
+      poolAddress,
+      data: data.data.attributes,
+    });
+
+    // Remove the '+' or '-' prefix from percentage strings
+    const cleanPercentage = (str: string) =>
+      parseFloat(str.replace(/%/g, "").replace(/[+]/g, ""));
+
     return {
       price: parseFloat(data.data.attributes.price_in_usd),
-      change1h: parseFloat(data.data.attributes.price_percent_changes.last_1h),
-      change24h: parseFloat(
+      change1h: cleanPercentage(
+        data.data.attributes.price_percent_changes.last_1h
+      ),
+      change24h: cleanPercentage(
         data.data.attributes.price_percent_changes.last_24h
       ),
-      volume24h: parseFloat(data.data.attributes.volume_in_usd),
+      volume24h: parseFloat(data.data.attributes.from_volume_in_usd),
       marketCap: parseFloat(data.data.attributes.fully_diluted_valuation),
     };
   } catch (error) {

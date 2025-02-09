@@ -73,19 +73,16 @@ export async function calculateRewards(
   const now = Math.floor(Date.now() / 1000);
   const secondsElapsed = now - creationTimestamp;
 
-  console.log("Rewards Calculation:", {
+  console.log("Pool Data:", {
     poolId,
     stakingPool,
-    creationTimestamp,
-    now,
-    secondsElapsed,
-    totalStreamed: secondsElapsed * REWARDS_PER_SECOND,
-    totalStakers: parseInt(poolData.totalMembers),
+    totalMembers: poolData.totalMembers,
   });
 
   return {
     totalStreamed: secondsElapsed * REWARDS_PER_SECOND,
     flowRate: REWARDS_PER_SECOND,
     totalStakers: parseInt(poolData.totalMembers),
+    totalMembers: poolData.totalMembers,
   };
 }
