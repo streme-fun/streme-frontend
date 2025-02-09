@@ -176,7 +176,7 @@ export function TokenTable({ tokens }: TokenTableProps) {
           <tbody>
             {table.getRowModel().rows.map((row) => (
               <tr
-                key={row.id}
+                key={row.original.contract_address}
                 className="hover:bg-black/[.02] dark:hover:bg-white/[.02]"
               >
                 {row.getVisibleCells().map((cell) => (

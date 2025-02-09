@@ -34,6 +34,7 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
               src={token.img_url}
               alt={token.name}
               fill
+              sizes="120px"
               className="object-cover transition-transform duration-300 group-hover:scale-110"
             />
           </figure>
@@ -75,6 +76,7 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
                     alt={token.creator?.name ?? "Unknown Creator"}
                     width={16}
                     height={16}
+                    sizes="16px"
                   />
                 </div>
               </div>
@@ -135,7 +137,7 @@ export function TokenGrid({ tokens }: TokenGridProps) {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredTokens.map((token) => (
-          <TokenCardComponent key={token.id} token={token} />
+          <TokenCardComponent key={token.contract_address} token={token} />
         ))}
       </div>
       {filteredTokens.length === 0 ? (

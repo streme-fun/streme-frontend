@@ -4,17 +4,12 @@ import { TokenGrid } from "./components/TokenGrid";
 import { TokenTable } from "./components/TokenTable";
 import { ViewSwitcher } from "./components/ViewSwitcher";
 import { useState, useEffect } from "react";
-import { ClientLayout } from "./components/ClientLayout";
 import { Hero } from "./components/Hero";
 import { TopStreamer } from "./components/TopStreamer";
 import { Token, TokensResponse } from "./types/token";
 
 export default function RootPage() {
-  return (
-    <ClientLayout>
-      <Home />
-    </ClientLayout>
-  );
+  return <Home />;
 }
 
 function Home() {
