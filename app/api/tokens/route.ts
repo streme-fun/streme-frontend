@@ -7,7 +7,7 @@ type CreatorProfile = NonNullable<Token["creator"]>;
 export async function GET() {
   try {
     // Fetch tokens
-    const response = await fetch("https://api.streme.fun/api/test/tokens");
+    const response = await fetch("https://api.streme.fun/api/tokens");
     const tokens: Token[] = await response.json();
 
     // Get unique creator IDs

@@ -8,7 +8,6 @@ import {
 } from "@tanstack/react-table";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Pagination } from "./Pagination";
 import { Token } from "../types/token";
 
 const columnHelper = createColumnHelper<Token>();
@@ -193,7 +192,6 @@ export function TokenTable({ tokens }: TokenTableProps) {
           </tbody>
         </table>
       </div>
-      <Pagination />
     </div>
   );
 }

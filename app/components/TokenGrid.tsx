@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { SearchBar } from "./SearchBar";
-import { Pagination } from "./Pagination";
 import { SortMenu } from "./SortMenu";
 import { Token } from "../types/token";
 
@@ -143,9 +142,7 @@ export function TokenGrid({ tokens }: TokenGridProps) {
         <div className="text-center py-12 opacity-60">
           No tokens found matching &quot;{searchQuery}&quot;
         </div>
-      ) : (
-        <Pagination />
-      )}
+      ) : null}
     </div>
   );
 }
