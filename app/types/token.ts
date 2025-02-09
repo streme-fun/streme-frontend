@@ -14,6 +14,8 @@ export interface Token {
   chain_id: number;
   metadata: Record<string, unknown>;
   profileImage: string | null;
+  pool_id: string;
+  staking_pool: string;
 
   price?: number;
   marketCap?: number;

@@ -38,7 +38,7 @@ Symbol: $[your ticker]
         </button>
 
         <h2 className="text-2xl font-bold mb-6">
-          Launch a Token on STREME.FUN
+          AI Token Launches on STREME.FUN
         </h2>
 
         <div className="space-y-6">
@@ -49,7 +49,7 @@ Symbol: $[your ticker]
             <p className="opacity-80">
               Launching a token on STREME.FUN is as simple as casting on
               Farcaster! Just mention @streme in your cast with your token
-              details.
+              details. The Streme AI will take care of the rest.
             </p>
           </div>
 
@@ -70,9 +70,9 @@ Symbol: $[your ticker]
               What Happens Next
             </h3>
             <p className="opacity-80">
-              Once you cast, our system will automatically process your request
-              and deploy your token. You&apos;ll receive a reply with your token
-              details and contract address.
+              Once you cast, the Streme AI will automatically process your
+              request and deploy your token. You&apos;ll receive a reply with
+              your token details and contract address.
             </p>
           </div>
 

@@ -9,6 +9,7 @@ import {
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Token } from "../types/token";
+import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
 
 const columnHelper = createColumnHelper<Token>();
 
@@ -25,27 +26,24 @@ const PriceChange = ({ value }: { value: number | undefined }) => {
   );
 };
 
-const AnimatedReward = ({
-  initial,
-  rate,
-}: {
-  initial: number;
-  rate: number;
-}) => {
-  const [value, setValue] = useState(initial);
+const AnimatedReward = ({ value }: { value: number }) => {
+  const [current, setCurrent] = useState(value);
+
+  // Update initial value when it changes
+  useEffect(() => {
+    setCurrent(value);
+  }, [value]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setValue((prev) => prev + rate / 20);
+      setCurrent((prev) => prev + REWARDS_PER_SECOND / 20);
     }, 50);
-
     return () => clearInterval(interval);
-  }, [rate]);
+  }, []);
 
   return (
     <div className="font-mono text-right">
-      $
-      {value.toLocaleString(undefined, {
+      {current.toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}
@@ -53,117 +51,119 @@ const AnimatedReward = ({
   );
 };
 
-const columns = [
-  columnHelper.accessor("name", {
-    header: () => (
-      <div className="flex items-center gap-2 cursor-pointer hover:text-primary">
-        Token
-        <span className="opacity-50">▼</span>
-      </div>
-    ),
-    cell: (info) => (
-      <Link
-        href={`/token/${info.row.original.contract_address}`}
-        className="flex items-center gap-2 hover:underline"
-      >
-        <span className="font-semibold">{info.getValue()}</span>
-        <span className="text-gray-500">{info.row.original.symbol}</span>
-      </Link>
-    ),
-  }),
-  columnHelper.accessor("price", {
-    header: () => (
-      <div className="text-right cursor-pointer hover:text-primary">
-        Price
-        <span className="opacity-50 ml-2">▼</span>
-      </div>
-    ),
-    cell: (info) => {
-      const price = info.getValue() ?? 0;
-      const decimals = price < 0.01 ? 6 : price < 1 ? 4 : 2;
-      return (
-        <div className="font-mono text-right">
-          $
-          {price.toLocaleString(undefined, {
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals,
-          })}
-        </div>
-      );
-    },
-  }),
-  columnHelper.accessor("change1h", {
-    header: () => <div className="text-right">1h</div>,
-    cell: (info) => <PriceChange value={info.getValue()} />,
-  }),
-  columnHelper.accessor("change24h", {
-    header: () => <div className="text-right">24h</div>,
-    cell: (info) => <PriceChange value={info.getValue()} />,
-  }),
-  columnHelper.accessor("change7d", {
-    header: () => <div className="text-right">7d</div>,
-    cell: (info) => <PriceChange value={info.getValue()} />,
-  }),
-  columnHelper.accessor("volume24h", {
-    header: () => <div className="text-right">24h Volume</div>,
-    cell: (info) => (
-      <div className="font-mono text-right">
-        ${(info.getValue() ?? 0).toLocaleString()}
-      </div>
-    ),
-  }),
-  columnHelper.accessor("marketCap", {
-    header: () => <div className="text-right">Market Cap</div>,
-    cell: (info) => (
-      <div className="font-mono text-right">
-        ${(info.getValue() ?? 0).toLocaleString()}
-      </div>
-    ),
-  }),
-  columnHelper.accessor("rewardDistributed", {
-    header: () => <div className="text-right">Rewards Distributed</div>,
-    cell: (info) => (
-      <AnimatedReward
-        initial={info.getValue() ?? 0}
-        rate={info.row.original.rewardRate ?? 0}
-      />
-    ),
-  }),
-  columnHelper.accessor("stakingAPY", {
-    header: () => <div className="text-right">Staking APY</div>,
-    cell: (info) => (
-      <div className="font-mono text-right">
-        {(info.getValue() ?? 0).toFixed(2)}%
-      </div>
-    ),
-  }),
-];
-
 interface TokenTableProps {
   tokens: Token[];
 }
 
-export function TokenTable({ tokens: initialTokens }: TokenTableProps) {
-  const [tokens, setTokens] = useState(initialTokens);
-
-  // Add polling effect
-  useEffect(() => {
-    const pollTokens = async () => {
-      try {
-        const response = await fetch("/api/tokens");
-        const data = await response.json();
-        if (data.data) {
-          setTokens(data.data);
-        }
-      } catch (error) {
-        console.error("Error polling tokens:", error);
+export function TokenTable({ tokens }: TokenTableProps) {
+  const [tokenData, setTokenData] = useState<
+    Map<
+      string,
+      {
+        rewards: number;
+        stakers: number;
       }
-    };
+    >
+  >(new Map());
 
-    // Poll every 10 seconds
-    const interval = setInterval(pollTokens, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  // Move columns inside component to access tokenData
+  const columns = [
+    columnHelper.accessor("name", {
+      header: () => (
+        <div className="flex items-center gap-2 cursor-pointer hover:text-primary">
+          Token
+          <span className="opacity-50">▼</span>
+        </div>
+      ),
+      cell: (info) => (
+        <Link
+          href={`/token/${info.row.original.contract_address}`}
+          className="flex items-center gap-2 hover:underline"
+        >
+          <span className="font-semibold">{info.getValue()}</span>
+          <span className="text-gray-500">{info.row.original.symbol}</span>
+        </Link>
+      ),
+    }),
+    columnHelper.accessor("price", {
+      header: () => (
+        <div className="text-right cursor-pointer hover:text-primary">
+          Price
+          <span className="opacity-50 ml-2">▼</span>
+        </div>
+      ),
+      cell: (info) => {
+        const price = info.getValue() ?? 0;
+        const decimals = price < 0.01 ? 6 : price < 1 ? 4 : 2;
+        return (
+          <div className="font-mono text-right">
+            $
+            {price.toLocaleString(undefined, {
+              minimumFractionDigits: decimals,
+              maximumFractionDigits: decimals,
+            })}
+          </div>
+        );
+      },
+    }),
+    columnHelper.accessor("change1h", {
+      header: () => <div className="text-right">1h</div>,
+      cell: (info) => <PriceChange value={info.getValue()} />,
+    }),
+    columnHelper.accessor("change24h", {
+      header: () => <div className="text-right">24h</div>,
+      cell: (info) => <PriceChange value={info.getValue()} />,
+    }),
+    columnHelper.accessor("change7d", {
+      header: () => <div className="text-right">7d</div>,
+      cell: (info) => <PriceChange value={info.getValue()} />,
+    }),
+    columnHelper.accessor("volume24h", {
+      header: () => <div className="text-right">24h Volume</div>,
+      cell: (info) => (
+        <div className="font-mono text-right">
+          ${(info.getValue() ?? 0).toLocaleString()}
+        </div>
+      ),
+    }),
+    columnHelper.accessor("marketCap", {
+      header: () => <div className="text-right">Market Cap</div>,
+      cell: (info) => (
+        <div className="font-mono text-right">
+          ${(info.getValue() ?? 0).toLocaleString()}
+        </div>
+      ),
+    }),
+    columnHelper.accessor("rewardDistributed", {
+      header: () => <div className="text-right">Rewards Distributed</div>,
+      cell: (info) => {
+        const data = tokenData.get(info.row.original.contract_address);
+        return data ? (
+          <AnimatedReward value={data.rewards} />
+        ) : (
+          <div className="font-mono text-right">0.00</div>
+        );
+      },
+    }),
+  ];
+
+  useEffect(() => {
+    // Fetch rewards data for all tokens
+    tokens.forEach(async (token) => {
+      const { totalStreamed, totalStakers } = await calculateRewards(
+        token.created_at,
+        token.contract_address,
+        token.staking_pool
+      );
+
+      setTokenData((prev) =>
+        new Map(prev).set(token.contract_address, {
+          rewards: totalStreamed,
+          stakers: totalStakers,
+        })
+      );
+    });
+  }, [tokens]);
 
   const table = useReactTable({
     data: tokens,

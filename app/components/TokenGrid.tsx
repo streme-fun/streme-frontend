@@ -7,20 +7,33 @@ import FarcasterIcon from "@/public/farcaster.svg";
 import { SearchBar } from "./SearchBar";
 import { SortMenu } from "./SortMenu";
 import { Token } from "../types/token";
+import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
 
 interface TokenGridProps {
   tokens: Token[];
 }
 
 const TokenCardComponent = ({ token }: { token: Token }) => {
-  const [rewards, setRewards] = useState(token.marketCap ?? 0 * 0.01);
+  const [rewards, setRewards] = useState<number>(0);
+  const [totalStakers, setTotalStakers] = useState<number>(0);
+
+  useEffect(() => {
+    calculateRewards(
+      token.created_at,
+      token.contract_address,
+      token.staking_pool
+    ).then(({ totalStreamed, totalStakers: stakers }) => {
+      setRewards(totalStreamed);
+      setTotalStakers(stakers);
+    });
+  }, [token.created_at, token.contract_address, token.staking_pool]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setRewards((prev) => prev + ((token.marketCap ?? 0) * 0.0001) / 20);
+      setRewards((prev) => prev + REWARDS_PER_SECOND / 20);
     }, 50);
     return () => clearInterval(interval);
-  }, [token.marketCap]);
+  }, []);
 
   // Helper function to shorten hash
   const shortenHash = (hash: string | undefined) => {
@@ -99,34 +112,34 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
                   />
                 </div>
               </div>
-              <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+              <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2">
                 {token.creator?.name ?? "Unknown"}
+                {token.cast_hash && token.creator?.name && (
+                  <button
+                    onClick={handleFarcasterClick}
+                    className="hover:text-primary inline-flex items-center ml-auto"
+                    title={shortenHash(token.cast_hash)}
+                  >
+                    <Image
+                      src={FarcasterIcon}
+                      alt={`View on Farcaster: ${shortenHash(token.cast_hash)}`}
+                      width={12}
+                      height={12}
+                      className="opacity-80 group-hover:opacity-100"
+                    />
+                  </button>
+                )}
               </span>
-              {token.cast_hash && token.creator?.name && (
-                <button
-                  onClick={handleFarcasterClick}
-                  className="hover:text-primary inline-flex items-center ml-auto"
-                  title={shortenHash(token.cast_hash)}
-                >
-                  <Image
-                    src={FarcasterIcon}
-                    alt={`View on Farcaster: ${shortenHash(token.cast_hash)}`}
-                    width={12}
-                    height={12}
-                    className="opacity-80 group-hover:opacity-100"
-                  />
-                </button>
-              )}
             </div>
           </div>
 
           <div className="card-actions justify-end mt-auto">
-            <div className="w-full px-1 flex items-center justify-between">
+            <div className="w-full flex justify-between flex-col">
               <div className="text-[11px] uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
-                Rewards
+                Rewards ({totalStakers}{" "}
+                {totalStakers === 1 ? "staker" : "stakers"})
               </div>
               <div className="font-mono text-base font-bold group-hover:text-primary transition-colors duration-300">
-                $
                 {rewards.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,

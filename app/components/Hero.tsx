@@ -1,17 +1,50 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
+import { Token } from "@/app/types/token";
 
 // Move these from page.tsx to here
-const initialTotal = 4234567.89; // About $4.2M
-const ratePerSecond = 52.45; // About $4.5M per day
+// const initialTotal = 4234567.89; // About $4.2M
+// const ratePerSecond = 52.45; // About $4.5M per day
 
 export function Hero() {
-  const [totalRewards, setTotalRewards] = useState(initialTotal);
+  const [totalRewards, setTotalRewards] = useState(0);
 
   useEffect(() => {
+    // Fetch tokens and calculate total rewards
+    async function fetchTotalRewards() {
+      try {
+        const response = await fetch("/api/tokens");
+        const data = await response.json();
+        const tokens: Token[] = data.data;
+
+        // Calculate initial rewards for all tokens
+        const rewards = await Promise.all(
+          tokens.map((token) =>
+            calculateRewards(
+              token.created_at,
+              token.contract_address,
+              token.staking_pool
+            ).then((r) => r.totalStreamed)
+          )
+        );
+
+        // Sum up all rewards
+        const total = rewards.reduce((acc, curr) => acc + curr, 0);
+        setTotalRewards(total);
+      } catch (error) {
+        console.error("Error fetching total rewards:", error);
+      }
+    }
+
+    fetchTotalRewards();
+  }, []);
+
+  // Keep animating the total
+  useEffect(() => {
     const interval = setInterval(() => {
-      setTotalRewards((prev) => prev + ratePerSecond / 20);
+      setTotalRewards((prev) => prev + REWARDS_PER_SECOND / 20);
     }, 50);
     return () => clearInterval(interval);
   }, []);
@@ -27,7 +60,6 @@ export function Hero() {
         </h1>
 
         <div className="text-2xl font-semibold mb-8">
-          <span className="opacity-60">$</span>
           <span className="font-mono">
             {totalRewards.toLocaleString(undefined, {
               minimumFractionDigits: 2,

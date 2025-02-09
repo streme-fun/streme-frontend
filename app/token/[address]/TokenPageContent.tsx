@@ -44,6 +44,8 @@ const mockToken: Token = {
     likes: 62,
     profileImage: "/avatars/zeni.avif",
   },
+  pool_id: "0xa040a8564c433970d7919c441104b1d25b9eaa1c",
+  staking_pool: "0xa040a8564c433970d7919c441104b1d25b9eaa1c",
 };
 
 export function TokenPageContent() {
