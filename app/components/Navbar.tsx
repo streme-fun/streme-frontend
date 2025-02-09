@@ -7,7 +7,7 @@ import { HowItWorksModal } from "./HowItWorksModal";
 import { LaunchTokenModal } from "./LaunchTokenModal";
 
 export function Navbar() {
-  const { login, logout, authenticated } = usePrivy();
+  const { login, logout, authenticated, user } = usePrivy();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
   const [isLaunchTokenOpen, setIsLaunchTokenOpen] = useState(false);
@@ -105,6 +105,18 @@ export function Navbar() {
             >
               Launch a Token
             </button>
+
+            {authenticated && (
+              <a
+                href={`https://explorer.superfluid.finance/base-mainnet/accounts/${user?.wallet?.address}?tab=pools`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-accent"
+              >
+                My Stakes
+              </a>
+            )}
+
             <button
               onClick={() => setIsHowItWorksOpen(true)}
               className="btn btn-ghost"
@@ -133,15 +145,6 @@ export function Navbar() {
           <div className="px-4 py-4 space-y-3">
             <button
               onClick={() => {
-                setIsHowItWorksOpen(true);
-                setIsMenuOpen(false);
-              }}
-              className="btn btn-ghost w-full justify-start"
-            >
-              How It Works
-            </button>
-            <button
-              onClick={() => {
                 setIsLaunchTokenOpen(true);
                 setIsMenuOpen(false);
               }}
@@ -149,6 +152,29 @@ export function Navbar() {
             >
               Launch a Token
             </button>
+
+            {authenticated && (
+              <a
+                href={`https://explorer.superfluid.finance/base-mainnet/accounts/${user?.wallet?.address}?tab=pools`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-accent w-full justify-start"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                My Stakes
+              </a>
+            )}
+
+            <button
+              onClick={() => {
+                setIsHowItWorksOpen(true);
+                setIsMenuOpen(false);
+              }}
+              className="btn btn-ghost w-full justify-start"
+            >
+              How It Works
+            </button>
+
             {authenticated ? (
               <button
                 onClick={() => {

@@ -1,471 +1,330 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
+import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import {
-  useSendTransaction,
-  useWaitForTransactionReceipt,
-  useBalance,
-} from "wagmi";
-import { parseUnits, formatUnits, BaseError } from "viem";
-import qs from "qs";
-import { QuoteResponse } from "@/lib/types/zerox";
 import { Token } from "@/app/types/token";
+import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
+import { fetchPoolData } from "@/app/lib/geckoterminal";
+import { StakeButton } from "@/app/components/StakeButton";
+import { UniswapModal } from "@/app/components/UniswapModal";
+import { createPublicClient, http } from "viem";
+import { base } from "viem/chains";
+import Image from "next/image";
+import FarcasterIcon from "@/public/farcaster.svg";
 
-// Using one of the mock tokens from TokenGrid
-const tokenInfo = {
-  name: "Based FWOG",
-  symbol: "FWOG",
-  address: "0x1035ae3f87a91084c6c5084d0615cc6121c5e228",
-  decimals: 18,
-  marketCap: 20258149,
-  marketCapChange: 15.0,
-  volume24h: 12420,
-  imageUrl: "/tokens/skimochi.avif",
-  creator: {
-    name: "zeni",
-    score: 79,
-    recasts: 17,
-    likes: 62,
-  },
-  createdAt: "2 months ago",
-  staking: {
-    apy: 156.8,
-    stakers: 1247,
-    totalStaked: 245690,
-    rewardsDistributed: 123456.78,
-    rewardRate: 1.85, // Per second
-  },
+// Helper functions from TokenTable
+const formatPrice = (price: number | undefined) => {
+  if (!price || isNaN(price)) return "-";
+
+  if (price < 0.000001) {
+    const scientificStr = price.toExponential(2);
+    const [base, exponent] = scientificStr.split("e");
+    return (
+      <span className="whitespace-nowrap">
+        ${base}
+        <span className="text-xs opacity-60">×10{exponent}</span>
+      </span>
+    );
+  }
+
+  return `$${price.toLocaleString(undefined, {
+    minimumFractionDigits: 6,
+    maximumFractionDigits: 6,
+  })}`;
 };
 
-type Tab = "buy" | "sell" | "stake";
-
-const ETH = {
-  symbol: "ETH",
-  name: "Ethereum",
-  image: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
-  address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-  decimals: 18,
-};
-
-const AFFILIATE_FEE = 25;
-const PROTOCOL_GUILD_ADDRESS = "0x32e3C7fD24e175701A35c224f2238d18439C7dBC";
-
-// Add a helper function at the top of the file
-const formatBalance = (value: bigint, decimals: number) => {
-  return parseFloat(formatUnits(value, decimals)).toFixed(4);
+const formatCurrency = (value: number | undefined) => {
+  if (!value || isNaN(value)) return "-";
+  return `$${value.toLocaleString(undefined, {
+    maximumFractionDigits: 0,
+  })}`;
 };
 
 interface TokenActionsProps {
   token: Token;
 }
 
-export function TokenActions({}: TokenActionsProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("buy");
-  const [amount, setAmount] = useState<string>("");
-  const [rewards, setRewards] = useState(tokenInfo.staking.rewardsDistributed);
-  const [quote, setQuote] = useState<QuoteResponse>();
-  const [fetchPriceError, setFetchPriceError] = useState([]);
-  const [isPriceLoading, setIsPriceLoading] = useState(false);
+const AnimatedReward = ({ value }: { value: number }) => {
+  const [current, setCurrent] = useState(value);
 
-  // More realistic ETH amounts (0.1, 0.5, 1.0)
-  const presetAmounts = ["0.01", "0.05", "0.1"];
-
-  const { user, login, ready } = usePrivy();
-  const address = user?.wallet?.address;
-  const isConnected = !!address;
-
-  const {
-    data: hash,
-    isPending,
-    error,
-    sendTransaction,
-  } = useSendTransaction();
-
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash,
-    });
-
-  // Update the ETH balance check
-  const { data: ethBalance } = useBalance({
-    address: address as `0x${string}`,
-  });
-
-  const { data: tokenBalance } = useBalance({
-    address: address as `0x${string}`,
-    token: tokenInfo.address as `0x${string}`,
-  });
-
-  // Helper to check if user has enough balance
-  const hasEnoughBalance = useCallback(() => {
-    if (!amount) return false;
-    const parsedAmount = parseUnits(amount, 18);
-
-    if (activeTab === "buy") {
-      return ethBalance?.value ? parsedAmount <= ethBalance.value : false;
-    } else {
-      return tokenBalance?.value ? parsedAmount <= tokenBalance.value : false;
-    }
-  }, [amount, activeTab, ethBalance?.value, tokenBalance?.value]);
-
-  const handlePresetClick = (value: string) => {
-    setAmount(value);
-  };
-
-  const handleReset = () => {
-    setAmount("");
-  };
-
-  const fetchQuote = useCallback(
-    async (params: unknown) => {
-      setIsPriceLoading(true);
-      try {
-        const response = await fetch(`/api/quote?${qs.stringify(params)}`);
-        const data = await response.json();
-        setQuote(data);
-      } finally {
-        setIsPriceLoading(false);
-      }
-    },
-    [setIsPriceLoading, setQuote]
-  );
-
-  const executeSwap = useCallback(() => {
-    if (quote?.transaction) {
-      sendTransaction({
-        gas: quote.transaction.gas ? BigInt(quote.transaction.gas) : undefined,
-        to: quote.transaction.to as `0x${string}`,
-        data: quote.transaction.data as `0x${string}`,
-        value: BigInt(quote.transaction.value),
-      });
-    }
-  }, [quote, sendTransaction]);
-
+  // Update initial value when it changes
   useEffect(() => {
-    if (!amount || !address) {
-      // Clear quote and errors when amount is empty
-      setQuote(undefined);
-      setFetchPriceError([]);
-      return;
-    }
-
-    const parsedAmount = parseUnits(
-      amount,
-      activeTab === "buy" ? ETH.decimals : tokenInfo.decimals
-    ).toString();
-
-    const params = {
-      chainId: 8453,
-      sellToken: activeTab === "buy" ? ETH.address : tokenInfo.address,
-      buyToken: activeTab === "buy" ? tokenInfo.address : ETH.address,
-      sellAmount: parsedAmount,
-      taker: address,
-      swapFeeRecipient: PROTOCOL_GUILD_ADDRESS,
-      swapFeeBps: AFFILIATE_FEE,
-      swapFeeToken: activeTab === "buy" ? tokenInfo.address : ETH.address,
-      tradeSurplusRecipient: PROTOCOL_GUILD_ADDRESS,
-    };
-
-    const timeoutId = setTimeout(() => {
-      if (amount !== "") {
-        fetchQuote(params);
-      }
-    }, 200);
-
-    return () => clearTimeout(timeoutId);
-  }, [address, amount, activeTab, fetchQuote]);
-
-  const handlePlaceTrade = () => {
-    if (!isConnected) {
-      login();
-      return;
-    }
-
-    executeSwap();
-  };
+    setCurrent(value);
+  }, [value]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setRewards((prev) => prev + tokenInfo.staking.rewardRate / 20);
+      setCurrent((prev) => prev + REWARDS_PER_SECOND / 20);
     }, 50);
     return () => clearInterval(interval);
   }, []);
 
-  // Only show preset amounts for buy tab
-  const showPresets = activeTab === "buy";
-
-  // Update the quote display in the JSX
-  const displayQuoteAmount = quote?.minBuyAmount && !isPriceLoading && (
-    <div className="text-sm opacity-60 mt-2">
-      You will receive:{" "}
-      {formatUnits(
-        BigInt(quote.minBuyAmount),
-        activeTab === "buy" ? tokenInfo.decimals : ETH.decimals
-      )}{" "}
-      {activeTab === "buy" ? tokenInfo.symbol : "ETH"}
+  return (
+    <div className="font-mono text-lg">
+      {current.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}
     </div>
   );
+};
+
+const shortenHash = (hash: string | undefined) => {
+  if (!hash) return "";
+  return hash.slice(0, 10);
+};
+
+export function TokenActions({ token }: TokenActionsProps) {
+  const [isUniswapOpen, setIsUniswapOpen] = useState(false);
+  const [tokenData, setTokenData] = useState<{
+    rewards: number;
+    stakers: number;
+    totalMembers?: string;
+    price?: number;
+    change1h?: number;
+    change24h?: number;
+    volume24h?: number;
+    marketCap?: number;
+  }>();
+
+  const { user, ready } = usePrivy();
+  const address = user?.wallet?.address;
+  const isConnected = ready && !!address;
+  const [balance, setBalance] = useState<bigint>(BigInt(0));
+
+  // Fetch token data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { totalStreamed, totalStakers, totalMembers } =
+          await calculateRewards(
+            token.created_at,
+            token.contract_address,
+            token.staking_pool
+          );
+
+        const marketData = token.pool_address
+          ? await fetchPoolData(token.pool_address)
+          : null;
+
+        setTokenData({
+          rewards: totalStreamed,
+          stakers: totalStakers,
+          totalMembers,
+          ...marketData,
+        });
+      } catch (error) {
+        console.error("Error fetching token data:", error);
+      }
+    };
+
+    fetchData();
+  }, [token]);
+
+  // Fetch balance
+  useEffect(() => {
+    if (!address || !isConnected) return;
+
+    const publicClient = createPublicClient({
+      chain: base,
+      transport: http(),
+    });
+
+    const fetchBalance = async () => {
+      const bal = await publicClient.readContract({
+        address: token.contract_address as `0x${string}`,
+        abi: [
+          {
+            inputs: [{ name: "account", type: "address" }],
+            name: "balanceOf",
+            outputs: [{ name: "", type: "uint256" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ],
+        functionName: "balanceOf",
+        args: [address as `0x${string}`],
+      });
+      setBalance(bal);
+    };
+
+    fetchBalance();
+  }, [address, isConnected, token.contract_address]);
+
+  const hasTokens = isConnected && balance > 0n;
 
   return (
-    <div className="card bg-base-100 border border-black/[.1] dark:border-white/[.1]">
-      <div className="card-body p-4">
-        {/* Token Info Section */}
-        <div className="mb-8 space-y-6">
-          {/* Token Header */}
-          <div className="flex items-center gap-4">
-            {tokenInfo.imageUrl ? (
-              <div className="relative w-16 h-16">
-                <Image
-                  src={tokenInfo.imageUrl}
-                  alt={tokenInfo.name}
-                  fill
-                  className="object-cover rounded-full"
-                />
-              </div>
-            ) : (
-              <div className="w-16 h-16 bg-primary flex items-center justify-center text-primary-content font-mono font-bold rounded-full">
-                ${tokenInfo.symbol}
-              </div>
-            )}
-            <div>
-              <h2 className="text-2xl font-bold mb-1">{tokenInfo.name}</h2>
-              <div className="flex items-center gap-3">
-                <span className="text-base opacity-60">
-                  ${tokenInfo.symbol}
-                </span>
-                <span
-                  className={`text-base ${
-                    tokenInfo.marketCapChange >= 0
-                      ? "text-green-500"
-                      : "text-red-500"
-                  }`}
-                >
-                  {tokenInfo.marketCapChange >= 0 ? "+" : ""}
-                  {tokenInfo.marketCapChange.toFixed(2)}%
-                </span>
-              </div>
-            </div>
+    <div className="space-y-6">
+      {/* Token Header */}
+      <div className="flex items-center gap-4">
+        {token.img_url ? (
+          <div className="relative w-16 h-16">
+            <Image
+              src={token.img_url}
+              alt={token.name}
+              fill
+              className="object-cover rounded-full"
+            />
           </div>
-
-          {/* Market Stats */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <div className="text-base opacity-60 mb-2">Market Cap</div>
-                <div className="font-mono text-xl">
-                  ${tokenInfo.marketCap.toLocaleString()}
-                </div>
-              </div>
-              <div>
-                <div className="text-base opacity-60 mb-2">24h Volume</div>
-                <div className="font-mono text-xl">
-                  ${tokenInfo.volume24h.toLocaleString()}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <div className="text-base opacity-60 mb-2">Staking APY</div>
-                <div className="font-mono text-xl text-green-500">
-                  {tokenInfo.staking.apy.toFixed(1)}%
-                </div>
-              </div>
-              <div>
-                <div className="text-base opacity-60 mb-2">Total Stakers</div>
-                <div className="font-mono text-xl">
-                  {tokenInfo.staking.stakers.toLocaleString()}
-                </div>
-              </div>
-            </div>
+        ) : (
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-2xl font-mono">
+            {token.symbol?.[0] ?? "?"}
           </div>
-
-          {/* Rewards Counter */}
-          <div>
-            <div className="text-base opacity-60 mb-2">Rewards Distributed</div>
-            <div className="font-mono text-2xl font-bold text-primary">
-              $
-              {rewards.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
-            <div className="text-sm opacity-40 mt-1">
-              {tokenInfo.staking.rewardRate.toFixed(2)} $FWOG/sec
-            </div>
-          </div>
-
-          {/* Creator Info */}
-          <div className="flex items-center gap-2">
-            <div className="avatar">
-              <div className="w-6 h-6 rounded-full">
-                <Image
-                  src={`/avatars/${tokenInfo.creator.name}.avif`}
-                  alt={tokenInfo.creator.name}
-                  width={24}
-                  height={24}
-                />
-              </div>
-            </div>
-            <span className="text-base opacity-60">
-              {tokenInfo.creator.name}
-            </span>
-            <div className="flex items-center gap-3 ml-auto opacity-60">
-              <span>🔄 {tokenInfo.creator.recasts}</span>
-              <span>❤️ {tokenInfo.creator.likes}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Tabs */}
-        <div className="flex gap-2 mb-4">
-          <button
-            className={`flex-1 btn ${
-              activeTab === "buy"
-                ? "btn-primary"
-                : "btn-ghost bg-black/[.02] dark:bg-white/[.02]"
-            }`}
-            onClick={() => setActiveTab("buy")}
-          >
-            BUY
-          </button>
-          <button
-            className={`flex-1 btn ${
-              activeTab === "sell"
-                ? "btn-primary"
-                : "btn-ghost bg-black/[.02] dark:bg-white/[.02]"
-            }`}
-            onClick={() => setActiveTab("sell")}
-          >
-            SELL
-          </button>
-          <button
-            className={`flex-1 btn ${
-              activeTab === "stake"
-                ? "btn-primary"
-                : "btn-ghost bg-black/[.02] dark:bg-white/[.02]"
-            }`}
-            onClick={() => setActiveTab("stake")}
-          >
-            STAKE
-          </button>
-        </div>
-
-        {/* Max Slippage Button */}
-        <button className="btn btn-sm btn-ghost bg-black/[.02] dark:bg-white/[.02] w-fit mb-4">
-          SET MAX SLIPPAGE
-        </button>
-
-        {/* Amount Input */}
-        <div className="relative mb-4">
-          <div className="flex justify-between mb-2 text-sm opacity-60">
-            <span>Amount</span>
-            <span>
-              Balance:{" "}
-              {activeTab === "buy"
-                ? ethBalance
-                  ? formatBalance(ethBalance.value, ETH.decimals)
-                  : "0.0000"
-                : tokenBalance
-                ? formatBalance(tokenBalance.value, tokenInfo.decimals)
-                : "0.0000"}{" "}
-              {activeTab === "buy" ? "ETH" : tokenInfo.symbol}
-            </span>
-          </div>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
-            className="input input-ghost bg-black/[.02] dark:bg-white/[.02] w-full pr-20 font-mono text-2xl"
-            disabled={isPriceLoading}
-          />
-          <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
-            <span className="font-mono">
-              {activeTab === "buy" ? "ETH" : tokenInfo.symbol}
-            </span>
-          </div>
-          {isPriceLoading && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="loading loading-spinner loading-md text-primary" />
-            </div>
-          )}
-        </div>
-
-        {/* Only show preset amounts for buy tab */}
-        {showPresets && (
-          <div className="flex gap-2 mb-4">
-            <button
-              className="btn btn-sm btn-ghost bg-black/[.02] dark:bg-white/[.02]"
-              onClick={handleReset}
+        )}
+        <div className="flex-1">
+          <h2 className="text-2xl font-bold">{token.name}</h2>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-base opacity-60">${token.symbol}</span>
+            <span
+              className={`text-base ${
+                tokenData?.change24h && tokenData.change24h >= 0
+                  ? "text-green-500"
+                  : "text-red-500"
+              }`}
             >
-              RESET
-            </button>
-            {presetAmounts.map((preset) => (
-              <button
-                key={preset}
-                className="btn btn-sm btn-ghost bg-black/[.02] dark:bg-white/[.02]"
-                onClick={() => handlePresetClick(preset)}
-              >
-                {preset} ETH
-              </button>
-            ))}
+              {tokenData?.change24h
+                ? `${
+                    tokenData.change24h >= 0 ? "+" : ""
+                  }${tokenData.change24h.toFixed(2)}%`
+                : "-"}
+            </span>
           </div>
-        )}
-
-        {/* Place Trade Button */}
-        <button
-          className="btn btn-primary w-full"
-          onClick={handlePlaceTrade}
-          disabled={
-            !ready ||
-            (!isConnected && !login) ||
-            !amount ||
-            isPending ||
-            !hasEnoughBalance()
-          }
-        >
-          {!isConnected
-            ? "Connect Wallet"
-            : !hasEnoughBalance()
-            ? "Insufficient Balance"
-            : activeTab === "buy"
-            ? "Buy Now"
-            : "Sell Now"}
-        </button>
-
-        {displayQuoteAmount}
-
-        {/* Add transaction status messages */}
-        {isConfirming && (
-          <div className="text-warning text-center mt-4">
-            ⏳ Waiting for confirmation...
-          </div>
-        )}
-        {isConfirmed && (
-          <div className="text-success text-center mt-4">
-            🎉 Transaction Confirmed!
-          </div>
-        )}
-        {/* Add error messages */}
-        {fetchPriceError.length > 0 && (
-          <div className="text-error text-sm mt-2">
-            {fetchPriceError.map((error, index) => (
-              <div key={index}>{error}</div>
-            ))}
-          </div>
-        )}
-        {error &&
-          (error as BaseError).shortMessage?.includes("simulation failed") && (
-            <div className="text-error text-sm mt-2">
-              Transaction simulation failed. This usually means the trade cannot
-              be executed at the current price. Please try a different amount or
-              try again later.
-            </div>
-          )}
+        </div>
       </div>
+
+      {/* Price Row */}
+      <div className="flex items-end justify-between px-1">
+        <div>
+          <div className="text-sm opacity-60 mb-1">Price</div>
+          <div className="font-mono text-2xl font-bold">
+            {formatPrice(tokenData?.price)}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-sm opacity-60 mb-1">24h Change</div>
+          <div
+            className={`font-mono text-lg ${
+              tokenData?.change24h && tokenData.change24h >= 0
+                ? "text-green-500"
+                : "text-red-500"
+            }`}
+          >
+            {tokenData?.change24h
+              ? `${
+                  tokenData.change24h >= 0 ? "+" : ""
+                }${tokenData.change24h.toFixed(2)}%`
+              : "-"}
+          </div>
+        </div>
+      </div>
+
+      {/* Creator Info */}
+      {token.creator && (
+        <div className="flex items-center gap-2 px-1">
+          <div className="avatar">
+            <div className="w-6 h-6 rounded-full">
+              <Image
+                src={
+                  token.creator.profileImage ??
+                  `/avatars/${token.creator.name}.avif`
+                }
+                alt={token.creator.name}
+                width={24}
+                height={24}
+              />
+            </div>
+          </div>
+          <a
+            href={`https://warpcast.com/${token.creator.name}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-base opacity-60 hover:opacity-100 hover:underline"
+          >
+            {token.creator.name}
+          </a>
+          {token.cast_hash && (
+            <a
+              href={`https://warpcast.com/${token.creator.name}/${shortenHash(
+                token.cast_hash
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-primary inline-flex items-center ml-2"
+              title="View original cast"
+            >
+              <Image
+                src={FarcasterIcon}
+                alt="View on Farcaster"
+                width={14}
+                height={14}
+                className="opacity-60 hover:opacity-100"
+              />
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* Market Stats */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <div className="text-sm opacity-60 mb-1">Volume 24h</div>
+          <div className="font-mono text-lg">
+            {formatCurrency(tokenData?.volume24h)}
+          </div>
+        </div>
+        <div>
+          <div className="text-sm opacity-60 mb-1">Market Cap</div>
+          <div className="font-mono text-lg">
+            {formatCurrency(tokenData?.marketCap)}
+          </div>
+        </div>
+      </div>
+
+      {/* Rewards Section */}
+      <div className="flex items-center justify-between px-1">
+        <div>
+          <div className="text-sm opacity-60 mb-1">
+            Rewards ({tokenData?.totalMembers ?? 0}{" "}
+            {tokenData?.totalMembers === "1" ? "staker" : "stakers"})
+          </div>
+          <AnimatedReward value={tokenData?.rewards ?? 0} />
+        </div>
+        <div className="text-sm opacity-40">
+          {REWARDS_PER_SECOND.toFixed(2)} ${token.symbol}/sec
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setIsUniswapOpen(true)}
+          className="btn btn-primary flex-1"
+        >
+          Buy
+        </button>
+        <StakeButton
+          tokenAddress={token.contract_address}
+          stakingAddress={token.staking_pool}
+          stakingPool={token.staking_pool}
+          disabled={!hasTokens}
+          symbol={token.symbol}
+          totalStakers={tokenData?.totalMembers}
+          className={`btn btn-outline flex-1 relative 
+            before:absolute before:inset-0 before:bg-gradient-to-r 
+            before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] 
+            before:scale-x-0 hover:before:scale-x-100 
+            before:origin-left before:opacity-0 hover:before:opacity-20
+            hover:border-[#ffa647]/50
+            hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]
+            ${!hasTokens && "btn-disabled opacity-50"}`}
+        />
+      </div>
+
+      <UniswapModal
+        isOpen={isUniswapOpen}
+        onClose={() => setIsUniswapOpen(false)}
+        tokenAddress={token.contract_address}
+      />
     </div>
   );
 }

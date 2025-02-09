@@ -2,12 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Image from "next/image";
-import FarcasterIcon from "@/public/farcaster.svg";
 import { TokenActions } from "./TokenActions";
 import { Token } from "@/app/types/token";
-import { calculateRewards } from "@/app/lib/rewards";
-import { fetchPoolData } from "@/app/lib/geckoterminal";
 
 // const HARDCODED_ADDRESS = "0x1234567890123456789012345678901234567890";
 // const BASED_FWOG_POOL = "0x1035ae3f87a91084c6c5084d0615cc6121c5e228";
@@ -56,16 +52,6 @@ export function TokenPageContent() {
   const address = params.address as string;
 
   const [token, setToken] = useState<Token | null>(null);
-  const [tokenData, setTokenData] = useState<{
-    rewards: number;
-    stakers: number;
-    totalMembers?: string;
-    price?: number;
-    change1h?: number;
-    change24h?: number;
-    volume24h?: number;
-    marketCap?: number;
-  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -80,25 +66,6 @@ export function TokenPageContent() {
 
         if (matchedToken) {
           setToken(matchedToken);
-
-          // Fetch additional data
-          const { totalStreamed, totalStakers, totalMembers } =
-            await calculateRewards(
-              matchedToken.created_at,
-              matchedToken.contract_address,
-              matchedToken.staking_pool
-            );
-
-          const marketData = matchedToken.pool_address
-            ? await fetchPoolData(matchedToken.pool_address)
-            : null;
-
-          setTokenData({
-            rewards: totalStreamed,
-            stakers: totalStakers,
-            totalMembers,
-            ...marketData,
-          });
         }
       } catch (error) {
         console.error("Error fetching token:", error);
@@ -125,66 +92,12 @@ export function TokenPageContent() {
       ? "https://www.geckoterminal.com/base/pools/0x1035ae3f87a91084c6c5084d0615cc6121c5e228?embed=1&info=0&swaps=1&grayscale=0&light_chart=1"
       : `https://www.geckoterminal.com/base/pools/${token.pool_address}?embed=1&info=0&swaps=1&grayscale=0&light_chart=1`;
 
-  const shortenHash = (hash: string | undefined) => {
-    if (!hash) return "";
-    return hash.slice(0, 10);
-  };
-
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8">
         {/* Chart */}
         <div className="lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1]">
           <div className="card-body p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-4">
-                {token.img_url ? (
-                  <div className="w-10 h-10 relative rounded-full overflow-hidden">
-                    <Image
-                      src={token.img_url}
-                      alt={token.name}
-                      fill
-                      sizes="40px"
-                      className="object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-lg font-mono">
-                    {token.symbol?.[0] ?? "?"}
-                  </div>
-                )}
-                <h2 className="text-2xl font-bold">{token.name}</h2>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <div className="text-lg font-mono">
-                    {tokenData?.price ? `$${tokenData.price.toFixed(6)}` : "-"}
-                  </div>
-                  <div className="text-sm opacity-60">
-                    {tokenData?.totalMembers ?? 0} stakers
-                  </div>
-                </div>
-                {token.cast_hash && token.creator?.name && (
-                  <a
-                    href={`https://warpcast.com/${
-                      token.creator.name
-                    }/${shortenHash(token.cast_hash)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-primary inline-flex items-center"
-                    title={shortenHash(token.cast_hash)}
-                  >
-                    <Image
-                      src={FarcasterIcon}
-                      alt={`View on Farcaster: ${shortenHash(token.cast_hash)}`}
-                      width={16}
-                      height={16}
-                      className="opacity-80 hover:opacity-100"
-                    />
-                  </a>
-                )}
-              </div>
-            </div>
             <iframe
               data-privy-ignore
               title="GeckoTerminal Embed"

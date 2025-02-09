@@ -1,7 +1,10 @@
 "use client";
 
-import { usePrivy, useWallets } from "@privy-io/react-auth";
-import { parseEther, encodeFunctionData } from "viem";
+import { useState, useEffect } from "react";
+import { usePrivy } from "@privy-io/react-auth";
+import { createPublicClient, http, createWalletClient, custom } from "viem";
+import { base } from "viem/chains";
+import { StakeModal } from "./StakeModal";
 
 const superAbi = [
   {
@@ -29,28 +32,22 @@ const stakingAbi = [
   },
 ] as const;
 
-const gdaAbi = [
-  {
-    name: "isMemberConnected",
-    type: "function",
-    stateMutability: "view",
-    inputs: [
-      { name: "pool", type: "address" },
-      { name: "member", type: "address" },
-    ],
-    outputs: [{ type: "bool" }],
-  },
-  {
-    name: "connectPool",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "pool", type: "address" },
-      { name: "userData", type: "bytes" },
-    ],
-    outputs: [{ type: "bool" }],
-  },
-] as const;
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(),
+});
+
+const toHex = (address: string) => address as `0x${string}`;
+
+interface StakeButtonProps {
+  tokenAddress: string;
+  stakingAddress: string;
+  stakingPool: string;
+  disabled?: boolean;
+  className?: string;
+  symbol: string;
+  totalStakers?: string;
+}
 
 export function StakeButton({
   tokenAddress,
@@ -58,95 +55,98 @@ export function StakeButton({
   stakingPool,
   disabled,
   className,
-}: {
-  tokenAddress: string;
-  stakingAddress: string;
-  stakingPool: string;
-  disabled: boolean;
-  className?: string;
-}) {
-  const { wallets } = useWallets();
+  symbol,
+  totalStakers,
+}: StakeButtonProps) {
   const { user } = usePrivy();
-  const address = user?.wallet?.address;
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [balance, setBalance] = useState<bigint>(0n);
 
-  const handleStake = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!address || !wallets?.[0]) return;
+  useEffect(() => {
+    if (!user?.wallet?.address) return;
+    const walletAddress = user.wallet.address;
 
-    try {
-      const provider = await wallets[0].getEthereumProvider();
-      const amount = parseEther("1000");
-
-      // First check if already connected to pool
-      const isConnected = await provider.request({
-        method: "eth_call",
-        params: [
-          {
-            to: stakingPool as `0x${string}`,
-            data: encodeFunctionData({
-              abi: gdaAbi,
-              functionName: "isMemberConnected",
-              args: [stakingPool as `0x${string}`, address as `0x${string}`],
-            }),
-          },
-          "latest",
-        ],
-      });
-
-      // First approve
-      await provider.request({
-        method: "eth_sendTransaction",
-        params: [
-          {
-            to: tokenAddress as `0x${string}`,
-            data: encodeFunctionData({
-              abi: superAbi,
-              functionName: "approve",
-              args: [stakingAddress as `0x${string}`, amount],
-            }),
-          },
-        ],
-      });
-
-      // Then stake
-      await provider.request({
-        method: "eth_sendTransaction",
-        params: [
-          {
-            to: stakingAddress as `0x${string}`,
-            data: encodeFunctionData({
-              abi: stakingAbi,
-              functionName: "stake",
-              args: [address as `0x${string}`, amount],
-            }),
-          },
-        ],
-      });
-
-      // Connect pool if not already connected
-      if (!isConnected) {
-        await provider.request({
-          method: "eth_sendTransaction",
-          params: [
+    const fetchBalance = async () => {
+      try {
+        const bal = await publicClient.readContract({
+          address: toHex(tokenAddress),
+          abi: [
             {
-              to: stakingPool as `0x${string}`,
-              data: encodeFunctionData({
-                abi: gdaAbi,
-                functionName: "connectPool",
-                args: [stakingPool as `0x${string}`, "0x"],
-              }),
+              inputs: [{ name: "account", type: "address" }],
+              name: "balanceOf",
+              outputs: [{ name: "", type: "uint256" }],
+              stateMutability: "view",
+              type: "function",
             },
           ],
+          functionName: "balanceOf",
+          args: [toHex(walletAddress)],
         });
+        setBalance(bal);
+      } catch (error) {
+        console.error("Error fetching balance:", error);
       }
+    };
+
+    fetchBalance();
+  }, [user?.wallet?.address, tokenAddress]);
+
+  const handleStake = async (amount: bigint) => {
+    if (!window.ethereum || !user?.wallet?.address) return;
+    const walletAddress = user.wallet.address; // Store in a const to satisfy TypeScript
+
+    const walletClient = createWalletClient({
+      chain: base,
+      transport: custom(window.ethereum),
+      account: toHex(walletAddress),
+    });
+
+    try {
+      // First approve the tokens
+      const approveTx = await walletClient.writeContract({
+        address: toHex(tokenAddress),
+        abi: superAbi,
+        functionName: "approve",
+        args: [toHex(stakingPool), amount],
+      });
+
+      await publicClient.waitForTransactionReceipt({ hash: approveTx });
+
+      // Then stake them
+      const stakeTx = await walletClient.writeContract({
+        address: toHex(stakingPool),
+        abi: stakingAbi,
+        functionName: "stake",
+        args: [toHex(walletAddress), amount],
+      });
+
+      await publicClient.waitForTransactionReceipt({ hash: stakeTx });
     } catch (error) {
       console.error("Staking error:", error);
+      throw error; // Re-throw to be handled by the modal
     }
   };
 
   return (
-    <button onClick={handleStake} disabled={disabled} className={className}>
-      <span className="relative">Stake</span>
-    </button>
+    <>
+      <button
+        onClick={() => setIsModalOpen(true)}
+        disabled={disabled}
+        className={className}
+      >
+        Stake
+      </button>
+
+      <StakeModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        tokenAddress={tokenAddress}
+        stakingAddress={stakingAddress}
+        balance={balance}
+        symbol={symbol}
+        totalStakers={totalStakers}
+        onStake={handleStake}
+      />
+    </>
   );
 }

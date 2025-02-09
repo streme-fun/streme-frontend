@@ -283,6 +283,7 @@ export function TokenTable({ tokens }: TokenTableProps) {
               setSelectedTokenAddress(address);
               setIsUniswapOpen(true);
             }}
+            tokenData={tokenData}
           />
         );
       },
@@ -423,10 +424,12 @@ const ActionButtons = ({
   tokenAddress,
   token,
   onBuy,
+  tokenData,
 }: {
   tokenAddress: string;
   token: Token;
   onBuy: (address: string) => void;
+  tokenData: Map<string, { totalMembers?: string }>;
 }) => {
   const { user, ready } = usePrivy();
   const address = user?.wallet?.address;
@@ -465,6 +468,8 @@ const ActionButtons = ({
 
   const hasTokens = isConnected && balance > 0n;
 
+  const data = tokenData.get(tokenAddress);
+
   return (
     <div className="flex justify-center gap-2">
       <button
@@ -482,6 +487,8 @@ const ActionButtons = ({
         stakingAddress={token.staking_pool}
         stakingPool={token.staking_pool}
         disabled={!hasTokens}
+        symbol={token.symbol}
+        totalStakers={data?.totalMembers}
         className={`btn btn-xs btn-outline normal-case font-normal relative 
           before:absolute before:inset-0 before:bg-gradient-to-r 
           before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] 
