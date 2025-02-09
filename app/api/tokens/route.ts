@@ -1,5 +1,6 @@
 import { Token } from "@/app/types/token";
 import { enrichTokenWithMarketData } from "@/app/lib/mockTokens";
+import { fetchTokensData } from "@/app/lib/geckoterminal";
 
 // Use Token's creator type
 type CreatorProfile = NonNullable<Token["creator"]>;
@@ -59,21 +60,26 @@ export async function GET() {
         ) ?? {};
     }
 
+    const addresses = tokens.map((t) => t.contract_address);
+    const geckoData = await fetchTokensData(addresses);
+
     // Enrich tokens with profile data and market data
-    const enrichedTokens = tokens.map((token, index) => {
-      const enrichedToken = enrichTokenWithMarketData(token, index);
-      if (token.requestor_fid && creatorProfiles[token.requestor_fid]) {
-        const profile = creatorProfiles[token.requestor_fid];
-        enrichedToken.creator = {
-          name: profile.name || "Unknown",
-          score: 0,
-          recasts: 0,
-          likes: 0,
-          profileImage: profile.profileImage,
-        };
-      }
-      return enrichedToken;
-    });
+    const enrichedTokens = await Promise.all(
+      tokens.map(async (token) => {
+        const enrichedToken = await enrichTokenWithMarketData(token, geckoData);
+        if (token.requestor_fid && creatorProfiles[token.requestor_fid]) {
+          const profile = creatorProfiles[token.requestor_fid];
+          enrichedToken.creator = {
+            name: profile.name || "Unknown",
+            score: 0,
+            recasts: 0,
+            likes: 0,
+            profileImage: profile.profileImage,
+          };
+        }
+        return enrichedToken;
+      })
+    );
 
     return Response.json({ data: enrichedTokens }, { headers });
   } catch (error) {

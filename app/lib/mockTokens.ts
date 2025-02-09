@@ -1,37 +1,41 @@
-import { Token } from "../types/token";
+import { Token } from "@/app/types/token";
 
 // Helper function to create a token with common fields
-export const enrichTokenWithMarketData = (
+export async function enrichTokenWithMarketData(
   token: Token,
-  index: number
-): Token => {
-  const seed = index;
-  const randomInRange = (min: number, max: number) => {
-    const rand = Math.sin(seed) * 10000;
-    return min + (rand - Math.floor(rand)) * (max - min);
-  };
+  geckoData: Record<
+    string,
+    {
+      price: number;
+      marketCap: number;
+      volume24h: number;
+      total_reserve_in_usd: number;
+    }
+  >
+): Promise<Token> {
+  const tokenData = geckoData[token.contract_address.toLowerCase()];
+  const enrichedToken = { ...token };
 
-  const price = randomInRange(0.0001, 0.1);
-  const marketCap = price * randomInRange(1000000, 10000000);
+  if (tokenData) {
+    // Use real market data if available
+    enrichedToken.price = tokenData.price;
+    enrichedToken.marketCap = tokenData.marketCap;
+    enrichedToken.volume24h = tokenData.volume24h;
 
-  return {
-    ...token,
-    price,
-    marketCap,
-    marketCapChange: randomInRange(-10, 10),
-    volume24h: randomInRange(10000, 1000000),
-    stakingAPY: randomInRange(5, 25),
-    change1h: randomInRange(-5, 5),
-    change24h: randomInRange(-15, 15),
-    change7d: randomInRange(-30, 30),
-    rewardDistributed: randomInRange(50000, 500000),
-    rewardRate: randomInRange(1, 5),
-    creator: {
-      name: "Unknown",
-      score: 0,
-      recasts: 0,
-      likes: 0,
-      profileImage: "",
-    },
-  };
-};
+    // Calculate market cap change (you might want to store historical data to calculate this properly)
+    enrichedToken.marketCapChange = 0; // This needs historical data to calculate properly
+  } else {
+    // Fallback to mock data if GeckoTerminal data is unavailable
+    enrichedToken.price = 0.0001;
+    enrichedToken.marketCap = 459510;
+    enrichedToken.marketCapChange = 12.77;
+    enrichedToken.volume24h = 12420;
+  }
+
+  // Keep the existing staking and rewards data
+  enrichedToken.stakingAPY = 156.8;
+  enrichedToken.rewardDistributed = 123456.78;
+  enrichedToken.rewardRate = 1.85;
+
+  return enrichedToken;
+}

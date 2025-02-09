@@ -28,6 +28,18 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
     return hash.slice(0, 10);
   };
 
+  const handleFarcasterClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    window.open(
+      `https://warpcast.com/${token.creator?.name}/${shortenHash(
+        token.cast_hash
+      )}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
   return (
     <Link href={`/token/${token.contract_address}`} className="block group">
       <div
@@ -91,13 +103,8 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
                 {token.creator?.name ?? "Unknown"}
               </span>
               {token.cast_hash && token.creator?.name && (
-                <a
-                  href={`https://warpcast.com/${
-                    token.creator.name
-                  }/${shortenHash(token.cast_hash)}`}
-                  onClick={(e) => e.stopPropagation()}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={handleFarcasterClick}
                   className="hover:text-primary inline-flex items-center ml-auto"
                   title={shortenHash(token.cast_hash)}
                 >
@@ -108,7 +115,7 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
                     height={12}
                     className="opacity-80 group-hover:opacity-100"
                   />
-                </a>
+                </button>
               )}
             </div>
           </div>
