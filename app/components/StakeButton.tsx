@@ -52,7 +52,6 @@ interface StakeButtonProps {
 export function StakeButton({
   tokenAddress,
   stakingAddress,
-  stakingPool,
   disabled,
   className,
   symbol,
@@ -68,6 +67,11 @@ export function StakeButton({
 
     const fetchBalance = async () => {
       try {
+        console.log("Fetching balance for:", {
+          tokenAddress,
+          walletAddress,
+        });
+
         const bal = await publicClient.readContract({
           address: toHex(tokenAddress),
           abi: [
@@ -82,9 +86,17 @@ export function StakeButton({
           functionName: "balanceOf",
           args: [toHex(walletAddress)],
         });
+
+        console.log("Balance fetched:", bal.toString());
         setBalance(bal);
       } catch (error) {
-        console.error("Error fetching balance:", error);
+        console.error("Error fetching balance:", {
+          error,
+          tokenAddress,
+          walletAddress,
+        });
+        // Don't throw, just set balance to 0
+        setBalance(0n);
       }
     };
 
@@ -93,7 +105,7 @@ export function StakeButton({
 
   const handleStake = async (amount: bigint) => {
     if (!window.ethereum || !user?.wallet?.address) return;
-    const walletAddress = user.wallet.address; // Store in a const to satisfy TypeScript
+    const walletAddress = user.wallet.address;
 
     const walletClient = createWalletClient({
       chain: base,
@@ -107,14 +119,14 @@ export function StakeButton({
         address: toHex(tokenAddress),
         abi: superAbi,
         functionName: "approve",
-        args: [toHex(stakingPool), amount],
+        args: [toHex(stakingAddress), amount],
       });
 
       await publicClient.waitForTransactionReceipt({ hash: approveTx });
 
       // Then stake them
       const stakeTx = await walletClient.writeContract({
-        address: toHex(stakingPool),
+        address: toHex(stakingAddress),
         abi: stakingAbi,
         functionName: "stake",
         args: [toHex(walletAddress), amount],
@@ -123,7 +135,7 @@ export function StakeButton({
       await publicClient.waitForTransactionReceipt({ hash: stakeTx });
     } catch (error) {
       console.error("Staking error:", error);
-      throw error; // Re-throw to be handled by the modal
+      throw error;
     }
   };
 

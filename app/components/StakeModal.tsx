@@ -50,9 +50,11 @@ export function StakeModal({
   const [isStaking, setIsStaking] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [step, setStep] = useState<"idle" | "approving" | "staking">("idle");
+  const [error, setError] = useState<string | null>(null);
   const { user } = usePrivy();
 
   const handleStake = async () => {
+    setError(null);
     try {
       setIsStaking(true);
       setStep("approving");
@@ -60,7 +62,17 @@ export function StakeModal({
       setStep("staking");
       setIsSuccess(true);
     } catch (error) {
-      console.error("Staking failed:", error);
+      if (error instanceof Error) {
+        // Handle user rejection
+        if (error.message.includes("User rejected")) {
+          setError("Transaction cancelled");
+        } else {
+          setError("Failed to stake tokens. Please try again.");
+        }
+      } else {
+        setError("An unexpected error occurred");
+      }
+      console.error("Staking error:", error);
     } finally {
       setIsStaking(false);
       setStep("idle");
@@ -70,6 +82,7 @@ export function StakeModal({
   const handleClose = () => {
     setAmount("");
     setIsSuccess(false);
+    setError(null);
     onClose();
   };
 
@@ -106,6 +119,9 @@ export function StakeModal({
             </span>
           )}
         </div>
+
+        {error && <div className="alert alert-error text-sm">{error}</div>}
+
         <div>
           <div className="flex justify-between text-sm mb-2">
             <span className="opacity-60">Amount</span>

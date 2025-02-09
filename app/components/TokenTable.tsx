@@ -484,7 +484,7 @@ const ActionButtons = ({
       </button>
       <StakeButton
         tokenAddress={tokenAddress}
-        stakingAddress={token.staking_pool}
+        stakingAddress={token.staking_address}
         stakingPool={token.staking_pool}
         disabled={!hasTokens}
         symbol={token.symbol}
