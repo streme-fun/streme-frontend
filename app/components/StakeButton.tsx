@@ -61,45 +61,33 @@ export function StakeButton({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [balance, setBalance] = useState<bigint>(0n);
 
-  useEffect(() => {
+  const fetchBalance = async () => {
     if (!user?.wallet?.address) return;
     const walletAddress = user.wallet.address;
 
-    const fetchBalance = async () => {
-      try {
-        console.log("Fetching balance for:", {
-          tokenAddress,
-          walletAddress,
-        });
+    try {
+      const bal = await publicClient.readContract({
+        address: toHex(tokenAddress),
+        abi: [
+          {
+            inputs: [{ name: "account", type: "address" }],
+            name: "balanceOf",
+            outputs: [{ name: "", type: "uint256" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ],
+        functionName: "balanceOf",
+        args: [toHex(walletAddress)],
+      });
+      setBalance(bal);
+    } catch (error) {
+      console.error("Error fetching balance:", error);
+      setBalance(0n);
+    }
+  };
 
-        const bal = await publicClient.readContract({
-          address: toHex(tokenAddress),
-          abi: [
-            {
-              inputs: [{ name: "account", type: "address" }],
-              name: "balanceOf",
-              outputs: [{ name: "", type: "uint256" }],
-              stateMutability: "view",
-              type: "function",
-            },
-          ],
-          functionName: "balanceOf",
-          args: [toHex(walletAddress)],
-        });
-
-        console.log("Balance fetched:", bal.toString());
-        setBalance(bal);
-      } catch (error) {
-        console.error("Error fetching balance:", {
-          error,
-          tokenAddress,
-          walletAddress,
-        });
-        // Don't throw, just set balance to 0
-        setBalance(0n);
-      }
-    };
-
+  useEffect(() => {
     fetchBalance();
   }, [user?.wallet?.address, tokenAddress]);
 
@@ -133,6 +121,9 @@ export function StakeButton({
       });
 
       await publicClient.waitForTransactionReceipt({ hash: stakeTx });
+
+      // Refresh balance after successful stake
+      await fetchBalance();
     } catch (error) {
       console.error("Staking error:", error);
       throw error;

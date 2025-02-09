@@ -312,10 +312,17 @@ export function TokenActions({ token }: TokenActionsProps) {
           className={`btn btn-outline flex-1 relative 
             before:absolute before:inset-0 before:bg-gradient-to-r 
             before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] 
-            before:scale-x-0 hover:before:scale-x-100 
-            before:origin-left before:opacity-0 hover:before:opacity-20
+            before:opacity-30
+            hover:before:opacity-40
+            border-[#ffa647]/30
             hover:border-[#ffa647]/50
+            shadow-[0_0_5px_rgba(255,166,71,0.3)]
             hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]
+            disabled:before:opacity-0
+            disabled:hover:before:opacity-0
+            disabled:border-opacity-0
+            disabled:shadow-none
+            disabled:hover:shadow-none
             ${!hasTokens && "btn-disabled opacity-50"}`}
         />
       </div>

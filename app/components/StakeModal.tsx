@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { formatUnits, parseUnits } from "viem";
 import { Modal } from "./Modal";
-import ReactConfetti from "react-confetti";
-import { useWindowSize } from "react-use";
 
 interface StakeModalProps {
   isOpen: boolean;
@@ -89,20 +87,11 @@ export function StakeModal({
   };
 
   if (isSuccess) {
-    const { width, height } = useWindowSize();
-
     return (
       <Modal isOpen={isOpen} onClose={handleClose}>
-        <ReactConfetti
-          width={width}
-          height={height}
-          recycle={false}
-          numberOfPieces={200}
-          gravity={0.3}
-        />
-        <div className="p-6 space-y-4">
+        <div className="p-4 space-y-3">
           <h3 className="text-lg font-bold">Stake Successful! 🎉</h3>
-          <div className="relative h-32 w-full overflow-hidden rounded-lg bg-black/5">
+          <div className="relative h-24 w-full overflow-hidden rounded-lg">
             <svg
               width="100%"
               height="100%"
@@ -126,7 +115,34 @@ export function StakeModal({
                 className="reward-particle"
                 style={{
                   offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
-                  animationDelay: "-1s",
+                  animationDelay: "-0.2s",
+                }}
+              >
+                <circle r="4" fill="currentColor" className="text-primary" />
+              </g>
+              <g
+                className="reward-particle"
+                style={{
+                  offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                  animationDelay: "-0.4s",
+                }}
+              >
+                <circle r="4" fill="currentColor" className="text-primary" />
+              </g>
+              <g
+                className="reward-particle"
+                style={{
+                  offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                  animationDelay: "-0.6s",
+                }}
+              >
+                <circle r="4" fill="currentColor" className="text-primary" />
+              </g>
+              <g
+                className="reward-particle"
+                style={{
+                  offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                  animationDelay: "-0.8s",
                 }}
               >
                 <circle r="4" fill="currentColor" className="text-primary" />
@@ -147,7 +163,7 @@ export function StakeModal({
             `}</style>
           </div>
           <p className="text-center">
-            Token rewards are now being streamed directly to you
+            Token rewards are now being streamed directly to you.
           </p>
           <a
             href={`https://explorer.superfluid.finance/base-mainnet/accounts/${user?.wallet?.address}?tab=pools`}
@@ -186,48 +202,56 @@ export function StakeModal({
               Balance: {formatBalance(balance)} {symbol}
             </span>
           </div>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.0000"
-            step="0.0001"
-            className="input input-bordered w-full"
-          />
-          <button
-            className="btn btn-xs btn-ghost mt-2"
-            onClick={() => setAmount(formatUnits(balance, 18))}
-          >
-            Max
-          </button>
+          <div className="space-y-4">
+            <div className="relative">
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.0000"
+                step="0.0001"
+                className="input input-bordered w-full"
+              />
+              <button
+                className="btn btn-xs btn-ghost absolute right-2 top-1/2 -translate-y-1/2"
+                onClick={() => setAmount(formatUnits(balance, 18))}
+              >
+                Max
+              </button>
+            </div>
+            <button
+              className={`btn w-full relative overflow-hidden
+                before:absolute before:inset-0 before:bg-gradient-to-r 
+                before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f]
+                before:opacity-30
+                hover:before:opacity-40
+                border-[#ffa647]/30
+                hover:border-[#ffa647]/50
+                shadow-[0_0_5px_rgba(255,166,71,0.3)]
+                hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]
+                disabled:before:opacity-0
+                disabled:hover:before:opacity-0
+                disabled:border-opacity-0
+                disabled:shadow-none
+                disabled:hover:shadow-none`}
+              onClick={handleStake}
+              disabled={
+                isStaking ||
+                !amount ||
+                parseUnits(amount || "0", 18) > balance ||
+                parseUnits(amount || "0", 18) <= 0n
+              }
+            >
+              {step === "approving" ? (
+                <LoadingText text="Approving" />
+              ) : step === "staking" ? (
+                <LoadingText text="Staking" />
+              ) : (
+                "Stake"
+              )}
+            </button>
+          </div>
         </div>
-        <button
-          className={`btn w-full relative overflow-hidden
-            before:absolute before:inset-0 before:bg-gradient-to-r 
-            before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f]
-            before:opacity-20
-            hover:before:opacity-30
-            hover:border-[#ffa647]/50
-            hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]
-            disabled:before:opacity-0
-            disabled:hover:before:opacity-0
-            disabled:hover:shadow-none`}
-          onClick={handleStake}
-          disabled={
-            isStaking ||
-            !amount ||
-            parseUnits(amount || "0", 18) > balance ||
-            parseUnits(amount || "0", 18) <= 0n
-          }
-        >
-          {step === "approving" ? (
-            <LoadingText text="Approving" />
-          ) : step === "staking" ? (
-            <LoadingText text="Staking" />
-          ) : (
-            "Stake"
-          )}
-        </button>
       </div>
     </Modal>
   );
