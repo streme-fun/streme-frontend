@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { createPublicClient, http, createWalletClient, custom } from "viem";
 import { base } from "viem/chains";
@@ -61,7 +61,7 @@ export function StakeButton({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [balance, setBalance] = useState<bigint>(0n);
 
-  const fetchBalance = async () => {
+  const fetchBalance = useCallback(async () => {
     if (!user?.wallet?.address) return;
     const walletAddress = user.wallet.address;
 
@@ -85,11 +85,11 @@ export function StakeButton({
       console.error("Error fetching balance:", error);
       setBalance(0n);
     }
-  };
+  }, [user?.wallet?.address, tokenAddress]);
 
   useEffect(() => {
     fetchBalance();
-  }, [user?.wallet?.address, tokenAddress]);
+  }, [user?.wallet?.address, tokenAddress, stakingAddress, fetchBalance]);
 
   const handleStake = async (amount: bigint) => {
     if (!window.ethereum || !user?.wallet?.address) return;

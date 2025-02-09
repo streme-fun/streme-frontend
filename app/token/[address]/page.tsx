@@ -1,47 +1,31 @@
 import { TokenPageContent } from "./TokenPageContent";
 import { Metadata } from "next";
 
-// Make the page dynamic to ensure fresh meta tags
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-// Add metadata function to generate OG and Frame tags
-export async function generateMetadata({
-  params,
-}: {
-  params: { address: string };
-}): Promise<Metadata> {
-  const tokenAddress = params.address;
-
-  // Base URL - replace with your actual domain
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://streme.fun";
-  const pageUrl = `${baseUrl}/token/${tokenAddress}`;
-
-  // Frame image URL - replace with your actual image generation URL
-  const imageUrl = `${baseUrl}/api/og/token/${tokenAddress}`;
-
-  return {
-    metadataBase: new URL(baseUrl),
-    openGraph: {
-      title: "View Token Details",
-      description: "Check out this token and start staking",
-      images: [imageUrl],
-    },
-    other: {
-      // Frame metadata
-      "fc:frame": "vNext",
-      "fc:frame:image": imageUrl,
-      "fc:frame:button:1": "View Token",
-      "fc:frame:button:1:action": "link",
-      "fc:frame:button:1:target": pageUrl,
-      "fc:frame:button:2": "Share",
-      "fc:frame:button:2:action": "link",
-      "fc:frame:button:2:target": `https://warpcast.com/~/compose?text=Check%20out%20this%20token!%20${encodeURIComponent(
-        pageUrl
-      )}`,
-    },
-  };
-}
+export const metadata: Metadata = {
+  title: "The Streme Team",
+  description: "The Streme Team",
+  metadataBase: new URL("https://streme.fun"),
+  viewport: "width=device-width, initial-scale=1",
+  other: {
+    "fc:frame": "vNext",
+    "fc:frame:image":
+      "https://imagedelivery.net/BXluQx4ige9GuW0Ia56BHw/d47990cc-e752-4f47-fcf7-0fe278286400/original",
+    "fc:frame:image:aspect_ratio": "1:1",
+    "fc:frame:button:1": "Trade",
+    "fc:frame:button:1:action": "link",
+    "fc:frame:button:1:target":
+      "https://streme.fun/token/0x340d15c2930805f47e946b934252b25406f365ac",
+    "fc:frame:button:2": "Share",
+    "fc:frame:button:2:action": "link",
+    "fc:frame:button:2:target":
+      "https://warpcast.com/~/compose?text=Check%20out%20$%3Csymbol%3E%20deployed%20by%20@%3Cdeployer%3E%20on%20Streme.fun!&embeds[]=https://streme.fun/token/0x340d15c2930805f47e946b934252b25406f365ac",
+  },
+  openGraph: {
+    title: "The Streme Team",
+    images:
+      "https://imagedelivery.net/BXluQx4ige9GuW0Ia56BHw/d47990cc-e752-4f47-fcf7-0fe278286400/original",
+  },
+};
 
 export default function TokenPage() {
   return <TokenPageContent />;
