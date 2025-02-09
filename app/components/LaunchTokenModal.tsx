@@ -58,8 +58,8 @@ Symbol: $[your ticker]
               Required Information
             </h3>
             <ul className="list-disc list-inside opacity-80 space-y-2">
-              <li>Token Name (e.g., "Based Pepe")</li>
-              <li>Token Symbol (e.g., "PEPE")</li>
+              <li>Token Name (e.g., &quot;Based Pepe&quot;)</li>
+              <li>Token Symbol (e.g., &quot;PEPE&quot;)</li>
               <li>Token Image (attach to your cast)</li>
               <li>Mention @streme</li>
             </ul>
@@ -71,7 +71,7 @@ Symbol: $[your ticker]
             </h3>
             <p className="opacity-80">
               Once you cast, our system will automatically process your request
-              and deploy your token. You'll receive a reply with your token
+              and deploy your token. You&apos;ll receive a reply with your token
               details and contract address.
             </p>
           </div>
