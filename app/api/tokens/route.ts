@@ -6,8 +6,17 @@ type CreatorProfile = NonNullable<Token["creator"]>;
 
 export async function GET() {
   try {
+    // Add cache control headers
+    const headers = {
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+    };
+
     // Fetch tokens
-    const response = await fetch("https://api.streme.fun/api/tokens");
+    const response = await fetch("https://api.streme.fun/api/tokens", {
+      cache: "no-store",
+    });
     const tokens: Token[] = await response.json();
 
     // Get unique creator IDs
@@ -66,7 +75,7 @@ export async function GET() {
       return enrichedToken;
     });
 
-    return Response.json({ data: enrichedTokens });
+    return Response.json({ data: enrichedTokens }, { headers });
   } catch (error) {
     console.error("Error fetching tokens:", error);
     return Response.json({ error: "Failed to fetch tokens" }, { status: 500 });

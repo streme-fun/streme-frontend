@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import FarcasterIcon from "@/public/farcaster.svg";
 import { SearchBar } from "./SearchBar";
 import { SortMenu } from "./SortMenu";
 import { Token } from "../types/token";
@@ -20,6 +21,12 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
     }, 50);
     return () => clearInterval(interval);
   }, [token.marketCap]);
+
+  // Helper function to shorten hash
+  const shortenHash = (hash: string | undefined) => {
+    if (!hash) return "";
+    return hash.slice(0, 10);
+  };
 
   return (
     <Link href={`/token/${token.contract_address}`} className="block group">
@@ -83,14 +90,26 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
               <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300">
                 {token.creator?.name ?? "Unknown"}
               </span>
-              <div className="flex items-center gap-2 ml-auto text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300">
-                <span className="hover:text-primary">
-                  🔄 {token.creator?.recasts ?? 0}
-                </span>
-                <span className="hover:text-primary">
-                  ❤️ {token.creator?.likes ?? 0}
-                </span>
-              </div>
+              {token.cast_hash && token.creator?.name && (
+                <a
+                  href={`https://warpcast.com/${
+                    token.creator.name
+                  }/${shortenHash(token.cast_hash)}`}
+                  onClick={(e) => e.stopPropagation()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-primary inline-flex items-center ml-auto"
+                  title={shortenHash(token.cast_hash)}
+                >
+                  <Image
+                    src={FarcasterIcon}
+                    alt={`View on Farcaster: ${shortenHash(token.cast_hash)}`}
+                    width={12}
+                    height={12}
+                    className="opacity-80 group-hover:opacity-100"
+                  />
+                </a>
+              )}
             </div>
           </div>
 
@@ -114,8 +133,28 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
   );
 };
 
-export function TokenGrid({ tokens }: TokenGridProps) {
+export function TokenGrid({ tokens: initialTokens }: TokenGridProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [tokens, setTokens] = useState(initialTokens);
+
+  // Add polling effect
+  useEffect(() => {
+    const pollTokens = async () => {
+      try {
+        const response = await fetch("/api/tokens");
+        const data = await response.json();
+        if (data.data) {
+          setTokens(data.data);
+        }
+      } catch (error) {
+        console.error("Error polling tokens:", error);
+      }
+    };
+
+    // Poll every 10 seconds
+    const interval = setInterval(pollTokens, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const filteredTokens = tokens.filter((token) => {
     const searchLower = searchQuery.toLowerCase();

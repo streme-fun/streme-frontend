@@ -4,11 +4,13 @@ import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
 import { useState } from "react";
 import { HowItWorksModal } from "./HowItWorksModal";
+import { LaunchTokenModal } from "./LaunchTokenModal";
 
 export function Navbar() {
   const { login, logout, authenticated } = usePrivy();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
+  const [isLaunchTokenOpen, setIsLaunchTokenOpen] = useState(false);
 
   return (
     <>
@@ -97,9 +99,12 @@ export function Navbar() {
 
           {/* Desktop Menu */}
           <div className="hidden lg:flex items-center gap-6">
-            <Link href="/launch" className="btn btn-primary">
+            <button
+              onClick={() => setIsLaunchTokenOpen(true)}
+              className="btn btn-primary"
+            >
               Launch a Token
-            </Link>
+            </button>
             <button
               onClick={() => setIsHowItWorksOpen(true)}
               className="btn btn-ghost"
@@ -135,13 +140,15 @@ export function Navbar() {
             >
               How It Works
             </button>
-            <Link
-              href="/launch"
+            <button
+              onClick={() => {
+                setIsLaunchTokenOpen(true);
+                setIsMenuOpen(false);
+              }}
               className="btn btn-primary w-full justify-start"
-              onClick={() => setIsMenuOpen(false)}
             >
               Launch a Token
-            </Link>
+            </button>
             {authenticated ? (
               <button
                 onClick={() => {
@@ -170,6 +177,10 @@ export function Navbar() {
       <HowItWorksModal
         isOpen={isHowItWorksOpen}
         onClose={() => setIsHowItWorksOpen(false)}
+      />
+      <LaunchTokenModal
+        isOpen={isLaunchTokenOpen}
+        onClose={() => setIsLaunchTokenOpen(false)}
       />
     </>
   );

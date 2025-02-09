@@ -143,7 +143,28 @@ interface TokenTableProps {
   tokens: Token[];
 }
 
-export function TokenTable({ tokens }: TokenTableProps) {
+export function TokenTable({ tokens: initialTokens }: TokenTableProps) {
+  const [tokens, setTokens] = useState(initialTokens);
+
+  // Add polling effect
+  useEffect(() => {
+    const pollTokens = async () => {
+      try {
+        const response = await fetch("/api/tokens");
+        const data = await response.json();
+        if (data.data) {
+          setTokens(data.data);
+        }
+      } catch (error) {
+        console.error("Error polling tokens:", error);
+      }
+    };
+
+    // Poll every 10 seconds
+    const interval = setInterval(pollTokens, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   const table = useReactTable({
     data: tokens,
     columns,
