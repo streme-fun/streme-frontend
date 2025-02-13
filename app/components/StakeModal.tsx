@@ -38,6 +38,8 @@ const formatBalance = (value: bigint, decimals: number = 18) => {
   return parseFloat(formatUnits(value, decimals)).toFixed(4);
 };
 
+const REWARDS_PER_SECOND = 634.1958449;
+
 const AnimatedNumber = ({
   value,
   symbol,
@@ -52,20 +54,21 @@ const AnimatedNumber = ({
     // Reset to 0 when value changes
     setCurrent(0);
 
-    // Constant slow increase
+    // Update every 50ms with the rewards rate
     const interval = setInterval(() => {
-      setCurrent((prev) => prev + target * 0.005); // Just keep increasing!
-    }, 0.5);
+      setCurrent((prev) => {
+        // REWARDS_PER_SECOND / 20 because we update every 50ms (1000ms/50ms = 20)
+        const increment = REWARDS_PER_SECOND / 20;
+        return prev + increment > target ? target : prev + increment;
+      });
+    }, 50);
 
     return () => clearInterval(interval);
   }, [target]);
 
   return (
     <div className="font-mono text-2xl text-center">
-      {current.toLocaleString(undefined, {
-        minimumFractionDigits: 4,
-        maximumFractionDigits: 4,
-      })}{" "}
+      {Math.floor(current).toLocaleString()}{" "}
       <span className="text-base opacity-60">{symbol}</span>
     </div>
   );
