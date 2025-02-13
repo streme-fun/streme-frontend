@@ -89,7 +89,7 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
   return (
     <Link href={`/token/${token.contract_address}`} className="block group">
       <div
-        className="card card-side bg-base-100 rounded-none border-3 border-base-900 
+        className="card card-side bg-base-100 rounded-md border-1 border-gray-300 
         hover:bg-black/[.02] dark:hover:bg-white/[.02] transition-all duration-300 ease-out
         hover:shadow-lg hover:-translate-y-1 group-hover:border-primary/20"
       >

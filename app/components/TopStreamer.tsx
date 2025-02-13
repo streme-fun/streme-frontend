@@ -62,7 +62,7 @@ export function TopStreamer() {
       <div className="max-w-md mx-auto">
         <Link href={`/token/${token.contract_address}`} className="block group">
           <div
-            className="card card-side bg-base-100 rounded-none border-3 border-base-900 
+            className="card card-side bg-base-100 border-1 border-gray-300 rounded-md 
             hover:bg-black/[.02] dark:hover:bg-white/[.02] transition-all duration-300 ease-out
             hover:shadow-lg hover:-translate-y-1 group-hover:border-primary/20"
           >

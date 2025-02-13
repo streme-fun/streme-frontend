@@ -66,19 +66,23 @@ const AnimatedReward = ({ value }: { value: number }) => {
 const formatPrice = (price: number | undefined) => {
   if (!price || isNaN(price)) return "-";
 
-  // For very small numbers (< 0.000001), use scientific notation
-  if (price < 0.000001) {
-    const scientificStr = price.toExponential(2);
-    const [base, exponent] = scientificStr.split("e");
+  if (price < 0.01 && price > 0) {
+    // Find the first non-zero decimal place
+    const decimalStr = price.toFixed(20).split(".")[1];
+    let zeroCount = 0;
+    while (decimalStr[zeroCount] === "0") {
+      zeroCount++;
+    }
+
+    // Format as 0.0₅984 (example)
     return (
       <span className="whitespace-nowrap">
-        ${base}
-        <span className="text-xs opacity-60">×10{exponent}</span>
+        $0.0{zeroCount > 0 && <sub>{zeroCount}</sub>}
+        {decimalStr.slice(zeroCount, zeroCount + 4)}
       </span>
     );
   }
 
-  // For regular numbers, use standard formatting
   return `$${price.toLocaleString(undefined, {
     minimumFractionDigits: 6,
     maximumFractionDigits: 6,

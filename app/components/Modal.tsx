@@ -15,7 +15,7 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
         className="fixed inset-0 bg-base-200/80 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-base-100 rounded-lg shadow-xl w-full max-w-md">
+      <div className="relative bg-base-100 rounded-xl shadow-xl w-full max-w-md">
         {children}
       </div>
     </div>
