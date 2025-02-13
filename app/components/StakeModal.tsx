@@ -85,7 +85,9 @@ export function StakeModal({
   const [amount, setAmount] = useState("");
   const [isStaking, setIsStaking] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [step, setStep] = useState<"idle" | "approving" | "staking">("idle");
+  const [step, setStep] = useState<
+    "idle" | "approving" | "staking" | "connecting"
+  >("idle");
   const [error, setError] = useState<string | null>(null);
   const { user } = usePrivy();
 
@@ -96,10 +98,12 @@ export function StakeModal({
       setStep("approving");
       await onStake(parseUnits(amount, 18));
       setStep("staking");
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setStep("connecting");
+      await new Promise((resolve) => setTimeout(resolve, 500));
       setIsSuccess(true);
     } catch (error) {
       if (error instanceof Error) {
-        // Handle user rejection
         if (error.message.includes("User rejected")) {
           setError("Transaction cancelled");
         } else {
@@ -201,7 +205,7 @@ export function StakeModal({
           <AnimatedNumber value={amount} symbol={symbol} />
 
           <p className="text-center">
-            Token rewards are now being streamed directly to you.
+            Token rewards are now being streamed directly to your wallet.
           </p>
           <a
             href={`https://explorer.superfluid.finance/base-mainnet/accounts/${user?.wallet?.address}?tab=pools`}
@@ -284,6 +288,8 @@ export function StakeModal({
                 <LoadingText text="Approving" />
               ) : step === "staking" ? (
                 <LoadingText text="Staking" />
+              ) : step === "connecting" ? (
+                <LoadingText text="Connecting to Pool" />
               ) : (
                 "Stake"
               )}

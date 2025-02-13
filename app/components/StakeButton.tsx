@@ -32,6 +32,31 @@ const stakingAbi = [
   },
 ] as const;
 
+const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
+
+const gdaABI = [
+  {
+    inputs: [
+      { name: "pool", type: "address" },
+      { name: "member", type: "address" },
+    ],
+    name: "isMemberConnected",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "pool", type: "address" },
+      { name: "userData", type: "bytes" },
+    ],
+    name: "connectPool",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
 const publicClient = createPublicClient({
   chain: base,
   transport: http(),
@@ -42,7 +67,7 @@ const toHex = (address: string) => address as `0x${string}`;
 interface StakeButtonProps {
   tokenAddress: string;
   stakingAddress: string;
-  stakingPool: string;
+  stakingPoolAddress: string;
   disabled?: boolean;
   className?: string;
   symbol: string;
@@ -52,6 +77,7 @@ interface StakeButtonProps {
 export function StakeButton({
   tokenAddress,
   stakingAddress,
+  stakingPoolAddress,
   disabled,
   className,
   symbol,
@@ -89,7 +115,7 @@ export function StakeButton({
 
   useEffect(() => {
     fetchBalance();
-  }, [user?.wallet?.address, tokenAddress]);
+  }, [user?.wallet?.address, tokenAddress, fetchBalance]);
 
   const handleStake = async (amount: bigint) => {
     if (!window.ethereum || !user?.wallet?.address) return;
@@ -121,6 +147,26 @@ export function StakeButton({
       });
 
       await publicClient.waitForTransactionReceipt({ hash: stakeTx });
+
+      // Finally connect to the GDA pool
+      const connected = await publicClient.readContract({
+        address: toHex(GDA_FORWARDER),
+        abi: gdaABI,
+        functionName: "isMemberConnected",
+        args: [toHex(stakingPoolAddress), toHex(walletAddress)],
+      });
+
+      if (!connected) {
+        const userData = "0x" as const;
+        const connectTx = await walletClient.writeContract({
+          address: toHex(GDA_FORWARDER),
+          abi: gdaABI,
+          functionName: "connectPool",
+          args: [toHex(stakingPoolAddress), userData],
+        });
+
+        await publicClient.waitForTransactionReceipt({ hash: connectTx });
+      }
 
       // Refresh balance after successful stake
       await fetchBalance();
