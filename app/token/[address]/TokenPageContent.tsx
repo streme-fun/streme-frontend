@@ -78,7 +78,13 @@ export function TokenPageContent() {
   }, [address]);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex items-center justify-center min-h-[500px]">
+          <div className="loading loading-bars loading-lg text-primary"></div>
+        </div>
+      </div>
+    );
   }
 
   if (!token) {
