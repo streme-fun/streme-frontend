@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { Token } from "@/app/types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
-import { fetchPoolData } from "@/app/lib/geckoterminal";
 import { StakeButton } from "@/app/components/StakeButton";
 import { UniswapModal } from "@/app/components/UniswapModal";
 import { createPublicClient, http } from "viem";
@@ -80,18 +79,11 @@ const shortenHash = (hash: string | undefined) => {
   return hash.slice(0, 10);
 };
 
-export function TokenActions({ token }: TokenActionsProps) {
+export function TokenActions({ token: initialToken }: TokenActionsProps) {
   const [isUniswapOpen, setIsUniswapOpen] = useState(false);
-  const [tokenData, setTokenData] = useState<{
-    rewards: number;
-    stakers: number;
-    totalMembers?: string;
-    price?: number;
-    change1h?: number;
-    change24h?: number;
-    volume24h?: number;
-    marketCap?: number;
-  }>();
+  const [token, setToken] = useState(initialToken);
+  const [rewardsData, setRewardsData] = useState<number>(0);
+  const [membersData, setMembersData] = useState<string>("0");
 
   const { user, ready } = usePrivy();
   const address = user?.wallet?.address;
@@ -100,32 +92,48 @@ export function TokenActions({ token }: TokenActionsProps) {
 
   // Fetch token data
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchToken = async () => {
       try {
-        const { totalStreamed, totalStakers, totalMembers } =
-          await calculateRewards(
-            token.created_at,
-            token.contract_address,
-            token.staking_pool
+        const response = await fetch("/api/tokens");
+        const data = await response.json();
+        if (data.data) {
+          const updatedToken = data.data.find(
+            (t: Token) => t.contract_address === token.contract_address
           );
-
-        const marketData = token.pool_address
-          ? await fetchPoolData(token.pool_address)
-          : null;
-
-        setTokenData({
-          rewards: totalStreamed,
-          stakers: totalStakers,
-          totalMembers,
-          ...marketData,
-        });
+          if (updatedToken) {
+            setToken(updatedToken);
+          }
+        }
       } catch (error) {
-        console.error("Error fetching token data:", error);
+        console.error("Error fetching token:", error);
       }
     };
 
-    fetchData();
+    fetchToken();
+  }, [token.contract_address]);
+
+  // Calculate rewards and members
+  useEffect(() => {
+    const calculateData = async () => {
+      const { totalStreamed, totalMembers } = await calculateRewards(
+        token.created_at,
+        token.contract_address,
+        token.staking_pool
+      );
+      setRewardsData(totalStreamed);
+      setMembersData(totalMembers);
+    };
+
+    calculateData();
   }, [token]);
+
+  // Update rewards periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRewardsData((prev) => prev + REWARDS_PER_SECOND);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch balance
   useEffect(() => {
@@ -183,15 +191,15 @@ export function TokenActions({ token }: TokenActionsProps) {
             <span className="text-base opacity-60">${token.symbol}</span>
             <span
               className={`text-base ${
-                tokenData?.change24h && tokenData.change24h >= 0
+                token.change24h && token.change24h >= 0
                   ? "text-green-500"
                   : "text-red-500"
               }`}
             >
-              {tokenData?.change24h
-                ? `${
-                    tokenData.change24h >= 0 ? "+" : ""
-                  }${tokenData.change24h.toFixed(2)}%`
+              {token.change24h
+                ? `${token.change24h >= 0 ? "+" : ""}${token.change24h.toFixed(
+                    2
+                  )}%`
                 : "-"}
             </span>
           </div>
@@ -203,22 +211,22 @@ export function TokenActions({ token }: TokenActionsProps) {
         <div>
           <div className="text-sm opacity-60 mb-1">Price</div>
           <div className="font-mono text-2xl font-bold">
-            {formatPrice(tokenData?.price)}
+            {formatPrice(token.price)}
           </div>
         </div>
         <div className="text-right">
           <div className="text-sm opacity-60 mb-1">24h Change</div>
           <div
             className={`font-mono text-lg ${
-              tokenData?.change24h && tokenData.change24h >= 0
+              token.change24h && token.change24h >= 0
                 ? "text-green-500"
                 : "text-red-500"
             }`}
           >
-            {tokenData?.change24h
-              ? `${
-                  tokenData.change24h >= 0 ? "+" : ""
-                }${tokenData.change24h.toFixed(2)}%`
+            {token.change24h
+              ? `${token.change24h >= 0 ? "+" : ""}${token.change24h.toFixed(
+                  2
+                )}%`
               : "-"}
           </div>
         </div>
@@ -275,13 +283,13 @@ export function TokenActions({ token }: TokenActionsProps) {
         <div>
           <div className="text-sm opacity-60 mb-1">Volume 24h</div>
           <div className="font-mono text-lg">
-            {formatCurrency(tokenData?.volume24h)}
+            {formatCurrency(token.volume24h)}
           </div>
         </div>
         <div>
           <div className="text-sm opacity-60 mb-1">Market Cap</div>
           <div className="font-mono text-lg">
-            {formatCurrency(tokenData?.marketCap)}
+            {formatCurrency(token.marketCap)}
           </div>
         </div>
       </div>
@@ -290,10 +298,10 @@ export function TokenActions({ token }: TokenActionsProps) {
       <div className="flex items-center justify-between px-1">
         <div>
           <div className="text-sm opacity-60 mb-1">
-            Rewards ({tokenData?.totalMembers ?? 0}{" "}
-            {tokenData?.totalMembers === "1" ? "staker" : "stakers"})
+            Rewards ({membersData ?? 0}{" "}
+            {membersData === "1" ? "staker" : "stakers"})
           </div>
-          <AnimatedReward value={tokenData?.rewards ?? 0} />
+          <AnimatedReward value={rewardsData} />
         </div>
         <div className="text-sm opacity-40">
           {REWARDS_PER_SECOND.toFixed(2)} ${token.symbol}/sec
@@ -314,7 +322,7 @@ export function TokenActions({ token }: TokenActionsProps) {
           stakingPoolAddress={token.staking_pool}
           disabled={!hasTokens}
           symbol={token.symbol}
-          totalStakers={tokenData?.totalMembers}
+          totalStakers={membersData}
           className={`btn btn-outline flex-1 relative 
             before:absolute before:inset-0 before:bg-gradient-to-r 
             before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] 
