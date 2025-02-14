@@ -1,3 +1,10 @@
+interface Token {
+  contract_address: string;
+  name: string;
+  symbol: string;
+  description: string;
+}
+
 export async function getTokenData(address: string) {
   try {
     // Fetch all tokens from our API
@@ -16,7 +23,7 @@ export async function getTokenData(address: string) {
 
     // Find the specific token by address
     const token = tokens.find(
-      (t: any) => t.contract_address.toLowerCase() === address.toLowerCase()
+      (t: Token) => t.contract_address.toLowerCase() === address.toLowerCase()
     );
 
     if (!token) {
