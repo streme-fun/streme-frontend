@@ -8,7 +8,7 @@ import {
   getSortedRowModel,
   SortingState,
 } from "@tanstack/react-table";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Token } from "../types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
@@ -36,9 +36,32 @@ const PriceChange = ({ value }: { value: number | undefined }) => {
 };
 
 const AnimatedReward = ({ value }: { value: number }) => {
+  const [displayValue, setDisplayValue] = useState(value);
+
+  useEffect(() => {
+    // Smoothly animate to new value
+    const frameDuration = 50; // 20 fps
+    const frames = 20; // 1 second animation
+    const increment = (value - displayValue) / frames;
+
+    let frame = 0;
+    const interval = setInterval(() => {
+      if (frame >= frames) {
+        setDisplayValue(value);
+        clearInterval(interval);
+        return;
+      }
+
+      setDisplayValue((prev) => prev + increment);
+      frame++;
+    }, frameDuration);
+
+    return () => clearInterval(interval);
+  }, [value]);
+
   return (
     <div className="font-mono text-right">
-      {value.toLocaleString(undefined, {
+      {displayValue.toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}
@@ -85,199 +108,181 @@ interface TokenTableProps {
   tokens: Token[];
 }
 
-export function TokenTable({ tokens: initialTokens }: TokenTableProps) {
+export function TokenTable({ tokens }: TokenTableProps) {
   const router = useRouter();
-  const [tokens, setTokens] = useState(initialTokens);
   const [rewardsData, setRewardsData] = useState<Map<string, number>>(
     new Map()
   );
   const [membersData, setMembersData] = useState<Map<string, string>>(
     new Map()
   );
-  const [isLoading, setIsLoading] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([
     { id: "marketCap", desc: true },
   ]);
 
-  // Remove the polling effect and replace with a single fetch
-  useEffect(() => {
-    const fetchTokens = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch("/api/tokens");
-        const data = await response.json();
-        if (data.data) {
-          setTokens(data.data);
-        }
-      } catch (error) {
-        console.error("Error fetching tokens:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Memoize the data calculations
+  const calculateAllData = useCallback(async () => {
+    const promises = tokens.map(async (token) => {
+      const { totalStreamed, totalMembers } = await calculateRewards(
+        token.created_at,
+        token.contract_address,
+        token.staking_pool
+      );
+      return {
+        address: token.contract_address,
+        rewards: totalStreamed,
+        members: totalMembers,
+      };
+    });
 
-    fetchTokens();
-  }, []); // Only runs once on mount
-
-  // Add effect for calculating rewards and members
-  useEffect(() => {
-    const calculateAllData = async () => {
-      const promises = tokens.map(async (token) => {
-        const { totalStreamed, totalMembers } = await calculateRewards(
-          token.created_at,
-          token.contract_address,
-          token.staking_pool
-        );
-        return {
-          address: token.contract_address,
-          rewards: totalStreamed,
-          members: totalMembers,
-        };
-      });
-
-      const results = await Promise.all(promises);
-      const newRewardsData = new Map();
-      const newMembersData = new Map();
-      results.forEach(({ address, rewards, members }) => {
-        newRewardsData.set(address, rewards);
-        newMembersData.set(address, members);
-      });
-      setRewardsData(newRewardsData);
-      setMembersData(newMembersData);
-    };
-
-    calculateAllData();
+    const results = await Promise.all(promises);
+    const newRewardsData = new Map();
+    const newMembersData = new Map();
+    results.forEach(({ address, rewards, members }) => {
+      newRewardsData.set(address, rewards);
+      newMembersData.set(address, members);
+    });
+    setRewardsData(newRewardsData);
+    setMembersData(newMembersData);
   }, [tokens]);
 
-  // Update rewards periodically
+  // Initial data load
+  useEffect(() => {
+    calculateAllData();
+  }, [calculateAllData]);
+
+  // Update rewards periodically with better performance
   useEffect(() => {
     const interval = setInterval(() => {
       setRewardsData((prev) => {
         const updated = new Map(prev);
-        updated.forEach((value, key) => {
+        for (const [key, value] of updated.entries()) {
           updated.set(key, value + REWARDS_PER_SECOND);
-        });
+        }
         return updated;
       });
     }, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Update columns to use the enriched token data directly
-  const columns = [
-    columnHelper.accessor("name", {
-      header: () => (
-        <div className="flex items-center gap-2 text-xs">Token</div>
-      ),
-      cell: (info) => (
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/token/${info.row.original.contract_address}`}
-            className="flex items-center gap-2 hover:underline text-xs relative z-50"
-            onClick={(e) => {
-              e.preventDefault();
-              router.push(`/token/${info.row.original.contract_address}`);
-            }}
-          >
-            {info.row.original.img_url ? (
-              <div className="w-5 h-5 relative rounded-full overflow-hidden">
-                <Image
-                  src={info.row.original.img_url}
-                  alt={info.getValue()}
-                  fill
-                  sizes="20px"
-                  className="object-cover"
-                />
-              </div>
-            ) : (
-              <div className="w-5 h-5 bg-primary/10 rounded-full flex items-center justify-center text-[10px] font-mono">
-                {info.row.original.symbol?.[0] ?? "?"}
-              </div>
-            )}
-            <span className="font-medium">{info.getValue()}</span>
-          </Link>
-        </div>
-      ),
-    }),
-    columnHelper.accessor("price", {
-      header: () => <div className="text-right w-full">Price</div>,
-      cell: (info) => (
-        <div className="font-mono text-right">
-          {formatPrice(info.row.original.price)}
-        </div>
-      ),
-    }),
-    columnHelper.accessor("change24h", {
-      header: () => <div className="text-right w-full">24h</div>,
-      cell: (info) => <PriceChange value={info.row.original.change24h} />,
-    }),
-    columnHelper.accessor("volume24h", {
-      header: () => <div className="text-right w-full">24h Volume</div>,
-      cell: (info) => (
-        <div className="font-mono text-right">
-          {formatCurrency(info.row.original.volume24h)}
-        </div>
-      ),
-    }),
-    columnHelper.accessor("marketCap", {
-      header: () => <div className="text-right w-full">Market Cap</div>,
-      cell: (info) => (
-        <div className="font-mono text-right">
-          {formatCurrency(info.row.original.marketCap)}
-        </div>
-      ),
-    }),
-    columnHelper.accessor("rewardDistributed", {
-      header: () => (
-        <div className="text-right w-full">Rewards Distributed</div>
-      ),
-      cell: (info) => {
-        const rewards = rewardsData.get(info.row.original.contract_address);
-        return rewards ? (
-          <AnimatedReward value={rewards} />
-        ) : (
-          <div className="font-mono text-right">0.00</div>
-        );
-      },
-    }),
-    columnHelper.accessor("staking_pool", {
-      header: () => <div className="text-right w-full">Stakers</div>,
-      cell: (info) => {
-        const members = membersData.get(info.row.original.contract_address);
-        return (
-          <div className="font-mono text-right">
-            {members ? (
-              <span className="text-primary">
-                {parseInt(members).toLocaleString()}
-              </span>
-            ) : (
-              "-"
-            )}
+  // Memoize the columns to prevent unnecessary re-renders
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("name", {
+        header: () => (
+          <div className="flex items-center gap-2 text-xs">Token</div>
+        ),
+        cell: (info) => (
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/token/${info.row.original.contract_address}`}
+              className="flex items-center gap-2 hover:underline text-xs relative z-50"
+              onClick={(e) => {
+                e.preventDefault();
+                router.push(`/token/${info.row.original.contract_address}`);
+              }}
+            >
+              {info.row.original.img_url ? (
+                <div className="w-5 h-5 relative rounded-full overflow-hidden">
+                  <Image
+                    src={info.row.original.img_url}
+                    alt={info.getValue()}
+                    fill
+                    sizes="20px"
+                    className="object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-5 h-5 bg-primary/10 rounded-full flex items-center justify-center text-[10px] font-mono">
+                  {info.row.original.symbol?.[0] ?? "?"}
+                </div>
+              )}
+              <span className="font-medium">{info.getValue()}</span>
+            </Link>
           </div>
-        );
-      },
-    }),
-    // Comment out the actions column
-    /*
-    columnHelper.accessor("pool_address", {
-      header: () => <div className="text-center">Actions</div>,
-      cell: (info) => {
-        const token = info.row.original;
-        return (
-          <ActionButtons
-            tokenAddress={token.contract_address}
-            token={token}
-            onBuy={(address) => {
-              setSelectedTokenAddress(address);
-              setIsUniswapOpen(true);
-            }}
-            membersData={membersData}
-          />
-        );
-      },
-    }),
-    */
-  ];
+        ),
+      }),
+      columnHelper.accessor("price", {
+        header: () => <div className="text-right w-full">Price</div>,
+        cell: (info) => (
+          <div className="font-mono text-right">
+            {formatPrice(info.row.original.price)}
+          </div>
+        ),
+      }),
+      columnHelper.accessor("change24h", {
+        header: () => <div className="text-right w-full">24h</div>,
+        cell: (info) => <PriceChange value={info.row.original.change24h} />,
+      }),
+      columnHelper.accessor("volume24h", {
+        header: () => <div className="text-right w-full">24h Volume</div>,
+        cell: (info) => (
+          <div className="font-mono text-right">
+            {formatCurrency(info.row.original.volume24h)}
+          </div>
+        ),
+      }),
+      columnHelper.accessor("marketCap", {
+        header: () => <div className="text-right w-full">Market Cap</div>,
+        cell: (info) => (
+          <div className="font-mono text-right">
+            {formatCurrency(info.row.original.marketCap)}
+          </div>
+        ),
+      }),
+      columnHelper.accessor("rewardDistributed", {
+        header: () => (
+          <div className="text-right w-full">Rewards Distributed</div>
+        ),
+        cell: (info) => {
+          const rewards = rewardsData.get(info.row.original.contract_address);
+          return rewards !== undefined ? (
+            <AnimatedReward value={rewards} />
+          ) : (
+            <div className="font-mono text-right">-</div>
+          );
+        },
+      }),
+      columnHelper.accessor("staking_pool", {
+        header: () => <div className="text-right w-full">Stakers</div>,
+        cell: (info) => {
+          const members = membersData.get(info.row.original.contract_address);
+          return (
+            <div className="font-mono text-right">
+              {members ? (
+                <span className="text-primary">
+                  {parseInt(members).toLocaleString()}
+                </span>
+              ) : (
+                "-"
+              )}
+            </div>
+          );
+        },
+      }),
+      // Comment out the actions column
+      /*
+      columnHelper.accessor("pool_address", {
+        header: () => <div className="text-center">Actions</div>,
+        cell: (info) => {
+          const token = info.row.original;
+          return (
+            <ActionButtons
+              tokenAddress={token.contract_address}
+              token={token}
+              onBuy={(address) => {
+                setSelectedTokenAddress(address);
+                setIsUniswapOpen(true);
+              }}
+              membersData={membersData}
+            />
+          );
+        },
+      }),
+      */
+    ],
+    [rewardsData, membersData]
+  );
 
   const table = useReactTable({
     data: tokens,
@@ -290,135 +295,59 @@ export function TokenTable({ tokens: initialTokens }: TokenTableProps) {
     getSortedRowModel: getSortedRowModel(),
   });
 
-  // Update skeleton to include stakers column
-  const TableSkeleton = () => (
-    <div className="animate-pulse">
-      <table className="w-full min-w-[800px] border-separate border-spacing-0">
-        <thead>
-          <tr>
-            {/* Token column - wider for name */}
-            <th className="h-10 px-4 text-left">
-              <div className="h-4 w-24 bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-            </th>
-            {/* Price column */}
-            <th className="h-10 px-4 text-right">
-              <div className="h-4 w-20 ml-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-            </th>
-            {/* 24h column - smaller */}
-            <th className="h-10 px-4 text-right">
-              <div className="h-4 w-12 ml-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-            </th>
-            {/* Volume, Market Cap, Stakers - medium width */}
-            {[...Array(3)].map((_, i) => (
-              <th key={i + 2} className="h-10 px-4 text-right">
-                <div className="h-4 w-16 ml-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-              </th>
-            ))}
-            {/* Remove or comment out the Actions column
-            <th className="h-10 px-4 text-center">
-              <div className="h-4 w-24 mx-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-            </th>
-            */}
-          </tr>
-        </thead>
-        <tbody>
-          {[...Array(5)].map((_, rowIndex) => (
-            <tr
-              key={rowIndex}
-              className="hover:bg-black/[.02] dark:hover:bg-white/[.02]"
-            >
-              {/* Token cell with image + name */}
-              <td className="h-10 px-4 flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] opacity-20 animate-shimmer" />
-                <div className="h-4 w-24 bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-              </td>
-              {/* Other cells with varying widths */}
-              <td className="h-10 px-4">
-                <div className="h-4 w-20 ml-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-              </td>
-              <td className="h-10 px-4">
-                <div className="h-4 w-12 ml-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-              </td>
-              {[...Array(3)].map((_, i) => (
-                <td key={i + 2} className="h-10 px-4">
-                  <div className="h-4 w-16 ml-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-                </td>
-              ))}
-              {/* Remove or comment out the Actions cell
-              <td className="h-10 px-4">
-                <div className="flex justify-center gap-2">
-                  <div className="h-6 w-12 bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-                  <div className="h-6 w-12 bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-                </div>
-              </td>
-              */}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
   return (
     <div>
       <div className="w-full overflow-x-auto">
-        {isLoading ? (
-          <TableSkeleton />
-        ) : (
-          <table className="w-full min-w-[800px] border-separate border-spacing-0">
-            <thead>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      className="border-b border-black/[.1] dark:border-white/[.1] h-10 px-4 text-left font-[family-name:var(--font-geist-mono)] text-xs"
-                      onClick={header.column.getToggleSortingHandler()}
-                      style={{
-                        cursor: header.column.getCanSort()
-                          ? "pointer"
-                          : "default",
-                      }}
-                    >
-                      <div className="flex items-center gap-1">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                        {{
-                          asc: " ↑",
-                          desc: " ↓",
-                        }[header.column.getIsSorted() as string] ?? null}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.original.contract_address}
-                  className="hover:bg-black/[.02] dark:hover:bg-white/[.02] relative"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className="border-b border-black/[.1] dark:border-white/[.1] h-10 px-4 text-xs relative"
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <table className="w-full min-w-[800px] border-separate border-spacing-0">
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <th
+                    key={header.id}
+                    className="border-b border-black/[.1] dark:border-white/[.1] h-10 px-4 text-left font-[family-name:var(--font-geist-mono)] text-xs"
+                    onClick={header.column.getToggleSortingHandler()}
+                    style={{
+                      cursor: header.column.getCanSort()
+                        ? "pointer"
+                        : "default",
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                      {{
+                        asc: " ↑",
+                        desc: " ↓",
+                      }[header.column.getIsSorted() as string] ?? null}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.original.contract_address}
+                className="hover:bg-black/[.02] dark:hover:bg-white/[.02] relative"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td
+                    key={cell.id}
+                    className="border-b border-black/[.1] dark:border-white/[.1] h-10 px-4 text-xs relative"
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

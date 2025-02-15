@@ -1,8 +1,7 @@
 "use client";
 
 import { TokenGrid } from "./components/TokenGrid";
-import { TokenTable } from "./components/TokenTable";
-import { ViewSwitcher } from "./components/ViewSwitcher";
+// import { ViewSwitcher } from "./components/ViewSwitcher";
 import { useState, useEffect } from "react";
 import { Hero } from "./components/Hero";
 import { TopStreamer } from "./components/TopStreamer";
@@ -13,12 +12,11 @@ export default function RootPage() {
 }
 
 function Home() {
-  const [view, setView] = useState<"grid" | "table">("grid");
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchTokens() {
+    const fetchTokens = async () => {
       try {
         const response = await fetch("/api/tokens");
         const data: TokensResponse = await response.json();
@@ -28,7 +26,7 @@ function Home() {
       } finally {
         setLoading(false);
       }
-    }
+    };
 
     fetchTokens();
   }, []);
@@ -40,13 +38,10 @@ function Home() {
           <Hero />
           <TopStreamer />
           <div className="w-full max-w-[1200px]">
-            <ViewSwitcher view={view} onChange={setView} />
             {loading ? (
               <div className="text-center py-8">Loading tokens...</div>
-            ) : view === "grid" ? (
-              <TokenGrid tokens={tokens} />
             ) : (
-              <TokenTable tokens={tokens} />
+              <TokenGrid tokens={tokens} />
             )}
           </div>
         </main>

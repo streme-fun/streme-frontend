@@ -57,15 +57,10 @@ export function TokenPageContent() {
   useEffect(() => {
     async function fetchToken() {
       try {
-        const response = await fetch("/api/tokens");
+        const response = await fetch(`/api/tokens/single?address=${address}`);
         const data = await response.json();
-        const matchedToken = data.data.find(
-          (t: Token) =>
-            t.contract_address.toLowerCase() === address.toLowerCase()
-        );
-
-        if (matchedToken) {
-          setToken(matchedToken);
+        if (data.data) {
+          setToken(data.data);
         }
       } catch (error) {
         console.error("Error fetching token:", error);

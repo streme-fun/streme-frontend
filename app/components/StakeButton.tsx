@@ -59,7 +59,9 @@ const gdaABI = [
 
 const publicClient = createPublicClient({
   chain: base,
-  transport: http(),
+  transport: http(
+    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
+  ),
 });
 
 const toHex = (address: string) => address as `0x${string}`;
@@ -110,6 +112,8 @@ export function StakeButton({
     } catch (error) {
       console.error("Error fetching balance:", error);
       setBalance(0n);
+      // Optionally add user-facing error handling here
+      // toast.error("Failed to fetch balance. Please try again later.");
     }
   }, [user?.wallet?.address, tokenAddress]);
 

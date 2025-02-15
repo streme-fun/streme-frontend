@@ -1,18 +1,22 @@
 import { Token } from "@/app/types/token";
 
+interface GeckoData {
+  price?: number;
+  marketCap?: number;
+  volume24h?: number;
+  total_reserve_in_usd?: number;
+}
+
 // Helper function to create a token with common fields
 export async function enrichTokenWithMarketData(
-  token: Token,
-  geckoData: Record<
-    string,
-    {
-      price: number;
-      marketCap: number;
-      volume24h: number;
-      total_reserve_in_usd: number;
-    }
-  >
+  token: Token | null,
+  geckoData: Record<string, GeckoData>
 ): Promise<Token> {
+  if (!token || !token.contract_address) {
+    console.error("Invalid token data:", token);
+    return token as Token;
+  }
+
   const tokenData = geckoData[token.contract_address.toLowerCase()];
   const enrichedToken = { ...token };
 
