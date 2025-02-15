@@ -20,7 +20,8 @@ const nextConfig = {
   },
   async headers() {
     const ContentSecurityPolicy = `
-      connect-src 'self' https://auth.privy.io wss://relay.walletconnect.com wss://relay.walletconnect.org wss://www.walletlink.org https://*.rpc.privy.systems;
+      connect-src 'self' https://auth.privy.io wss://relay.walletconnect.com wss://relay.walletconnect.org wss://www.walletlink.org https://*.rpc.privy.systems https://explorer-api.walletconnect.com;
+      frame-ancestors 'self' https://streme.fun https://www.streme.fun https://auth.privy.io;
     `;
 
     const securityHeaders = [
