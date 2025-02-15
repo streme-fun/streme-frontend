@@ -85,41 +85,19 @@ interface TokenTableProps {
   tokens: Token[];
 }
 
-export function TokenTable({ tokens: initialTokens }: TokenTableProps) {
+export function TokenTable({ tokens }: TokenTableProps) {
   const router = useRouter();
-  const [tokens, setTokens] = useState(initialTokens);
   const [rewardsData, setRewardsData] = useState<Map<string, number>>(
     new Map()
   );
   const [membersData, setMembersData] = useState<Map<string, string>>(
     new Map()
   );
-  const [isLoading, setIsLoading] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([
     { id: "marketCap", desc: true },
   ]);
 
-  // Remove the polling effect and replace with a single fetch
-  useEffect(() => {
-    const fetchTokens = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch("/api/tokens");
-        const data = await response.json();
-        if (data.data) {
-          setTokens(data.data);
-        }
-      } catch (error) {
-        console.error("Error fetching tokens:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTokens();
-  }, []); // Only runs once on mount
-
-  // Add effect for calculating rewards and members
+  // Keep the rewards calculation effects
   useEffect(() => {
     const calculateAllData = async () => {
       const promises = tokens.map(async (token) => {
@@ -290,135 +268,59 @@ export function TokenTable({ tokens: initialTokens }: TokenTableProps) {
     getSortedRowModel: getSortedRowModel(),
   });
 
-  // Update skeleton to include stakers column
-  const TableSkeleton = () => (
-    <div className="animate-pulse">
-      <table className="w-full min-w-[800px] border-separate border-spacing-0">
-        <thead>
-          <tr>
-            {/* Token column - wider for name */}
-            <th className="h-10 px-4 text-left">
-              <div className="h-4 w-24 bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-            </th>
-            {/* Price column */}
-            <th className="h-10 px-4 text-right">
-              <div className="h-4 w-20 ml-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-            </th>
-            {/* 24h column - smaller */}
-            <th className="h-10 px-4 text-right">
-              <div className="h-4 w-12 ml-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-            </th>
-            {/* Volume, Market Cap, Stakers - medium width */}
-            {[...Array(3)].map((_, i) => (
-              <th key={i + 2} className="h-10 px-4 text-right">
-                <div className="h-4 w-16 ml-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-              </th>
-            ))}
-            {/* Remove or comment out the Actions column
-            <th className="h-10 px-4 text-center">
-              <div className="h-4 w-24 mx-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-            </th>
-            */}
-          </tr>
-        </thead>
-        <tbody>
-          {[...Array(5)].map((_, rowIndex) => (
-            <tr
-              key={rowIndex}
-              className="hover:bg-black/[.02] dark:hover:bg-white/[.02]"
-            >
-              {/* Token cell with image + name */}
-              <td className="h-10 px-4 flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] opacity-20 animate-shimmer" />
-                <div className="h-4 w-24 bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-              </td>
-              {/* Other cells with varying widths */}
-              <td className="h-10 px-4">
-                <div className="h-4 w-20 ml-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-              </td>
-              <td className="h-10 px-4">
-                <div className="h-4 w-12 ml-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-              </td>
-              {[...Array(3)].map((_, i) => (
-                <td key={i + 2} className="h-10 px-4">
-                  <div className="h-4 w-16 ml-auto bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-                </td>
-              ))}
-              {/* Remove or comment out the Actions cell
-              <td className="h-10 px-4">
-                <div className="flex justify-center gap-2">
-                  <div className="h-6 w-12 bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-                  <div className="h-6 w-12 bg-gradient-to-r from-[#ff75c3] via-[#ffa647] to-[#ffe83f] rounded opacity-20 animate-shimmer" />
-                </div>
-              </td>
-              */}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
   return (
     <div>
       <div className="w-full overflow-x-auto">
-        {isLoading ? (
-          <TableSkeleton />
-        ) : (
-          <table className="w-full min-w-[800px] border-separate border-spacing-0">
-            <thead>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      className="border-b border-black/[.1] dark:border-white/[.1] h-10 px-4 text-left font-[family-name:var(--font-geist-mono)] text-xs"
-                      onClick={header.column.getToggleSortingHandler()}
-                      style={{
-                        cursor: header.column.getCanSort()
-                          ? "pointer"
-                          : "default",
-                      }}
-                    >
-                      <div className="flex items-center gap-1">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                        {{
-                          asc: " ↑",
-                          desc: " ↓",
-                        }[header.column.getIsSorted() as string] ?? null}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.original.contract_address}
-                  className="hover:bg-black/[.02] dark:hover:bg-white/[.02] relative"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className="border-b border-black/[.1] dark:border-white/[.1] h-10 px-4 text-xs relative"
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <table className="w-full min-w-[800px] border-separate border-spacing-0">
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <th
+                    key={header.id}
+                    className="border-b border-black/[.1] dark:border-white/[.1] h-10 px-4 text-left font-[family-name:var(--font-geist-mono)] text-xs"
+                    onClick={header.column.getToggleSortingHandler()}
+                    style={{
+                      cursor: header.column.getCanSort()
+                        ? "pointer"
+                        : "default",
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                      {{
+                        asc: " ↑",
+                        desc: " ↓",
+                      }[header.column.getIsSorted() as string] ?? null}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.original.contract_address}
+                className="hover:bg-black/[.02] dark:hover:bg-white/[.02] relative"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td
+                    key={cell.id}
+                    className="border-b border-black/[.1] dark:border-white/[.1] h-10 px-4 text-xs relative"
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

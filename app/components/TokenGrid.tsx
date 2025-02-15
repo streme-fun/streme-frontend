@@ -187,28 +187,8 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
   );
 };
 
-export function TokenGrid({ tokens: initialTokens }: TokenGridProps) {
+export function TokenGrid({ tokens }: TokenGridProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [tokens, setTokens] = useState(initialTokens);
-
-  // Add polling effect
-  useEffect(() => {
-    const pollTokens = async () => {
-      try {
-        const response = await fetch("/api/tokens");
-        const data = await response.json();
-        if (data.data) {
-          setTokens(data.data);
-        }
-      } catch (error) {
-        console.error("Error polling tokens:", error);
-      }
-    };
-
-    // Poll every 10 seconds
-    const interval = setInterval(pollTokens, 10000);
-    return () => clearInterval(interval);
-  }, []);
 
   const filteredTokens = tokens.filter((token) => {
     const searchLower = searchQuery.toLowerCase();

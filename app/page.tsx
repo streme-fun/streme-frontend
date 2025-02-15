@@ -17,20 +17,26 @@ function Home() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Single data fetching implementation
   useEffect(() => {
-    async function fetchTokens() {
+    const pollTokens = async () => {
       try {
         const response = await fetch("/api/tokens");
         const data: TokensResponse = await response.json();
         setTokens(data.data);
       } catch (error) {
-        console.error("Error fetching tokens:", error);
+        console.error("Error polling tokens:", error);
       } finally {
         setLoading(false);
       }
-    }
+    };
 
-    fetchTokens();
+    // Initial fetch
+    pollTokens();
+
+    // Poll every 10 seconds
+    const interval = setInterval(pollTokens, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
