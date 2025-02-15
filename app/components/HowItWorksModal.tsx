@@ -36,7 +36,8 @@ export function HowItWorksModal({
             <p className="opacity-80">
               Every token launched on STREME.FUN automatically streams rewards
               directly to stakers. No waiting periods, no claims needed -
-              rewards flow straight to your wallet in real-time.
+              rewards flow straight to your wallet in real-time through
+              Superfluid.
             </p>
           </div>
 
@@ -47,20 +48,30 @@ export function HowItWorksModal({
             <p className="opacity-80">
               20% of each token&apos;s total supply is allocated to the rewards
               pool, distributed over 365 days. Your share of rewards is
-              proportional to your stake - the more you stake, the more you
-              earn.
+              proportional to your stake - the more you stake, the more you earn
+              through continuous streaming.
             </p>
           </div>
 
           <div>
             <h3 className="text-lg font-semibold mb-2 text-accent">
-              Simple Staking
+              Secure Staking
             </h3>
             <p className="opacity-80">
-              Just stake your tokens and watch your rewards grow in real-time.
-              No complex mechanics, no hidden fees - just continuous streaming
-              rewards for holders.
+              Staking is simple but secure. When you stake tokens, they&apos;re
+              locked for 24 hours to ensure system stability. After the lock
+              period, you can unstake anytime. Your rewards continue streaming
+              during the lock period - just stake and watch your balance grow in
+              real-time.
             </p>
+          </div>
+
+          <div className="bg-base-200 p-4 rounded-lg">
+            <h3 className="text-lg font-semibold mb-2 text-info">Quick Tips</h3>
+            <ul className="list-disc list-inside opacity-80 space-y-2">
+              <li>Rewards start streaming immediately after staking</li>
+              <li>24-hour lock period applies to each stake</li>
+            </ul>
           </div>
         </div>
       </div>

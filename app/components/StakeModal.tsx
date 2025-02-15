@@ -223,6 +223,10 @@ export function StakeModal({
                 Max
               </button>
             </div>
+            <div className="text-sm opacity-60 bg-base-200 p-3 rounded-lg">
+              Note: Staked tokens are locked for 24 hours before they can be
+              unstaked. Rewards will start streaming immediately.
+            </div>
             <button
               className={`btn w-full relative overflow-hidden
                 before:absolute before:inset-0 before:bg-gradient-to-r 
