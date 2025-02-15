@@ -38,42 +38,6 @@ const formatBalance = (value: bigint, decimals: number = 18) => {
   return parseFloat(formatUnits(value, decimals)).toFixed(4);
 };
 
-const REWARDS_PER_SECOND = 634.1958449;
-
-const AnimatedNumber = ({
-  value,
-  symbol,
-}: {
-  value: string;
-  symbol: string;
-}) => {
-  const [current, setCurrent] = useState(0);
-  const target = parseFloat(value);
-
-  useEffect(() => {
-    // Reset to 0 when value changes
-    setCurrent(0);
-
-    // Update every 50ms with the rewards rate
-    const interval = setInterval(() => {
-      setCurrent((prev) => {
-        // REWARDS_PER_SECOND / 20 because we update every 50ms (1000ms/50ms = 20)
-        const increment = REWARDS_PER_SECOND / 20;
-        return prev + increment > target ? target : prev + increment;
-      });
-    }, 50);
-
-    return () => clearInterval(interval);
-  }, [target]);
-
-  return (
-    <div className="font-mono text-2xl text-center">
-      {Math.floor(current).toLocaleString()}{" "}
-      <span className="text-base opacity-60">{symbol}</span>
-    </div>
-  );
-};
-
 export function StakeModal({
   isOpen,
   onClose,
@@ -202,8 +166,6 @@ export function StakeModal({
               }
             `}</style>
           </div>
-          <AnimatedNumber value={amount} symbol={symbol} />
-
           <p className="text-center">
             Token rewards are now being streamed directly to your wallet.
           </p>
