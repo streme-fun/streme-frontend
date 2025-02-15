@@ -18,6 +18,25 @@ const nextConfig = {
       "api.streme.fun",
     ],
   },
+  async headers() {
+    const ContentSecurityPolicy = `
+      connect-src 'self' https://auth.privy.io wss://relay.walletconnect.com wss://relay.walletconnect.org wss://www.walletlink.org https://*.rpc.privy.systems;
+    `;
+
+    const securityHeaders = [
+      {
+        key: "Content-Security-Policy",
+        value: ContentSecurityPolicy.replace(/\s{2,}/g, " ").trim(),
+      },
+    ];
+
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
