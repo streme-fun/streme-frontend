@@ -5,10 +5,17 @@ import { enrichTokenWithMarketData } from "@/app/lib/mockTokens";
 export type CreatorProfile = NonNullable<Token["creator"]>;
 
 export async function fetchTokensFromStreme(): Promise<Token[]> {
-  const response = await fetch("https://api.streme.fun/api/tokens", {
-    cache: "no-store",
-  });
-  return response.json();
+  try {
+    const response = await fetch("https://api.streme.fun/api/tokens", {
+      cache: "no-store",
+    });
+    const tokens = await response.json();
+    // Return the tokens array directly if it's not wrapped in data
+    return Array.isArray(tokens) ? tokens : tokens.data || [];
+  } catch (error) {
+    console.error("Error fetching tokens:", error);
+    return [];
+  }
 }
 
 export async function fetchCreatorProfiles(
@@ -48,78 +55,109 @@ export async function fetchCreatorProfiles(
   );
 }
 
+type EnrichedToken = Omit<Token, "creator"> & {
+  creator?: {
+    name: string;
+    score: number;
+    recasts: number;
+    likes: number;
+    profileImage: string;
+  };
+};
+
 export async function enrichTokensWithData(
   tokens: Token[],
-  creatorProfiles: Record<string, CreatorProfile>
-): Promise<Token[]> {
-  const addresses = tokens.map((t) => t.contract_address);
-  const geckoData = await fetchTokensData(addresses);
+  creatorProfiles: Record<string, CreatorProfile>,
+  includeMarketData: boolean = false
+): Promise<EnrichedToken[]> {
+  if (!Array.isArray(tokens)) {
+    console.error("Expected tokens array, got:", tokens);
+    return [];
+  }
 
-  // Fetch detailed pool data for each token
-  const poolDataPromises = tokens.map((token) =>
-    token.pool_address ? fetchPoolData(token.pool_address) : null
-  );
-  const poolData = await Promise.all(poolDataPromises);
+  let enrichedTokens = tokens.map((token) => ({
+    ...token,
+    creator:
+      token.requestor_fid && creatorProfiles[token.requestor_fid]
+        ? {
+            name: creatorProfiles[token.requestor_fid].name || "Unknown",
+            score: 0,
+            recasts: 0,
+            likes: 0,
+            profileImage: creatorProfiles[token.requestor_fid].profileImage,
+          }
+        : undefined,
+  })) as EnrichedToken[];
 
-  // Enrich tokens with all data
-  return Promise.all(
-    tokens.map(async (token, index) => {
-      // Start with existing market data
-      const enrichedToken = await enrichTokenWithMarketData(token, geckoData);
+  // Only fetch market data if explicitly requested
+  if (includeMarketData) {
+    const addresses = tokens.map((t) => t.contract_address);
+    const geckoData = await fetchTokensData(addresses);
+    const poolDataPromises = tokens.map((token) =>
+      token.pool_address ? fetchPoolData(token.pool_address) : null
+    );
+    const poolData = await Promise.all(poolDataPromises);
 
-      // Add pool data if available, but don't override existing values unless null
-      if (poolData[index]) {
-        const pool = poolData[index];
-        enrichedToken.price = enrichedToken.price ?? pool?.price;
-        enrichedToken.change1h = enrichedToken.change1h ?? pool?.change1h;
-        enrichedToken.change24h = enrichedToken.change24h ?? pool?.change24h;
-        enrichedToken.volume24h = enrichedToken.volume24h ?? pool?.volume24h;
-        enrichedToken.marketCap = enrichedToken.marketCap ?? pool?.marketCap;
-      }
+    enrichedTokens = await Promise.all(
+      enrichedTokens.map(async (token, index) => {
+        const enrichedToken = await enrichTokenWithMarketData(token, geckoData);
+        if (poolData[index]) {
+          const pool = poolData[index];
+          enrichedToken.price = enrichedToken.price ?? pool?.price;
+          enrichedToken.change1h = enrichedToken.change1h ?? pool?.change1h;
+          enrichedToken.change24h = enrichedToken.change24h ?? pool?.change24h;
+          enrichedToken.volume24h = enrichedToken.volume24h ?? pool?.volume24h;
+          enrichedToken.marketCap = enrichedToken.marketCap ?? pool?.marketCap;
+        }
+        return enrichedToken;
+      })
+    );
+  }
 
-      // Add creator profile
-      if (token.requestor_fid && creatorProfiles[token.requestor_fid]) {
-        const profile = creatorProfiles[token.requestor_fid];
-        enrichedToken.creator = {
-          name: profile.name || "Unknown",
-          score: 0,
-          recasts: 0,
-          likes: 0,
-          profileImage: profile.profileImage,
-        };
-      }
-      return enrichedToken;
-    })
-  );
+  return enrichedTokens;
 }
 
 export async function fetchTokenFromStreme(
   address: string
 ): Promise<Token | null> {
-  // First try to get the single token
+  if (!address) {
+    console.error("No address provided to fetchTokenFromStreme");
+    return null;
+  }
+
   try {
+    const normalizedAddress = address.toLowerCase();
+    console.log("Fetching token data for:", normalizedAddress);
     const response = await fetch(
-      `https://api.streme.fun/api/tokens/${address}`,
+      `https://api.streme.fun/token/${normalizedAddress}`,
       {
         cache: "no-store",
       }
     );
 
-    if (response.ok) {
-      return response.json();
+    const tokenJson = await response.json();
+    console.log("Raw token response:", tokenJson);
+
+    if (
+      !response.ok ||
+      tokenJson.message === "No such document!" ||
+      tokenJson.errors
+    ) {
+      console.error("Token fetch failed:", {
+        status: response.status,
+        data: tokenJson,
+      });
+      return null;
     }
 
-    // If single token endpoint fails, fall back to getting all tokens and filtering
-    const allTokensResponse = await fetch("https://api.streme.fun/api/tokens", {
-      cache: "no-store",
-    });
-    const allTokens: Token[] = await allTokensResponse.json();
+    // Check if we have actual token data
+    const token = tokenJson.data ? tokenJson.data : tokenJson;
+    if (!token.contract_address) {
+      console.error("Invalid token data received:", token);
+      return null;
+    }
 
-    const token = allTokens.find(
-      (t) => t.contract_address.toLowerCase() === address.toLowerCase()
-    );
-
-    return token || null;
+    return token;
   } catch (error) {
     console.error("Error fetching token:", error);
     return null;

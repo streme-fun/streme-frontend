@@ -35,18 +35,6 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
     return () => clearInterval(interval);
   }, []);
 
-  // Get the real market change from token data
-  const marketChange = token.change24h ?? token.marketCapChange;
-  const changeDisplay =
-    marketChange === undefined ? (
-      <span className="opacity-50">-</span>
-    ) : (
-      <>
-        {marketChange >= 0 ? "+" : ""}
-        {marketChange.toFixed(2)}%
-      </>
-    );
-
   // Helper function to shorten hash
   const shortenHash = (hash: string | undefined) => {
     if (!hash) return "";
@@ -106,17 +94,23 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
         ) : (
           <div
             className="w-[120px] h-[120px] bg-primary flex items-center justify-center 
-            text-primary-content font-mono font-bold text-xl
+            text-primary-content font-mono font-bold text-xl overflow-hidden px-2
             transition-colors duration-300 group-hover:bg-primary-focus"
+            title={token.symbol}
           >
-            ${token.symbol}
+            ${token.symbol.slice(0, 10)}
+            {token.symbol.length > 10 && "..."}
           </div>
         )}
         <div className="card-body p-2 gap-2">
           <div>
-            <h2 className="card-title text-sm group-hover:text-primary transition-colors duration-300">
+            <h2
+              className="card-title text-sm group-hover:text-primary transition-colors duration-300 truncate max-w-[200px] overflow-hidden"
+              title={token.name}
+            >
               {token.name}
             </h2>
+            {/* Comment out market change display
             <div className="flex items-center justify-between">
               <div
                 className={`transition-all duration-300 ${
@@ -130,6 +124,7 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
                 {changeDisplay}
               </div>
             </div>
+            */}
 
             <div className="flex items-center gap-2 mt-2">
               <div className="avatar transition-transform duration-300 group-hover:scale-110">
@@ -146,8 +141,13 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
                   />
                 </div>
               </div>
-              <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2">
-                {token.creator?.name ?? "Unknown"}
+              <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2 max-w-[120px]">
+                <span
+                  className="truncate"
+                  title={token.creator?.name ?? "Unknown"}
+                >
+                  {token.creator?.name ?? "Unknown"}
+                </span>
                 {token.cast_hash && token.creator?.name && (
                   <button
                     onClick={handleFarcasterClick}
