@@ -158,7 +158,7 @@ export function Navbar() {
                         logout();
                         setIsAddressDropdownOpen(false);
                       }}
-                      className="w-full px-4 py-2 text-left hover:bg-base-200 rounded-lg"
+                      className="w-full px-4 py-2 text-left hover:bg-base-200 rounded-lg cursor-pointer"
                     >
                       Logout
                     </button>
