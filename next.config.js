@@ -20,8 +20,35 @@ const nextConfig = {
   },
   async headers() {
     const ContentSecurityPolicy = `
-      connect-src 'self' https://auth.privy.io wss://relay.walletconnect.com wss://relay.walletconnect.org wss://www.walletlink.org https://*.rpc.privy.systems https://explorer-api.walletconnect.com;
-      frame-ancestors 'self' https://streme.fun https://www.streme.fun https://auth.privy.io;
+      connect-src 'self' 
+        https://auth.privy.io 
+        wss://relay.walletconnect.com 
+        wss://relay.walletconnect.org 
+        wss://www.walletlink.org 
+        https://*.rpc.privy.systems 
+        https://explorer-api.walletconnect.com
+        https://api.relay.link
+        https://api.testnets.relay.link
+        https://subgraph-endpoints.superfluid.dev
+        https://*.base-mainnet.superfluid.dev
+        https://*.base.superfluid.dev;
+      frame-ancestors 'self' 
+        https://streme.fun 
+        https://www.streme.fun 
+        https://auth.privy.io;
+      frame-src 'self' 
+        https://auth.privy.io 
+        https://verify.walletconnect.com 
+        https://verify.walletconnect.org 
+        https://challenges.cloudflare.com 
+        https://oauth.telegram.org;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' 
+        https://challenges.cloudflare.com 
+        https://telegram.org;
+      child-src 'self'
+        https://auth.privy.io
+        https://verify.walletconnect.com
+        https://verify.walletconnect.org;
     `;
 
     const securityHeaders = [
