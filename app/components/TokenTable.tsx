@@ -8,7 +8,7 @@ import {
   getSortedRowModel,
   SortingState,
 } from "@tanstack/react-table";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Token } from "../types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
@@ -36,9 +36,32 @@ const PriceChange = ({ value }: { value: number | undefined }) => {
 };
 
 const AnimatedReward = ({ value }: { value: number }) => {
+  const [displayValue, setDisplayValue] = useState(value);
+
+  useEffect(() => {
+    // Smoothly animate to new value
+    const frameDuration = 50; // 20 fps
+    const frames = 20; // 1 second animation
+    const increment = (value - displayValue) / frames;
+
+    let frame = 0;
+    const interval = setInterval(() => {
+      if (frame >= frames) {
+        setDisplayValue(value);
+        clearInterval(interval);
+        return;
+      }
+
+      setDisplayValue((prev) => prev + increment);
+      frame++;
+    }, frameDuration);
+
+    return () => clearInterval(interval);
+  }, [value]);
+
   return (
     <div className="font-mono text-right">
-      {value.toLocaleString(undefined, {
+      {displayValue.toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}
@@ -97,165 +120,169 @@ export function TokenTable({ tokens }: TokenTableProps) {
     { id: "marketCap", desc: true },
   ]);
 
-  // Keep the rewards calculation effects
-  useEffect(() => {
-    const calculateAllData = async () => {
-      const promises = tokens.map(async (token) => {
-        const { totalStreamed, totalMembers } = await calculateRewards(
-          token.created_at,
-          token.contract_address,
-          token.staking_pool
-        );
-        return {
-          address: token.contract_address,
-          rewards: totalStreamed,
-          members: totalMembers,
-        };
-      });
+  // Memoize the data calculations
+  const calculateAllData = useCallback(async () => {
+    const promises = tokens.map(async (token) => {
+      const { totalStreamed, totalMembers } = await calculateRewards(
+        token.created_at,
+        token.contract_address,
+        token.staking_pool
+      );
+      return {
+        address: token.contract_address,
+        rewards: totalStreamed,
+        members: totalMembers,
+      };
+    });
 
-      const results = await Promise.all(promises);
-      const newRewardsData = new Map();
-      const newMembersData = new Map();
-      results.forEach(({ address, rewards, members }) => {
-        newRewardsData.set(address, rewards);
-        newMembersData.set(address, members);
-      });
-      setRewardsData(newRewardsData);
-      setMembersData(newMembersData);
-    };
-
-    calculateAllData();
+    const results = await Promise.all(promises);
+    const newRewardsData = new Map();
+    const newMembersData = new Map();
+    results.forEach(({ address, rewards, members }) => {
+      newRewardsData.set(address, rewards);
+      newMembersData.set(address, members);
+    });
+    setRewardsData(newRewardsData);
+    setMembersData(newMembersData);
   }, [tokens]);
 
-  // Update rewards periodically
+  // Initial data load
+  useEffect(() => {
+    calculateAllData();
+  }, [calculateAllData]);
+
+  // Update rewards periodically with better performance
   useEffect(() => {
     const interval = setInterval(() => {
       setRewardsData((prev) => {
         const updated = new Map(prev);
-        updated.forEach((value, key) => {
+        for (const [key, value] of updated.entries()) {
           updated.set(key, value + REWARDS_PER_SECOND);
-        });
+        }
         return updated;
       });
     }, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Update columns to use the enriched token data directly
-  const columns = [
-    columnHelper.accessor("name", {
-      header: () => (
-        <div className="flex items-center gap-2 text-xs">Token</div>
-      ),
-      cell: (info) => (
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/token/${info.row.original.contract_address}`}
-            className="flex items-center gap-2 hover:underline text-xs relative z-50"
-            onClick={(e) => {
-              e.preventDefault();
-              router.push(`/token/${info.row.original.contract_address}`);
-            }}
-          >
-            {info.row.original.img_url ? (
-              <div className="w-5 h-5 relative rounded-full overflow-hidden">
-                <Image
-                  src={info.row.original.img_url}
-                  alt={info.getValue()}
-                  fill
-                  sizes="20px"
-                  className="object-cover"
-                />
-              </div>
-            ) : (
-              <div className="w-5 h-5 bg-primary/10 rounded-full flex items-center justify-center text-[10px] font-mono">
-                {info.row.original.symbol?.[0] ?? "?"}
-              </div>
-            )}
-            <span className="font-medium">{info.getValue()}</span>
-          </Link>
-        </div>
-      ),
-    }),
-    columnHelper.accessor("price", {
-      header: () => <div className="text-right w-full">Price</div>,
-      cell: (info) => (
-        <div className="font-mono text-right">
-          {formatPrice(info.row.original.price)}
-        </div>
-      ),
-    }),
-    columnHelper.accessor("change24h", {
-      header: () => <div className="text-right w-full">24h</div>,
-      cell: (info) => <PriceChange value={info.row.original.change24h} />,
-    }),
-    columnHelper.accessor("volume24h", {
-      header: () => <div className="text-right w-full">24h Volume</div>,
-      cell: (info) => (
-        <div className="font-mono text-right">
-          {formatCurrency(info.row.original.volume24h)}
-        </div>
-      ),
-    }),
-    columnHelper.accessor("marketCap", {
-      header: () => <div className="text-right w-full">Market Cap</div>,
-      cell: (info) => (
-        <div className="font-mono text-right">
-          {formatCurrency(info.row.original.marketCap)}
-        </div>
-      ),
-    }),
-    columnHelper.accessor("rewardDistributed", {
-      header: () => (
-        <div className="text-right w-full">Rewards Distributed</div>
-      ),
-      cell: (info) => {
-        const rewards = rewardsData.get(info.row.original.contract_address);
-        return rewards ? (
-          <AnimatedReward value={rewards} />
-        ) : (
-          <div className="font-mono text-right">0.00</div>
-        );
-      },
-    }),
-    columnHelper.accessor("staking_pool", {
-      header: () => <div className="text-right w-full">Stakers</div>,
-      cell: (info) => {
-        const members = membersData.get(info.row.original.contract_address);
-        return (
-          <div className="font-mono text-right">
-            {members ? (
-              <span className="text-primary">
-                {parseInt(members).toLocaleString()}
-              </span>
-            ) : (
-              "-"
-            )}
+  // Memoize the columns to prevent unnecessary re-renders
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("name", {
+        header: () => (
+          <div className="flex items-center gap-2 text-xs">Token</div>
+        ),
+        cell: (info) => (
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/token/${info.row.original.contract_address}`}
+              className="flex items-center gap-2 hover:underline text-xs relative z-50"
+              onClick={(e) => {
+                e.preventDefault();
+                router.push(`/token/${info.row.original.contract_address}`);
+              }}
+            >
+              {info.row.original.img_url ? (
+                <div className="w-5 h-5 relative rounded-full overflow-hidden">
+                  <Image
+                    src={info.row.original.img_url}
+                    alt={info.getValue()}
+                    fill
+                    sizes="20px"
+                    className="object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-5 h-5 bg-primary/10 rounded-full flex items-center justify-center text-[10px] font-mono">
+                  {info.row.original.symbol?.[0] ?? "?"}
+                </div>
+              )}
+              <span className="font-medium">{info.getValue()}</span>
+            </Link>
           </div>
-        );
-      },
-    }),
-    // Comment out the actions column
-    /*
-    columnHelper.accessor("pool_address", {
-      header: () => <div className="text-center">Actions</div>,
-      cell: (info) => {
-        const token = info.row.original;
-        return (
-          <ActionButtons
-            tokenAddress={token.contract_address}
-            token={token}
-            onBuy={(address) => {
-              setSelectedTokenAddress(address);
-              setIsUniswapOpen(true);
-            }}
-            membersData={membersData}
-          />
-        );
-      },
-    }),
-    */
-  ];
+        ),
+      }),
+      columnHelper.accessor("price", {
+        header: () => <div className="text-right w-full">Price</div>,
+        cell: (info) => (
+          <div className="font-mono text-right">
+            {formatPrice(info.row.original.price)}
+          </div>
+        ),
+      }),
+      columnHelper.accessor("change24h", {
+        header: () => <div className="text-right w-full">24h</div>,
+        cell: (info) => <PriceChange value={info.row.original.change24h} />,
+      }),
+      columnHelper.accessor("volume24h", {
+        header: () => <div className="text-right w-full">24h Volume</div>,
+        cell: (info) => (
+          <div className="font-mono text-right">
+            {formatCurrency(info.row.original.volume24h)}
+          </div>
+        ),
+      }),
+      columnHelper.accessor("marketCap", {
+        header: () => <div className="text-right w-full">Market Cap</div>,
+        cell: (info) => (
+          <div className="font-mono text-right">
+            {formatCurrency(info.row.original.marketCap)}
+          </div>
+        ),
+      }),
+      columnHelper.accessor("rewardDistributed", {
+        header: () => (
+          <div className="text-right w-full">Rewards Distributed</div>
+        ),
+        cell: (info) => {
+          const rewards = rewardsData.get(info.row.original.contract_address);
+          return rewards !== undefined ? (
+            <AnimatedReward value={rewards} />
+          ) : (
+            <div className="font-mono text-right">-</div>
+          );
+        },
+      }),
+      columnHelper.accessor("staking_pool", {
+        header: () => <div className="text-right w-full">Stakers</div>,
+        cell: (info) => {
+          const members = membersData.get(info.row.original.contract_address);
+          return (
+            <div className="font-mono text-right">
+              {members ? (
+                <span className="text-primary">
+                  {parseInt(members).toLocaleString()}
+                </span>
+              ) : (
+                "-"
+              )}
+            </div>
+          );
+        },
+      }),
+      // Comment out the actions column
+      /*
+      columnHelper.accessor("pool_address", {
+        header: () => <div className="text-center">Actions</div>,
+        cell: (info) => {
+          const token = info.row.original;
+          return (
+            <ActionButtons
+              tokenAddress={token.contract_address}
+              token={token}
+              onBuy={(address) => {
+                setSelectedTokenAddress(address);
+                setIsUniswapOpen(true);
+              }}
+              membersData={membersData}
+            />
+          );
+        },
+      }),
+      */
+    ],
+    [rewardsData, membersData]
+  );
 
   const table = useReactTable({
     data: tokens,
