@@ -55,7 +55,7 @@ export function TopStreamer() {
     <div className="w-full max-w-[1200px] mx-auto mb-8">
       <div className="text-center mb-4">
         <h2 className="text-3xl font-bold tracking-tight">
-          🏆 KING OF STREME REWARDS
+          🎁 RANDOMLY FEATURED TOKEN
         </h2>
       </div>
 
