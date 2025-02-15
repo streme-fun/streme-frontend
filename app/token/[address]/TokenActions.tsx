@@ -10,6 +10,7 @@ import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import Image from "next/image";
 import FarcasterIcon from "@/public/farcaster.svg";
+import { UnstakeButton } from "@/app/components/UnstakeButton";
 
 // Helper functions from TokenTable
 const formatPrice = (price: number | undefined) => {
@@ -309,10 +310,10 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2">
         <button
           onClick={() => setIsUniswapOpen(true)}
-          className="btn btn-primary flex-1"
+          className="btn btn-primary"
         >
           Buy
         </button>
@@ -323,7 +324,7 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
           disabled={!hasTokens}
           symbol={token.symbol}
           totalStakers={membersData}
-          className={`btn btn-outline flex-1 relative 
+          className={`btn btn-outline relative 
             before:absolute before:inset-0 before:bg-gradient-to-r 
             before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] 
             before:opacity-30
@@ -338,6 +339,11 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
             disabled:shadow-none
             disabled:hover:shadow-none
             ${!hasTokens && "btn-disabled opacity-50"}`}
+        />
+        <UnstakeButton
+          stakingAddress={token.staking_address}
+          symbol={token.symbol}
+          className="btn btn-outline"
         />
       </div>
 
