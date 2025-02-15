@@ -41,7 +41,8 @@ const nextConfig = {
         https://verify.walletconnect.com 
         https://verify.walletconnect.org 
         https://challenges.cloudflare.com 
-        https://oauth.telegram.org;
+        https://oauth.telegram.org
+        https://*.geckoterminal.com;
       script-src 'self' 'unsafe-inline' 'unsafe-eval' 
         https://challenges.cloudflare.com 
         https://telegram.org;
