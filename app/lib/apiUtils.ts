@@ -92,3 +92,36 @@ export async function enrichTokensWithData(
     })
   );
 }
+
+export async function fetchTokenFromStreme(
+  address: string
+): Promise<Token | null> {
+  // First try to get the single token
+  try {
+    const response = await fetch(
+      `https://api.streme.fun/api/tokens/${address}`,
+      {
+        cache: "no-store",
+      }
+    );
+
+    if (response.ok) {
+      return response.json();
+    }
+
+    // If single token endpoint fails, fall back to getting all tokens and filtering
+    const allTokensResponse = await fetch("https://api.streme.fun/api/tokens", {
+      cache: "no-store",
+    });
+    const allTokens: Token[] = await allTokensResponse.json();
+
+    const token = allTokens.find(
+      (t) => t.contract_address.toLowerCase() === address.toLowerCase()
+    );
+
+    return token || null;
+  } catch (error) {
+    console.error("Error fetching token:", error);
+    return null;
+  }
+}

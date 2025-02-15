@@ -94,22 +94,22 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
   useEffect(() => {
     const fetchToken = async () => {
       try {
-        const response = await fetch("/api/tokens");
+        const response = await fetch(
+          `/api/tokens/single?address=${token.contract_address}`
+        );
         const data = await response.json();
         if (data.data) {
-          const updatedToken = data.data.find(
-            (t: Token) => t.contract_address === token.contract_address
-          );
-          if (updatedToken) {
-            setToken(updatedToken);
-          }
+          setToken(data.data);
         }
       } catch (error) {
         console.error("Error fetching token:", error);
       }
     };
 
-    fetchToken();
+    const interval = setInterval(fetchToken, 10000);
+    fetchToken(); // Initial fetch
+
+    return () => clearInterval(interval);
   }, [token.contract_address]);
 
   // Calculate rewards and members

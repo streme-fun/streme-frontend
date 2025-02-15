@@ -13,7 +13,7 @@ export async function GET() {
       Expires: "0",
     };
 
-    // Fetch tokens
+    // Fetch all tokens
     const allTokens = await fetchTokensFromStreme();
     // Take only first 10 tokens for debugging
     const tokens = allTokens.slice(0, 10);
