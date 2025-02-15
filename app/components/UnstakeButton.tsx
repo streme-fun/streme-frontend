@@ -17,6 +17,13 @@ const stakingAbi = [
     ],
     outputs: [],
   },
+  {
+    name: "depositTimestamps",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
 ] as const;
 
 const publicClient = createPublicClient({
@@ -44,6 +51,8 @@ export function UnstakeButton({
   const { user } = usePrivy();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
+  const [unlockTime, setUnlockTime] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState<string>("");
 
   const fetchStakedBalance = useCallback(async () => {
     if (!user?.wallet?.address) return;
@@ -71,9 +80,60 @@ export function UnstakeButton({
     }
   }, [user?.wallet?.address, stakingAddress]);
 
+  const fetchUnlockTime = useCallback(async () => {
+    if (!user?.wallet?.address) return;
+    try {
+      const timestamp = await publicClient.readContract({
+        address: toHex(stakingAddress),
+        abi: stakingAbi,
+        functionName: "depositTimestamps",
+        args: [toHex(user.wallet.address)],
+      });
+
+      const unlockTimeStamp = Number(timestamp) + 86400; // 24 hours in seconds
+      setUnlockTime(unlockTimeStamp);
+    } catch (error) {
+      console.error("Error fetching unlock time:", error);
+    }
+  }, [user?.wallet?.address, stakingAddress]);
+
+  // Update timer every second
+  useEffect(() => {
+    if (!unlockTime) return;
+
+    const updateTimer = () => {
+      const now = Math.floor(Date.now() / 1000);
+      const secondsLeft = unlockTime - now;
+
+      if (secondsLeft <= 0) {
+        setTimeLeft("");
+        return;
+      }
+
+      const hours = Math.floor(secondsLeft / 3600);
+      const minutes = Math.floor((secondsLeft % 3600) / 60);
+      const seconds = secondsLeft % 60;
+
+      setTimeLeft(
+        `${hours}h ${minutes.toString().padStart(2, "0")}m ${seconds
+          .toString()
+          .padStart(2, "0")}s`
+      );
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [unlockTime]);
+
   useEffect(() => {
     fetchStakedBalance();
-  }, [fetchStakedBalance]);
+    fetchUnlockTime();
+  }, [fetchStakedBalance, fetchUnlockTime]);
+
+  const isLocked = unlockTime
+    ? Math.floor(Date.now() / 1000) < unlockTime
+    : false;
 
   const handleUnstake = async (amount: bigint) => {
     if (!window.ethereum || !user?.wallet?.address) return;
@@ -107,10 +167,11 @@ export function UnstakeButton({
     <>
       <button
         onClick={() => setIsModalOpen(true)}
-        disabled={disabled || stakedBalance <= 0n}
+        disabled={disabled || stakedBalance <= 0n || isLocked}
         className={className}
+        title={timeLeft ? `Unlocks in ${timeLeft}` : undefined}
       >
-        Unstake
+        {timeLeft ? `Unlock in ${timeLeft}` : "Unstake"}
       </button>
 
       <UnstakeModal
