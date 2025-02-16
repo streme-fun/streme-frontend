@@ -26,7 +26,7 @@ export async function fetchTokensData(addresses: string[]) {
     );
     const data = await response.json();
 
-    console.log("GeckoTerminal Raw Response:", data);
+    // console.log("GeckoTerminal Raw Response:", data);
 
     if (!data.data) return {};
 
@@ -97,10 +97,10 @@ export async function fetchPoolData(poolAddress: string) {
     );
     const data: GeckoTerminalResponse = await response.json();
 
-    console.log("GeckoTerminal raw response:", {
-      poolAddress,
-      data: data.data.attributes,
-    });
+    // console.log("GeckoTerminal raw response:", {
+    //   poolAddress,
+    //   data: data.data.attributes,
+    // });
 
     // Remove the '+' or '-' prefix from percentage strings
     const cleanPercentage = (str: string) =>
