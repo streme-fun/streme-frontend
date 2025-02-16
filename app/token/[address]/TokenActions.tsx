@@ -510,7 +510,7 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
             ) : !user?.wallet?.address ? (
               "Connect Wallet"
             ) : (
-              "Claim LP Fees"
+              "Claim Fees"
             )}
           </button>
         )}
