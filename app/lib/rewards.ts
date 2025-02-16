@@ -36,7 +36,6 @@ async function fetchPoolData(poolId: string, stakingPool: string) {
     );
 
     const data = await response.json();
-    console.log("Raw Subgraph Response:", data);
 
     if (data.errors) {
       console.error("Subgraph errors:", data.errors);
@@ -72,12 +71,6 @@ export async function calculateRewards(
   const creationTimestamp = parseInt(poolData.token.createdAtTimestamp);
   const now = Math.floor(Date.now() / 1000);
   const secondsElapsed = now - creationTimestamp;
-
-  console.log("Pool Data:", {
-    poolId,
-    stakingPool,
-    totalMembers: poolData.totalMembers,
-  });
 
   return {
     totalStreamed: secondsElapsed * REWARDS_PER_SECOND,

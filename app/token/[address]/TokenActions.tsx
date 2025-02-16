@@ -89,7 +89,7 @@ const AnimatedReward = ({ value }: { value: number }) => {
 
 const shortenHash = (hash: string | undefined) => {
   if (!hash) return "";
-  return hash.slice(0, 10);
+  return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
 };
 
 // Add LP Factory ABI and address
@@ -98,6 +98,22 @@ const LP_FACTORY_ABI = parseAbi([
   "function getTokensDeployedByUser(address) external view returns ((address token, address locker, uint256 positionId)[])",
   "function claimRewards(address) external",
 ]);
+
+type LinkedAccount = {
+  type: string;
+  address?: string;
+};
+
+type PrivyUser = {
+  linkedAccounts?: LinkedAccount[];
+};
+
+const getAllUserAddresses = (user: PrivyUser) => {
+  if (!user?.linkedAccounts) return [];
+  return user.linkedAccounts
+    .filter((account) => account.type === "wallet" && account.address)
+    .map((account) => account.address!.toLowerCase());
+};
 
 export function TokenActions({ token: initialToken }: TokenActionsProps) {
   const [isUniswapOpen, setIsUniswapOpen] = useState(false);
@@ -192,43 +208,41 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
     fetchBalance();
   }, [address, isConnected, token.contract_address]);
 
-  // Check if connected user is the creator
+  // Then update the creator check useEffect
   useEffect(() => {
-    if (!address || !token.creator) {
-      console.log("Skipping creator check - missing address or token.creator", {
-        address,
-        creator: token.creator,
-      });
+    if (!user) {
+      console.log("Skipping creator check - no user");
       return;
     }
 
     const checkIsCreator = async () => {
-      console.log("Checking if address is creator:", {
-        userAddress: address,
+      const userAddresses = getAllUserAddresses(user);
+      console.log("Checking if addresses are creator:", {
+        userAddresses,
         tokenAddress: token.contract_address,
       });
 
       try {
-        const deployments = await publicClient.readContract({
-          address: LP_FACTORY_ADDRESS,
-          abi: LP_FACTORY_ABI,
-          functionName: "getTokensDeployedByUser",
-          args: [address as `0x${string}`],
-        });
+        // Check each address
+        for (const address of userAddresses) {
+          const deployments = await publicClient.readContract({
+            address: LP_FACTORY_ADDRESS,
+            abi: LP_FACTORY_ABI,
+            functionName: "getTokensDeployedByUser",
+            args: [address as `0x${string}`],
+          });
 
-        console.log("Deployments returned:", deployments);
+          const isCreatorResult = deployments.some(
+            (d) =>
+              d.token.toLowerCase() === token.contract_address.toLowerCase()
+          );
 
-        const isCreatorResult = deployments.some(
-          (d) => d.token.toLowerCase() === token.contract_address.toLowerCase()
-        );
-
-        console.log("Creator check result:", {
-          isCreator: isCreatorResult,
-          deployedTokens: deployments.map((d) => d.token.toLowerCase()),
-          currentToken: token.contract_address.toLowerCase(),
-        });
-
-        setIsCreator(isCreatorResult);
+          if (isCreatorResult) {
+            setIsCreator(true);
+            return;
+          }
+        }
+        setIsCreator(false);
       } catch (error) {
         console.error("Error checking creator status:", error);
         setIsCreator(false);
@@ -236,7 +250,7 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
     };
 
     checkIsCreator();
-  }, [address, token.contract_address, token.creator]);
+  }, [user, token.contract_address]);
 
   const handleClaimFees = async () => {
     if (!window.ethereum || !user?.wallet?.address) {
@@ -497,22 +511,27 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
         />
         {/* Add Claim Fees button for creator */}
         {isCreator && (
-          <button
-            onClick={handleClaimFees}
-            disabled={isClaimingFees || !user?.wallet?.address}
-            className="btn btn-secondary"
-          >
-            {isClaimingFees ? (
-              <>
-                <span className="loading loading-spinner"></span>
-                Claiming...
-              </>
-            ) : !user?.wallet?.address ? (
-              "Connect Wallet"
-            ) : (
-              "Claim Fees"
-            )}
-          </button>
+          <div className="space-y-1">
+            <button
+              onClick={handleClaimFees}
+              disabled={isClaimingFees || !user?.wallet?.address}
+              className="btn btn-secondary w-full"
+            >
+              {isClaimingFees ? (
+                <>
+                  <span className="loading loading-spinner"></span>
+                  Claiming...
+                </>
+              ) : !user?.wallet?.address ? (
+                "Connect Wallet"
+              ) : (
+                "Claim Fees"
+              )}
+            </button>
+            <div className="text-xs opacity-60 text-center">
+              Claimable by: {shortenHash(user?.wallet?.address)}
+            </div>
+          </div>
         )}
       </div>
 
