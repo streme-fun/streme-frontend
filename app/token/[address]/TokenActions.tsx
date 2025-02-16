@@ -6,11 +6,23 @@ import { Token } from "@/app/types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
 import { StakeButton } from "@/app/components/StakeButton";
 import { UniswapModal } from "@/app/components/UniswapModal";
-import { createPublicClient, http } from "viem";
+import {
+  createPublicClient,
+  http,
+  parseAbi,
+  createWalletClient,
+  custom,
+} from "viem";
 import { base } from "viem/chains";
 import Image from "next/image";
 import FarcasterIcon from "@/public/farcaster.svg";
 import { UnstakeButton } from "@/app/components/UnstakeButton";
+import { toast } from "sonner";
+
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(),
+});
 
 // Helper functions from TokenTable
 const formatPrice = (price: number | undefined) => {
@@ -80,6 +92,13 @@ const shortenHash = (hash: string | undefined) => {
   return hash.slice(0, 10);
 };
 
+// Add LP Factory ABI and address
+const LP_FACTORY_ADDRESS = "0xfF65a5f74798EebF87C8FdFc4e56a71B511aB5C8";
+const LP_FACTORY_ABI = parseAbi([
+  "function getTokensDeployedByUser(address) external view returns ((address token, address locker, uint256 positionId)[])",
+  "function claimRewards(address) external",
+]);
+
 export function TokenActions({ token: initialToken }: TokenActionsProps) {
   const [isUniswapOpen, setIsUniswapOpen] = useState(false);
   const [token, setToken] = useState(initialToken);
@@ -90,6 +109,18 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
   const address = user?.wallet?.address;
   const isConnected = ready && !!address;
   const [balance, setBalance] = useState<bigint>(BigInt(0));
+
+  const [isCreator, setIsCreator] = useState(false);
+  const [isClaimingFees, setIsClaimingFees] = useState(false);
+
+  // Add debug logs
+  useEffect(() => {
+    console.log("Wallet state:", {
+      isReady: ready,
+      user: user,
+      address,
+    });
+  }, [ready, user, address]);
 
   // Fetch token data
   useEffect(() => {
@@ -140,11 +171,6 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
   useEffect(() => {
     if (!address || !isConnected) return;
 
-    const publicClient = createPublicClient({
-      chain: base,
-      transport: http(),
-    });
-
     const fetchBalance = async () => {
       const bal = await publicClient.readContract({
         address: token.contract_address as `0x${string}`,
@@ -165,6 +191,130 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
 
     fetchBalance();
   }, [address, isConnected, token.contract_address]);
+
+  // Check if connected user is the creator
+  useEffect(() => {
+    if (!address || !token.creator) {
+      console.log("Skipping creator check - missing address or token.creator", {
+        address,
+        creator: token.creator,
+      });
+      return;
+    }
+
+    const checkIsCreator = async () => {
+      console.log("Checking if address is creator:", {
+        userAddress: address,
+        tokenAddress: token.contract_address,
+      });
+
+      try {
+        const deployments = await publicClient.readContract({
+          address: LP_FACTORY_ADDRESS,
+          abi: LP_FACTORY_ABI,
+          functionName: "getTokensDeployedByUser",
+          args: [address as `0x${string}`],
+        });
+
+        console.log("Deployments returned:", deployments);
+
+        const isCreatorResult = deployments.some(
+          (d) => d.token.toLowerCase() === token.contract_address.toLowerCase()
+        );
+
+        console.log("Creator check result:", {
+          isCreator: isCreatorResult,
+          deployedTokens: deployments.map((d) => d.token.toLowerCase()),
+          currentToken: token.contract_address.toLowerCase(),
+        });
+
+        setIsCreator(isCreatorResult);
+      } catch (error) {
+        console.error("Error checking creator status:", error);
+        setIsCreator(false);
+      }
+    };
+
+    checkIsCreator();
+  }, [address, token.contract_address, token.creator]);
+
+  const handleClaimFees = async () => {
+    if (!window.ethereum || !user?.wallet?.address) {
+      console.error("No wallet available");
+      return;
+    }
+
+    setIsClaimingFees(true);
+    try {
+      // Single toast for the entire process
+      const toastId = toast.loading("Switching to Base network...");
+
+      // Try to switch to Base chain first
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x2105" }],
+        });
+
+        const currentChain = await window.ethereum.request({
+          method: "eth_chainId",
+        });
+        if (currentChain !== "0x2105") {
+          toast.error(
+            "Wallet did not switch to Base network, please switch manually",
+            { id: toastId }
+          );
+          return;
+        }
+
+        // Update toast message
+        toast.loading("Claiming LP fees...", { id: toastId });
+
+        const walletClient = createWalletClient({
+          chain: base,
+          transport: custom(window.ethereum),
+          account: user.wallet.address as `0x${string}`,
+        });
+
+        const tx = await walletClient.writeContract({
+          address: LP_FACTORY_ADDRESS,
+          abi: LP_FACTORY_ABI,
+          functionName: "claimRewards",
+          args: [token.contract_address as `0x${string}`],
+        });
+
+        console.log("Transaction submitted:", tx);
+
+        // Update toast while waiting for confirmation
+        toast.loading("Waiting for confirmation...", { id: toastId });
+
+        await publicClient.waitForTransactionReceipt({
+          hash: tx,
+        });
+
+        // Show success toast with transaction link
+        toast.success(
+          <div className="flex flex-col gap-2">
+            <div>Successfully claimed LP fees!</div>
+            <a
+              href={`https://basescan.org/tx/${tx}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs opacity-80 hover:opacity-100 underline"
+            >
+              View on Basescan
+            </a>
+          </div>,
+          { id: toastId, duration: 8000 }
+        );
+      } catch (error) {
+        console.error("Error:", error);
+        toast.error("Failed to claim LP fees", { id: toastId });
+      }
+    } finally {
+      setIsClaimingFees(false);
+    }
+  };
 
   const hasTokens = isConnected && balance > 0n;
 
@@ -345,6 +495,25 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
           symbol={token.symbol}
           className="btn btn-outline"
         />
+        {/* Add Claim Fees button for creator */}
+        {isCreator && (
+          <button
+            onClick={handleClaimFees}
+            disabled={isClaimingFees || !user?.wallet?.address}
+            className="btn btn-secondary"
+          >
+            {isClaimingFees ? (
+              <>
+                <span className="loading loading-spinner"></span>
+                Claiming...
+              </>
+            ) : !user?.wallet?.address ? (
+              "Connect Wallet"
+            ) : (
+              "Claim LP Fees"
+            )}
+          </button>
+        )}
       </div>
 
       <UniswapModal
