@@ -1,36 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { usePrivy } from "@privy-io/react-auth";
-import { createPublicClient, http, createWalletClient, custom } from "viem";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import { StakeModal } from "./StakeModal";
-
-const superAbi = [
-  {
-    name: "approve",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "spender", type: "address" },
-      { name: "amount", type: "uint256" },
-    ],
-    outputs: [{ type: "bool" }],
-  },
-] as const;
-
-const stakingAbi = [
-  {
-    name: "stake",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "to", type: "address" },
-      { name: "amount", type: "uint256" },
-    ],
-    outputs: [],
-  },
-] as const;
+import { Interface } from "@ethersproject/abi";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 
@@ -43,16 +18,6 @@ const gdaABI = [
     name: "isMemberConnected",
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      { name: "pool", type: "address" },
-      { name: "userData", type: "bytes" },
-    ],
-    name: "connectPool",
-    outputs: [{ name: "", type: "bool" }],
-    stateMutability: "nonpayable",
     type: "function",
   },
 ] as const;
@@ -86,6 +51,7 @@ export function StakeButton({
   totalStakers,
 }: StakeButtonProps) {
   const { user } = usePrivy();
+  const { wallets } = useWallets();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [balance, setBalance] = useState<bigint>(0n);
 
@@ -126,31 +92,45 @@ export function StakeButton({
       throw new Error("Wallet not connected");
     }
 
-    // Check if we have a valid ethereum provider
-    if (!window.ethereum) {
-      throw new Error("No ethereum wallet detected");
+    const walletAddress = user.wallet.address;
+    const wallet = wallets.find((w) => w.address === walletAddress);
+
+    if (!wallet) {
+      throw new Error("Wallet not found");
     }
 
-    const walletAddress = user.wallet.address;
-
     try {
-      const walletClient = createWalletClient({
-        chain: base,
-        transport: custom(window.ethereum),
-        account: toHex(walletAddress),
+      const provider = await wallet.getEthereumProvider();
+
+      // Add this section to switch network
+      await provider.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: "0x2105" }], // 0x2105 is hex for 8453 (Base)
       });
 
       // First approve the tokens
-      const approveTx = await walletClient.writeContract({
-        address: toHex(tokenAddress),
-        abi: superAbi,
-        functionName: "approve",
-        args: [toHex(stakingAddress), amount],
+      const approveIface = new Interface([
+        "function approve(address spender, uint256 amount) external returns (bool)",
+      ]);
+      const approveData = approveIface.encodeFunctionData("approve", [
+        toHex(stakingAddress),
+        amount,
+      ]);
+
+      const approveTx = await provider.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            to: toHex(tokenAddress),
+            from: walletAddress,
+            data: approveData,
+          },
+        ],
       });
 
       // Wait for approval confirmation
       const approveReceipt = await publicClient.waitForTransactionReceipt({
-        hash: approveTx,
+        hash: approveTx as `0x${string}`,
       });
 
       if (!approveReceipt.status) {
@@ -158,15 +138,27 @@ export function StakeButton({
       }
 
       // Then stake them
-      const stakeTx = await walletClient.writeContract({
-        address: toHex(stakingAddress),
-        abi: stakingAbi,
-        functionName: "stake",
-        args: [toHex(walletAddress), amount],
+      const stakeIface = new Interface([
+        "function stake(address to, uint256 amount) external",
+      ]);
+      const stakeData = stakeIface.encodeFunctionData("stake", [
+        toHex(walletAddress),
+        amount,
+      ]);
+
+      const stakeTx = await provider.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            to: toHex(stakingAddress),
+            from: walletAddress,
+            data: stakeData,
+          },
+        ],
       });
 
       const stakeReceipt = await publicClient.waitForTransactionReceipt({
-        hash: stakeTx,
+        hash: stakeTx as `0x${string}`,
       });
 
       if (!stakeReceipt.status) {
@@ -182,16 +174,27 @@ export function StakeButton({
       });
 
       if (!connected) {
-        const userData = "0x" as const;
-        const connectTx = await walletClient.writeContract({
-          address: toHex(GDA_FORWARDER),
-          abi: gdaABI,
-          functionName: "connectPool",
-          args: [toHex(stakingPoolAddress), userData],
+        const gdaIface = new Interface([
+          "function connectPool(address pool, bytes calldata userData) external returns (bool)",
+        ]);
+        const connectData = gdaIface.encodeFunctionData("connectPool", [
+          toHex(stakingPoolAddress),
+          "0x",
+        ]);
+
+        const connectTx = await provider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: toHex(GDA_FORWARDER),
+              from: walletAddress,
+              data: connectData,
+            },
+          ],
         });
 
         const connectReceipt = await publicClient.waitForTransactionReceipt({
-          hash: connectTx,
+          hash: connectTx as `0x${string}`,
         });
 
         if (!connectReceipt.status) {
@@ -203,7 +206,7 @@ export function StakeButton({
       await fetchBalance();
     } catch (error) {
       console.error("Staking error:", error);
-      throw error; // Re-throw to be handled by the modal
+      throw error;
     }
   };
 

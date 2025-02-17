@@ -62,16 +62,20 @@ export function StakeModal({
 
     try {
       await onStake(parseUnits(amount, 18));
-
       setIsSuccess(true);
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes("User rejected")) {
-          setError("Transaction cancelled");
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "message" in error &&
+        typeof error.message === "string"
+      ) {
+        if (error.message.includes("rejected")) {
+          setError("Transaction rejected");
         } else if (error.message.includes("insufficient funds")) {
           setError("Insufficient funds for transaction");
-        } else if (error.message.includes("user rejected transaction")) {
-          setError("Transaction rejected");
+        } else if (error.message.includes("Wallet not found")) {
+          setError("Wallet not found. Please reconnect.");
         } else {
           setError("Failed to stake tokens. Please try again.");
         }
