@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { Token } from "@/app/types/token";
-import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
 import { StakeButton } from "@/app/components/StakeButton";
 import { UniswapModal } from "@/app/components/UniswapModal";
 import {
@@ -14,8 +13,6 @@ import {
   custom,
 } from "viem";
 import { base } from "viem/chains";
-import Image from "next/image";
-import FarcasterIcon from "@/public/farcaster.svg";
 import { UnstakeButton } from "@/app/components/UnstakeButton";
 import { toast } from "sonner";
 
@@ -24,68 +21,9 @@ const publicClient = createPublicClient({
   transport: http(),
 });
 
-// Helper functions from TokenTable
-const formatPrice = (price: number | undefined) => {
-  if (!price || isNaN(price)) return "-";
-
-  if (price < 0.01 && price > 0) {
-    // Find the first non-zero decimal place
-    const decimalStr = price.toFixed(20).split(".")[1];
-    let zeroCount = 0;
-    while (decimalStr[zeroCount] === "0") {
-      zeroCount++;
-    }
-
-    // Format as 0.0₅984 (example)
-    return (
-      <span className="whitespace-nowrap">
-        $0.0{zeroCount > 0 && <sub>{zeroCount}</sub>}
-        {decimalStr.slice(zeroCount, zeroCount + 4)}
-      </span>
-    );
-  }
-
-  return `$${price.toLocaleString(undefined, {
-    minimumFractionDigits: 6,
-    maximumFractionDigits: 6,
-  })}`;
-};
-
-const formatCurrency = (value: number | undefined) => {
-  if (!value || isNaN(value)) return "-";
-  return `$${value.toLocaleString(undefined, {
-    maximumFractionDigits: 0,
-  })}`;
-};
-
 interface TokenActionsProps {
   token: Token;
 }
-
-const AnimatedReward = ({ value }: { value: number }) => {
-  const [current, setCurrent] = useState(value);
-
-  // Update initial value when it changes
-  useEffect(() => {
-    setCurrent(value);
-  }, [value]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrent((prev) => prev + REWARDS_PER_SECOND / 20);
-    }, 50);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className="font-mono text-lg">
-      {current.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}
-    </div>
-  );
-};
 
 const shortenHash = (hash: string | undefined) => {
   if (!hash) return "";
@@ -143,8 +81,6 @@ const getAllUserAddresses = (user: PrivyUser) => {
 export function TokenActions({ token: initialToken }: TokenActionsProps) {
   const [isUniswapOpen, setIsUniswapOpen] = useState(false);
   const [token, setToken] = useState(initialToken);
-  const [rewardsData, setRewardsData] = useState<number>(0);
-  const [membersData, setMembersData] = useState<string>("0");
 
   const { user, ready } = usePrivy();
   const address = user?.wallet?.address;
@@ -189,54 +125,6 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
 
     return () => clearInterval(interval);
   }, [token.contract_address]);
-
-  // Calculate rewards and members
-  useEffect(() => {
-    const calculateData = async () => {
-      const { totalStreamed, totalMembers } = await calculateRewards(
-        token.created_at,
-        token.contract_address,
-        token.staking_pool
-      );
-      setRewardsData(totalStreamed);
-      setMembersData(totalMembers);
-    };
-
-    calculateData();
-  }, [token]);
-
-  // Update rewards periodically
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRewardsData((prev) => prev + REWARDS_PER_SECOND);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Fetch balance
-  useEffect(() => {
-    if (!address || !isConnected) return;
-
-    const fetchBalance = async () => {
-      const bal = await publicClient.readContract({
-        address: token.contract_address as `0x${string}`,
-        abi: [
-          {
-            inputs: [{ name: "account", type: "address" }],
-            name: "balanceOf",
-            outputs: [{ name: "", type: "uint256" }],
-            stateMutability: "view",
-            type: "function",
-          },
-        ],
-        functionName: "balanceOf",
-        args: [address as `0x${string}`],
-      });
-      setBalance(bal);
-    };
-
-    fetchBalance();
-  }, [address, isConnected, token.contract_address]);
 
   // Then update the creator check useEffect
   useEffect(() => {
@@ -334,6 +222,34 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
 
     checkStakedBalance();
   }, [user?.wallet?.address, token.staking_address]);
+
+  // Add balance fetch effect
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!address || !isConnected) return;
+      try {
+        const bal = await publicClient.readContract({
+          address: token.contract_address as `0x${string}`,
+          abi: [
+            {
+              inputs: [{ name: "account", type: "address" }],
+              name: "balanceOf",
+              outputs: [{ name: "", type: "uint256" }],
+              stateMutability: "view",
+              type: "function",
+            },
+          ],
+          functionName: "balanceOf",
+          args: [address as `0x${string}`],
+        });
+        setBalance(bal);
+      } catch (error) {
+        console.error("Error fetching balance:", error);
+      }
+    };
+
+    fetchBalance();
+  }, [address, isConnected, token.contract_address]);
 
   const handleClaimFees = async () => {
     if (!window.ethereum || !user?.wallet?.address) {
@@ -453,145 +369,6 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
 
   return (
     <div className="space-y-6">
-      {/* Token Header */}
-      <div className="flex items-center gap-4">
-        {token.img_url ? (
-          <div className="relative w-16 h-16">
-            <Image
-              src={token.img_url}
-              alt={token.name}
-              fill
-              className="object-cover rounded-md"
-            />
-          </div>
-        ) : (
-          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-2xl font-mono">
-            {token.symbol?.[0] ?? "?"}
-          </div>
-        )}
-        <div className="flex-1">
-          <h2 className="text-2xl font-bold">{token.name}</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-base opacity-60">${token.symbol}</span>
-            <span
-              className={`text-base ${
-                token.change24h && token.change24h >= 0
-                  ? "text-green-500"
-                  : "text-red-500"
-              }`}
-            >
-              {token.change24h
-                ? `${token.change24h >= 0 ? "+" : ""}${token.change24h.toFixed(
-                    2
-                  )}%`
-                : "-"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Price Row */}
-      <div className="flex items-end justify-between px-1">
-        <div>
-          <div className="text-sm opacity-60 mb-1">Price</div>
-          <div className="font-mono text-2xl font-bold">
-            {formatPrice(token.price)}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-sm opacity-60 mb-1">24h Change</div>
-          <div
-            className={`font-mono text-lg ${
-              token.change24h && token.change24h >= 0
-                ? "text-green-500"
-                : "text-red-500"
-            }`}
-          >
-            {token.change24h
-              ? `${token.change24h >= 0 ? "+" : ""}${token.change24h.toFixed(
-                  2
-                )}%`
-              : "-"}
-          </div>
-        </div>
-      </div>
-
-      {/* Creator Info */}
-      {token.creator && (
-        <div className="flex items-center gap-2 px-1">
-          <div className="avatar">
-            <div className="w-6 h-6 rounded-full">
-              <Image
-                src={
-                  token.creator.profileImage ??
-                  `/avatars/${token.creator.name}.avif`
-                }
-                alt={token.creator.name}
-                width={24}
-                height={24}
-              />
-            </div>
-          </div>
-          <a
-            href={`https://warpcast.com/${token.creator.name}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-base opacity-60 hover:opacity-100 hover:underline"
-          >
-            {token.creator.name}
-          </a>
-          {token.cast_hash && (
-            <a
-              href={`https://warpcast.com/${token.creator.name}/${shortenHash(
-                token.cast_hash
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-primary inline-flex items-center ml-2"
-              title="View original cast"
-            >
-              <Image
-                src={FarcasterIcon}
-                alt="View on Farcaster"
-                width={14}
-                height={14}
-                className="opacity-60 hover:opacity-100"
-              />
-            </a>
-          )}
-        </div>
-      )}
-
-      {/* Market Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <div className="text-sm opacity-60 mb-1">Volume 24h</div>
-          <div className="font-mono text-lg">
-            {formatCurrency(token.volume24h)}
-          </div>
-        </div>
-        <div>
-          <div className="text-sm opacity-60 mb-1">Market Cap</div>
-          <div className="font-mono text-lg">
-            {formatCurrency(token.marketCap)}
-          </div>
-        </div>
-      </div>
-
-      {/* Rewards Section */}
-      <div className="flex items-center justify-between px-1">
-        <div>
-          <div className="text-sm opacity-60 mb-1">
-            Rewards ({membersData ?? 0}{" "}
-            {membersData === "1" ? "staker" : "stakers"})
-          </div>
-          <AnimatedReward value={rewardsData} />
-        </div>
-        <div className="text-sm opacity-40">
-          {REWARDS_PER_SECOND.toFixed(2)} ${token.symbol}/sec
-        </div>
-      </div>
-
       {/* Action Buttons */}
       <div className="flex flex-col gap-2">
         <button
@@ -606,7 +383,6 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
           stakingPoolAddress={token.staking_pool}
           disabled={!hasTokens}
           symbol={token.symbol}
-          totalStakers={membersData}
           className={`btn btn-outline relative 
             before:absolute before:inset-0 before:bg-gradient-to-r 
             before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] 

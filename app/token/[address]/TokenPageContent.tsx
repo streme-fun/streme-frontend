@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { TokenActions } from "./TokenActions";
 import { Token } from "@/app/types/token";
+import { TokenInfo } from "./TokenInfo";
 
 // const HARDCODED_ADDRESS = "0x1234567890123456789012345678901234567890";
 // const BASED_FWOG_POOL = "0x1035ae3f87a91084c6c5084d0615cc6121c5e228";
@@ -110,8 +111,9 @@ export function TokenPageContent() {
           </div>
         </div>
 
-        {/* Trading Interface */}
-        <div className="lg:col-span-4">
+        {/* Right Column */}
+        <div className="lg:col-span-4 space-y-4">
+          <TokenInfo token={token} />
           <TokenActions token={token} />
         </div>
       </div>
