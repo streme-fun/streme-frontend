@@ -57,19 +57,21 @@ export function StakeModal({
 
   const handleStake = async () => {
     setError(null);
+    setIsStaking(true);
+    setStep("approving");
+
     try {
-      setIsStaking(true);
-      setStep("approving");
       await onStake(parseUnits(amount, 18));
-      setStep("staking");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setStep("connecting");
-      await new Promise((resolve) => setTimeout(resolve, 500));
+
       setIsSuccess(true);
     } catch (error) {
       if (error instanceof Error) {
         if (error.message.includes("User rejected")) {
           setError("Transaction cancelled");
+        } else if (error.message.includes("insufficient funds")) {
+          setError("Insufficient funds for transaction");
+        } else if (error.message.includes("user rejected transaction")) {
+          setError("Transaction rejected");
         } else {
           setError("Failed to stake tokens. Please try again.");
         }
@@ -77,6 +79,7 @@ export function StakeModal({
         setError("An unexpected error occurred");
       }
       console.error("Staking error:", error);
+      setIsSuccess(false);
     } finally {
       setIsStaking(false);
       setStep("idle");

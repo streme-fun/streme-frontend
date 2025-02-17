@@ -122,16 +122,24 @@ export function StakeButton({
   }, [fetchBalance]);
 
   const handleStake = async (amount: bigint) => {
-    if (!window.ethereum || !user?.wallet?.address) return;
+    if (!user?.wallet?.address) {
+      throw new Error("Wallet not connected");
+    }
+
+    // Check if we have a valid ethereum provider
+    if (!window.ethereum) {
+      throw new Error("No ethereum wallet detected");
+    }
+
     const walletAddress = user.wallet.address;
 
-    const walletClient = createWalletClient({
-      chain: base,
-      transport: custom(window.ethereum),
-      account: toHex(walletAddress),
-    });
-
     try {
+      const walletClient = createWalletClient({
+        chain: base,
+        transport: custom(window.ethereum),
+        account: toHex(walletAddress),
+      });
+
       // First approve the tokens
       const approveTx = await walletClient.writeContract({
         address: toHex(tokenAddress),
@@ -140,7 +148,14 @@ export function StakeButton({
         args: [toHex(stakingAddress), amount],
       });
 
-      await publicClient.waitForTransactionReceipt({ hash: approveTx });
+      // Wait for approval confirmation
+      const approveReceipt = await publicClient.waitForTransactionReceipt({
+        hash: approveTx,
+      });
+
+      if (!approveReceipt.status) {
+        throw new Error("Approval transaction failed");
+      }
 
       // Then stake them
       const stakeTx = await walletClient.writeContract({
@@ -150,9 +165,15 @@ export function StakeButton({
         args: [toHex(walletAddress), amount],
       });
 
-      await publicClient.waitForTransactionReceipt({ hash: stakeTx });
+      const stakeReceipt = await publicClient.waitForTransactionReceipt({
+        hash: stakeTx,
+      });
 
-      // Finally connect to the GDA pool
+      if (!stakeReceipt.status) {
+        throw new Error("Stake transaction failed");
+      }
+
+      // Check GDA pool connection
       const connected = await publicClient.readContract({
         address: toHex(GDA_FORWARDER),
         abi: gdaABI,
@@ -169,14 +190,20 @@ export function StakeButton({
           args: [toHex(stakingPoolAddress), userData],
         });
 
-        await publicClient.waitForTransactionReceipt({ hash: connectTx });
+        const connectReceipt = await publicClient.waitForTransactionReceipt({
+          hash: connectTx,
+        });
+
+        if (!connectReceipt.status) {
+          throw new Error("Pool connection failed");
+        }
       }
 
       // Refresh balance after successful stake
       await fetchBalance();
     } catch (error) {
       console.error("Staking error:", error);
-      throw error;
+      throw error; // Re-throw to be handled by the modal
     }
   };
 
