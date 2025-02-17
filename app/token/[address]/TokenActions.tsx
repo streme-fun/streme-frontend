@@ -5,16 +5,17 @@ import { usePrivy } from "@privy-io/react-auth";
 import { Token } from "@/app/types/token";
 import { StakeButton } from "@/app/components/StakeButton";
 import { UniswapModal } from "@/app/components/UniswapModal";
-import {
-  createPublicClient,
-  http,
-  parseAbi,
-  createWalletClient,
-  custom,
-} from "viem";
+import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import { UnstakeButton } from "@/app/components/UnstakeButton";
-import { toast } from "sonner";
+import { ClaimFeesButton } from "@/app/components/ClaimFeesButton";
+import { ConnectPoolButton } from "@/app/components/ConnectPoolButton";
+import {
+  LP_FACTORY_ADDRESS,
+  LP_FACTORY_ABI,
+  GDA_FORWARDER,
+  GDA_ABI,
+} from "@/app/lib/contracts";
 
 const publicClient = createPublicClient({
   chain: base,
@@ -24,43 +25,6 @@ const publicClient = createPublicClient({
 interface TokenActionsProps {
   token: Token;
 }
-
-const shortenHash = (hash: string | undefined) => {
-  if (!hash) return "";
-  return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
-};
-
-// Add LP Factory ABI and address
-const LP_FACTORY_ADDRESS = "0xfF65a5f74798EebF87C8FdFc4e56a71B511aB5C8";
-const LP_FACTORY_ABI = parseAbi([
-  "function getTokensDeployedByUser(address) external view returns ((address token, address locker, uint256 positionId)[])",
-  "function claimRewards(address) external",
-]);
-
-// Add GDA constants at the top with other constants
-const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
-const GDA_ABI = [
-  {
-    inputs: [
-      { name: "pool", type: "address" },
-      { name: "member", type: "address" },
-    ],
-    name: "isMemberConnected",
-    outputs: [{ name: "", type: "bool" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      { name: "pool", type: "address" },
-      { name: "userData", type: "bytes" },
-    ],
-    name: "connectPool",
-    outputs: [{ name: "", type: "bool" }],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-] as const;
 
 type LinkedAccount = {
   type: string;
@@ -78,6 +42,12 @@ const getAllUserAddresses = (user: PrivyUser) => {
     .map((account) => account.address!.toLowerCase());
 };
 
+type Deployment = {
+  token: string;
+  locker: string;
+  positionId: bigint;
+};
+
 export function TokenActions({ token: initialToken }: TokenActionsProps) {
   const [isUniswapOpen, setIsUniswapOpen] = useState(false);
   const [token, setToken] = useState(initialToken);
@@ -88,9 +58,7 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
   const [balance, setBalance] = useState<bigint>(BigInt(0));
 
   const [isCreator, setIsCreator] = useState(false);
-  const [isClaimingFees, setIsClaimingFees] = useState(false);
   const [isConnectedToPool, setIsConnectedToPool] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
 
   // Add staking balance check
   const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
@@ -143,12 +111,12 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
       try {
         // Check each address
         for (const address of userAddresses) {
-          const deployments = await publicClient.readContract({
+          const deployments = (await publicClient.readContract({
             address: LP_FACTORY_ADDRESS,
             abi: LP_FACTORY_ABI,
             functionName: "getTokensDeployedByUser",
             args: [address as `0x${string}`],
-          });
+          })) as Deployment[];
 
           const isCreatorResult = deployments.some(
             (d) =>
@@ -251,120 +219,6 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
     fetchBalance();
   }, [address, isConnected, token.contract_address]);
 
-  const handleClaimFees = async () => {
-    if (!window.ethereum || !user?.wallet?.address) {
-      console.error("No wallet available");
-      return;
-    }
-
-    setIsClaimingFees(true);
-    try {
-      // Single toast for the entire process
-      const toastId = toast.loading("Switching to Base network...");
-
-      // Try to switch to Base chain first
-      try {
-        await window.ethereum.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x2105" }],
-        });
-
-        const currentChain = await window.ethereum.request({
-          method: "eth_chainId",
-        });
-        if (currentChain !== "0x2105") {
-          toast.error(
-            "Wallet did not switch to Base network, please switch manually",
-            { id: toastId }
-          );
-          return;
-        }
-
-        // Update toast message
-        toast.loading("Claiming LP fees...", { id: toastId });
-
-        const walletClient = createWalletClient({
-          chain: base,
-          transport: custom(window.ethereum),
-          account: user.wallet.address as `0x${string}`,
-        });
-
-        const tx = await walletClient.writeContract({
-          address: LP_FACTORY_ADDRESS,
-          abi: LP_FACTORY_ABI,
-          functionName: "claimRewards",
-          args: [token.contract_address as `0x${string}`],
-        });
-
-        console.log("Transaction submitted:", tx);
-
-        // Update toast while waiting for confirmation
-        toast.loading("Waiting for confirmation...", { id: toastId });
-
-        await publicClient.waitForTransactionReceipt({
-          hash: tx,
-        });
-
-        // Show success toast with transaction link
-        toast.success(
-          <div className="flex flex-col gap-2">
-            <div>Successfully claimed LP fees!</div>
-            <a
-              href={`https://basescan.org/tx/${tx}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs opacity-80 hover:opacity-100 underline"
-            >
-              View on Basescan
-            </a>
-          </div>,
-          { id: toastId, duration: 8000 }
-        );
-      } catch (error) {
-        console.error("Error:", error);
-        toast.error("Failed to claim LP fees", { id: toastId });
-      }
-    } finally {
-      setIsClaimingFees(false);
-    }
-  };
-
-  // Add connect pool function
-  const handleConnectPool = async () => {
-    if (!window.ethereum || !user?.wallet?.address) return;
-
-    setIsConnecting(true);
-    const toastId = toast.loading("Connecting to reward pool...");
-
-    try {
-      const walletClient = createWalletClient({
-        chain: base,
-        transport: custom(window.ethereum),
-        account: user.wallet.address as `0x${string}`,
-      });
-
-      const userData = "0x" as const;
-      const tx = await walletClient.writeContract({
-        address: GDA_FORWARDER,
-        abi: GDA_ABI,
-        functionName: "connectPool",
-        args: [token.staking_pool as `0x${string}`, userData],
-      });
-
-      toast.loading("Confirming transaction...", { id: toastId });
-
-      await publicClient.waitForTransactionReceipt({ hash: tx });
-
-      setIsConnectedToPool(true);
-      toast.success("Successfully connected to reward pool!", { id: toastId });
-    } catch (error) {
-      console.error("Error connecting to pool:", error);
-      toast.error("Failed to connect to reward pool", { id: toastId });
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
   const hasTokens = isConnected && balance > 0n;
 
   return (
@@ -433,20 +287,10 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
                   </div>
                 </div>
                 <div className="flex-none">
-                  <button
-                    onClick={handleConnectPool}
-                    disabled={isConnecting}
-                    className="btn btn-sm btn-primary"
-                  >
-                    {isConnecting ? (
-                      <>
-                        <span className="loading loading-spinner loading-sm"></span>
-                        Connecting...
-                      </>
-                    ) : (
-                      "Connect"
-                    )}
-                  </button>
+                  <ConnectPoolButton
+                    poolAddress={token.staking_pool}
+                    onSuccess={() => setIsConnectedToPool(true)}
+                  />
                 </div>
               </div>
             ) : (
@@ -473,29 +317,7 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
         )}
 
         {/* Claim Fees button for creator */}
-        {isCreator && (
-          <div className="space-y-1">
-            <button
-              onClick={handleClaimFees}
-              disabled={isClaimingFees || !user?.wallet?.address}
-              className="btn btn-secondary w-full"
-            >
-              {isClaimingFees ? (
-                <>
-                  <span className="loading loading-spinner"></span>
-                  Claiming...
-                </>
-              ) : !user?.wallet?.address ? (
-                "Connect Wallet"
-              ) : (
-                "Claim Fees"
-              )}
-            </button>
-            <div className="text-xs opacity-60 text-center">
-              Claimable by: {shortenHash(user?.wallet?.address)}
-            </div>
-          </div>
-        )}
+        {isCreator && <ClaimFeesButton tokenAddress={token.contract_address} />}
       </div>
 
       <UniswapModal
