@@ -99,6 +99,31 @@ const LP_FACTORY_ABI = parseAbi([
   "function claimRewards(address) external",
 ]);
 
+// Add GDA constants at the top with other constants
+const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
+const GDA_ABI = [
+  {
+    inputs: [
+      { name: "pool", type: "address" },
+      { name: "member", type: "address" },
+    ],
+    name: "isMemberConnected",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "pool", type: "address" },
+      { name: "userData", type: "bytes" },
+    ],
+    name: "connectPool",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
 type LinkedAccount = {
   type: string;
   address?: string;
@@ -128,6 +153,11 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
 
   const [isCreator, setIsCreator] = useState(false);
   const [isClaimingFees, setIsClaimingFees] = useState(false);
+  const [isConnectedToPool, setIsConnectedToPool] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  // Add staking balance check
+  const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
 
   // Add debug logs
   useEffect(() => {
@@ -252,6 +282,59 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
     checkIsCreator();
   }, [user, token.contract_address]);
 
+  // Add effect to check pool connection
+  useEffect(() => {
+    const checkPoolConnection = async () => {
+      if (!user?.wallet?.address || !token.staking_pool) return;
+
+      try {
+        const connected = await publicClient.readContract({
+          address: GDA_FORWARDER,
+          abi: GDA_ABI,
+          functionName: "isMemberConnected",
+          args: [
+            token.staking_pool as `0x${string}`,
+            user.wallet.address as `0x${string}`,
+          ],
+        });
+        setIsConnectedToPool(connected);
+      } catch (error) {
+        console.error("Error checking pool connection:", error);
+      }
+    };
+
+    checkPoolConnection();
+  }, [user?.wallet?.address, token.staking_pool]);
+
+  // Add effect to check staking balance
+  useEffect(() => {
+    const checkStakedBalance = async () => {
+      if (!user?.wallet?.address || !token.staking_address) return;
+
+      try {
+        const staked = await publicClient.readContract({
+          address: token.staking_address as `0x${string}`,
+          abi: [
+            {
+              inputs: [{ name: "account", type: "address" }],
+              name: "balanceOf",
+              outputs: [{ name: "", type: "uint256" }],
+              stateMutability: "view",
+              type: "function",
+            },
+          ],
+          functionName: "balanceOf",
+          args: [user.wallet.address as `0x${string}`],
+        });
+        setStakedBalance(staked);
+      } catch (error) {
+        console.error("Error checking staked balance:", error);
+      }
+    };
+
+    checkStakedBalance();
+  }, [user?.wallet?.address, token.staking_address]);
+
   const handleClaimFees = async () => {
     if (!window.ethereum || !user?.wallet?.address) {
       console.error("No wallet available");
@@ -327,6 +410,42 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
       }
     } finally {
       setIsClaimingFees(false);
+    }
+  };
+
+  // Add connect pool function
+  const handleConnectPool = async () => {
+    if (!window.ethereum || !user?.wallet?.address) return;
+
+    setIsConnecting(true);
+    const toastId = toast.loading("Connecting to reward pool...");
+
+    try {
+      const walletClient = createWalletClient({
+        chain: base,
+        transport: custom(window.ethereum),
+        account: user.wallet.address as `0x${string}`,
+      });
+
+      const userData = "0x" as const;
+      const tx = await walletClient.writeContract({
+        address: GDA_FORWARDER,
+        abi: GDA_ABI,
+        functionName: "connectPool",
+        args: [token.staking_pool as `0x${string}`, userData],
+      });
+
+      toast.loading("Confirming transaction...", { id: toastId });
+
+      await publicClient.waitForTransactionReceipt({ hash: tx });
+
+      setIsConnectedToPool(true);
+      toast.success("Successfully connected to reward pool!", { id: toastId });
+    } catch (error) {
+      console.error("Error connecting to pool:", error);
+      toast.error("Failed to connect to reward pool", { id: toastId });
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -509,7 +628,75 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
           symbol={token.symbol}
           className="btn btn-outline"
         />
-        {/* Add Claim Fees button for creator */}
+
+        {/* Connection status alerts */}
+        {stakedBalance > 0n && (
+          <>
+            {!isConnectedToPool ? (
+              <div className="alert alert-warning shadow-lg">
+                <div className="flex">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    className="w-6 h-6 mx-2 stroke-current"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    ></path>
+                  </svg>
+                  <div>
+                    <h3 className="font-bold">Action Required</h3>
+                    <div className="text-sm">
+                      Connect to the reward pool to start receiving streaming
+                      rewards.
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-none">
+                  <button
+                    onClick={handleConnectPool}
+                    disabled={isConnecting}
+                    className="btn btn-sm btn-primary"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <span className="loading loading-spinner loading-sm"></span>
+                        Connecting...
+                      </>
+                    ) : (
+                      "Connect"
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="alert alert-success shadow-lg">
+                <div className="flex items-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    className="w-6 h-6 mx-2 stroke-current"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    ></path>
+                  </svg>
+                  <div className="text-sm">Connected to reward pool</div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Claim Fees button for creator */}
         {isCreator && (
           <div className="space-y-1">
             <button
