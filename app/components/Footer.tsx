@@ -8,6 +8,14 @@ export function Footer() {
           <div className="text-sm opacity-60">
             © {new Date().getFullYear()} Streme.Fun
           </div>
+          <a
+            href="https://docs.streme.fun"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm opacity-60 hover:opacity-100"
+          >
+            Docs
+          </a>
         </div>
       </div>
     </footer>

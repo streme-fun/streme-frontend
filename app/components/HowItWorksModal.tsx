@@ -73,6 +73,18 @@ export function HowItWorksModal({
               <li>24-hour lock period applies to each stake</li>
             </ul>
           </div>
+
+          {/* Add docs link */}
+          <div className="text-center pt-4">
+            <a
+              href="https://docs.streme.fun"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary hover:underline"
+            >
+              Read the full documentation →
+            </a>
+          </div>
         </div>
       </div>
     </div>
