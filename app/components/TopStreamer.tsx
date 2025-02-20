@@ -107,9 +107,9 @@ export function TopStreamer() {
                     <div className="rounded-full w-4 h-4">
                       <Image
                         src={
-                          token.creator?.profileImage ?? `/avatars/default.avif`
+                          token.creator?.profileImage ?? `/avatars/streme.png`
                         }
-                        alt={token.creator?.name ?? "Unknown Creator"}
+                        alt={token.creator?.name ?? "Anon"}
                         width={16}
                         height={16}
                       />

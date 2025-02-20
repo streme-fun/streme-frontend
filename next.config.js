@@ -22,12 +22,22 @@ const nextConfig = {
         protocol: "https",
         hostname: "pbs.twimg.com",
       },
-    ],
-    domains: [
-      "utfs.io",
-      "imagedelivery.net", // For the other image URLs in the API response
-      "media.tenor.com",
-      "api.streme.fun",
+      {
+        protocol: "https",
+        hostname: "arweave.net",
+      },
+      {
+        protocol: "https",
+        hostname: "utfs.io",
+      },
+      {
+        protocol: "https",
+        hostname: "media.tenor.com",
+      },
+      {
+        protocol: "https",
+        hostname: "api.streme.fun",
+      },
     ],
   },
   async headers() {

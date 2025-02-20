@@ -89,6 +89,10 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
               fill
               sizes="120px"
               className="object-cover transition-transform duration-300 group-hover:scale-110"
+              unoptimized={
+                token.img_url.includes(".gif") ||
+                token.img_url.includes("imagedelivery.net")
+              }
             />
           </figure>
         ) : (
@@ -132,21 +136,28 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
                   <Image
                     src={
                       token.creator?.profileImage ??
-                      `/avatars/${token.creator?.name ?? "default"}.avif`
+                      `/avatars/${token.creator?.name ?? "streme"}.png`
                     }
-                    alt={token.creator?.name ?? "Unknown Creator"}
+                    alt={token.creator?.name ?? "Anon"}
                     width={16}
                     height={16}
                     sizes="16px"
+                    unoptimized={
+                      (token.creator?.profileImage?.includes(".gif") ||
+                        token.creator?.profileImage?.includes(
+                          "imagedelivery.net"
+                        )) ??
+                      false
+                    }
                   />
                 </div>
               </div>
               <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2 max-w-[120px]">
                 <span
                   className="truncate"
-                  title={token.creator?.name ?? "Unknown"}
+                  title={token.creator?.name ?? "Anon"}
                 >
-                  {token.creator?.name ?? "Unknown"}
+                  {token.creator?.name ?? "Anon"}
                 </span>
                 {token.cast_hash && token.creator?.name && (
                   <button
