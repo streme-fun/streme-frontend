@@ -12,12 +12,45 @@ export async function GET() {
 
     const tokens = await fetchTokensFromStreme();
 
+    // Debug initial tokens
+    console.log("Initial tokens count:", tokens.length);
+    console.log(
+      "Tokens without requestor_fid:",
+      tokens
+        .filter((t) => !t.requestor_fid)
+        .map((t) => ({
+          name: t.name,
+          symbol: t.symbol,
+          address: t.contract_address,
+        }))
+    );
+
     const creatorIds = [
       ...new Set(tokens.map((token) => token.requestor_fid?.toString())),
     ].filter(Boolean);
 
+    // Debug creator IDs
+    console.log("Unique creator IDs:", creatorIds.length);
+
     const creatorProfiles = await fetchCreatorProfiles(creatorIds);
+
+    // Debug creator profiles
+    console.log(
+      "Creator profiles fetched:",
+      Object.keys(creatorProfiles).length
+    );
+    console.log(
+      "Missing creator profiles:",
+      creatorIds.filter((id) => !creatorProfiles[id])
+    );
+
     const enrichedTokens = await enrichTokensWithData(tokens, creatorProfiles);
+
+    // Debug final enriched tokens
+    console.log(
+      "Enriched tokens without creators:",
+      enrichedTokens.filter((t) => !t.creator).length
+    );
 
     return Response.json({ data: enrichedTokens }, { headers });
   } catch (error) {

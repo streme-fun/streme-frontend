@@ -18,6 +18,23 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
   const [totalStakers, setTotalStakers] = useState<number>(0);
 
   useEffect(() => {
+    if (!token.creator) {
+      console.log("Missing creator for token:", {
+        name: token.name,
+        symbol: token.symbol,
+        address: token.contract_address,
+      });
+    } else if (!token.creator.name) {
+      console.log("Missing creator name for token:", {
+        name: token.name,
+        symbol: token.symbol,
+        address: token.contract_address,
+        creator: token.creator,
+      });
+    }
+  }, [token]);
+
+  useEffect(() => {
     calculateRewards(
       token.created_at,
       token.contract_address,

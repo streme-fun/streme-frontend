@@ -35,12 +35,24 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Pass userIds directly in the variables object
+    const userIdArray = userIds.split(",");
+
+    // Ensure we don't exceed Airstack's limit
+    if (userIdArray.length > 50) {
+      console.warn(`Received ${userIdArray.length} userIds, limiting to 50`);
+      userIdArray.length = 50;
+    }
+
     const response = await fetchQuery(getProfileImagesQuery, {
-      userId: userIds.split(","),
+      userId: userIdArray,
     });
 
-    console.log("Response data:", response.data);
+    console.log(
+      `Fetched ${response.data?.Socials?.Social?.length ?? 0} profiles for ${
+        userIdArray.length
+      } requested IDs`
+    );
+
     return NextResponse.json(response);
   } catch (error: unknown) {
     console.error("Error fetching profile images:", error);

@@ -38,6 +38,14 @@ const nextConfig = {
         protocol: "https",
         hostname: "api.streme.fun",
       },
+      {
+        protocol: "https",
+        hostname: "images.colorino.site",
+      },
+      {
+        protocol: "https",
+        hostname: "warpcast.com",
+      },
     ],
   },
   async headers() {

@@ -23,36 +23,55 @@ export async function fetchCreatorProfiles(
 ): Promise<Record<string, CreatorProfile>> {
   if (creatorIds.length === 0) return {};
 
-  const profileResponse = await fetch(
-    `${
-      process.env.NEXT_PUBLIC_BASE_URL
-    }/api/fetchFarcasterProfile?userIds=${creatorIds.join(",")}`,
-    { method: "GET" }
-  );
-  const profileData = await profileResponse.json();
+  const batchSize = 50;
+  const profiles: Record<string, CreatorProfile> = {};
 
-  return (
-    profileData.data?.Socials?.Social?.reduce(
-      (
-        acc: Record<string, CreatorProfile>,
-        social: {
-          userId: string;
-          profileImage: string;
-          profileName: string;
-        }
-      ) => {
-        acc[social.userId] = {
-          profileImage: social.profileImage,
-          name: social.profileName,
-          score: 0,
-          recasts: 0,
-          likes: 0,
-        };
-        return acc;
-      },
-      {}
-    ) ?? {}
-  );
+  // Process creatorIds in batches of 50
+  for (let i = 0; i < creatorIds.length; i += batchSize) {
+    const batchIds = creatorIds.slice(i, i + batchSize);
+
+    try {
+      const profileResponse = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_BASE_URL
+        }/api/fetchFarcasterProfile?userIds=${batchIds.join(",")}`,
+        { method: "GET" }
+      );
+      const profileData = await profileResponse.json();
+
+      // Merge the batch results into the profiles object
+      const batchProfiles =
+        profileData.data?.Socials?.Social?.reduce(
+          (
+            acc: Record<string, CreatorProfile>,
+            social: {
+              userId: string;
+              profileImage: string;
+              profileName: string;
+            }
+          ) => {
+            acc[social.userId] = {
+              profileImage: social.profileImage,
+              name: social.profileName,
+              score: 0,
+              recasts: 0,
+              likes: 0,
+            };
+            return acc;
+          },
+          {}
+        ) ?? {};
+
+      Object.assign(profiles, batchProfiles);
+    } catch (error) {
+      console.error(
+        `Error fetching profiles batch ${i}-${i + batchSize}:`,
+        error
+      );
+    }
+  }
+
+  return profiles;
 }
 
 type EnrichedToken = Omit<Token, "creator"> & {
