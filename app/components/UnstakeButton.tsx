@@ -40,6 +40,7 @@ interface UnstakeButtonProps {
   disabled?: boolean;
   className?: string;
   symbol: string;
+  onSuccess?: () => void;
 }
 
 export function UnstakeButton({
@@ -47,6 +48,7 @@ export function UnstakeButton({
   disabled,
   className,
   symbol,
+  onSuccess,
 }: UnstakeButtonProps) {
   const { user } = usePrivy();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -157,6 +159,7 @@ export function UnstakeButton({
 
       // Refresh balance after successful unstake
       await fetchStakedBalance();
+      onSuccess?.();
     } catch (error) {
       console.error("Unstaking error:", error);
       throw error;
@@ -180,6 +183,7 @@ export function UnstakeButton({
         balance={stakedBalance}
         symbol={symbol}
         onUnstake={handleUnstake}
+        onSuccess={onSuccess}
       />
     </>
   );

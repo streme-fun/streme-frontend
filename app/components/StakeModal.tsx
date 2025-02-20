@@ -14,6 +14,7 @@ interface StakeModalProps {
   symbol: string;
   onStake: (amount: bigint) => Promise<void>;
   totalStakers?: string;
+  onSuccess?: () => void;
 }
 
 const LoadingText = ({ text }: { text: string }) => {
@@ -45,6 +46,7 @@ export function StakeModal({
   symbol,
   onStake,
   totalStakers,
+  onSuccess,
 }: StakeModalProps) {
   const [amount, setAmount] = useState("");
   const [isStaking, setIsStaking] = useState(false);
@@ -63,6 +65,7 @@ export function StakeModal({
     try {
       await onStake(parseUnits(amount, 18));
       setIsSuccess(true);
+      onSuccess?.();
     } catch (error: unknown) {
       if (
         error &&

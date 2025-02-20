@@ -248,12 +248,14 @@ export function TokenGrid({ tokens }: TokenGridProps) {
 
   // Filter tokens based on search
   const filteredTokens = tokenData.filter((token) => {
-    const searchLower = searchQuery.toLowerCase();
+    // If search is empty, return all tokens
+    if (!searchQuery.trim()) return true;
+
+    const searchLower = searchQuery.toLowerCase().trim();
     return (
-      (token.name.toLowerCase().includes(searchLower) ||
-        token.symbol.toLowerCase().includes(searchLower) ||
-        token.creator?.name?.toLowerCase().includes(searchLower)) ??
-      false
+      token.name?.toLowerCase().includes(searchLower) ||
+      token.symbol?.toLowerCase().includes(searchLower) ||
+      token.creator?.name?.toLowerCase().includes(searchLower)
     );
   });
 
@@ -290,7 +292,10 @@ export function TokenGrid({ tokens }: TokenGridProps) {
           </select>
         </div>
         <div className="flex-1">
-          <SearchBar value={searchQuery} onChange={setSearchQuery} />
+          <SearchBar
+            value={searchQuery}
+            onChange={(value) => setSearchQuery(value.trim())}
+          />
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -298,11 +303,11 @@ export function TokenGrid({ tokens }: TokenGridProps) {
           <TokenCardComponent key={token.contract_address} token={token} />
         ))}
       </div>
-      {sortedTokens.length === 0 ? (
+      {sortedTokens.length === 0 && searchQuery.trim() !== "" && (
         <div className="text-center py-12 opacity-60">
-          No tokens found matching &quot;{searchQuery}&quot;
+          No tokens found matching &quot;{searchQuery.trim()}&quot;
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

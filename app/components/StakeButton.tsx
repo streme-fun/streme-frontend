@@ -39,6 +39,7 @@ interface StakeButtonProps {
   className?: string;
   symbol: string;
   totalStakers?: string;
+  onSuccess?: () => void;
 }
 
 export function StakeButton({
@@ -49,6 +50,7 @@ export function StakeButton({
   className,
   symbol,
   totalStakers,
+  onSuccess,
 }: StakeButtonProps) {
   const { user } = usePrivy();
   const { wallets } = useWallets();
@@ -204,6 +206,7 @@ export function StakeButton({
 
       // Refresh balance after successful stake
       await fetchBalance();
+      onSuccess?.();
     } catch (error) {
       console.error("Staking error:", error);
       throw error;
@@ -229,6 +232,7 @@ export function StakeButton({
         symbol={symbol}
         totalStakers={totalStakers}
         onStake={handleStake}
+        onSuccess={onSuccess}
       />
     </>
   );

@@ -19,12 +19,6 @@ async function fetchPoolData(poolId: string, stakingPool: string) {
     }
   `;
 
-  console.log(
-    "Fetching pool data for token:",
-    poolId,
-    "staking pool:",
-    stakingPool
-  );
   try {
     const response = await fetch(
       "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",

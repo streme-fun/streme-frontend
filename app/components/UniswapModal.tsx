@@ -4,12 +4,19 @@ export function UniswapModal({
   isOpen,
   onClose,
   tokenAddress,
+  onAfterClose,
 }: {
   isOpen: boolean;
   onClose: () => void;
   tokenAddress: string;
+  onAfterClose?: () => void;
 }) {
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    onClose();
+    onAfterClose?.();
+  };
 
   const uniswapUrl = `https://app.uniswap.org/swap?outputCurrency=${tokenAddress}&chain=base`;
 
@@ -18,7 +25,7 @@ export function UniswapModal({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Modal */}
@@ -52,7 +59,7 @@ export function UniswapModal({
               />
             </svg>
           </a>
-          <button onClick={onClose} className="btn btn-ghost btn-sm">
+          <button onClick={handleClose} className="btn btn-ghost btn-sm">
             ✕
           </button>
         </div>

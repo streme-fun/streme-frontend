@@ -10,6 +10,7 @@ interface UnstakeModalProps {
   balance: bigint;
   symbol: string;
   onUnstake: (amount: bigint) => Promise<void>;
+  onSuccess?: () => void;
 }
 
 const LoadingText = ({ text }: { text: string }) => {
@@ -40,6 +41,7 @@ export function UnstakeModal({
   balance,
   symbol,
   onUnstake,
+  onSuccess,
 }: UnstakeModalProps) {
   const [amount, setAmount] = useState("");
   const [isUnstaking, setIsUnstaking] = useState(false);
@@ -52,6 +54,7 @@ export function UnstakeModal({
       setIsUnstaking(true);
       await onUnstake(parseUnits(amount, 18));
       setIsSuccess(true);
+      onSuccess?.();
     } catch (error) {
       if (error instanceof Error) {
         if (error.message.includes("User rejected")) {

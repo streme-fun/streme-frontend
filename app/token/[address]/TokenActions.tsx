@@ -221,6 +221,54 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
 
   const hasTokens = isConnected && balance > 0n;
 
+  const refreshBalances = async () => {
+    if (!address || !isConnected) return;
+    try {
+      // Fetch token balance
+      const bal = await publicClient.readContract({
+        address: token.contract_address as `0x${string}`,
+        abi: [
+          {
+            inputs: [{ name: "account", type: "address" }],
+            name: "balanceOf",
+            outputs: [{ name: "", type: "uint256" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ],
+        functionName: "balanceOf",
+        args: [address as `0x${string}`],
+      });
+      setBalance(bal);
+
+      // Fetch staked balance if applicable
+      if (token.staking_address) {
+        const staked = await publicClient.readContract({
+          address: token.staking_address as `0x${string}`,
+          abi: [
+            {
+              inputs: [{ name: "account", type: "address" }],
+              name: "balanceOf",
+              outputs: [{ name: "", type: "uint256" }],
+              stateMutability: "view",
+              type: "function",
+            },
+          ],
+          functionName: "balanceOf",
+          args: [address as `0x${string}`],
+        });
+        setStakedBalance(staked);
+      }
+    } catch (error) {
+      console.error("Error refreshing balances:", error);
+    }
+  };
+
+  // Update the balance fetch effect to use refreshBalances
+  useEffect(() => {
+    refreshBalances();
+  }, [address, isConnected, token.contract_address]);
+
   return (
     <div className="space-y-6">
       {/* Action Buttons */}
@@ -237,6 +285,7 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
           stakingPoolAddress={token.staking_pool}
           disabled={!hasTokens}
           symbol={token.symbol}
+          onSuccess={refreshBalances}
           className={`btn btn-outline relative 
             before:absolute before:inset-0 before:bg-gradient-to-r 
             before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] 
@@ -257,6 +306,7 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
           stakingAddress={token.staking_address}
           symbol={token.symbol}
           className="btn btn-outline"
+          onSuccess={refreshBalances}
         />
 
         {/* Connection status alerts */}
@@ -324,6 +374,7 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
         isOpen={isUniswapOpen}
         onClose={() => setIsUniswapOpen(false)}
         tokenAddress={token.contract_address}
+        onAfterClose={refreshBalances}
       />
     </div>
   );
