@@ -168,7 +168,7 @@ export function StakedBalance({
     } else {
       setStreamedAmount(0);
     }
-  }, [flowRate, lastUpdateTime]);
+  }, [flowRate, lastUpdateTime, baseAmount]);
 
   useEffect(() => {
     const element = document.querySelector("[data-staking-balance]");
