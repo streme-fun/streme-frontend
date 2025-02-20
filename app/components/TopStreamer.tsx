@@ -89,18 +89,6 @@ export function TopStreamer() {
                 <h2 className="card-title text-sm group-hover:text-primary transition-colors duration-300">
                   {token.name}
                 </h2>
-                <div className="flex items-center justify-between">
-                  <div
-                    className={`transition-all duration-300 ${
-                      (token.change24h ?? 0) >= 0
-                        ? "text-green-500 group-hover:text-green-400"
-                        : "text-red-500 group-hover:text-red-400"
-                    } gap-1 rounded-none text-xs`}
-                  >
-                    {(token.change24h ?? 0) >= 0 ? "+" : ""}
-                    {(token.change24h ?? 0).toFixed(2)}%
-                  </div>
-                </div>
 
                 <div className="flex items-center gap-2 mt-2">
                   <div className="avatar transition-transform duration-300 group-hover:scale-110">
