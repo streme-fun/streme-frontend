@@ -13,6 +13,8 @@ interface TokenGridProps {
   tokens: Token[];
 }
 
+type SortOption = "stakers" | "newest" | "oldest";
+
 const TokenCardComponent = ({ token }: { token: Token }) => {
   const [rewards, setRewards] = useState<number>(0);
   const [totalStakers, setTotalStakers] = useState<number>(0);
@@ -217,8 +219,35 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
 
 export function TokenGrid({ tokens }: TokenGridProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [tokenData, setTokenData] = useState<
+    Array<Token & { rewards: number; totalStakers: number }>
+  >([]);
 
-  const filteredTokens = tokens.filter((token) => {
+  // Fetch rewards and stakers data for all tokens
+  useEffect(() => {
+    const fetchData = async () => {
+      const enrichedTokens = await Promise.all(
+        tokens.map(async (token) => {
+          const { totalStreamed, totalStakers } = await calculateRewards(
+            token.created_at,
+            token.contract_address,
+            token.staking_pool
+          );
+          return {
+            ...token,
+            rewards: totalStreamed,
+            totalStakers,
+          };
+        })
+      );
+      setTokenData(enrichedTokens);
+    };
+    fetchData();
+  }, [tokens]);
+
+  // Filter tokens based on search
+  const filteredTokens = tokenData.filter((token) => {
     const searchLower = searchQuery.toLowerCase();
     return (
       (token.name.toLowerCase().includes(searchLower) ||
@@ -228,21 +257,48 @@ export function TokenGrid({ tokens }: TokenGridProps) {
     );
   });
 
+  // Sort tokens based on selected option
+  const sortedTokens = [...filteredTokens].sort((a, b) => {
+    switch (sortBy) {
+      case "stakers":
+        return b.totalStakers - a.totalStakers;
+      case "newest":
+        return (
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      case "oldest":
+        return (
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      default:
+        return 0;
+    }
+  });
+
   return (
     <div>
       <div className="flex items-center gap-4 mb-4">
-        {/* Temporarily disable sorting */}
-        {/* <SortMenu /> */}
+        <div className="flex-none">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="select select-bordered select-sm w-[140px]"
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="stakers">Most Stakers</option>
+          </select>
+        </div>
         <div className="flex-1">
           <SearchBar value={searchQuery} onChange={setSearchQuery} />
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredTokens.map((token) => (
+        {sortedTokens.map((token) => (
           <TokenCardComponent key={token.contract_address} token={token} />
         ))}
       </div>
-      {filteredTokens.length === 0 ? (
+      {sortedTokens.length === 0 ? (
         <div className="text-center py-12 opacity-60">
           No tokens found matching &quot;{searchQuery}&quot;
         </div>
