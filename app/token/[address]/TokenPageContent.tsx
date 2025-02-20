@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { TokenActions } from "./TokenActions";
 import { Token } from "@/app/types/token";
 import { TokenInfo } from "./TokenInfo";
+import { StakedBalance } from "@/app/components/StakedBalance";
 
 // const HARDCODED_ADDRESS = "0x1234567890123456789012345678901234567890";
 // const BASED_FWOG_POOL = "0x1035ae3f87a91084c6c5084d0615cc6121c5e228";
@@ -73,6 +74,16 @@ export function TokenPageContent() {
     fetchToken();
   }, [address]);
 
+  const handleStakingChange = () => {
+    // Force refresh of staked balance
+    const stakedBalanceElement = document.querySelector(
+      "[data-staking-balance]"
+    );
+    if (stakedBalanceElement) {
+      stakedBalanceElement.dispatchEvent(new Event("refresh"));
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -114,7 +125,14 @@ export function TokenPageContent() {
         {/* Right Column */}
         <div className="lg:col-span-4 space-y-4">
           <TokenInfo token={token} />
-          <TokenActions token={token} />
+          <TokenActions token={token} onStakingChange={handleStakingChange} />
+          <StakedBalance
+            data-staking-balance
+            stakingAddress={token.staking_address}
+            stakingPool={token.staking_pool}
+            symbol={token.symbol}
+            tokenAddress={token.contract_address}
+          />
         </div>
       </div>
     </div>

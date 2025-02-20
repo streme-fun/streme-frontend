@@ -24,6 +24,7 @@ const publicClient = createPublicClient({
 
 interface TokenActionsProps {
   token: Token;
+  onStakingChange: () => void;
 }
 
 type LinkedAccount = {
@@ -48,7 +49,10 @@ type Deployment = {
   positionId: bigint;
 };
 
-export function TokenActions({ token: initialToken }: TokenActionsProps) {
+export function TokenActions({
+  token: initialToken,
+  onStakingChange,
+}: TokenActionsProps) {
   const [isUniswapOpen, setIsUniswapOpen] = useState(false);
   const [token, setToken] = useState(initialToken);
 
@@ -285,7 +289,7 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
           stakingPoolAddress={token.staking_pool}
           disabled={!hasTokens}
           symbol={token.symbol}
-          onSuccess={refreshBalances}
+          onSuccess={onStakingChange}
           onPoolConnect={() => setIsConnectedToPool(true)}
           className={`btn btn-outline relative 
             before:absolute before:inset-0 before:bg-gradient-to-r 
@@ -307,7 +311,7 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
           stakingAddress={token.staking_address}
           symbol={token.symbol}
           className="btn btn-outline"
-          onSuccess={refreshBalances}
+          onSuccess={onStakingChange}
         />
 
         {/* Connection status alerts */}
