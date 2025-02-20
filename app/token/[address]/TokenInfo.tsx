@@ -65,7 +65,7 @@ export function TokenInfo({ token }: { token: Token }) {
   }, []);
 
   return (
-    <div className="card bg-base-100 border border-black/[.1] dark:border-white/[.1] p-6 space-y-6">
+    <div className="card bg-base-100 border border-black/[.1] dark:border-white/[.1] space-y-6">
       {/* Token Header */}
       <div className="flex items-center gap-4">
         {token.img_url ? (

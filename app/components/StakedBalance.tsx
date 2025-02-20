@@ -186,23 +186,23 @@ export function StakedBalance({
   return (
     <div className="space-y-4">
       <div>
-        <div className="text-sm opacity-60 mb-1">Your Staked Balance</div>
+        <div className="text-sm opacity-60 mb-1">My Staked Balance</div>
         <div className="font-mono text-lg">
           {formattedBalance} st{symbol}
         </div>
       </div>
       <div>
-        <div className="text-sm opacity-60 mb-1">Amount Received</div>
+        <div className="text-sm opacity-60 mb-1">My Amount Received</div>
         <div className="font-mono text-lg">
           {formattedReceived} {symbol}
         </div>
       </div>
       <div>
-        <div className="text-sm opacity-60 mb-1">Your Pool Share</div>
+        <div className="text-sm opacity-60 mb-1">My Pool Share</div>
         <div className="font-mono text-lg">{poolPercentage}%</div>
       </div>
       <div>
-        <div className="text-sm opacity-60 mb-1">Your Flow Rate</div>
+        <div className="text-sm opacity-60 mb-1">My Flow Rate</div>
         <div className="font-mono text-lg">
           {flowRate} {symbol}/day
         </div>
