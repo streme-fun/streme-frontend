@@ -22,6 +22,19 @@ const gdaABI = [
   },
 ] as const;
 
+const erc20ABI = [
+  {
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    name: "allowance",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
 const publicClient = createPublicClient({
   chain: base,
   transport: http(
@@ -40,6 +53,7 @@ interface StakeButtonProps {
   symbol: string;
   totalStakers?: string;
   onSuccess?: () => void;
+  onPoolConnect?: () => void;
 }
 
 export function StakeButton({
@@ -51,6 +65,7 @@ export function StakeButton({
   symbol,
   totalStakers,
   onSuccess,
+  onPoolConnect,
 }: StakeButtonProps) {
   const { user } = usePrivy();
   const { wallets } = useWallets();
@@ -89,6 +104,22 @@ export function StakeButton({
     fetchBalance();
   }, [fetchBalance]);
 
+  const checkAllowance = async () => {
+    if (!user?.wallet?.address) return 0n;
+    try {
+      const allowance = await publicClient.readContract({
+        address: toHex(tokenAddress),
+        abi: erc20ABI,
+        functionName: "allowance",
+        args: [toHex(user.wallet.address), toHex(stakingAddress)],
+      });
+      return allowance;
+    } catch (error) {
+      console.error("Error checking allowance:", error);
+      return 0n;
+    }
+  };
+
   const handleStake = async (amount: bigint) => {
     if (!user?.wallet?.address) {
       throw new Error("Wallet not connected");
@@ -110,33 +141,37 @@ export function StakeButton({
         params: [{ chainId: "0x2105" }], // 0x2105 is hex for 8453 (Base)
       });
 
-      // First approve the tokens
-      const approveIface = new Interface([
-        "function approve(address spender, uint256 amount) external returns (bool)",
-      ]);
-      const approveData = approveIface.encodeFunctionData("approve", [
-        toHex(stakingAddress),
-        amount,
-      ]);
+      // Check current allowance
+      const currentAllowance = await checkAllowance();
 
-      const approveTx = await provider.request({
-        method: "eth_sendTransaction",
-        params: [
-          {
-            to: toHex(tokenAddress),
-            from: walletAddress,
-            data: approveData,
-          },
-        ],
-      });
+      // Only approve if necessary
+      if (currentAllowance < amount) {
+        const approveIface = new Interface([
+          "function approve(address spender, uint256 amount) external returns (bool)",
+        ]);
+        const approveData = approveIface.encodeFunctionData("approve", [
+          toHex(stakingAddress),
+          amount,
+        ]);
 
-      // Wait for approval confirmation
-      const approveReceipt = await publicClient.waitForTransactionReceipt({
-        hash: approveTx as `0x${string}`,
-      });
+        const approveTx = await provider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: toHex(tokenAddress),
+              from: walletAddress,
+              data: approveData,
+            },
+          ],
+        });
 
-      if (!approveReceipt.status) {
-        throw new Error("Approval transaction failed");
+        const approveReceipt = await publicClient.waitForTransactionReceipt({
+          hash: approveTx as `0x${string}`,
+        });
+
+        if (!approveReceipt.status) {
+          throw new Error("Approval transaction failed");
+        }
       }
 
       // Then stake them
@@ -202,6 +237,8 @@ export function StakeButton({
         if (!connectReceipt.status) {
           throw new Error("Pool connection failed");
         }
+
+        onPoolConnect?.();
       }
 
       // Refresh balance after successful stake
@@ -213,10 +250,15 @@ export function StakeButton({
     }
   };
 
+  const handleModalOpen = async () => {
+    await fetchBalance(); // Refresh balance before opening modal
+    setIsModalOpen(true);
+  };
+
   return (
     <>
       <button
-        onClick={() => setIsModalOpen(true)}
+        onClick={handleModalOpen}
         disabled={disabled}
         className={className}
       >

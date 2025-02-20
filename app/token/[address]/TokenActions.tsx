@@ -286,6 +286,7 @@ export function TokenActions({ token: initialToken }: TokenActionsProps) {
           disabled={!hasTokens}
           symbol={token.symbol}
           onSuccess={refreshBalances}
+          onPoolConnect={() => setIsConnectedToPool(true)}
           className={`btn btn-outline relative 
             before:absolute before:inset-0 before:bg-gradient-to-r 
             before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] 

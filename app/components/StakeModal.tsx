@@ -18,19 +18,38 @@ interface StakeModalProps {
 }
 
 const LoadingText = ({ text }: { text: string }) => {
-  const [dots, setDots] = useState("");
+  const [rotation, setRotation] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setDots((d) => (d.length >= 3 ? "" : d + "."));
-    }, 500);
+      setRotation((r) => (r + 45) % 360);
+    }, 150);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <span>
+    <span className="flex items-center gap-2">
       {text}
-      {dots}
+      <svg
+        className="animate-spin h-4 w-4"
+        viewBox="0 0 24 24"
+        style={{ transform: `rotate(${rotation}deg)` }}
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+          fill="none"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        />
+      </svg>
     </span>
   );
 };
@@ -51,16 +70,14 @@ export function StakeModal({
   const [amount, setAmount] = useState("");
   const [isStaking, setIsStaking] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [step, setStep] = useState<
-    "idle" | "approving" | "staking" | "connecting"
-  >("idle");
+  const [step, setStep] = useState<"idle" | "staking" | "connecting">("idle");
   const [error, setError] = useState<string | null>(null);
   const { user } = usePrivy();
 
   const handleStake = async () => {
     setError(null);
     setIsStaking(true);
-    setStep("approving");
+    setStep("staking");
 
     try {
       await onStake(parseUnits(amount, 18));
@@ -176,7 +193,7 @@ export function StakeModal({
               }
             `}</style>
           </div>
-          <p className="text-center">
+          <p className="text-center text-sm pb-4">
             Token rewards are now being streamed directly to your wallet.
           </p>
           <a
@@ -238,20 +255,7 @@ export function StakeModal({
               unstaked. Rewards will start streaming immediately.
             </div>
             <button
-              className={`btn w-full relative overflow-hidden
-                before:absolute before:inset-0 before:bg-gradient-to-r 
-                before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f]
-                before:opacity-30
-                hover:before:opacity-40
-                border-[#ffa647]/30
-                hover:border-[#ffa647]/50
-                shadow-[0_0_5px_rgba(255,166,71,0.3)]
-                hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]
-                disabled:before:opacity-0
-                disabled:hover:before:opacity-0
-                disabled:border-opacity-0
-                disabled:shadow-none
-                disabled:hover:shadow-none`}
+              className="btn btn-primary w-full"
               onClick={handleStake}
               disabled={
                 isStaking ||
@@ -260,9 +264,7 @@ export function StakeModal({
                 parseUnits(amount || "0", 18) <= 0n
               }
             >
-              {step === "approving" ? (
-                <LoadingText text="Approving" />
-              ) : step === "staking" ? (
+              {step === "staking" ? (
                 <LoadingText text="Staking" />
               ) : step === "connecting" ? (
                 <LoadingText text="Connecting to Pool" />
