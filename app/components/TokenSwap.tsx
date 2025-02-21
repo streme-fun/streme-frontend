@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useSendTransaction, useWaitForTransactionReceipt } from "wagmi";
 import Image from "next/image";
-import { parseUnits, formatUnits, BaseError } from "viem";
+import { parseUnits, formatUnits } from "viem";
 import qs from "qs";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 
 import { truncateAddress } from "@/lib/truncateAddress";
 import { QuoteResponse } from "@/lib/types/zerox";
@@ -28,34 +27,19 @@ const ETH = {
 
 const DEMO_TOKENS: Token[] = [
   {
-    symbol: "MOXIE",
-    name: "Moxie",
-    image:
-      "https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png",
-    address: "0x8c9037d1ef5c6d1f6816278c7aaf5491d24cd527",
-    decimals: 6,
-  },
-  {
-    symbol: "CLANKER",
-    name: "Clanker",
-    image:
-      "https://imagedelivery.net/BXluQx4ige9GuW0Ia56BHw/295953fa-15ed-4d3c-241d-b6c1758c6200/original",
-    address: "0x1bc0c42215582d5A085795f4baDbaC3ff36d1Bcb",
+    symbol: "STREME",
+    name: "STREME",
+    image: "/avatars/streme.png",
+    address: "0x3B3Cd21242BA44e9865B066e5EF5d1cC1030CC58",
     decimals: 18,
   },
 ];
 
-const AFFILIATE_FEE = 25;
-const PROTOCOL_GUILD_ADDRESS = "0x32e3C7fD24e175701A35c224f2238d18439C7dBC";
-
-export default function TokenSwap({ token }: { token: string }) {
+export default function TokenSwap() {
   const sellToken = ETH;
   const [sellAmount, setSellAmount] = useState("");
-
   const [buyAmount, setBuyAmount] = useState("");
-  const [buyToken, setBuyToken] = useState<Token>(
-    token === "clanker" ? DEMO_TOKENS[1] : DEMO_TOKENS[0]
-  );
+  const buyToken = DEMO_TOKENS[0];
 
   const [isFinalized, setIsFinalized] = useState(false);
   const [quote, setQuote] = useState<QuoteResponse>();
@@ -63,30 +47,18 @@ export default function TokenSwap({ token }: { token: string }) {
   const [fetchPriceError, setFetchPriceError] = useState([]);
 
   const { user, login, ready } = usePrivy();
+  const { wallets } = useWallets();
   const address = user?.wallet?.address;
   const isConnected = !!address;
+  const [isPending, setIsPending] = useState(false);
+  const [hash, setHash] = useState<string>();
+  const [sendTransactionError, setSendTransactionError] = useState<Error>();
 
   const parsedSellAmount = sellAmount
     ? parseUnits(sellAmount, sellToken.decimals).toString()
     : undefined;
 
-  const parsedBuyAmount = buyAmount
-    ? parseUnits(buyAmount, buyToken.decimals).toString()
-    : undefined;
-
   const [isPriceLoading, setIsPriceLoading] = useState(false);
-
-  const {
-    data: hash,
-    isPending,
-    error,
-    sendTransaction,
-  } = useSendTransaction();
-
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash,
-    });
 
   const finalize = useCallback(() => {
     setIsFinalized(true);
@@ -112,7 +84,7 @@ export default function TokenSwap({ token }: { token: string }) {
         setIsPriceLoading(false);
       }
     },
-    [buyToken.decimals, setBuyAmount, setFetchPriceError]
+    [buyToken.decimals]
   );
 
   const linkToBaseScan = useCallback((hash?: string) => {
@@ -121,43 +93,73 @@ export default function TokenSwap({ token }: { token: string }) {
     }
   }, []);
 
-  const fetchQuote = useCallback(
-    async (params: unknown) => {
-      setIsPriceLoading(true);
-      try {
-        const response = await fetch(`/api/quote?${qs.stringify(params)}`);
-        const data = await response.json();
-        setQuote(data);
-      } finally {
-        setIsPriceLoading(false);
-      }
-    },
-    [setIsPriceLoading, setQuote]
-  );
-
-  const executeSwap = useCallback(() => {
-    if (quote) {
-      sendTransaction({
-        gas: quote.transaction.gas ? BigInt(quote.transaction.gas) : undefined,
-        to: quote.transaction.to,
-        data: quote.transaction.data,
-        value: BigInt(quote.transaction.value),
-      });
+  const fetchQuote = useCallback(async (params: unknown) => {
+    setIsPriceLoading(true);
+    try {
+      const response = await fetch(`/api/quote?${qs.stringify(params)}`);
+      const data = await response.json();
+      setQuote(data);
+    } finally {
+      setIsPriceLoading(false);
     }
-  }, [quote, sendTransaction]);
+  }, []);
+
+  const executeSwap = useCallback(async () => {
+    if (!quote || !user?.wallet?.address) return;
+
+    try {
+      setIsPending(true);
+      const wallet = wallets.find((w) => w.address === user.wallet?.address);
+
+      if (!wallet) {
+        throw new Error("Wallet not found");
+      }
+
+      const provider = await wallet.getEthereumProvider();
+
+      try {
+        const tx = await provider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: quote.transaction.to,
+              from: user.wallet.address,
+              data: quote.transaction.data,
+              value: `0x${BigInt(quote.transaction.value).toString(16)}`,
+            },
+          ],
+        });
+
+        setHash(tx as string);
+      } catch (error: unknown) {
+        if (
+          error &&
+          typeof error === "object" &&
+          "message" in error &&
+          typeof error.message === "string" &&
+          error.message.includes("rejected")
+        ) {
+          setSendTransactionError(new Error("Transaction rejected"));
+        } else {
+          console.error("Error executing swap:", error);
+          setSendTransactionError(new Error("Failed to execute swap"));
+        }
+      }
+    } catch (error) {
+      console.error("Error setting up connection:", error);
+      setSendTransactionError(new Error("Failed to setup connection"));
+    } finally {
+      setIsPending(false);
+    }
+  }, [quote, user?.wallet?.address, wallets]);
 
   useEffect(() => {
     const params = {
       chainId: 8453,
-      sellToken: ETH.address,
+      sellToken: sellToken.address,
       buyToken: buyToken.address,
       sellAmount: parsedSellAmount,
-      buyAmount: parsedBuyAmount,
       taker: address,
-      swapFeeRecipient: PROTOCOL_GUILD_ADDRESS,
-      swapFeeBps: AFFILIATE_FEE,
-      swapFeeToken: buyToken.address,
-      tradeSurplusRecipient: PROTOCOL_GUILD_ADDRESS,
     };
 
     const timeoutId = setTimeout(() => {
@@ -170,15 +172,22 @@ export default function TokenSwap({ token }: { token: string }) {
     return () => clearTimeout(timeoutId);
   }, [
     address,
-    buyAmount,
     buyToken.address,
-    parsedBuyAmount,
     parsedSellAmount,
     sellAmount,
+    sellToken.address,
     isFinalized,
     fetchPrice,
     fetchQuote,
   ]);
+
+  useEffect(() => {
+    if (!address || !quote) return;
+
+    if (quote.issues?.allowance) {
+      console.log("Allowance needed for Permit2");
+    }
+  }, [address, quote]);
 
   return (
     <div className="card w-[300px] shadow-xl mx-auto p-4">
@@ -197,7 +206,16 @@ export default function TokenSwap({ token }: { token: string }) {
             type="number"
             inputMode="decimal"
             value={sellAmount}
-            onChange={(e) => setSellAmount(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              // Limit to 4 decimal places
+              if (value.includes(".") && value.split(".")[1].length > 4) {
+                setSellAmount(Number(value).toFixed(4));
+              } else {
+                setSellAmount(value);
+              }
+            }}
+            step="0.0001"
             placeholder="0.0"
             className="input input-bordered w-full"
           />
@@ -213,13 +231,30 @@ export default function TokenSwap({ token }: { token: string }) {
           </div>
         </div>
 
+        {/* Quick Amount Button */}
+        <button
+          onClick={() => setSellAmount("0.0001")}
+          className="btn btn-sm btn-outline w-full"
+        >
+          Set 0.0001 ETH
+        </button>
+
         {/* Buy Token Input */}
         <div className="relative">
           <input
             type="number"
             inputMode="decimal"
             value={buyAmount}
-            onChange={(e) => setBuyAmount(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              // Limit to 4 decimal places
+              if (value.includes(".") && value.split(".")[1].length > 4) {
+                setBuyAmount(Number(value).toFixed(4));
+              } else {
+                setBuyAmount(value);
+              }
+            }}
+            step="0.0001"
             placeholder="0.0"
             className="input input-bordered w-full"
           />
@@ -236,22 +271,7 @@ export default function TokenSwap({ token }: { token: string }) {
               height={100}
               className="w-6 h-6 rounded-full"
             />
-            <select
-              value={buyToken.symbol}
-              onChange={(e) =>
-                setBuyToken(
-                  DEMO_TOKENS.find((t) => t.symbol === e.target.value) ||
-                    DEMO_TOKENS[1]
-                )
-              }
-              className="select select-ghost select-sm min-h-0 h-auto"
-            >
-              {DEMO_TOKENS.map((token) => (
-                <option key={token.symbol} value={token.symbol}>
-                  {token.symbol}
-                </option>
-              ))}
-            </select>
+            <div className="font-medium">{buyToken.symbol}</div>
           </div>
         </div>
 
@@ -266,22 +286,39 @@ export default function TokenSwap({ token }: { token: string }) {
           }
           className="btn btn-primary w-full"
         >
-          {isConnected ? (isFinalized ? "Confirm" : "Swap") : "Connect Wallet"}
+          {isConnected
+            ? isFinalized
+              ? "Confirm"
+              : "Review Swap"
+            : "Connect Wallet"}
         </button>
 
         {quote && (
-          <div className="text-sm text-base-content/80">
-            Receive at least:{" "}
-            {formatUnits(BigInt(quote.minBuyAmount), buyToken.decimals)}{" "}
-            {buyToken.symbol}
+          <div className="mt-4 space-y-2 text-sm">
+            <div>
+              Min. Received:{" "}
+              {formatUnits(BigInt(quote.minBuyAmount), buyToken.decimals)}{" "}
+              {buyToken.symbol}
+            </div>
+            <div>Gas Estimate: {quote.gas} gas units</div>
+            {quote.fees?.zeroExFee && (
+              <div>
+                Fee:{" "}
+                {formatUnits(
+                  BigInt(quote.fees.zeroExFee.amount),
+                  buyToken.decimals
+                )}{" "}
+                {quote.fees.zeroExFee.token}
+              </div>
+            )}
           </div>
         )}
-        {isConfirming && (
+        {isPending && (
           <div className="text-warning text-center mt-4">
             ⏳ Waiting for confirmation...
           </div>
         )}
-        {isConfirmed && (
+        {hash && (
           <div
             className="text-success text-center mt-4 cursor-pointer"
             onClick={() => linkToBaseScan(hash)}
@@ -298,9 +335,9 @@ export default function TokenSwap({ token }: { token: string }) {
             ))}
           </div>
         )}
-        {error && (
+        {sendTransactionError && (
           <div className="text-error text-sm mt-2">
-            Error: {(error as BaseError).shortMessage || error.message}
+            Error: {sendTransactionError.message}
           </div>
         )}
       </div>

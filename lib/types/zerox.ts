@@ -43,49 +43,56 @@ export interface PriceResponse {
 
 // This interface is subject to change as the API V2 endpoints aren't finalized.
 export interface QuoteResponse {
-  sellToken: Address;
-  buyToken: Address;
-  sellAmount: string;
-  buyAmount: string;
-  grossSellAmount: string;
-  grossBuyAmount: string;
-  minBuyAmount: string;
-  gasPrice: string;
-  allowanceTarget: Address;
-  route: [];
-  fees: {
-    integratorFee: {
-      amount: string;
-      token: string;
-      type: "volume" | "gas";
-    } | null;
-    zeroExFee: {
-      billingType: "on-chain" | "off-chain";
-      feeAmount: string;
-      feeToken: Address;
-      feeType: "volume" | "gas";
-    };
-    gasFee: null;
-  } | null;
-  auxiliaryChainData: unknown;
-  to: Address;
-  data: Hex;
+  price: string;
+  guaranteedPrice: string;
+  to: string;
+  data: string;
   value: string;
   gas: string;
-  permit2: {
-    type: "Permit2";
-    hash: Hex;
-    eip712: EIP712TypedData;
-  };
-  transaction: V2QuoteTransaction;
-  tokenMetadata: {
-    buyToken: {
-      buyTaxBps: string | null;
-      sellTaxBps: string | null;
+  estimatedGas: string;
+  gasPrice: string;
+  protocolFee: string;
+  minimumProtocolFee: string;
+  buyAmount: string;
+  sellAmount: string;
+  sources: any[];
+  buyTokenAddress: string;
+  sellTokenAddress: string;
+  allowanceTarget: string;
+  permit2?: {
+    type: string;
+    hash: string;
+    eip712: {
+      types: Record<string, Array<{ name: string; type: string }>>;
+      domain: {
+        name: string;
+        chainId: number;
+        verifyingContract: string;
+      };
+      message: any;
+      primaryType: string;
     };
-    sellToken: {
-      buyTaxBps: string | null;
-      sellTaxBps: string | null;
+  };
+  transaction: {
+    to: string;
+    data: string;
+    value: string;
+    gas: string;
+    gasPrice?: string;
+  };
+  minBuyAmount: string;
+  issues?: {
+    allowance?: {
+      actual: string;
+      expected: string;
+      spender: string;
+    };
+  };
+  fees?: {
+    zeroExFee?: {
+      amount: string;
+      token: string;
+      type: string;
     };
   };
 }
