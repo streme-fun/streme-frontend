@@ -2,9 +2,20 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
-import { parseUnits, formatUnits } from "viem";
+import {
+  parseUnits,
+  formatUnits,
+  createPublicClient,
+  http,
+  parseAbi,
+  encodeFunctionData,
+  numberToHex,
+  concat,
+  size,
+} from "viem";
 import qs from "qs";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { base } from "viem/chains";
 
 import { truncateAddress } from "@/lib/truncateAddress";
 import { QuoteResponse } from "@/lib/types/zerox";
@@ -35,11 +46,24 @@ const DEMO_TOKENS: Token[] = [
   },
 ];
 
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(),
+});
+
+const ERC20_ABI = parseAbi([
+  "function approve(address spender, uint256 amount) external returns (bool)",
+  "function allowance(address owner, address spender) external view returns (uint256)",
+]);
+
+const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
+
 export default function TokenSwap() {
-  const sellToken = ETH;
+  const [isSellETH, setIsSellETH] = useState(true);
+  const sellToken = isSellETH ? ETH : DEMO_TOKENS[0];
+  const buyToken = isSellETH ? DEMO_TOKENS[0] : ETH;
   const [sellAmount, setSellAmount] = useState("");
   const [buyAmount, setBuyAmount] = useState("");
-  const buyToken = DEMO_TOKENS[0];
 
   const [isFinalized, setIsFinalized] = useState(false);
   const [quote, setQuote] = useState<QuoteResponse>();
@@ -54,15 +78,13 @@ export default function TokenSwap() {
   const [hash, setHash] = useState<string>();
   const [sendTransactionError, setSendTransactionError] = useState<Error>();
 
+  const [isApproving, setIsApproving] = useState(false);
+
   const parsedSellAmount = sellAmount
     ? parseUnits(sellAmount, sellToken.decimals).toString()
     : undefined;
 
   const [isPriceLoading, setIsPriceLoading] = useState(false);
-
-  const finalize = useCallback(() => {
-    setIsFinalized(true);
-  }, []);
 
   const fetchPrice = useCallback(
     async (params: unknown) => {
@@ -104,54 +126,169 @@ export default function TokenSwap() {
     }
   }, []);
 
+  const checkAndSetAllowance = useCallback(async () => {
+    if (!user?.wallet?.address || !parsedSellAmount || isSellETH) return true;
+
+    try {
+      setIsApproving(true);
+      const wallet = wallets.find((w) => w.address === user.wallet?.address);
+      if (!wallet) throw new Error("Wallet not found");
+
+      const provider = await wallet.getEthereumProvider();
+
+      // Check current allowance
+      const allowanceData = await publicClient.readContract({
+        address: sellToken.address as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: "allowance",
+        args: [
+          user.wallet.address as `0x${string}`,
+          PERMIT2_ADDRESS as `0x${string}`,
+        ],
+      });
+
+      console.log("Current allowance:", allowanceData.toString());
+      console.log("Required amount:", parsedSellAmount);
+
+      if (BigInt(allowanceData) < BigInt(parsedSellAmount)) {
+        console.log("Approving PERMIT2...");
+        const tx = await provider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: sellToken.address,
+              from: user.wallet.address,
+              data: encodeFunctionData({
+                abi: ERC20_ABI,
+                functionName: "approve",
+                args: [
+                  PERMIT2_ADDRESS as `0x${string}`,
+                  BigInt(2) ** BigInt(256) - BigInt(1),
+                ],
+              }),
+            },
+          ],
+        });
+
+        await publicClient.waitForTransactionReceipt({
+          hash: tx as `0x${string}`,
+        });
+        console.log("Approval complete");
+      } else {
+        console.log("Already approved");
+      }
+      return true;
+    } catch (error) {
+      console.error("Error setting allowance:", error);
+      setSendTransactionError(new Error("Failed to approve token"));
+      return false;
+    } finally {
+      setIsApproving(false);
+    }
+  }, [
+    isSellETH,
+    parsedSellAmount,
+    sellToken.address,
+    user?.wallet?.address,
+    wallets,
+  ]);
+
+  const finalize = useCallback(async () => {
+    if (!isSellETH) {
+      const approved = await checkAndSetAllowance();
+      if (!approved) return;
+    }
+    setIsFinalized(true);
+  }, [isSellETH, checkAndSetAllowance]);
+
   const executeSwap = useCallback(async () => {
     if (!quote || !user?.wallet?.address) return;
 
     try {
       setIsPending(true);
       const wallet = wallets.find((w) => w.address === user.wallet?.address);
-
-      if (!wallet) {
-        throw new Error("Wallet not found");
-      }
+      if (!wallet) throw new Error("Wallet not found");
 
       const provider = await wallet.getEthereumProvider();
 
-      try {
-        const tx = await provider.request({
-          method: "eth_sendTransaction",
-          params: [
-            {
-              to: quote.transaction.to,
-              from: user.wallet.address,
-              data: quote.transaction.data,
-              value: `0x${BigInt(quote.transaction.value).toString(16)}`,
-            },
-          ],
-        });
-
-        setHash(tx as string);
-      } catch (error: unknown) {
-        if (
-          error &&
-          typeof error === "object" &&
-          "message" in error &&
-          typeof error.message === "string" &&
-          error.message.includes("rejected")
-        ) {
-          setSendTransactionError(new Error("Transaction rejected"));
-        } else {
-          console.error("Error executing swap:", error);
-          setSendTransactionError(new Error("Failed to execute swap"));
+      // 1. First sign the Permit2 message if it exists
+      let signature;
+      if (quote.permit2?.eip712) {
+        console.log("Signing Permit2 message...");
+        try {
+          // Sign the EIP-712 data
+          signature = await provider.request({
+            method: "eth_signTypedData_v4",
+            params: [user.wallet.address, JSON.stringify(quote.permit2.eip712)],
+          });
+          console.log("Signature obtained:", signature);
+        } catch (error) {
+          console.error("Error signing Permit2 message:", error);
+          throw new Error("Failed to sign Permit2 message");
         }
       }
-    } catch (error) {
-      console.error("Error setting up connection:", error);
-      setSendTransactionError(new Error("Failed to setup connection"));
+
+      // 2. Prepare the transaction data with signature
+      let txData = quote.transaction.data;
+      if (signature) {
+        console.log("Appending signature to transaction data...");
+        // Convert signature length to 32-byte hex
+        const signatureLengthInHex = numberToHex(
+          size(signature as `0x${string}`),
+          {
+            signed: false,
+            size: 32,
+          }
+        );
+        // Concatenate original data with signature length and signature
+        txData = concat([
+          txData as `0x${string}`,
+          signatureLengthInHex,
+          signature as `0x${string}`,
+        ]) as `0x${string}`;
+      }
+
+      // 3. Send the transaction with the complete data
+      console.log("Sending transaction...");
+      const tx = await provider.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            to: quote.transaction.to,
+            from: user.wallet.address,
+            data: txData,
+            value: `0x${BigInt(quote.transaction.value || "0").toString(16)}`,
+          },
+        ],
+      });
+
+      setHash(tx as string);
+      console.log("Transaction sent:", tx);
+    } catch (error: unknown) {
+      console.error("Error executing swap:", error);
+      if (
+        error &&
+        typeof error === "object" &&
+        "message" in error &&
+        typeof error.message === "string" &&
+        error.message.includes("rejected")
+      ) {
+        setSendTransactionError(new Error("Transaction rejected"));
+      } else {
+        setSendTransactionError(new Error("Failed to execute swap"));
+      }
     } finally {
       setIsPending(false);
     }
   }, [quote, user?.wallet?.address, wallets]);
+
+  const switchTokens = useCallback(() => {
+    setIsSellETH(!isSellETH);
+    setSellAmount("");
+    setBuyAmount("");
+    setIsFinalized(false);
+    setQuote(undefined);
+  }, [isSellETH]);
 
   useEffect(() => {
     const params = {
@@ -180,14 +317,6 @@ export default function TokenSwap() {
     fetchPrice,
     fetchQuote,
   ]);
-
-  useEffect(() => {
-    if (!address || !quote) return;
-
-    if (quote.issues?.allowance) {
-      console.log("Allowance needed for Permit2");
-    }
-  }, [address, quote]);
 
   return (
     <div className="card w-[300px] shadow-xl mx-auto p-4">
@@ -221,23 +350,31 @@ export default function TokenSwap() {
           />
           <div className="absolute right-2 top-2 flex items-center gap-2 px-2 py-1 rounded-btn">
             <Image
-              src={ETH.image}
-              alt={ETH.symbol}
+              src={sellToken.image}
+              alt={sellToken.symbol}
               width={100}
               height={100}
               className="w-6 h-6 rounded-full"
             />
-            <div className="font-medium">{ETH.symbol}</div>
+            <div className="font-medium">{sellToken.symbol}</div>
           </div>
         </div>
 
-        {/* Quick Amount Button */}
-        <button
-          onClick={() => setSellAmount("0.0001")}
-          className="btn btn-sm btn-outline w-full"
-        >
-          Set 0.0001 ETH
-        </button>
+        {/* Switch and Quick Amount Buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={switchTokens}
+            className="btn btn-sm btn-outline flex-1"
+          >
+            🔄 Switch
+          </button>
+          <button
+            onClick={() => setSellAmount(isSellETH ? "0.0001" : "300000")}
+            className="btn btn-sm btn-outline flex-1"
+          >
+            Set {isSellETH ? "0.0001" : "300000"} {sellToken.symbol}
+          </button>
+        </div>
 
         {/* Buy Token Input */}
         <div className="relative">
@@ -276,18 +413,29 @@ export default function TokenSwap() {
         </div>
 
         <button
-          onClick={isConnected ? (isFinalized ? executeSwap : finalize) : login}
+          onClick={async () => {
+            if (!isConnected) {
+              login();
+            } else if (isFinalized) {
+              await executeSwap();
+            } else {
+              await finalize();
+            }
+          }}
           disabled={
             !ready ||
             (!isConnected && !login) ||
             !sellAmount ||
             !buyAmount ||
-            isPending
+            isPending ||
+            isApproving
           }
           className="btn btn-primary w-full"
         >
           {isConnected
-            ? isFinalized
+            ? isApproving
+              ? "Approving..."
+              : isFinalized
               ? "Confirm"
               : "Review Swap"
             : "Connect Wallet"}
