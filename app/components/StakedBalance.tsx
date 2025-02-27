@@ -84,7 +84,7 @@ export function StakedBalance({
         });
 
         const formattedReceived = Number(formatUnits(received, 18));
-        console.log("Token balance:", formattedReceived);
+        // console.log("Token balance:", formattedReceived);
         setBaseAmount(formattedReceived);
         setLastUpdateTime(Date.now());
 
@@ -156,12 +156,12 @@ export function StakedBalance({
       const interval = setInterval(() => {
         const elapsed = (Date.now() - lastUpdateTime) / 1000;
         const newStreamed = userFlowRate * elapsed;
-        console.log("Stream calculation:", {
-          userFlowRate,
-          elapsed,
-          newStreamed,
-          baseAmount,
-        });
+        // console.log("Stream calculation:", {
+        //   userFlowRate,
+        //   elapsed,
+        //   newStreamed,
+        //   baseAmount,
+        // });
         setStreamedAmount(newStreamed);
       }, 50);
       return () => clearInterval(interval);

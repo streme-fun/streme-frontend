@@ -10,13 +10,9 @@ import { base } from "viem/chains";
 
 interface ClaimFeesButtonProps {
   tokenAddress: string;
+  creatorAddress?: string;
   className?: string;
 }
-
-const shortenHash = (hash: string | undefined) => {
-  if (!hash) return "";
-  return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
-};
 
 const publicClient = createPublicClient({
   chain: base,
@@ -148,11 +144,13 @@ export function ClaimFeesButton({
         ) : !user?.wallet?.address ? (
           "Connect Wallet"
         ) : (
-          "Claim Fees"
+          "Send Fees to Creator"
         )}
       </button>
       <div className="text-xs opacity-60 text-center">
-        Claimable by: {shortenHash(user?.wallet?.address)}
+        <div className="mt-1 text-xs text-amber-500">
+          Note: Fees are sent to the creator&apos;s wallet.
+        </div>
       </div>
     </div>
   );

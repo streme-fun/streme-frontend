@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { Token } from "@/app/types/token";
 import { StakeButton } from "@/app/components/StakeButton";
@@ -121,7 +121,6 @@ export function TokenActions({
             functionName: "getTokensDeployedByUser",
             args: [address as `0x${string}`],
           })) as Deployment[];
-
           const isCreatorResult = deployments.some(
             (d) =>
               d.token.toLowerCase() === token.contract_address.toLowerCase()
@@ -225,7 +224,8 @@ export function TokenActions({
 
   const hasTokens = isConnected && balance > 0n;
 
-  const refreshBalances = async () => {
+  // Wrap in useCallback to prevent recreation on every render
+  const refreshBalances = useCallback(async () => {
     if (!address || !isConnected) return;
     try {
       // Fetch token balance
@@ -266,12 +266,12 @@ export function TokenActions({
     } catch (error) {
       console.error("Error refreshing balances:", error);
     }
-  };
+  }, [address, isConnected, token.contract_address, token.staking_address]);
 
-  // Update the balance fetch effect to use refreshBalances
+  // Now the effect will only re-run when refreshBalances actually changes
   useEffect(() => {
     refreshBalances();
-  }, [address, isConnected, token.contract_address]);
+  }, [refreshBalances]);
 
   return (
     <div className="space-y-6">
@@ -372,7 +372,10 @@ export function TokenActions({
         )}
 
         {/* Claim Fees button for creator */}
-        {isCreator && <ClaimFeesButton tokenAddress={token.contract_address} />}
+        <ClaimFeesButton
+          tokenAddress={token.contract_address}
+          creatorAddress={isCreator ? address : undefined}
+        />
       </div>
 
       <UniswapModal
