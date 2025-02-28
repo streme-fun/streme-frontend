@@ -183,6 +183,17 @@ export function StakeButton({
         amount,
       ]);
 
+      // Get the estimated gas using publicClient instead of provider
+      const estimatedGas = await publicClient.estimateGas({
+        account: walletAddress as `0x${string}`,
+        to: stakingAddress as `0x${string}`,
+        data: stakeData as `0x${string}`,
+      });
+
+      // Add a 50% safety margin to the gas limit (multiply by 1.5)
+      const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.5));
+      const gas = `0x${gasLimit.toString(16)}` as `0x${string}`;
+
       const stakeTx = await provider.request({
         method: "eth_sendTransaction",
         params: [
@@ -190,6 +201,7 @@ export function StakeButton({
             to: toHex(stakingAddress),
             from: walletAddress,
             data: stakeData,
+            gas: gas,
           },
         ],
       });
