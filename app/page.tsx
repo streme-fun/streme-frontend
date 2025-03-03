@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { Hero } from "./components/Hero";
 import { TopStreamer } from "./components/TopStreamer";
 import { Token, TokensResponse } from "./types/token";
+import sdk from "@farcaster/frame-sdk";
 
 export default function RootPage() {
   return <Home />;
@@ -14,6 +15,18 @@ export default function RootPage() {
 function Home() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      sdk.actions.ready();
+    };
+    if (sdk && !isSDKLoaded) {
+      setIsSDKLoaded(true);
+      load();
+    }
+  }, [isSDKLoaded]);
 
   useEffect(() => {
     const fetchTokens = async () => {
@@ -31,6 +44,9 @@ function Home() {
     fetchTokens();
   }, []);
 
+  if (!isSDKLoaded) {
+    return <div>Loading...</div>;
+  }
   return (
     <>
       <div className="font-[family-name:var(--font-geist-sans)]">
