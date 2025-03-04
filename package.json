@@ -16,6 +16,7 @@
     "@tanstack/react-query": "^5.66.0",
     "@tanstack/react-table": "^8.20.6",
     "i": "^0.3.7",
+    "lucide-react": "^0.477.0",
     "next": "15.1.6",
     "npm": "^11.1.0",
     "qs": "^6.14.0",

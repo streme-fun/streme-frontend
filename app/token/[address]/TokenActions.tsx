@@ -8,8 +8,8 @@ import { UniswapModal } from "@/app/components/UniswapModal";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import { UnstakeButton } from "@/app/components/UnstakeButton";
-import { ClaimFeesButton } from "@/app/components/ClaimFeesButton";
 import { ConnectPoolButton } from "@/app/components/ConnectPoolButton";
+import { ZapStakeButton } from "@/app/components/ZapStakeButton";
 import {
   LP_FACTORY_ADDRESS,
   LP_FACTORY_ABI,
@@ -61,10 +61,7 @@ export function TokenActions({
   const isConnected = ready && !!address;
   const [balance, setBalance] = useState<bigint>(BigInt(0));
 
-  const [isCreator, setIsCreator] = useState(false);
   const [isConnectedToPool, setIsConnectedToPool] = useState(false);
-
-  // Add staking balance check
   const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
 
   // Add debug logs
@@ -127,14 +124,11 @@ export function TokenActions({
           );
 
           if (isCreatorResult) {
-            setIsCreator(true);
             return;
           }
         }
-        setIsCreator(false);
       } catch (error) {
         console.error("Error checking creator status:", error);
-        setIsCreator(false);
       }
     };
 
@@ -274,24 +268,14 @@ export function TokenActions({
   }, [refreshBalances]);
 
   return (
-    <div className="space-y-6">
+    <div className="card border-gray-100 border-2 p-4 space-y-6">
       {/* Action Buttons */}
       <div className="flex flex-col gap-2">
-        <button
-          onClick={() => setIsUniswapOpen(true)}
-          className="btn btn-primary"
-        >
-          Buy
-        </button>
-        <StakeButton
+        <ZapStakeButton
           tokenAddress={token.contract_address}
           stakingAddress={token.staking_address}
-          stakingPoolAddress={token.staking_pool}
-          disabled={!hasTokens}
-          symbol={token.symbol}
           onSuccess={onStakingChange}
-          onPoolConnect={() => setIsConnectedToPool(true)}
-          className={`btn btn-outline relative 
+          className="btn btn-outline relative 
             before:absolute before:inset-0 before:bg-gradient-to-r 
             before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] 
             before:opacity-30
@@ -299,83 +283,97 @@ export function TokenActions({
             border-[#ffa647]/30
             hover:border-[#ffa647]/50
             shadow-[0_0_5px_rgba(255,166,71,0.3)]
-            hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]
+            hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]"
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={() => setIsUniswapOpen(true)}
+            className="btn btn-outline border-gray-400 text-gray-600 flex-1"
+          >
+            Swap
+          </button>
+          <StakeButton
+            tokenAddress={token.contract_address}
+            stakingAddress={token.staking_address}
+            stakingPoolAddress={token.staking_pool}
+            disabled={!hasTokens}
+            symbol={token.symbol}
+            onSuccess={onStakingChange}
+            onPoolConnect={() => setIsConnectedToPool(true)}
+            className={`btn btn-outline border-gray-400 text-gray-600 flex-1
             disabled:before:opacity-0
             disabled:hover:before:opacity-0
             disabled:border-opacity-0
             disabled:shadow-none
             disabled:hover:shadow-none
             ${!hasTokens && "btn-disabled opacity-50"}`}
-        />
-        <UnstakeButton
-          stakingAddress={token.staking_address}
-          symbol={token.symbol}
-          className="btn btn-outline"
-          onSuccess={onStakingChange}
-        />
+          />
+        </div>
 
-        {/* Connection status alerts */}
-        {stakedBalance > 0n && (
-          <>
-            {!isConnectedToPool ? (
-              <div className="alert alert-warning shadow-lg">
-                <div className="flex">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    className="w-6 h-6 mx-2 stroke-current"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    ></path>
-                  </svg>
-                  <div>
-                    <h3 className="font-bold">Action Required</h3>
-                    <div className="text-sm">
-                      Connect to the reward pool to start receiving streaming
-                      rewards.
+        <div className="flex flex-col gap-2 mt-4 ">
+          <UnstakeButton
+            stakingAddress={token.staking_address}
+            symbol={token.symbol}
+            className="btn btn-outline"
+            onSuccess={onStakingChange}
+          />
+          {/* Connection status alerts */}
+          {stakedBalance > 0n && (
+            <>
+              {!isConnectedToPool ? (
+                <div className="alert alert-warning shadow-lg">
+                  <div className="flex">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      className="w-6 h-6 mx-2 stroke-current"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      ></path>
+                    </svg>
+                    <div>
+                      <h3 className="font-bold">Action Required</h3>
+                      <div className="text-sm">
+                        Connect to the reward pool to start receiving streaming
+                        rewards.
+                      </div>
                     </div>
                   </div>
+                  <div className="flex-none">
+                    <ConnectPoolButton
+                      poolAddress={token.staking_pool}
+                      onSuccess={() => setIsConnectedToPool(true)}
+                    />
+                  </div>
                 </div>
-                <div className="flex-none">
-                  <ConnectPoolButton
-                    poolAddress={token.staking_pool}
-                    onSuccess={() => setIsConnectedToPool(true)}
-                  />
+              ) : (
+                <div className="alert alert-success shadow-lg">
+                  <div className="flex items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      className="w-6 h-6 mx-2 stroke-current"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      ></path>
+                    </svg>
+                    <div className="text-sm">Connected to reward pool</div>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="alert alert-success shadow-lg">
-                <div className="flex items-center">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    className="w-6 h-6 mx-2 stroke-current"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    ></path>
-                  </svg>
-                  <div className="text-sm">Connected to reward pool</div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Claim Fees button for creator */}
-        <ClaimFeesButton
-          tokenAddress={token.contract_address}
-          creatorAddress={isCreator ? address : undefined}
-        />
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       <UniswapModal

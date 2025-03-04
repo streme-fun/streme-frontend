@@ -65,11 +65,11 @@ export function TokenInfo({ token }: { token: Token }) {
   }, []);
 
   return (
-    <div className="card bg-base-100 border border-black/[.1] dark:border-white/[.1] space-y-6">
+    <div className="space-y-6 card border-gray-100 border-2 p-4">
       {/* Token Header */}
       <div className="flex items-center gap-4">
         {token.img_url ? (
-          <div className="relative w-16 h-16">
+          <div className="relative w-12 h-12">
             <Image
               src={token.img_url}
               alt={token.name}
@@ -83,9 +83,9 @@ export function TokenInfo({ token }: { token: Token }) {
           </div>
         )}
         <div className="flex-1">
-          <h2 className="text-2xl font-bold">{token.name}</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-base opacity-60">${token.symbol}</span>
+          <h2 className="text-xl font-bold">{token.name}</h2>
+          <div className="flex items-center gap-2">
+            <span className="text-sm opacity-60">${token.symbol}</span>
           </div>
         </div>
         {token.creator && (
@@ -138,7 +138,7 @@ export function TokenInfo({ token }: { token: Token }) {
       <div className="flex items-end justify-between px-1">
         <div>
           <div className="text-sm opacity-60 mb-1">Price</div>
-          <div className="font-mono text-2xl font-bold">
+          <div className="font-mono text-xl font-bold">
             {formatPrice(token.price)}
           </div>
         </div>
@@ -163,7 +163,7 @@ export function TokenInfo({ token }: { token: Token }) {
       {/* Market Stats */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm opacity-60 mb-1">Volume 24h</div>
+          <div className="text-sm opacity-60 mb-1">24h Volume</div>
           <div className="font-mono text-lg">
             {formatCurrency(token.volume24h)}
           </div>

@@ -184,26 +184,26 @@ export function StakedBalance({
   const formattedReceived = (baseAmount + streamedAmount).toFixed(4);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 card border-gray-100 border-2 p-4">
       <div>
         <div className="text-sm opacity-60 mb-1">My Staked Balance</div>
-        <div className="font-mono text-lg">
+        <div className="font-mono">
           {formattedBalance} st{symbol}
         </div>
       </div>
       <div>
         <div className="text-sm opacity-60 mb-1">My Amount Received</div>
-        <div className="font-mono text-lg">
+        <div className="font-mono">
           {formattedReceived} {symbol}
         </div>
       </div>
       <div>
         <div className="text-sm opacity-60 mb-1">My Pool Share</div>
-        <div className="font-mono text-lg">{poolPercentage}%</div>
+        <div className="font-mono">{poolPercentage}%</div>
       </div>
       <div>
         <div className="text-sm opacity-60 mb-1">My Flow Rate</div>
-        <div className="font-mono text-lg">
+        <div className="font-mono">
           {flowRate} {symbol}/day
         </div>
       </div>
