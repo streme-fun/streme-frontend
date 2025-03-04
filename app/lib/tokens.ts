@@ -46,3 +46,24 @@ export async function getTokenData(address: string) {
     };
   }
 }
+
+export async function getTokens() {
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/api/tokens`,
+      {
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch tokens");
+    }
+
+    const { data: tokens } = await response.json();
+    return tokens;
+  } catch (error) {
+    console.error("Error fetching tokens:", error);
+    return [];
+  }
+}

@@ -179,6 +179,18 @@ export async function fetchTokenFromStreme(
     return token;
   } catch (error) {
     console.error("Error fetching token:", error);
+    if (
+      error &&
+      typeof error === "object" &&
+      "message" in error &&
+      typeof error.message === "string"
+    ) {
+      if (error.message.includes("rejected")) {
+        console.error("Transaction rejected");
+      } else if (error.message.includes("insufficient funds")) {
+        console.error("Insufficient funds for transaction");
+      }
+    }
     return null;
   }
 }

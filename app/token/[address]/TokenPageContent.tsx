@@ -6,6 +6,38 @@ import { TokenActions } from "./TokenActions";
 import { Token } from "@/app/types/token";
 import { TokenInfo } from "./TokenInfo";
 import { StakedBalance } from "@/app/components/StakedBalance";
+import { ClaimFeesButton } from "@/app/components/ClaimFeesButton";
+import { usePrivy } from "@privy-io/react-auth";
+import { createPublicClient, http } from "viem";
+import { base } from "viem/chains";
+import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/app/lib/contracts";
+
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(),
+});
+
+type LinkedAccount = {
+  type: string;
+  address?: string;
+};
+
+type PrivyUser = {
+  linkedAccounts?: LinkedAccount[];
+};
+
+const getAllUserAddresses = (user: PrivyUser) => {
+  if (!user?.linkedAccounts) return [];
+  return user.linkedAccounts
+    .filter((account) => account.type === "wallet" && account.address)
+    .map((account) => account.address!.toLowerCase());
+};
+
+type Deployment = {
+  token: string;
+  locker: string;
+  positionId: bigint;
+};
 
 // const HARDCODED_ADDRESS = "0x1234567890123456789012345678901234567890";
 // const BASED_FWOG_POOL = "0x1035ae3f87a91084c6c5084d0615cc6121c5e228";
@@ -52,9 +84,10 @@ import { StakedBalance } from "@/app/components/StakedBalance";
 export function TokenPageContent() {
   const params = useParams();
   const address = params.address as string;
-
+  const { user } = usePrivy();
   const [token, setToken] = useState<Token | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isCreator, setIsCreator] = useState(false);
 
   useEffect(() => {
     async function fetchToken() {
@@ -73,6 +106,41 @@ export function TokenPageContent() {
 
     fetchToken();
   }, [address]);
+
+  // Add creator check effect
+  useEffect(() => {
+    if (!user || !token) return;
+
+    const checkIsCreator = async () => {
+      const userAddresses = getAllUserAddresses(user);
+      try {
+        for (const address of userAddresses) {
+          const deployments = (await publicClient.readContract({
+            address: LP_FACTORY_ADDRESS,
+            abi: LP_FACTORY_ABI,
+            functionName: "getTokensDeployedByUser",
+            args: [address as `0x${string}`],
+          })) as Deployment[];
+
+          const isCreatorResult = deployments.some(
+            (d) =>
+              d.token.toLowerCase() === token.contract_address.toLowerCase()
+          );
+
+          if (isCreatorResult) {
+            setIsCreator(true);
+            return;
+          }
+        }
+        setIsCreator(false);
+      } catch (error) {
+        console.error("Error checking creator status:", error);
+        setIsCreator(false);
+      }
+    };
+
+    checkIsCreator();
+  }, [user, token]);
 
   const handleStakingChange = () => {
     // Force refresh of staked balance
@@ -132,6 +200,10 @@ export function TokenPageContent() {
             stakingPool={token.staking_pool}
             symbol={token.symbol}
             tokenAddress={token.contract_address}
+          />
+          <ClaimFeesButton
+            tokenAddress={token.contract_address}
+            creatorAddress={isCreator ? user?.wallet?.address : undefined}
           />
         </div>
       </div>
