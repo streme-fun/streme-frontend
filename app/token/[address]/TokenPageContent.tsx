@@ -84,10 +84,11 @@ type Deployment = {
 export function TokenPageContent() {
   const params = useParams();
   const address = params.address as string;
-  const { user } = usePrivy();
+  const { user, ready } = usePrivy();
   const [token, setToken] = useState<Token | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
+  const isWalletConnected = ready && !!user?.wallet?.address;
 
   useEffect(() => {
     async function fetchToken() {
@@ -201,10 +202,12 @@ export function TokenPageContent() {
             symbol={token.symbol}
             tokenAddress={token.contract_address}
           />
-          <ClaimFeesButton
-            tokenAddress={token.contract_address}
-            creatorAddress={isCreator ? user?.wallet?.address : undefined}
-          />
+          {isWalletConnected && (
+            <ClaimFeesButton
+              tokenAddress={token.contract_address}
+              creatorAddress={isCreator ? user?.wallet?.address : undefined}
+            />
+          )}
         </div>
       </div>
     </div>

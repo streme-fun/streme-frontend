@@ -7,6 +7,7 @@ import { base } from "viem/chains";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { Modal } from "./Modal";
+import { Zap } from "lucide-react";
 
 const publicClient = createPublicClient({
   chain: base,
@@ -338,7 +339,14 @@ export function ZapStakeButton({
             disabled={disabled || isLoading || !isValid}
             className={className}
           >
-            {isLoading ? "Processing..." : "⚡️ Buy & Stake"}
+            {isLoading ? (
+              "Processing..."
+            ) : (
+              <span className="flex items-center gap-1">
+                <Zap size={16} />
+                Buy & Stake
+              </span>
+            )}
           </button>
         </div>
       </div>
