@@ -1,8 +1,4 @@
-import {
-  fetchTokenFromStreme,
-  fetchCreatorProfiles,
-  enrichTokensWithData,
-} from "@/app/lib/apiUtils";
+import { fetchTokenFromStreme, enrichTokensWithData } from "@/app/lib/apiUtils";
 
 export async function GET(request: Request) {
   try {
@@ -22,17 +18,8 @@ export async function GET(request: Request) {
       return Response.json({ error: "Token not found" }, { status: 404 });
     }
 
-    // Get creator profile if exists
-    const creatorProfiles = token.requestor_fid
-      ? await fetchCreatorProfiles([token.requestor_fid.toString()])
-      : {};
-
-    // Enrich token with data
-    const enrichedToken = await enrichTokensWithData(
-      [token],
-      creatorProfiles,
-      true
-    );
+    // Enrich token with data including market data
+    const enrichedToken = await enrichTokensWithData([token], true);
 
     return Response.json({ data: enrichedToken[0] });
   } catch (error) {
