@@ -19,6 +19,10 @@ export interface Token {
   staking_address: string;
   pfp_url: string;
   username: string;
+  timestamp: {
+    _seconds: number;
+    _nanoseconds: number;
+  };
 
   price?: number;
   marketCap?: number;
@@ -42,5 +46,5 @@ export interface Token {
 export interface TokensResponse {
   data: Token[];
   hasMore: boolean;
-  total: number;
+  nextPage?: number;
 }

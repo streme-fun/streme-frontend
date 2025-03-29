@@ -2,9 +2,21 @@ import { Token } from "@/app/types/token";
 import { fetchTokensData, fetchPoolData } from "@/app/lib/geckoterminal";
 import { enrichTokenWithMarketData } from "@/app/lib/mockTokens";
 
-export async function fetchTokensFromStreme(): Promise<Token[]> {
+export async function fetchTokensFromStreme(
+  before?: number,
+  limit: number = 200
+): Promise<Token[]> {
   try {
-    const response = await fetch("https://api.streme.fun/api/tokens", {
+    const params = new URLSearchParams();
+    if (before) params.append("before", before.toString());
+    if (limit) params.append("limit", limit.toString());
+
+    const queryString = params.toString();
+    const url = `https://api.streme.fun/api/tokens${
+      queryString ? `?${queryString}` : ""
+    }`;
+
+    const response = await fetch(url, {
       cache: "no-store",
     });
     const tokens = await response.json();

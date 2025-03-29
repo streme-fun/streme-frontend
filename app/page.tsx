@@ -15,19 +15,34 @@ function Home() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchTokens = async () => {
-      try {
-        const response = await fetch("/api/tokens");
-        const data: TokensResponse = await response.json();
-        setTokens(data.data);
-      } catch (error) {
-        console.error("Error fetching tokens:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchTokens = async (before?: number) => {
+    try {
+      const params = new URLSearchParams();
+      if (before) params.append("before", before.toString());
 
+      const response = await fetch(
+        `/api/tokens${params.toString() ? `?${params}` : ""}`
+      );
+      const data: TokensResponse = await response.json();
+
+      if (before) {
+        setTokens((prev) => [...prev, ...data.data]);
+      } else {
+        setTokens(data.data);
+      }
+
+      // If there are more tokens, fetch them automatically
+      if (data.hasMore && data.nextPage) {
+        await fetchTokens(data.nextPage);
+      }
+    } catch (error) {
+      console.error("Error fetching tokens:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchTokens();
   }, []);
 
@@ -38,7 +53,7 @@ function Home() {
           <Hero />
           <TopStreamer />
           <div className="w-full max-w-[1200px]">
-            {loading ? (
+            {loading && tokens.length === 0 ? (
               <div className="text-center py-8">Loading tokens...</div>
             ) : (
               <TokenGrid tokens={tokens} />
