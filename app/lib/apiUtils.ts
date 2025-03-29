@@ -2,8 +2,6 @@ import { Token } from "@/app/types/token";
 import { fetchTokensData, fetchPoolData } from "@/app/lib/geckoterminal";
 import { enrichTokenWithMarketData } from "@/app/lib/mockTokens";
 
-export type CreatorProfile = NonNullable<Token["creator"]>;
-
 export async function fetchTokensFromStreme(): Promise<Token[]> {
   try {
     const response = await fetch("https://api.streme.fun/api/tokens", {
@@ -18,62 +16,6 @@ export async function fetchTokensFromStreme(): Promise<Token[]> {
   }
 }
 
-export async function fetchCreatorProfiles(
-  creatorIds: string[]
-): Promise<Record<string, CreatorProfile>> {
-  if (creatorIds.length === 0) return {};
-
-  const batchSize = 50;
-  const profiles: Record<string, CreatorProfile> = {};
-
-  // Process creatorIds in batches of 50
-  for (let i = 0; i < creatorIds.length; i += batchSize) {
-    const batchIds = creatorIds.slice(i, i + batchSize);
-
-    try {
-      const profileResponse = await fetch(
-        `${
-          process.env.NEXT_PUBLIC_BASE_URL
-        }/api/fetchFarcasterProfile?userIds=${batchIds.join(",")}`,
-        { method: "GET" }
-      );
-      const profileData = await profileResponse.json();
-
-      // Merge the batch results into the profiles object
-      const batchProfiles =
-        profileData.data?.Socials?.Social?.reduce(
-          (
-            acc: Record<string, CreatorProfile>,
-            social: {
-              userId: string;
-              profileImage: string;
-              profileName: string;
-            }
-          ) => {
-            acc[social.userId] = {
-              profileImage: social.profileImage,
-              name: social.profileName,
-              score: 0,
-              recasts: 0,
-              likes: 0,
-            };
-            return acc;
-          },
-          {}
-        ) ?? {};
-
-      Object.assign(profiles, batchProfiles);
-    } catch (error) {
-      console.error(
-        `Error fetching profiles batch ${i}-${i + batchSize}:`,
-        error
-      );
-    }
-  }
-
-  return profiles;
-}
-
 type EnrichedToken = Omit<Token, "creator"> & {
   creator?: {
     name: string;
@@ -86,7 +28,6 @@ type EnrichedToken = Omit<Token, "creator"> & {
 
 export async function enrichTokensWithData(
   tokens: Token[],
-  creatorProfiles: Record<string, CreatorProfile>,
   includeMarketData: boolean = false
 ): Promise<EnrichedToken[]> {
   if (!Array.isArray(tokens)) {
@@ -96,16 +37,15 @@ export async function enrichTokensWithData(
 
   let enrichedTokens = tokens.map((token) => ({
     ...token,
-    creator:
-      token.requestor_fid && creatorProfiles[token.requestor_fid]
-        ? {
-            name: creatorProfiles[token.requestor_fid].name || "Unknown",
-            score: 0,
-            recasts: 0,
-            likes: 0,
-            profileImage: creatorProfiles[token.requestor_fid].profileImage,
-          }
-        : undefined,
+    creator: token.requestor_fid
+      ? {
+          name: token.username || "Unknown",
+          score: 0,
+          recasts: 0,
+          likes: 0,
+          profileImage: token.pfp_url || "",
+        }
+      : undefined,
   })) as EnrichedToken[];
 
   // Only fetch market data if explicitly requested

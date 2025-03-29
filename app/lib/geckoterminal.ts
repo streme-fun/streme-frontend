@@ -24,11 +24,20 @@ export async function fetchTokensData(addresses: string[]) {
     const response = await fetch(
       `${GECKOTERMINAL_API}/networks/base/tokens/multi/${addressString}`
     );
+
+    if (!response.ok) {
+      console.error(
+        `GeckoTerminal API error: ${response.status} ${response.statusText}`
+      );
+      return {};
+    }
+
     const data = await response.json();
 
-    // console.log("GeckoTerminal Raw Response:", data);
-
-    if (!data.data) return {};
+    if (!data.data) {
+      console.warn("No data returned from GeckoTerminal API");
+      return {};
+    }
 
     const processedData = data.data.reduce(
       (
@@ -57,7 +66,6 @@ export async function fetchTokensData(addresses: string[]) {
       {}
     );
 
-    console.log("Processed GeckoTerminal Data:", processedData);
     return processedData;
   } catch (error) {
     console.error("Error fetching tokens data:", error);
@@ -90,32 +98,44 @@ export async function fetchPoolData(poolAddress: string) {
   }
 
   try {
-    // Add base URL for API calls
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
     const response = await fetch(
       `${baseUrl}/api/geckoterminal?poolAddress=${poolAddress}`
     );
-    const data: GeckoTerminalResponse = await response.json();
 
-    // console.log("GeckoTerminal raw response:", {
-    //   poolAddress,
-    //   data: data.data.attributes,
-    // });
+    if (!response.ok) {
+      console.error(
+        `GeckoTerminal API error: ${response.status} ${response.statusText}`
+      );
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Check for error response
+    if (data.error) {
+      console.error("GeckoTerminal API error:", data.error);
+      return null;
+    }
+
+    // Validate data structure
+    if (!data?.data?.attributes) {
+      console.error("Invalid data structure from GeckoTerminal API");
+      return null;
+    }
+
+    const attrs = data.data.attributes;
 
     // Remove the '+' or '-' prefix from percentage strings
     const cleanPercentage = (str: string) =>
       parseFloat(str.replace(/%/g, "").replace(/[+]/g, ""));
 
     return {
-      price: parseFloat(data.data.attributes.price_in_usd),
-      change1h: cleanPercentage(
-        data.data.attributes.price_percent_changes.last_1h
-      ),
-      change24h: cleanPercentage(
-        data.data.attributes.price_percent_changes.last_24h
-      ),
-      volume24h: parseFloat(data.data.attributes.from_volume_in_usd),
-      marketCap: parseFloat(data.data.attributes.fully_diluted_valuation),
+      price: parseFloat(attrs.price_in_usd || "0"),
+      change1h: cleanPercentage(attrs.price_percent_changes?.last_1h || "0"),
+      change24h: cleanPercentage(attrs.price_percent_changes?.last_24h || "0"),
+      volume24h: parseFloat(attrs.from_volume_in_usd || "0"),
+      marketCap: parseFloat(attrs.fully_diluted_valuation || "0"),
     };
   } catch (error) {
     console.error("Error fetching pool data for address:", poolAddress, error);

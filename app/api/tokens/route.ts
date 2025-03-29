@@ -1,6 +1,5 @@
 import {
   fetchTokensFromStreme,
-  fetchCreatorProfiles,
   enrichTokensWithData,
 } from "@/app/lib/apiUtils";
 
@@ -25,26 +24,7 @@ export async function GET() {
         }))
     );
 
-    const creatorIds = [
-      ...new Set(tokens.map((token) => token.requestor_fid?.toString())),
-    ].filter(Boolean);
-
-    // Debug creator IDs
-    console.log("Unique creator IDs:", creatorIds.length);
-
-    const creatorProfiles = await fetchCreatorProfiles(creatorIds);
-
-    // Debug creator profiles
-    console.log(
-      "Creator profiles fetched:",
-      Object.keys(creatorProfiles).length
-    );
-    console.log(
-      "Missing creator profiles:",
-      creatorIds.filter((id) => !creatorProfiles[id])
-    );
-
-    const enrichedTokens = await enrichTokensWithData(tokens, creatorProfiles);
+    const enrichedTokens = await enrichTokensWithData(tokens);
 
     // Debug final enriched tokens
     console.log(

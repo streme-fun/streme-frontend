@@ -46,6 +46,10 @@ const nextConfig = {
         protocol: "https",
         hostname: "warpcast.com",
       },
+      {
+        protocol: "https",
+        hostname: "media.firefly.land",
+      },
     ],
   },
   async headers() {

@@ -17,6 +17,8 @@ export interface Token {
   pool_id: string;
   staking_pool: string;
   staking_address: string;
+  pfp_url: string;
+  username: string;
 
   price?: number;
   marketCap?: number;
