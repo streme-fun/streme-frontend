@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Token } from "@/app/types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
+import { SPAMMER_BLACKLIST } from "@/app/lib/blacklist";
 
 export function TopStreamer() {
   const [token, setToken] = useState<Token | null>(null);
@@ -18,8 +19,20 @@ export function TopStreamer() {
         const data = await response.json();
         const tokens: Token[] = data.data;
 
-        // Randomly select a token
-        const randomToken = tokens[Math.floor(Math.random() * tokens.length)];
+        // Filter out blacklisted tokens
+        const filteredTokens = tokens.filter(
+          (token) =>
+            !token.creator?.name ||
+            !SPAMMER_BLACKLIST.includes(token.creator.name.toLowerCase())
+        );
+
+        // Randomly select a token from the filtered list
+        if (filteredTokens.length === 0) {
+          setToken(null); // Or handle this case as you see fit
+          return;
+        }
+        const randomToken =
+          filteredTokens[Math.floor(Math.random() * filteredTokens.length)];
         setToken(randomToken);
 
         // Calculate initial rewards

@@ -8,6 +8,7 @@ import { SearchBar } from "./SearchBar";
 // import { SortMenu } from "./SortMenu";
 import { Token } from "../types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
+import { SPAMMER_BLACKLIST } from "@/app/lib/blacklist";
 
 interface TokenGridProps {
   tokens: Token[];
@@ -228,18 +229,24 @@ export function TokenGrid({ tokens }: TokenGridProps) {
   useEffect(() => {
     const fetchData = async () => {
       const enrichedTokens = await Promise.all(
-        tokens.map(async (token) => {
-          const { totalStreamed, totalStakers } = await calculateRewards(
-            token.created_at,
-            token.contract_address,
-            token.staking_pool
-          );
-          return {
-            ...token,
-            rewards: totalStreamed,
-            totalStakers,
-          };
-        })
+        tokens
+          .filter(
+            (token) =>
+              !token.creator?.name ||
+              !SPAMMER_BLACKLIST.includes(token.creator.name.toLowerCase())
+          )
+          .map(async (token) => {
+            const { totalStreamed, totalStakers } = await calculateRewards(
+              token.created_at,
+              token.contract_address,
+              token.staking_pool
+            );
+            return {
+              ...token,
+              rewards: totalStreamed,
+              totalStakers,
+            };
+          })
       );
       setTokenData(enrichedTokens);
     };
