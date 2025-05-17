@@ -50,6 +50,18 @@ const nextConfig = {
         protocol: "https",
         hostname: "media.firefly.land",
       },
+      {
+        protocol: "https",
+        hostname: "i.ibb.co",
+      },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.amazonaws.com",
+      },
     ],
   },
   async headers() {
