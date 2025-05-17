@@ -14,7 +14,9 @@ import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/app/lib/contracts";
 
 const publicClient = createPublicClient({
   chain: base,
-  transport: http(),
+  transport: http(
+    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
+  ),
 });
 
 type LinkedAccount = {

@@ -11,7 +11,9 @@ import { Zap } from "lucide-react";
 
 const publicClient = createPublicClient({
   chain: base,
-  transport: http(),
+  transport: http(
+    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
+  ),
 });
 
 const WETH = "0x4200000000000000000000000000000000000006";
@@ -105,8 +107,9 @@ export function ZapStakeButton({
     }
 
     setIsLoading(true);
-    try {
-      const walletAddress = user.wallet.address;
+
+    const zapPromise = async () => {
+      const walletAddress = user.wallet!.address;
       const wallet = wallets?.find(
         (w: { address: string }) => w.address === walletAddress
       );
@@ -117,56 +120,12 @@ export function ZapStakeButton({
 
       const provider = await wallet.getEthereumProvider();
 
-      // Add this section to switch network if needed
       await provider.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: "0x2105" }], // 0x2105 is hex for 8453 (Base)
       });
 
-      // Convert amount to BigInt (wei)
       const amountInWei = parseEther(amountIn);
-
-      // Check user's ETH balance
-      const ethBalance = await publicClient.getBalance({
-        address: walletAddress as `0x${string}`,
-      });
-
-      // Estimate gas for the transaction
-      const zapAddress = "0xeA25b9CD2D9F8Ba6cff45Ed0f6e1eFa2fC79a57E";
-      const zapAbi = [
-        "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
-      ];
-
-      // Get gas price
-      const gasPrice = await publicClient.getGasPrice();
-
-      // Estimate gas (we'll try to estimate before the actual transaction)
-      let estimatedGas;
-      try {
-        estimatedGas = await publicClient.estimateGas({
-          account: walletAddress as `0x${string}`,
-          to: zapAddress as `0x${string}`,
-          value: amountInWei,
-          data: "0x", // We'll just use empty data for estimation
-        });
-      } catch {
-        // If estimation fails, use a safe upper limit
-        estimatedGas = 300000n;
-      }
-
-      // Calculate total cost (gas * gas price + value to send)
-      const totalCost = estimatedGas * gasPrice + amountInWei;
-
-      // Check if user has enough balance
-      if (ethBalance < totalCost) {
-        const requiredEth = Number(formatEther(totalCost));
-        const availableEth = Number(formatEther(ethBalance));
-        throw new Error(
-          `Insufficient funds. You need approximately ${requiredEth.toFixed(
-            4
-          )} ETH but have ${availableEth.toFixed(4)} ETH`
-        );
-      }
 
       // 1. Get quote from Uniswap Quoter
       const quoterAddress = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
@@ -197,8 +156,6 @@ export function ZapStakeButton({
         },
       ];
 
-      // Call quoter contract to get expected output amount
-      toast.info("Getting swap quote...");
       const quoteResult = (await publicClient.readContract({
         address: quoterAddress as `0x${string}`,
         abi: quoterAbi,
@@ -214,28 +171,59 @@ export function ZapStakeButton({
         ],
       })) as [bigint, bigint, number, bigint];
 
-      // Calculate minimum amount out with 0.5% slippage
       const amountOut = quoteResult[0];
-      const amountOutMin = amountOut - amountOut / 200n;
+      const amountOutMin = amountOut - amountOut / 200n; // 0.5% slippage
 
-      toast.info(
-        `Expected to receive: ${amountOut.toString()} tokens (min: ${amountOutMin.toString()})`
-      );
-
-      // 2. Call the zap function
+      // Define zap ABI and interface
+      const zapAddress = "0xeA25b9CD2D9F8Ba6cff45Ed0f6e1eFa2fC79a57E";
+      const zapAbi = [
+        "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
+      ];
       const zapIface = new Interface(zapAbi);
       const zapData = zapIface.encodeFunctionData("zap", [
         tokenAddress,
         amountInWei,
         amountOutMin,
         stakingAddress,
-      ]);
+      ]) as `0x${string}`;
 
-      toast.info("Initiating zap stake transaction...");
+      // Estimate gas using the actual zapData
+      let estimatedGas;
+      try {
+        estimatedGas = await publicClient.estimateGas({
+          account: walletAddress as `0x${string}`,
+          to: zapAddress as `0x${string}`,
+          value: amountInWei,
+          data: zapData, // Use actual transaction data for estimation
+        });
+      } catch (e: unknown) {
+        console.error("Gas estimation failed:", e);
+        // If estimation fails, use a safe upper limit (e.g., 1.2M, as user reported ~900k usage)
+        // The original 300k was too low.
+        estimatedGas = 1200000n;
+      }
 
-      // Use the previously estimated gas with safety margin
-      const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.5));
+      const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.2)); // Reduced safety margin as estimate should be better
+      // Or if using fixed fallback, 1.2M is already a buffer.
+      // User reported actual usage around 900k. Max 450k default.
+      // Let's try 1.2M as fallback and 20% buffer on estimate.
       const gas = `0x${gasLimit.toString(16)}` as `0x${string}`;
+
+      const ethBalance = await publicClient.getBalance({
+        address: walletAddress as `0x${string}`,
+      });
+      const gasPrice = await publicClient.getGasPrice();
+      const totalCost = gasLimit * gasPrice + amountInWei;
+
+      if (ethBalance < totalCost) {
+        const requiredEth = Number(formatEther(totalCost));
+        const availableEth = Number(formatEther(ethBalance));
+        throw new Error(
+          `Insufficient funds. You need ~${requiredEth.toFixed(
+            4
+          )} ETH but have ${availableEth.toFixed(4)} ETH (includes gas).`
+        );
+      }
 
       // Send the transaction
       const zapTx = await provider.request({
@@ -245,21 +233,19 @@ export function ZapStakeButton({
             to: zapAddress,
             from: walletAddress,
             data: zapData,
-            value: `0x${amountInWei.toString(16)}`, // Convert to hex
+            value: `0x${amountInWei.toString(16)}`,
             gas: gas,
           },
         ],
       });
 
-      toast.info("Waiting for transaction confirmation...");
-
       // Add timeout for transaction confirmation
-      const timeoutPromise = new Promise(
-        (_, reject) =>
-          setTimeout(
-            () => reject(new Error("Transaction confirmation timeout")),
-            180000
-          ) // 3 minutes timeout
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () =>
+            reject(new Error("Transaction confirmation timeout (3 minutes)")),
+          180000
+        )
       );
 
       const receipt = (await Promise.race([
@@ -267,43 +253,54 @@ export function ZapStakeButton({
           hash: zapTx as `0x${string}`,
         }),
         timeoutPromise,
-      ])) as { status: boolean } | undefined;
+      ])) as { status: "success" | "reverted" } | undefined; // viem uses "success" | "reverted"
 
-      if (receipt?.status) {
+      if (receipt?.status !== "success") {
+        // Check for "success" string
+        throw new Error(
+          receipt
+            ? "Transaction failed or reverted on-chain."
+            : "Transaction timed out or failed to get receipt."
+        );
+      }
+      return receipt; // Return receipt on success
+    };
+
+    toast.promise(zapPromise(), {
+      loading: "Processing Zap & Stake...",
+      success: () => {
+        setIsLoading(false);
         setShowSuccessModal(true);
         onSuccess?.();
-      } else {
-        throw new Error("Transaction failed");
-      }
-    } catch (error) {
-      console.error("Zap stake error:", error);
-
-      // Better error handling
-      if (
-        error &&
-        typeof error === "object" &&
-        "message" in error &&
-        typeof error.message === "string"
-      ) {
-        if (error.message.includes("rejected")) {
-          toast.error("Transaction rejected");
-        } else if (error.message.toLowerCase().includes("insufficient funds")) {
-          toast.error(error.message);
-        } else if (error.message.includes("Wallet not found")) {
-          toast.error("Wallet not found. Please reconnect.");
-        } else if (error.message.includes("confirmation timeout")) {
-          toast.error(
-            "Transaction is taking longer than expected. Please check your wallet or transaction history."
-          );
-        } else {
-          toast.error("Failed to zap stake. Please try again.");
+        return "Zap & Stake successful!";
+      },
+      error: (err: unknown) => {
+        setIsLoading(false);
+        let message = "Zap & Stake failed. Please try again.";
+        if (err instanceof Error) {
+          if (err.message.includes("User rejected the request")) {
+            message = "Transaction rejected by user.";
+          } else if (err.message.includes("Insufficient funds")) {
+            message = err.message; // Use the detailed insufficient funds message
+          } else if (err.message.includes("Transaction confirmation timeout")) {
+            message =
+              "Transaction timed out. Please check your wallet activity.";
+          } else if (
+            err.message.includes("Transaction failed or reverted on-chain")
+          ) {
+            message =
+              "Transaction failed or reverted. Check a block explorer for details.";
+          } else if (err.message.length > 100) {
+            // Keep messages concise
+            message = err.message.substring(0, 100) + "...";
+          } else {
+            message = err.message;
+          }
         }
-      } else {
-        toast.error("An unexpected error occurred");
-      }
-    } finally {
-      setIsLoading(false);
-    }
+        console.error("ZapStake error:", err);
+        return message;
+      },
+    });
   };
 
   return (
@@ -352,102 +349,104 @@ export function ZapStakeButton({
       </div>
 
       {/* Success Modal */}
-      <Modal
-        isOpen={showSuccessModal}
-        onClose={() => setShowSuccessModal(false)}
-      >
-        <div className="p-4 space-y-3">
-          <h3 className="text-lg font-bold">Buy & Stake Successful! 🎉</h3>
-          <div className="relative h-24 w-full overflow-hidden rounded-lg">
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="0 0 400 100"
-              preserveAspectRatio="xMidYMid meet"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
+      {showSuccessModal && (
+        <Modal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+        >
+          <div className="p-4 space-y-3">
+            <h3 className="text-lg font-bold">Buy & Stake Successful! 🎉</h3>
+            <div className="relative h-24 w-full overflow-hidden rounded-lg">
+              <svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 400 100"
+                preserveAspectRatio="xMidYMid meet"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M0 50 Q100 50 200 50 T400 50"
+                  stroke="hsl(220 13% 91%)"
+                  strokeWidth="2"
+                />
+                <g
+                  className="reward-particle"
+                  style={{ offsetPath: "path('M0 50 Q100 50 200 50 T400 50')" }}
+                >
+                  <circle r="4" fill="currentColor" className="text-primary" />
+                </g>
+                <g
+                  className="reward-particle"
+                  style={{
+                    offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                    animationDelay: "-0.2s",
+                  }}
+                >
+                  <circle r="4" fill="currentColor" className="text-primary" />
+                </g>
+                <g
+                  className="reward-particle"
+                  style={{
+                    offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                    animationDelay: "-0.4s",
+                  }}
+                >
+                  <circle r="4" fill="currentColor" className="text-primary" />
+                </g>
+                <g
+                  className="reward-particle"
+                  style={{
+                    offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                    animationDelay: "-0.6s",
+                  }}
+                >
+                  <circle r="4" fill="currentColor" className="text-primary" />
+                </g>
+                <g
+                  className="reward-particle"
+                  style={{
+                    offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                    animationDelay: "-0.8s",
+                  }}
+                >
+                  <circle r="4" fill="currentColor" className="text-primary" />
+                </g>
+              </svg>
+              <style jsx>{`
+                .reward-particle {
+                  animation: flow 2s linear infinite;
+                }
+                @keyframes flow {
+                  from {
+                    offset-distance: 0%;
+                  }
+                  to {
+                    offset-distance: 100%;
+                  }
+                }
+              `}</style>
+            </div>
+            <p className="text-center text-sm pb-4">
+              Token rewards are now being streamed directly to your wallet.
+            </p>
+            <a
+              href={`https://explorer.superfluid.finance/base-mainnet/accounts/${user?.wallet?.address}?tab=pools`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-accent w-full"
             >
-              <path
-                d="M0 50 Q100 50 200 50 T400 50"
-                stroke="hsl(220 13% 91%)"
-                strokeWidth="2"
-              />
-              <g
-                className="reward-particle"
-                style={{ offsetPath: "path('M0 50 Q100 50 200 50 T400 50')" }}
-              >
-                <circle r="4" fill="currentColor" className="text-primary" />
-              </g>
-              <g
-                className="reward-particle"
-                style={{
-                  offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
-                  animationDelay: "-0.2s",
-                }}
-              >
-                <circle r="4" fill="currentColor" className="text-primary" />
-              </g>
-              <g
-                className="reward-particle"
-                style={{
-                  offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
-                  animationDelay: "-0.4s",
-                }}
-              >
-                <circle r="4" fill="currentColor" className="text-primary" />
-              </g>
-              <g
-                className="reward-particle"
-                style={{
-                  offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
-                  animationDelay: "-0.6s",
-                }}
-              >
-                <circle r="4" fill="currentColor" className="text-primary" />
-              </g>
-              <g
-                className="reward-particle"
-                style={{
-                  offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
-                  animationDelay: "-0.8s",
-                }}
-              >
-                <circle r="4" fill="currentColor" className="text-primary" />
-              </g>
-            </svg>
-            <style jsx>{`
-              .reward-particle {
-                animation: flow 2s linear infinite;
-              }
-              @keyframes flow {
-                from {
-                  offset-distance: 0%;
-                }
-                to {
-                  offset-distance: 100%;
-                }
-              }
-            `}</style>
+              Manage Stakes
+            </a>
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="btn btn-ghost w-full"
+            >
+              Close
+            </button>
           </div>
-          <p className="text-center text-sm pb-4">
-            Token rewards are now being streamed directly to your wallet.
-          </p>
-          <a
-            href={`https://explorer.superfluid.finance/base-mainnet/accounts/${user?.wallet?.address}?tab=pools`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-accent w-full"
-          >
-            Manage Stakes
-          </a>
-          <button
-            onClick={() => setShowSuccessModal(false)}
-            className="btn btn-ghost w-full"
-          >
-            Close
-          </button>
-        </div>
-      </Modal>
+        </Modal>
+      )}
     </>
   );
 }

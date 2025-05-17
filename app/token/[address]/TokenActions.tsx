@@ -20,7 +20,9 @@ import {
 
 const publicClient = createPublicClient({
   chain: base,
-  transport: http(),
+  transport: http(
+    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
+  ),
 });
 
 interface TokenActionsProps {
@@ -98,8 +100,10 @@ export function TokenActions({
 
   // Then update the creator check useEffect
   useEffect(() => {
-    if (!user) {
-      console.log("Skipping creator check - no user");
+    if (!user?.linkedAccounts || user.linkedAccounts.length === 0) {
+      console.log(
+        "Skipping creator check - no linked accounts or user object not ready"
+      );
       return;
     }
 
@@ -125,7 +129,9 @@ export function TokenActions({
           );
 
           if (isCreatorResult) {
-            return;
+            // No need to set any state here, just break if found
+            // setIsCreator(true); // Assuming you might have such a state
+            break; // Exit loop once a creator address is found
           }
         }
       } catch (error) {
@@ -134,7 +140,7 @@ export function TokenActions({
     };
 
     checkIsCreator();
-  }, [user, token.contract_address]);
+  }, [user?.linkedAccounts, token.contract_address]); // More specific dependencies
 
   // Add effect to check pool connection
   useEffect(() => {

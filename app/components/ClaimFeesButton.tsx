@@ -16,7 +16,9 @@ interface ClaimFeesButtonProps {
 
 const publicClient = createPublicClient({
   chain: base,
-  transport: http(),
+  transport: http(
+    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
+  ),
 });
 
 export function ClaimFeesButton({
