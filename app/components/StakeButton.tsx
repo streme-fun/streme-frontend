@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
-import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
+// import { base } from "viem/chains"; // Removed as it's no longer used
 import { StakeModal } from "./StakeModal";
 import { Interface } from "@ethersproject/abi";
+import { publicClient } from "@/app/lib/viemClient"; // Import the centralized client
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 
@@ -34,13 +34,6 @@ const erc20ABI = [
     type: "function",
   },
 ] as const;
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(
-    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
-  ),
-});
 
 const toHex = (address: string) => address as `0x${string}`;
 

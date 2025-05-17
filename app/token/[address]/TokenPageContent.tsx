@@ -8,16 +8,8 @@ import { TokenInfo } from "./TokenInfo";
 import { StakedBalance } from "@/app/components/StakedBalance";
 import { ClaimFeesButton } from "@/app/components/ClaimFeesButton";
 import { usePrivy } from "@privy-io/react-auth";
-import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
+import { publicClient } from "@/app/lib/viemClient";
 import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/app/lib/contracts";
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(
-    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
-  ),
-});
 
 type LinkedAccount = {
   type: string;

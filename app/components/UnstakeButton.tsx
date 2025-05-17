@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { createPublicClient, http, createWalletClient, custom } from "viem";
+import { createWalletClient, custom } from "viem";
 import { base } from "viem/chains";
 import { UnstakeModal } from "./UnstakeModal";
+import { publicClient } from "@/app/lib/viemClient";
 
 const stakingAbi = [
   {
@@ -25,13 +26,6 @@ const stakingAbi = [
     outputs: [{ name: "", type: "uint256" }],
   },
 ] as const;
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(
-    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
-  ),
-});
 
 const toHex = (address: string) => address as `0x${string}`;
 

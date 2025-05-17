@@ -4,16 +4,8 @@ import { useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
-import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
+import { publicClient } from "@/app/lib/viemClient";
 import { GDA_FORWARDER } from "@/app/lib/contracts";
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(
-    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
-  ),
-});
 
 interface ConnectPoolButtonProps {
   poolAddress: string;

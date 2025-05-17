@@ -1,16 +1,9 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
-import { createPublicClient, http, formatUnits } from "viem";
-import { base } from "viem/chains";
+import { formatUnits } from "viem";
 import { useState, useEffect } from "react";
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(
-    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
-  ),
-});
+import { publicClient } from "@/app/lib/viemClient"; // Import the centralized client
 
 interface StakedBalanceProps {
   stakingAddress: string;

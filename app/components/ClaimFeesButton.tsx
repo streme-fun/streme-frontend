@@ -5,21 +5,13 @@ import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { LP_FACTORY_ADDRESS } from "@/app/lib/contracts";
-import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
+import { publicClient } from "@/app/lib/viemClient";
 
 interface ClaimFeesButtonProps {
   tokenAddress: string;
   creatorAddress?: string;
   className?: string;
 }
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(
-    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
-  ),
-});
 
 export function ClaimFeesButton({
   tokenAddress,

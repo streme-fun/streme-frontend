@@ -2,19 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
-import { createPublicClient, http, parseEther, formatEther } from "viem";
-import { base } from "viem/chains";
+import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { Modal } from "./Modal";
 import { Zap } from "lucide-react";
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(
-    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
-  ),
-});
+import { publicClient } from "@/app/lib/viemClient"; // Import the centralized client
 
 const WETH = "0x4200000000000000000000000000000000000006";
 

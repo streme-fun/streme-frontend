@@ -5,8 +5,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { Token } from "@/app/types/token";
 import { StakeButton } from "@/app/components/StakeButton";
 import { UniswapModal } from "@/app/components/UniswapModal";
-import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
+import { publicClient } from "@/app/lib/viemClient";
 import { UnstakeButton } from "@/app/components/UnstakeButton";
 import { ConnectPoolButton } from "@/app/components/ConnectPoolButton";
 import { ZapStakeButton } from "@/app/components/ZapStakeButton";
@@ -17,13 +16,6 @@ import {
   GDA_FORWARDER,
   GDA_ABI,
 } from "@/app/lib/contracts";
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(
-    process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL || "https://base.llamarpc.com"
-  ),
-});
 
 interface TokenActionsProps {
   token: Token;
