@@ -4,8 +4,8 @@ import { useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
-import { LP_FACTORY_ADDRESS } from "@/app/lib/contracts";
-import { publicClient } from "@/app/lib/viemClient";
+import { LP_FACTORY_ADDRESS } from "@/lib/contracts";
+import { publicClient } from "@/lib/viemClient";
 
 interface ClaimFeesButtonProps {
   tokenAddress: string;

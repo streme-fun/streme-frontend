@@ -3,7 +3,7 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { formatUnits } from "viem";
 import { useState, useEffect } from "react";
-import { publicClient } from "@/app/lib/viemClient"; // Import the centralized client
+import { publicClient } from "@/lib/viemClient"; // Import the centralized client
 
 interface StakedBalanceProps {
   stakingAddress: string;

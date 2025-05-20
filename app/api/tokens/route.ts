@@ -1,7 +1,4 @@
-import {
-  fetchTokensFromStreme,
-  enrichTokensWithData,
-} from "@/app/lib/apiUtils";
+import { fetchTokensFromStreme, enrichTokensWithData } from "@/lib/apiUtils";
 import { NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {

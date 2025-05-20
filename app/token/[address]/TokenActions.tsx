@@ -3,19 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { Token } from "@/app/types/token";
-import { StakeButton } from "@/app/components/StakeButton";
-import { UniswapModal } from "@/app/components/UniswapModal";
-import { publicClient } from "@/app/lib/viemClient";
-import { UnstakeButton } from "@/app/components/UnstakeButton";
-import { ConnectPoolButton } from "@/app/components/ConnectPoolButton";
-import { ZapStakeButton } from "@/app/components/ZapStakeButton";
+import { StakeButton } from "@/components/StakeButton";
+import { UniswapModal } from "@/components/UniswapModal";
+import { publicClient } from "@/lib/viemClient";
+import { UnstakeButton } from "@/components/UnstakeButton";
+import { ConnectPoolButton } from "@/components/ConnectPoolButton";
+import { ZapStakeButton } from "@/components/ZapStakeButton";
 import { Wallet } from "lucide-react";
 import {
   LP_FACTORY_ADDRESS,
   LP_FACTORY_ABI,
   GDA_FORWARDER,
   GDA_ABI,
-} from "@/app/lib/contracts";
+} from "@/lib/contracts";
 
 interface TokenActionsProps {
   token: Token;

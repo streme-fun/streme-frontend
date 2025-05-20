@@ -5,11 +5,11 @@ import { useParams } from "next/navigation";
 import { TokenActions } from "./TokenActions";
 import { Token } from "@/app/types/token";
 import { TokenInfo } from "./TokenInfo";
-import { StakedBalance } from "@/app/components/StakedBalance";
-import { ClaimFeesButton } from "@/app/components/ClaimFeesButton";
+import { StakedBalance } from "@/components/StakedBalance";
+import { ClaimFeesButton } from "@/components/ClaimFeesButton";
 import { usePrivy } from "@privy-io/react-auth";
-import { publicClient } from "@/app/lib/viemClient";
-import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/app/lib/contracts";
+import { publicClient } from "@/lib/viemClient";
+import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/lib/contracts";
 
 type LinkedAccount = {
   type: string;

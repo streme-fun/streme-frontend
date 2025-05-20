@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
+import { calculateRewards, REWARDS_PER_SECOND } from "@/lib/rewards";
 import { Token } from "@/app/types/token";
 
 // Move these from page.tsx to here

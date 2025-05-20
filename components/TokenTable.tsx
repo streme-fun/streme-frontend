@@ -10,8 +10,8 @@ import {
 } from "@tanstack/react-table";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { Token } from "../types/token";
-import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
+import { Token } from "../app/types/token";
+import { calculateRewards, REWARDS_PER_SECOND } from "@/lib/rewards";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 // import { StakeButton } from "./StakeButton";

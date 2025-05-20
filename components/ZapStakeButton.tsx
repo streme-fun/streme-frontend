@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { Modal } from "./Modal";
 import { Zap } from "lucide-react";
-import { publicClient } from "@/app/lib/viemClient"; // Import the centralized client
+import { publicClient } from "@/lib/viemClient"; // Import the centralized client
 
 const WETH = "0x4200000000000000000000000000000000000006";
 

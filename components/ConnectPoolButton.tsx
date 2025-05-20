@@ -4,8 +4,8 @@ import { useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
-import { publicClient } from "@/app/lib/viemClient";
-import { GDA_FORWARDER } from "@/app/lib/contracts";
+import { publicClient } from "@/lib/viemClient";
+import { GDA_FORWARDER } from "@/lib/contracts";
 
 interface ConnectPoolButtonProps {
   poolAddress: string;

@@ -6,9 +6,9 @@ import Link from "next/link";
 import FarcasterIcon from "@/public/farcaster.svg";
 import { SearchBar } from "./SearchBar";
 // import { SortMenu } from "./SortMenu";
-import { Token } from "../types/token";
-import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
-import { SPAMMER_BLACKLIST } from "@/app/lib/blacklist";
+import { Token } from "../app/types/token";
+import { calculateRewards, REWARDS_PER_SECOND } from "@/lib/rewards";
+import { SPAMMER_BLACKLIST } from "@/lib/blacklist";
 
 interface TokenGridProps {
   tokens: Token[];

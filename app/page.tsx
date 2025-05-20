@@ -1,10 +1,10 @@
 "use client";
 
-import { TokenGrid } from "./components/TokenGrid";
+import { TokenGrid } from "../components/TokenGrid";
 // import { ViewSwitcher } from "./components/ViewSwitcher";
 import { useState, useEffect } from "react";
-import { Hero } from "./components/Hero";
-import { TopStreamer } from "./components/TopStreamer";
+import { Hero } from "../components/Hero";
+import { TopStreamer } from "../components/TopStreamer";
 import { Token, TokensResponse } from "./types/token";
 
 export default function RootPage() {

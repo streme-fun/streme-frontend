@@ -4,8 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Token } from "@/app/types/token";
-import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
-import { SPAMMER_BLACKLIST } from "@/app/lib/blacklist";
+import { calculateRewards, REWARDS_PER_SECOND } from "@/lib/rewards";
+import { SPAMMER_BLACKLIST } from "@/lib/blacklist";
 
 export function TopStreamer() {
   const [token, setToken] = useState<Token | null>(null);

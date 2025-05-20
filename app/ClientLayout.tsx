@@ -3,9 +3,9 @@
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { base } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import PrivyProviderWrapper from "./components/auth/PrivyProviderWrapper";
-import { Navbar } from "./components/Navbar";
-import { Footer } from "./components/Footer";
+import PrivyProviderWrapper from "../components/auth/PrivyProviderWrapper";
+import { Navbar } from "../components/Navbar";
+import { Footer } from "../components/Footer";
 
 const config = createConfig({
   chains: [base],

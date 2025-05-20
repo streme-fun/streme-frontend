@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Token } from "@/app/types/token";
 import FarcasterIcon from "@/public/farcaster.svg";
 import { useState, useEffect } from "react";
-import { calculateRewards, REWARDS_PER_SECOND } from "@/app/lib/rewards";
+import { calculateRewards, REWARDS_PER_SECOND } from "@/lib/rewards";
 
 const formatPrice = (price: number | undefined) => {
   if (!price || isNaN(price)) return "-";

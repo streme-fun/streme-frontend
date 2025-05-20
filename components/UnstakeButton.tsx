@@ -5,7 +5,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { createWalletClient, custom } from "viem";
 import { base } from "viem/chains";
 import { UnstakeModal } from "./UnstakeModal";
-import { publicClient } from "@/app/lib/viemClient";
+import { publicClient } from "@/lib/viemClient";
 
 const stakingAbi = [
   {

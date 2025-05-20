@@ -1,4 +1,4 @@
-import { fetchTokenFromStreme, enrichTokensWithData } from "@/app/lib/apiUtils";
+import { fetchTokenFromStreme, enrichTokensWithData } from "@/lib/apiUtils";
 
 export async function GET(request: Request) {
   try {

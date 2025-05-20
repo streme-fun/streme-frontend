@@ -1,6 +1,6 @@
-import { Leaderboard } from "../components/Leaderboard";
-import { LeaderboardHeader } from "../components/LeaderboardHeader";
-import { getTokens } from "@/app/lib/tokens";
+import { Leaderboard } from "../../components/Leaderboard";
+import { LeaderboardHeader } from "../../components/LeaderboardHeader";
+import { getTokens } from "@/lib/tokens";
 
 export const revalidate = 60;
 

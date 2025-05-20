@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Token } from "../types/token";
-import { calculateRewards } from "@/app/lib/rewards";
+import { Token } from "../app/types/token";
+import { calculateRewards } from "@/lib/rewards";
 
 interface LeaderboardProps {
   tokens: Token[];

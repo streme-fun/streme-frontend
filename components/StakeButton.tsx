@@ -5,7 +5,7 @@ import { usePrivy, useWallets } from "@privy-io/react-auth";
 // import { base } from "viem/chains"; // Removed as it's no longer used
 import { StakeModal } from "./StakeModal";
 import { Interface } from "@ethersproject/abi";
-import { publicClient } from "@/app/lib/viemClient"; // Import the centralized client
+import { publicClient } from "@/lib/viemClient"; // Import the centralized client
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 

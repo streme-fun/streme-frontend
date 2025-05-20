@@ -1,6 +1,6 @@
 import { Token } from "@/app/types/token";
-import { fetchTokensData, fetchPoolData } from "@/app/lib/geckoterminal";
-import { enrichTokenWithMarketData } from "@/app/lib/mockTokens";
+import { fetchTokensData, fetchPoolData } from "@/lib/geckoterminal";
+import { enrichTokenWithMarketData } from "@/lib/mockTokens";
 
 export async function fetchTokensFromStreme(
   before?: number,
