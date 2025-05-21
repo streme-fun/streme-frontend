@@ -2,30 +2,41 @@
   "name": "streme.fun",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/dev.js",
+    "build": "node scripts/build.js",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "deploy:vercel": "node scripts/deploy.js",
+    "cleanup": "lsof -ti :3000 | xargs kill -9"
   },
   "dependencies": {
     "@airstack/node": "^0.0.7",
+    "@farcaster/frame-node": "^0.0.29",
+    "@farcaster/frame-sdk": "^0.0.45",
+    "@farcaster/frame-wagmi-connector": "^0.0.34",
+    "@neynar/nodejs-sdk": "^2.43.0",
     "@privy-io/react-auth": "^2.4.3",
     "@privy-io/wagmi": "^1.0.3",
     "@tailwindcss/postcss": "^4.0.3",
     "@tanstack/react-query": "^5.66.0",
     "@tanstack/react-table": "^8.20.6",
+    "clsx": "^2.1.1",
     "i": "^0.3.7",
     "lucide-react": "^0.477.0",
     "next": "15.1.6",
+    "next-auth": "^4.24.11",
     "npm": "^11.1.0",
     "qs": "^6.14.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "sonner": "^1.7.4",
+    "tailwind-merge": "^3.3.0",
     "tailwindcss": "^4.0.3",
     "viem": "^2.22.22",
-    "wagmi": "^2.14.11"
+    "wagmi": "^2.14.11",
+    "zod": "^3.25.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -33,9 +44,11 @@
     "@types/qs": "^6.9.18",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "crypto": "^1.0.1",
     "daisyui": "^5.0.0-beta.6",
     "eslint": "^9",
     "eslint-config-next": "15.1.6",
+    "localtunnel": "^2.0.2",
     "postcss": "^8.5.1",
     "typescript": "^5"
   }
