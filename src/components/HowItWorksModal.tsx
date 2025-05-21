@@ -26,7 +26,7 @@ export function HowItWorksModal({
           ✕
         </button>
 
-        <h2 className="text-2xl font-bold mb-6">How STREME.FUN Works</h2>
+        <h2 className="text-2xl font-bold mb-6">How Streme Works</h2>
 
         <div className="space-y-6">
           <div>
@@ -34,7 +34,7 @@ export function HowItWorksModal({
               Streaming Rewards
             </h3>
             <p className="opacity-80">
-              Streme.fun is a token launcher, where every token launched
+              Streme is a token launcher, where every token launched
               automatically streams rewards directly to stakers&apos; wallets -
               no claiming needed.
             </p>

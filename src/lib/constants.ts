@@ -4,10 +4,10 @@ export const APP_DESCRIPTION = process.env.NEXT_PUBLIC_FRAME_DESCRIPTION;
 export const APP_PRIMARY_CATEGORY =
   process.env.NEXT_PUBLIC_FRAME_PRIMARY_CATEGORY;
 export const APP_TAGS = process.env.NEXT_PUBLIC_FRAME_TAGS?.split(",");
-export const APP_ICON_URL = `${APP_URL}/icon.png`;
-export const APP_OG_IMAGE_URL = `${APP_URL}/1200x630.png`;
-export const APP_SPLASH_URL = `${APP_URL}/splash.png`;
-export const APP_SPLASH_BACKGROUND_COLOR = "#855DCD";
+export const APP_ICON_URL = `${APP_URL}/android-chrome-512x512.png`;
+export const APP_OG_IMAGE_URL = `${APP_URL}/streme-og-ase.png`;
+export const APP_SPLASH_URL = `${APP_URL}/android-chrome-512x512.png`;
+export const APP_SPLASH_BACKGROUND_COLOR = "#FFFFFF";
 export const APP_BUTTON_TEXT = process.env.NEXT_PUBLIC_FRAME_BUTTON_TEXT;
 export const APP_WEBHOOK_URL =
   process.env.NEYNAR_API_KEY && process.env.NEYNAR_CLIENT_ID

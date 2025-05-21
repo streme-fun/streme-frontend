@@ -9,7 +9,7 @@ export function LaunchTokenModal({
 }) {
   if (!isOpen) return null;
 
-  const launchText = `@streme Hey! I'd love to launch a token on streme.fun 🚀
+  const launchText = `@streme Hey! Could you launch a token for me?
 
 Name: [your token name]
 Symbol: $[your ticker]
@@ -37,9 +37,7 @@ Symbol: $[your ticker]
           ✕
         </button>
 
-        <h2 className="text-2xl font-bold mb-6">
-          AI Token Launches on STREME.FUN
-        </h2>
+        <h2 className="text-2xl font-bold mb-6">Launch a Token</h2>
 
         <div className="space-y-6">
           <div>
@@ -47,15 +45,14 @@ Symbol: $[your ticker]
               How to Launch
             </h3>
             <p className="opacity-80">
-              Launching a token on STREME.FUN is as simple as casting on
-              Farcaster! Just mention @streme in your cast with your token
-              details. The Streme AI will take care of the rest.
+              Just mention @streme in a cast on Farcaster with your token
+              details.
             </p>
           </div>
 
           <div>
             <h3 className="text-lg font-semibold mb-2 text-secondary">
-              Required Information
+              Required Token Details
             </h3>
             <ul className="list-disc list-inside opacity-80 space-y-2">
               <li>Token Name (e.g., &quot;Based Pepe&quot;)</li>
@@ -70,9 +67,9 @@ Symbol: $[your ticker]
               What Happens Next
             </h3>
             <p className="opacity-80">
-              Once you cast, the Streme AI will automatically process your
-              request and deploy your token. You&apos;ll receive a reply with
-              your token details and contract address.
+              Once you cast, the Streme AI will process your request and deploy
+              your token. You&apos;ll receive a reply with your token details
+              and contract address.
             </p>
           </div>
 

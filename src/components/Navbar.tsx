@@ -5,17 +5,135 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useState } from "react";
 import { HowItWorksModal } from "./HowItWorksModal";
 import { LaunchTokenModal } from "./LaunchTokenModal";
+import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
+import sdk from "@farcaster/frame-sdk";
 
-export function Navbar() {
-  const { login, logout, authenticated, user } = usePrivy();
+interface NavbarProps {
+  isMiniAppView?: boolean;
+}
+
+export function Navbar({ isMiniAppView }: NavbarProps) {
+  const {
+    login: privyLogin,
+    logout: privyLogout,
+    authenticated: privyAuthenticated,
+    user: privyUser,
+  } = usePrivy();
+
+  const {
+    address: wagmiAddress,
+    isConnected: wagmiIsConnected,
+    disconnect: wagmiDisconnect,
+    connect: wagmiConnect,
+    connectors: wagmiConnectors,
+    isSDKLoaded,
+  } = useAppFrameLogic();
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
   const [isLaunchTokenOpen, setIsLaunchTokenOpen] = useState(false);
   const [isAddressDropdownOpen, setIsAddressDropdownOpen] = useState(false);
 
   const truncateAddress = (address: string) => {
+    if (!address) return "";
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
+
+  const handleMiniAppConnect = () => {
+    const fcConnector = wagmiConnectors.find((c) => c.id === "farcaster");
+    if (fcConnector) {
+      wagmiConnect({ connector: fcConnector });
+    } else {
+      console.warn(
+        "Farcaster connector not found. Ensure it's configured in WagmiProvider.tsx and active in the Farcaster client."
+      );
+      if (wagmiConnectors.length > 0) {
+        // wagmiConnect({ connector: wagmiConnectors[0] });
+      }
+    }
+  };
+
+  if (isMiniAppView) {
+    return (
+      <>
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 border-t border-black/[.1] dark:border-white/[.1] bg-white bg-opacity-80">
+          <div className="px-2 sm:px-4 py-2 flex items-center justify-around gap-1 sm:gap-2">
+            <button
+              onClick={async () => {
+                if (isSDKLoaded && sdk) {
+                  try {
+                    const castText = `@streme Hey! Could you launch a token for me?\n\nName: [your token name]\nSymbol: $[your ticker]\n\n[Don't forget to attach an image!] 🎨`;
+                    await sdk.actions.composeCast({
+                      text: castText,
+                      embeds: ["https://streme.fun"],
+                    });
+                  } catch (error) {
+                    console.error("Error composing cast:", error);
+                    setIsLaunchTokenOpen(true);
+                  }
+                } else {
+                  console.warn(
+                    "Farcaster SDK not loaded or sdk not available. Opening LaunchTokenModal as fallback."
+                  );
+                  setIsLaunchTokenOpen(true);
+                }
+              }}
+              className="btn btn-primary btn-sm flex-1 justify-center text-xs sm:text-sm"
+            >
+              Launch
+            </button>
+
+            {wagmiIsConnected && (
+              <a
+                href={`https://explorer.superfluid.finance/base-mainnet/accounts/${wagmiAddress}?tab=pools`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-accent btn-sm flex-1 justify-center text-xs sm:text-sm"
+              >
+                My Stakes
+              </a>
+            )}
+
+            <button
+              onClick={() => {
+                setIsHowItWorksOpen(true);
+              }}
+              className="btn btn-ghost btn-sm flex-1 justify-center text-xs sm:text-sm"
+            >
+              How It Works
+            </button>
+
+            {wagmiIsConnected ? (
+              <button
+                onClick={() => {
+                  wagmiDisconnect();
+                }}
+                className="btn btn-ghost btn-sm flex-1 justify-center text-xs sm:text-sm"
+              >
+                Logout
+              </button>
+            ) : (
+              <button
+                onClick={handleMiniAppConnect}
+                className="btn btn-ghost btn-sm flex-1 justify-center text-xs sm:text-sm"
+              >
+                Login
+              </button>
+            )}
+          </div>
+        </nav>
+
+        <HowItWorksModal
+          isOpen={isHowItWorksOpen}
+          onClose={() => setIsHowItWorksOpen(false)}
+        />
+        <LaunchTokenModal
+          isOpen={isLaunchTokenOpen}
+          onClose={() => setIsLaunchTokenOpen(false)}
+        />
+      </>
+    );
+  }
 
   return (
     <>
@@ -76,7 +194,6 @@ export function Navbar() {
             </svg>
           </Link>
 
-          {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="lg:hidden btn btn-ghost btn-sm"
@@ -102,7 +219,6 @@ export function Navbar() {
             </svg>
           </button>
 
-          {/* Desktop Menu */}
           <div className="hidden lg:flex items-center gap-6">
             <button
               onClick={() => setIsLaunchTokenOpen(true)}
@@ -111,9 +227,9 @@ export function Navbar() {
               Launch a Token
             </button>
 
-            {authenticated && (
+            {privyAuthenticated && (
               <a
-                href={`https://explorer.superfluid.finance/base-mainnet/accounts/${user?.wallet?.address}?tab=pools`}
+                href={`https://explorer.superfluid.finance/base-mainnet/accounts/${privyUser?.wallet?.address}?tab=pools`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn btn-accent"
@@ -129,7 +245,7 @@ export function Navbar() {
               How It Works
             </button>
 
-            {authenticated ? (
+            {privyAuthenticated ? (
               <div className="relative">
                 <button
                   onClick={() =>
@@ -137,7 +253,7 @@ export function Navbar() {
                   }
                   className="btn btn-ghost gap-2"
                 >
-                  {truncateAddress(user?.wallet?.address || "")}
+                  {truncateAddress(privyUser?.wallet?.address || "")}
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 20 20"
@@ -155,7 +271,7 @@ export function Navbar() {
                   <div className="absolute right-0 mt-2 w-48 bg-base-100 rounded-lg shadow-lg border border-base-300">
                     <button
                       onClick={() => {
-                        logout();
+                        privyLogout();
                         setIsAddressDropdownOpen(false);
                       }}
                       className="w-full px-4 py-2 text-left hover:bg-base-200 rounded-lg cursor-pointer"
@@ -166,14 +282,13 @@ export function Navbar() {
                 )}
               </div>
             ) : (
-              <button onClick={login} className="btn btn-ghost">
+              <button onClick={privyLogin} className="btn btn-ghost">
                 Login
               </button>
             )}
           </div>
         </div>
 
-        {/* Mobile Menu */}
         <div
           className={`lg:hidden ${
             isMenuOpen ? "block" : "hidden"
@@ -190,10 +305,10 @@ export function Navbar() {
               Launch a Token
             </button>
 
-            {authenticated && (
+            {privyAuthenticated && (
               <>
                 <a
-                  href={`https://explorer.superfluid.finance/base-mainnet/accounts/${user?.wallet?.address}?tab=pools`}
+                  href={`https://explorer.superfluid.finance/base-mainnet/accounts/${privyUser?.wallet?.address}?tab=pools`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-accent w-full justify-start"
@@ -202,7 +317,7 @@ export function Navbar() {
                   My Stakes
                 </a>
                 <div className="px-4 py-2 text-sm opacity-70">
-                  {truncateAddress(user?.wallet?.address || "")}
+                  {truncateAddress(privyUser?.wallet?.address || "")}
                 </div>
               </>
             )}
@@ -217,10 +332,10 @@ export function Navbar() {
               How It Works
             </button>
 
-            {authenticated ? (
+            {privyAuthenticated ? (
               <button
                 onClick={() => {
-                  logout();
+                  privyLogout();
                   setIsMenuOpen(false);
                 }}
                 className="btn btn-ghost w-full justify-start"
@@ -230,7 +345,7 @@ export function Navbar() {
             ) : (
               <button
                 onClick={() => {
-                  login();
+                  privyLogin();
                   setIsMenuOpen(false);
                 }}
                 className="btn btn-ghost w-full justify-start"
