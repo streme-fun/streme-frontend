@@ -1,19 +1,12 @@
 "use client";
 
-import { WagmiProvider, createConfig, http } from "wagmi";
-import { base } from "wagmi/chains";
+import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import PrivyProviderWrapper from "../components/auth/PrivyProviderWrapper";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { FrameProvider } from "../components/providers/FrameProvider";
-
-const config = createConfig({
-  chains: [base],
-  transports: {
-    [base.id]: http(),
-  },
-});
+import { config } from "../components/providers/WagmiProvider";
 
 const queryClient = new QueryClient();
 

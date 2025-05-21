@@ -60,18 +60,18 @@ export const config = createConfig({
     [unichain.id]: http(),
   },
   connectors: [
-    farcasterFrame(),
-    coinbaseWallet({
-      appName: APP_NAME,
-      appLogoUrl: APP_ICON_URL,
-      preference: "all",
-    }),
     metaMask({
       dappMetadata: {
         name: APP_NAME,
         url: APP_URL,
       },
     }),
+    coinbaseWallet({
+      appName: APP_NAME,
+      appLogoUrl: APP_ICON_URL,
+      preference: "all",
+    }),
+    farcasterFrame(),
   ],
 });
 

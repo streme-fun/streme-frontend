@@ -30,6 +30,7 @@ function Home() {
     connectors,
     switchChain,
     isSwitchingChain,
+    disconnect,
   } = useAppFrameLogic(); // Use the hook
 
   const fetchTokens = async (before?: number) => {
@@ -69,15 +70,29 @@ function Home() {
   }
 
   if (isMiniAppView) {
+    const handleMiniAppConnect = () => {
+      const fcConnector = connectors.find((c) => c.id === "farcaster");
+      if (fcConnector) {
+        connect({ connector: fcConnector });
+      } else {
+        console.warn(
+          "Farcaster connector not found. Ensure it's configured in WagmiProvider.tsx and active in the Farcaster client."
+        );
+        // Optional: Fallback to the first connector if Farcaster one isn't found,
+        // though this might lead to unexpected behavior if not the Frame connector.
+        if (connectors.length > 0) {
+          // connect({ connector: connectors[0] });
+        }
+      }
+    };
+
     return (
       <div className="font-[family-name:var(--font-geist-sans)]">
         <main className="flex flex-col gap-8 row-start-2 items-center w-full p-4">
           <h1 className="text-xl font-bold">Farcaster Mini-App</h1>
 
           {!isConnected ? (
-            <Button onClick={() => connect({ connector: connectors[0] })}>
-              Connect Wallet
-            </Button>
+            <Button onClick={handleMiniAppConnect}>Connect Wallet</Button>
           ) : !isOnCorrectNetwork ? (
             <Button
               onClick={() => switchChain && switchChain({ chainId: base.id })}
@@ -94,7 +109,7 @@ function Home() {
                 FID: {farcasterContext?.user?.fid?.toString()}
               </p>
               {/* <TopStreamer /> */}
-              <div className="w-full max-w-[1200px]">
+              {/* <div className="w-full max-w-[1200px]">
                 {loading && tokens.length === 0 ? (
                   <div className="text-center py-8">
                     Loading tokens for Mini-App...
@@ -102,7 +117,8 @@ function Home() {
                 ) : (
                   <TokenGrid tokens={tokens} />
                 )}
-              </div>
+              </div> */}
+              <Button onClick={() => disconnect()}>Disconnect Wallet</Button>
             </>
           )}
         </main>

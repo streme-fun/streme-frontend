@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useFrame } from "../components/providers/FrameProvider"; // Assuming FrameProvider is in components/providers
-import { useAccount, useConnect, useSwitchChain } from "wagmi";
+import { useAccount, useConnect, useSwitchChain, useDisconnect } from "wagmi";
 import { base } from "wagmi/chains";
 import type { Context as FarcasterContextType } from "@farcaster/frame-sdk";
 
@@ -12,6 +12,7 @@ export function useAppFrameLogic() {
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
+  const { disconnect } = useDisconnect();
 
   useEffect(() => {
     if (isSDKLoaded && farcasterContext) {
@@ -37,5 +38,6 @@ export function useAppFrameLogic() {
     connectors,
     switchChain,
     isSwitchingChain,
+    disconnect,
   };
 }
