@@ -102,7 +102,14 @@ const nextConfig = {
               frame-ancestors 'self'
                 https://streme.fun
                 https://www.streme.fun
-                https://auth.privy.io;
+                https://auth.privy.io
+                https://twelve-parrots-play.loca.lt
+                https://farcaster.xyz
+                https://warpcast.com
+                https://wrpcd.net
+                https://*.wrpcd.net
+                blob:
+                https://cdn.blockaid.io;
               img-src 'self' data: https: http:;
             `
               .replace(/\s{2,}/g, " ")
@@ -114,4 +121,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
