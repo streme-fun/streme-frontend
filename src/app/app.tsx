@@ -27,6 +27,7 @@ function App() {
     switchChain,
     isSwitchingChain,
     disconnect,
+    promptToAddMiniApp,
   } = useAppFrameLogic(); // Use the hook
 
   const fetchTokens = async (before?: number) => {
@@ -60,6 +61,12 @@ function App() {
       fetchTokens();
     }
   }, [isMiniAppView, isOnCorrectNetwork]);
+
+  useEffect(() => {
+    if (isMiniAppView && isSDKLoaded && promptToAddMiniApp) {
+      promptToAddMiniApp();
+    }
+  }, [isMiniAppView, isSDKLoaded, promptToAddMiniApp]);
 
   if (!isSDKLoaded) {
     return <div className="text-center py-8">Loading SDK...</div>;

@@ -5,6 +5,7 @@ import { useFrame } from "../components/providers/FrameProvider"; // Assuming Fr
 import { useAccount, useConnect, useSwitchChain, useDisconnect } from "wagmi";
 import { base } from "wagmi/chains";
 import type { Context as FarcasterContextType } from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/frame-sdk"; // Added SDK import
 
 export function useAppFrameLogic() {
   const [isMiniAppView, setIsMiniAppView] = useState(false);
@@ -24,6 +25,16 @@ export function useAppFrameLogic() {
 
   const isOnCorrectNetwork = isConnected && chain?.id === base.id;
 
+  const promptToAddMiniApp = async () => {
+    if (isSDKLoaded && isMiniAppView) {
+      try {
+        await sdk.actions.addMiniApp();
+      } catch (error) {
+        console.error("Error prompting to add mini app:", error);
+      }
+    }
+  };
+
   return {
     isSDKLoaded,
     isMiniAppView,
@@ -39,5 +50,6 @@ export function useAppFrameLogic() {
     switchChain,
     isSwitchingChain,
     disconnect,
+    promptToAddMiniApp, // Exposed the new function
   };
 }
