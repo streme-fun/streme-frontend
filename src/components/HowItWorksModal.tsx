@@ -26,7 +26,7 @@ export function HowItWorksModal({
           ✕
         </button>
 
-        <h2 className="text-2xl font-bold mb-6">How Streme Works</h2>
+        <h2 className="text-2xl font-bold mb-6">How to Streme</h2>
 
         <div className="space-y-6">
           <div>

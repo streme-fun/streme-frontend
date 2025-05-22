@@ -89,6 +89,7 @@ const nextConfig = {
                 https://api.testnets.relay.link
                 https://subgraph-endpoints.superfluid.dev
                 https://*.base-mainnet.superfluid.dev
+                https://metamask-sdk.api.cx.metamask.io
                 https://*.base.superfluid.dev;
               frame-src 'self'
                 https://auth.privy.io

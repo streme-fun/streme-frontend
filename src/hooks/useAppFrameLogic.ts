@@ -16,10 +16,8 @@ export function useAppFrameLogic() {
   const { disconnect } = useDisconnect();
 
   useEffect(() => {
-    if (isSDKLoaded && farcasterContext) {
-      setIsMiniAppView(true);
-    } else if (isSDKLoaded) {
-      setIsMiniAppView(false);
+    if (isSDKLoaded) {
+      setIsMiniAppView(!!farcasterContext);
     }
   }, [farcasterContext, isSDKLoaded]);
 
@@ -29,8 +27,15 @@ export function useAppFrameLogic() {
     if (isSDKLoaded && isMiniAppView) {
       try {
         await sdk.actions.addMiniApp();
-      } catch (error) {
-        console.error("Error prompting to add mini app:", error);
+      } catch (error: unknown) {
+        if (
+          error instanceof Error &&
+          error.message === "AddMiniApp.InvalidDomainManifest"
+        ) {
+          // Do nothing, ignore this specific error
+        } else {
+          console.error("Error prompting to add mini app:", error);
+        }
       }
     }
   };

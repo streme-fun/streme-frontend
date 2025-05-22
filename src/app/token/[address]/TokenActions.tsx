@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-// import { usePrivy } from "@privy-io/react-auth"; // Replaced
+import { usePrivy } from "@privy-io/react-auth";
 import { Token } from "@/src/app/types/token";
 import { StakeButton } from "@/src/components/StakeButton";
 import { UniswapModal } from "@/src/components/UniswapModal";
@@ -16,16 +16,19 @@ import {
   GDA_FORWARDER,
   GDA_ABI,
 } from "@/src/lib/contracts";
-import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic"; // Added
-import { Button as UiButton } from "@/src/components/ui/button"; // Added for connect/switch
-// import { base } from "wagmi/chains"; // Removed as it's unused after refactoring
+import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
+import { Button as UiButton } from "@/src/components/ui/button";
+import { useAccount, useSwitchChain } from "wagmi";
+import { base } from "wagmi/chains";
 
 interface TokenActionsProps {
   token: Token;
   onStakingChange: () => void;
+  isMiniAppView?: boolean;
+  address?: `0x${string}` | undefined;
+  isConnected?: boolean;
+  isOnCorrectNetwork?: boolean;
 }
-
-// Removed PrivyUser, LinkedAccount, getAllUserAddresses as they are not used with useAppFrameLogic direct address
 
 type Deployment = {
   token: string;
@@ -36,6 +39,10 @@ type Deployment = {
 export function TokenActions({
   token: initialToken,
   onStakingChange,
+  isMiniAppView: isMiniAppViewProp,
+  address: addressProp,
+  isConnected: isConnectedProp,
+  isOnCorrectNetwork: isOnCorrectNetworkProp,
 }: TokenActionsProps) {
   const [isUniswapOpen, setIsUniswapOpen] = useState(false);
   const [token, setToken] = useState(initialToken);
@@ -44,31 +51,92 @@ export function TokenActions({
   const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
 
   const {
-    isSDKLoaded, // Available if needed
-    isMiniAppView, // To conditionally render UI
-    // farcasterContext, // Not directly used in TokenActions, but available from hook
-    address, // Connected wallet address
-    isConnected, // Wallet connection status
-    isOnCorrectNetwork,
-    connect,
-    connectors,
-    // switchChain,      // Handled by parent in mini-app view
-    // isSwitchingChain, // Handled by parent in mini-app view
+    isSDKLoaded: fcSDKLoaded,
+    isMiniAppView: detectedMiniAppView,
+    address: fcAddress,
+    isConnected: fcIsConnected,
+    isOnCorrectNetwork: fcIsOnCorrectNetwork,
+    connect: fcConnect,
+    connectors: fcConnectors,
+    switchChain: fcSwitchChain,
   } = useAppFrameLogic();
 
-  // const { user, ready, login } = usePrivy(); // Replaced
-  // const address = user?.wallet?.address; // Replaced by hook's address
-  // const isConnected = ready && !!address; // Replaced by hook's isConnected
+  const { user: privyUser, ready: privyReady, login: privyLogin } = usePrivy();
+  const {
+    address: wagmiAddress,
+    isConnected: wagmiIsConnectedGlobal,
+    chain: activeChain,
+  } = useAccount();
+  const { switchChain: wagmiSwitchNetwork } = useSwitchChain();
+
+  const isEffectivelyMiniApp = isMiniAppViewProp ?? detectedMiniAppView;
+
+  let currentAddress: `0x${string}` | undefined;
+  let walletIsConnected: boolean;
+  let onCorrectNetwork: boolean;
+  let effectiveLogin: () => void;
+  let effectiveSwitchNetwork: (() => void) | undefined;
+
+  if (isEffectivelyMiniApp) {
+    currentAddress = addressProp ?? fcAddress;
+    walletIsConnected = isConnectedProp ?? fcIsConnected;
+    onCorrectNetwork = isOnCorrectNetworkProp ?? fcIsOnCorrectNetwork;
+    effectiveLogin = () => {
+      if (fcConnect && fcConnectors && fcConnectors.length > 0) {
+        fcConnect({ connector: fcConnectors[0] });
+      } else {
+        console.warn("Farcaster connect function not available");
+      }
+    };
+    effectiveSwitchNetwork = fcSwitchChain
+      ? () => fcSwitchChain({ chainId: base.id })
+      : undefined;
+  } else {
+    currentAddress = privyUser?.wallet?.address as `0x${string}` | undefined;
+    walletIsConnected =
+      privyReady && !!privyUser?.wallet?.address && wagmiIsConnectedGlobal;
+    onCorrectNetwork = activeChain?.id === base.id;
+    effectiveLogin = privyLogin;
+    effectiveSwitchNetwork = wagmiSwitchNetwork
+      ? () => wagmiSwitchNetwork({ chainId: base.id })
+      : undefined;
+  }
 
   useEffect(() => {
-    console.log("TokenActions Wallet state (from useAppFrameLogic):", {
-      isSDKLoaded,
-      isMiniAppView,
-      address,
-      isConnected,
-      isOnCorrectNetwork,
+    console.log("TokenActions Wallet state:", {
+      isEffectivelyMiniApp,
+      fcSDKLoaded,
+      privyReady,
+      currentAddress,
+      walletIsConnected,
+      onCorrectNetwork,
+      detectedMiniAppView,
+      isMiniAppViewProp,
+      fcAddress,
+      fcIsConnected,
+      fcIsOnCorrectNetwork,
+      privyUserAddress: privyUser?.wallet?.address,
+      wagmiAddress,
+      wagmiIsConnectedGlobal,
+      activeChainId: activeChain?.id,
     });
-  }, [isSDKLoaded, isMiniAppView, address, isConnected, isOnCorrectNetwork]);
+  }, [
+    isEffectivelyMiniApp,
+    fcSDKLoaded,
+    privyReady,
+    currentAddress,
+    walletIsConnected,
+    onCorrectNetwork,
+    detectedMiniAppView,
+    isMiniAppViewProp,
+    fcAddress,
+    fcIsConnected,
+    fcIsOnCorrectNetwork,
+    privyUser?.wallet?.address,
+    wagmiAddress,
+    wagmiIsConnectedGlobal,
+    activeChain?.id,
+  ]);
 
   useEffect(() => {
     const fetchToken = async () => {
@@ -90,8 +158,7 @@ export function TokenActions({
   }, [token.contract_address]);
 
   useEffect(() => {
-    if (!address || !isConnected) {
-      // Use address from hook
+    if (!currentAddress || !walletIsConnected) {
       console.log(
         "Skipping creator check - no address connected or user object not ready"
       );
@@ -99,7 +166,7 @@ export function TokenActions({
     }
     const checkIsCreator = async () => {
       console.log("Checking if address is creator:", {
-        userAddress: address, // Use address from hook
+        userAddress: currentAddress,
         tokenAddress: token.contract_address,
       });
       try {
@@ -107,12 +174,11 @@ export function TokenActions({
           address: LP_FACTORY_ADDRESS,
           abi: LP_FACTORY_ABI,
           functionName: "getTokensDeployedByUser",
-          args: [address as `0x${string}`], // Use address from hook
+          args: [currentAddress as `0x${string}`],
         })) as Deployment[];
         const isCreatorResult = deployments.some(
           (d) => d.token.toLowerCase() === token.contract_address.toLowerCase()
         );
-        // setIsCreator(isCreatorResult); // Assuming you might have such a state, if needed
         if (isCreatorResult) {
           console.log("User is creator of this token");
         }
@@ -121,17 +187,20 @@ export function TokenActions({
       }
     };
     checkIsCreator();
-  }, [address, isConnected, token.contract_address]);
+  }, [currentAddress, walletIsConnected, token.contract_address]);
 
   useEffect(() => {
     const checkPoolConnection = async () => {
-      if (!address || !isConnected || !token.staking_pool) return; // Use address from hook
+      if (!currentAddress || !walletIsConnected || !token.staking_pool) return;
       try {
         const connectedStatus = await publicClient.readContract({
           address: GDA_FORWARDER,
           abi: GDA_ABI,
           functionName: "isMemberConnected",
-          args: [token.staking_pool as `0x${string}`, address as `0x${string}`], // Use address from hook
+          args: [
+            token.staking_pool as `0x${string}`,
+            currentAddress as `0x${string}`,
+          ],
         });
         setIsConnectedToPool(connectedStatus);
       } catch (error) {
@@ -139,11 +208,12 @@ export function TokenActions({
       }
     };
     checkPoolConnection();
-  }, [address, isConnected, token.staking_pool]);
+  }, [currentAddress, walletIsConnected, token.staking_pool]);
 
   useEffect(() => {
     const checkStakedBalance = async () => {
-      if (!address || !isConnected || !token.staking_address) return; // Use address from hook
+      if (!currentAddress || !walletIsConnected || !token.staking_address)
+        return;
       try {
         const stakedVal = await publicClient.readContract({
           address: token.staking_address as `0x${string}`,
@@ -157,7 +227,7 @@ export function TokenActions({
             },
           ],
           functionName: "balanceOf",
-          args: [address as `0x${string}`], // Use address from hook
+          args: [currentAddress as `0x${string}`],
         });
         setStakedBalance(stakedVal);
       } catch (error) {
@@ -165,11 +235,11 @@ export function TokenActions({
       }
     };
     checkStakedBalance();
-  }, [address, isConnected, token.staking_address]);
+  }, [currentAddress, walletIsConnected, token.staking_address]);
 
   useEffect(() => {
     const fetchBalance = async () => {
-      if (!address || !isConnected) return;
+      if (!currentAddress || !walletIsConnected) return;
       try {
         const balVal = await publicClient.readContract({
           address: token.contract_address as `0x${string}`,
@@ -183,7 +253,7 @@ export function TokenActions({
             },
           ],
           functionName: "balanceOf",
-          args: [address as `0x${string}`],
+          args: [currentAddress as `0x${string}`],
         });
         setBalance(balVal);
       } catch (error) {
@@ -191,12 +261,12 @@ export function TokenActions({
       }
     };
     fetchBalance();
-  }, [address, isConnected, token.contract_address]);
+  }, [currentAddress, walletIsConnected, token.contract_address]);
 
-  const hasTokens = isConnected && balance > 0n;
+  const hasTokens = walletIsConnected && balance > 0n;
 
   const refreshBalances = useCallback(async () => {
-    if (!address || !isConnected) return;
+    if (!currentAddress || !walletIsConnected) return;
     try {
       const balVal = await publicClient.readContract({
         address: token.contract_address as `0x${string}`,
@@ -210,7 +280,7 @@ export function TokenActions({
           },
         ],
         functionName: "balanceOf",
-        args: [address as `0x${string}`],
+        args: [currentAddress as `0x${string}`],
       });
       setBalance(balVal);
 
@@ -227,161 +297,168 @@ export function TokenActions({
             },
           ],
           functionName: "balanceOf",
-          args: [address as `0x${string}`],
+          args: [currentAddress as `0x${string}`],
         });
         setStakedBalance(stakedVal);
       }
+      onStakingChange();
     } catch (error) {
       console.error("Error refreshing balances:", error);
     }
-  }, [address, isConnected, token.contract_address, token.staking_address]);
+  }, [
+    currentAddress,
+    walletIsConnected,
+    token.contract_address,
+    token.staking_address,
+    onStakingChange,
+  ]);
 
-  useEffect(() => {
-    refreshBalances();
-  }, [refreshBalances]);
-
-  // Mini App View: Wallet connection and network check handled by parent (TokenPageContent)
-  // We just ensure we don't show actions if in mini-app view and not ready
-  if (isMiniAppView && (!isConnected || !isOnCorrectNetwork)) {
-    // Parent component (TokenPageContent) should be showing connect/switch buttons.
-    // TokenActions can show a placeholder or minimal message, or null.
+  if (isEffectivelyMiniApp && !fcSDKLoaded) {
     return (
-      <div className="card border-gray-100 border-2 p-4 space-y-6 text-center">
-        <p className="text-sm text-gray-500">
-          Please connect your wallet and switch to Base network using the
-          options above.
-        </p>
+      <div className="card bg-base-100 border border-black/[.1] dark:border-white/[.1]">
+        <div className="card-body items-center justify-center min-h-[100px]">
+          <span className="loading loading-spinner loading-sm"></span>
+        </div>
       </div>
     );
   }
 
-  // Standard view or Mini-app view (wallet ready)
-  return (
-    <div className="card border-gray-100 border-2 p-4 space-y-6">
-      {!isConnected ? (
-        <div className="flex flex-col items-center gap-4 py-4">
-          {/* Use UiButton for consistency if desired, or keep Privy's login style if that was intentional for non-mini-app */}
-          <UiButton
-            onClick={() => connect && connect({ connector: connectors[0] })}
-            className="btn btn-primary gap-2"
-          >
-            <Wallet size={18} />
-            Connect Wallet
-          </UiButton>
+  if (!isEffectivelyMiniApp && !privyReady) {
+    return (
+      <div className="card bg-base-100 border border-black/[.1] dark:border-white/[.1]">
+        <div className="card-body items-center justify-center min-h-[100px]">
+          <span className="loading loading-spinner loading-sm"></span>
+          <p className="text-sm text-gray-500">Initializing wallet...</p>
         </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <ZapStakeButton
-            tokenAddress={token.contract_address}
-            stakingAddress={token.staking_address}
-            onSuccess={onStakingChange}
-            className="btn btn-outline relative 
-              before:absolute before:inset-0 before:bg-gradient-to-r 
-              before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] 
-              before:opacity-30
-              hover:before:opacity-40
-              border-[#ffa647]/30
-              hover:border-[#ffa647]/50
-              shadow-[0_0_5px_rgba(255,166,71,0.3)]
-              hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]"
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={() => setIsUniswapOpen(true)}
-              className="btn btn-outline border-gray-400 text-gray-600 flex-1"
-            >
-              Swap
-            </button>
-            <StakeButton
-              tokenAddress={token.contract_address}
-              stakingAddress={token.staking_address}
-              stakingPoolAddress={token.staking_pool}
-              disabled={!hasTokens}
-              symbol={token.symbol}
-              onSuccess={onStakingChange}
-              onPoolConnect={() => setIsConnectedToPool(true)}
-              className={`btn btn-outline border-gray-400 text-gray-600 flex-1
-              disabled:before:opacity-0
-              disabled:hover:before:opacity-0
-              disabled:border-opacity-0
-              disabled:shadow-none
-              disabled:hover:shadow-none
-              ${!hasTokens && "btn-disabled opacity-50"}`}
-            />
-          </div>
+      </div>
+    );
+  }
 
-          <div className="flex flex-col gap-2">
-            <UnstakeButton
-              stakingAddress={token.staking_address}
-              symbol={token.symbol}
-              className="btn btn-outline border-gray-400 text-gray-600"
-              onSuccess={onStakingChange}
-            />
-            {stakedBalance > 0n && (
-              <>
-                {!isConnectedToPool ? (
-                  <div className="alert alert-warning shadow-lg">
-                    <div className="flex">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        className="w-6 h-6 mx-2 stroke-current"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        ></path>
-                      </svg>
-                      <div>
-                        <h3 className="font-bold">Action Required</h3>
-                        <div className="text-sm">
-                          Connect to the reward pool to start receiving
-                          streaming rewards.
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex-none">
-                      <ConnectPoolButton
-                        poolAddress={token.staking_pool}
-                        onSuccess={() => setIsConnectedToPool(true)}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="alert alert-success shadow-lg">
-                    <div className="flex items-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        className="w-6 h-6 mx-2 stroke-current"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                        ></path>
-                      </svg>
-                      <div className="text-sm">Connected to reward pool</div>
-                    </div>
-                  </div>
-                )}
-              </>
+  if (!walletIsConnected || !onCorrectNetwork) {
+    return (
+      <div className="card bg-base-100 border border-black/[.1] dark:border-white/[.1]">
+        <div className="card-body items-center">
+          <div className="mb-4 text-center">
+            <Wallet size={48} className="mx-auto mb-2 text-gray-400" />
+            <p className="font-semibold">
+              {isEffectivelyMiniApp ? "Farcaster Wallet" : "Wallet"} Not
+              Connected
+            </p>
+            {!onCorrectNetwork && walletIsConnected && (
+              <p className="text-xs text-red-500 mt-1">
+                Please switch to Base network.
+              </p>
             )}
           </div>
+          <UiButton
+            onClick={
+              walletIsConnected && !onCorrectNetwork && effectiveSwitchNetwork
+                ? effectiveSwitchNetwork
+                : effectiveLogin
+            }
+            className="btn btn-primary btn-sm w-full"
+            disabled={
+              walletIsConnected && !onCorrectNetwork && !effectiveSwitchNetwork
+            }
+          >
+            {walletIsConnected && !onCorrectNetwork
+              ? "Switch Network"
+              : isEffectivelyMiniApp
+              ? "Connect Farcaster Wallet"
+              : "Connect Wallet"}
+          </UiButton>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      <UniswapModal
-        isOpen={isUniswapOpen}
-        onClose={() => setIsUniswapOpen(false)}
-        tokenAddress={token.contract_address}
-        onAfterClose={refreshBalances}
-      />
+  const showConnectPoolButton =
+    token.staking_pool && stakedBalance === 0n && !isConnectedToPool;
+
+  return (
+    <div className="card border-gray-100 border-2 space-y-6">
+      <div className="card-body space-y-1">
+        {showConnectPoolButton && (
+          <ConnectPoolButton
+            stakingPoolAddress={token.staking_pool as `0x${string}`}
+            onSuccess={() => {
+              setIsConnectedToPool(true);
+              refreshBalances();
+            }}
+            isMiniApp={isEffectivelyMiniApp}
+            farcasterAddress={currentAddress}
+            farcasterIsConnected={walletIsConnected}
+          />
+        )}
+
+        {!showConnectPoolButton && (
+          <>
+            <ZapStakeButton
+              tokenAddress={token.contract_address as `0x${string}`}
+              stakingAddress={token.staking_address as `0x${string}`}
+              symbol={token.symbol}
+              onSuccess={() => {
+                refreshBalances();
+                onStakingChange();
+              }}
+              disabled={!token.staking_address}
+              isMiniApp={isEffectivelyMiniApp}
+              farcasterAddress={currentAddress}
+              farcasterIsConnected={walletIsConnected}
+              className="btn btn-outline relative  before:absolute before:inset-0 before:bg-gradient-to-r  before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f]  before:opacity-30 hover:before:opacity-40 border-[#ffa647]/30 hover:border-[#ffa647]/50 shadow-[0_0_5px_rgba(255,166,71,0.3)] hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)] w-full"
+            />
+
+            {!isEffectivelyMiniApp && (
+              <button
+                className="btn btn-outline border-gray-400 text-gray-600 w-full"
+                onClick={() => setIsUniswapOpen(true)}
+              >
+                Swap
+              </button>
+            )}
+
+            <StakeButton
+              tokenAddress={token.contract_address as `0x${string}`}
+              stakingAddress={token.staking_address as `0x${string}`}
+              stakingPoolAddress={token.staking_pool as `0x${string}`}
+              onSuccess={() => {
+                refreshBalances();
+                onStakingChange();
+              }}
+              disabled={!hasTokens || !token.staking_address}
+              symbol={token.symbol}
+              className={`btn btn-outline border-gray-400 text-gray-600 w-full`}
+              isMiniApp={isEffectivelyMiniApp}
+              farcasterAddress={currentAddress}
+              farcasterIsConnected={walletIsConnected}
+            />
+          </>
+        )}
+
+        <UnstakeButton
+          stakingAddress={token.staking_address as `0x${string}`}
+          userStakedBalance={stakedBalance}
+          onSuccess={() => {
+            refreshBalances();
+            onStakingChange();
+          }}
+          disabled={stakedBalance === 0n || !token.staking_address}
+          symbol={token.symbol}
+          className="btn btn-primary w-full"
+          isMiniApp={isEffectivelyMiniApp}
+          farcasterAddress={currentAddress}
+          farcasterIsConnected={walletIsConnected}
+        />
+
+        {!isEffectivelyMiniApp && (
+          <UniswapModal
+            isOpen={isUniswapOpen}
+            onClose={() => setIsUniswapOpen(false)}
+            tokenAddress={token.contract_address}
+            symbol={token.symbol}
+          />
+        )}
+      </div>
     </div>
   );
 }

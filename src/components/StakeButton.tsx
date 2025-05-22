@@ -6,6 +6,8 @@ import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { StakeModal } from "./StakeModal";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient"; // Import the centralized client
+import { toast } from "sonner"; // Added for Mini App placeholder
+import { sdk } from "@farcaster/frame-sdk"; // Added Farcaster SDK
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 
@@ -47,6 +49,9 @@ interface StakeButtonProps {
   totalStakers?: string;
   onSuccess?: () => void;
   onPoolConnect?: () => void;
+  isMiniApp?: boolean;
+  farcasterAddress?: string;
+  farcasterIsConnected?: boolean;
 }
 
 export function StakeButton({
@@ -59,15 +64,26 @@ export function StakeButton({
   totalStakers,
   onSuccess,
   onPoolConnect,
+  isMiniApp,
+  farcasterAddress,
+  farcasterIsConnected,
 }: StakeButtonProps) {
   const { user } = usePrivy();
   const { wallets } = useWallets();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [balance, setBalance] = useState<bigint>(0n);
+  const [isLoading, setIsLoading] = useState(false); // Added for loading state
+
+  const effectiveIsConnected = isMiniApp
+    ? farcasterIsConnected
+    : !!user?.wallet?.address;
+  const effectiveAddress = isMiniApp ? farcasterAddress : user?.wallet?.address;
 
   const fetchBalance = useCallback(async () => {
-    if (!user?.wallet?.address) return;
-    const walletAddress = user.wallet.address;
+    if (!effectiveAddress || !effectiveIsConnected) {
+      setBalance(0n);
+      return;
+    }
 
     try {
       const bal = await publicClient.readContract({
@@ -82,29 +98,27 @@ export function StakeButton({
           },
         ],
         functionName: "balanceOf",
-        args: [toHex(walletAddress)],
+        args: [toHex(effectiveAddress)],
       });
       setBalance(bal);
     } catch (error) {
-      console.error("Error fetching balance:", error);
+      console.error("Error fetching token balance:", error);
       setBalance(0n);
-      // Optionally add user-facing error handling here
-      // toast.error("Failed to fetch balance. Please try again later.");
     }
-  }, [user?.wallet?.address, tokenAddress]);
+  }, [effectiveAddress, effectiveIsConnected, tokenAddress]);
 
   useEffect(() => {
     fetchBalance();
   }, [fetchBalance]);
 
   const checkAllowance = async () => {
-    if (!user?.wallet?.address) return 0n;
+    if (!effectiveAddress || !effectiveIsConnected) return 0n;
     try {
       const allowance = await publicClient.readContract({
         address: toHex(tokenAddress),
         abi: erc20ABI,
         functionName: "allowance",
-        args: [toHex(user.wallet.address), toHex(stakingAddress)],
+        args: [toHex(effectiveAddress!), toHex(stakingAddress)],
       });
       return allowance;
     } catch (error) {
@@ -114,149 +128,308 @@ export function StakeButton({
   };
 
   const handleStake = async (amount: bigint) => {
-    if (!user?.wallet?.address) {
-      throw new Error("Wallet not connected");
+    if (!effectiveAddress || !effectiveIsConnected) {
+      toast.error("Wallet not connected or address missing");
+      throw new Error("Wallet not connected or address missing");
     }
-
-    const walletAddress = user.wallet.address;
-    const wallet = wallets.find((w) => w.address === walletAddress);
-
-    if (!wallet) {
-      throw new Error("Wallet not found");
-    }
+    setIsLoading(true);
+    const toastId = toast.loading("Preparing stake transaction...");
 
     try {
-      const provider = await wallet.getEthereumProvider();
+      let approveTxHash: `0x${string}` | undefined;
+      let stakeTxHash: `0x${string}` | undefined;
+      let connectTxHash: `0x${string}` | undefined;
 
-      // Add this section to switch network
-      await provider.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: "0x2105" }], // 0x2105 is hex for 8453 (Base)
-      });
+      if (isMiniApp) {
+        const ethProvider = sdk.wallet.ethProvider;
+        if (!ethProvider)
+          throw new Error("Farcaster Ethereum provider not available.");
 
-      // Check current allowance
-      const currentAllowance = await checkAllowance();
+        const currentAllowance = await checkAllowance();
+        if (currentAllowance < amount) {
+          toast.info("Requesting approval...", { id: toastId });
+          const approveIface = new Interface([
+            "function approve(address spender, uint256 amount) external returns (bool)",
+          ]);
+          const approveData = approveIface.encodeFunctionData("approve", [
+            toHex(stakingAddress),
+            amount,
+          ]);
+          approveTxHash = await ethProvider.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                to: toHex(tokenAddress),
+                from: toHex(effectiveAddress!),
+                data: toHex(approveData),
+              },
+            ],
+          });
+          if (!approveTxHash)
+            throw new Error(
+              "Approval transaction hash not received. User might have cancelled."
+            );
+          toast.loading("Waiting for approval confirmation...", {
+            id: toastId,
+          });
+          const approveReceipt = await publicClient.waitForTransactionReceipt({
+            hash: approveTxHash,
+          });
+          if (approveReceipt.status !== "success")
+            throw new Error("Approval transaction failed");
+          toast.success("Approval successful!", { id: toastId });
+        }
 
-      // Only approve if necessary
-      if (currentAllowance < amount) {
-        const approveIface = new Interface([
-          "function approve(address spender, uint256 amount) external returns (bool)",
+        toast.loading("Requesting stake...", { id: toastId });
+        const stakeIface = new Interface([
+          "function stake(address to, uint256 amount) external",
         ]);
-        const approveData = approveIface.encodeFunctionData("approve", [
-          toHex(stakingAddress),
+        const stakeData = stakeIface.encodeFunctionData("stake", [
+          toHex(effectiveAddress!),
           amount,
         ]);
-
-        const approveTx = await provider.request({
+        stakeTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
           params: [
             {
-              to: toHex(tokenAddress),
-              from: walletAddress,
-              data: approveData,
+              to: toHex(stakingAddress),
+              from: toHex(effectiveAddress!),
+              data: toHex(stakeData),
             },
           ],
         });
+        if (!stakeTxHash)
+          throw new Error(
+            "Stake transaction hash not received. User might have cancelled."
+          );
+        toast.loading("Waiting for stake confirmation...", { id: toastId });
+        const stakeReceipt = await publicClient.waitForTransactionReceipt({
+          hash: stakeTxHash,
+        });
+        if (stakeReceipt.status !== "success")
+          throw new Error("Stake transaction failed");
+        toast.success("Staking successful!", { id: toastId });
 
-        const approveReceipt = await publicClient.waitForTransactionReceipt({
-          hash: approveTx as `0x${string}`,
+        if (
+          stakingPoolAddress &&
+          stakingPoolAddress !== "0x0000000000000000000000000000000000000000"
+        ) {
+          const connected = await publicClient.readContract({
+            address: toHex(GDA_FORWARDER),
+            abi: gdaABI,
+            functionName: "isMemberConnected",
+            args: [toHex(stakingPoolAddress), toHex(effectiveAddress!)],
+          });
+          if (!connected) {
+            toast.loading("Connecting to reward pool...", { id: toastId });
+            const gdaIface = new Interface([
+              "function connectPool(address pool, bytes calldata userData) external returns (bool)",
+            ]);
+            const connectData = gdaIface.encodeFunctionData("connectPool", [
+              toHex(stakingPoolAddress),
+              "0x",
+            ]);
+            connectTxHash = await ethProvider.request({
+              method: "eth_sendTransaction",
+              params: [
+                {
+                  to: toHex(GDA_FORWARDER),
+                  from: toHex(effectiveAddress!),
+                  data: toHex(connectData),
+                },
+              ],
+            });
+            if (!connectTxHash)
+              throw new Error("Pool connection transaction hash not received.");
+            await publicClient.waitForTransactionReceipt({
+              hash: connectTxHash,
+            });
+            toast.success("Connected to reward pool!", { id: toastId });
+            onPoolConnect?.();
+          }
+        }
+      } else {
+        // Privy Path (existing logic, ensure it also throws detailed errors)
+        if (!user?.wallet?.address)
+          throw new Error("Privy wallet not connected.");
+        const walletAddress = user.wallet.address;
+        const wallet = wallets.find((w) => w.address === walletAddress);
+        if (!wallet) throw new Error("Privy Wallet not found");
+        const provider = await wallet.getEthereumProvider();
+        await provider.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x2105" }],
         });
 
-        if (!approveReceipt.status) {
-          throw new Error("Approval transaction failed");
+        const currentAllowance = await checkAllowance();
+        if (currentAllowance < amount) {
+          toast.info("Requesting approval...", { id: toastId });
+          const approveIface = new Interface([
+            "function approve(address spender, uint256 amount) external returns (bool)",
+          ]);
+          const approveData = approveIface.encodeFunctionData("approve", [
+            toHex(stakingAddress),
+            amount,
+          ]);
+          const approveTxResult = await provider.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                to: toHex(tokenAddress),
+                from: toHex(walletAddress),
+                data: toHex(approveData),
+              },
+            ],
+          });
+          approveTxHash = approveTxResult as `0x${string}`;
+          if (!approveTxHash)
+            throw new Error(
+              "Approval transaction hash not received (Privy). User might have cancelled."
+            );
+          toast.loading("Waiting for approval confirmation...", {
+            id: toastId,
+          });
+          const approveReceipt = await publicClient.waitForTransactionReceipt({
+            hash: approveTxHash,
+          });
+          if (!approveReceipt.status || approveReceipt.status !== "success")
+            throw new Error("Approval transaction failed (Privy)");
+          toast.success("Approval successful!", { id: toastId });
         }
-      }
 
-      // Then stake them
-      const stakeIface = new Interface([
-        "function stake(address to, uint256 amount) external",
-      ]);
-      const stakeData = stakeIface.encodeFunctionData("stake", [
-        toHex(walletAddress),
-        amount,
-      ]);
-
-      // Get the estimated gas using publicClient instead of provider
-      const estimatedGas = await publicClient.estimateGas({
-        account: walletAddress as `0x${string}`,
-        to: stakingAddress as `0x${string}`,
-        data: stakeData as `0x${string}`,
-      });
-
-      // Add a 50% safety margin to the gas limit (multiply by 1.5)
-      const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.5));
-      const gas = `0x${gasLimit.toString(16)}` as `0x${string}`;
-
-      const stakeTx = await provider.request({
-        method: "eth_sendTransaction",
-        params: [
-          {
-            to: toHex(stakingAddress),
-            from: walletAddress,
-            data: stakeData,
-            gas: gas,
-          },
-        ],
-      });
-
-      const stakeReceipt = await publicClient.waitForTransactionReceipt({
-        hash: stakeTx as `0x${string}`,
-      });
-
-      if (!stakeReceipt.status) {
-        throw new Error("Stake transaction failed");
-      }
-
-      // Check GDA pool connection
-      const connected = await publicClient.readContract({
-        address: toHex(GDA_FORWARDER),
-        abi: gdaABI,
-        functionName: "isMemberConnected",
-        args: [toHex(stakingPoolAddress), toHex(walletAddress)],
-      });
-
-      if (!connected) {
-        const gdaIface = new Interface([
-          "function connectPool(address pool, bytes calldata userData) external returns (bool)",
+        toast.loading("Requesting stake...", { id: toastId });
+        const stakeIface = new Interface([
+          "function stake(address to, uint256 amount) external",
         ]);
-        const connectData = gdaIface.encodeFunctionData("connectPool", [
-          toHex(stakingPoolAddress),
-          "0x",
+        const stakeData = stakeIface.encodeFunctionData("stake", [
+          toHex(walletAddress),
+          amount,
         ]);
-
-        const connectTx = await provider.request({
+        const estimatedGas = await publicClient.estimateGas({
+          account: walletAddress as `0x${string}`,
+          to: toHex(stakingAddress),
+          data: stakeData as `0x${string}`,
+        });
+        const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.5));
+        const gas = `0x${gasLimit.toString(16)}` as `0x${string}`;
+        const stakeTxResult = await provider.request({
           method: "eth_sendTransaction",
           params: [
             {
-              to: toHex(GDA_FORWARDER),
-              from: walletAddress,
-              data: connectData,
+              to: toHex(stakingAddress),
+              from: toHex(walletAddress),
+              data: toHex(stakeData),
+              gas: gas,
             },
           ],
         });
-
-        const connectReceipt = await publicClient.waitForTransactionReceipt({
-          hash: connectTx as `0x${string}`,
+        stakeTxHash = stakeTxResult as `0x${string}`;
+        if (!stakeTxHash)
+          throw new Error(
+            "Stake transaction hash not received (Privy). User might have cancelled."
+          );
+        toast.loading("Waiting for stake confirmation...", { id: toastId });
+        const stakeReceipt = await publicClient.waitForTransactionReceipt({
+          hash: stakeTxHash,
         });
+        if (!stakeReceipt.status || stakeReceipt.status !== "success")
+          throw new Error("Stake transaction failed (Privy)");
+        toast.success("Staking successful!", { id: toastId });
 
-        if (!connectReceipt.status) {
-          throw new Error("Pool connection failed");
+        if (
+          stakingPoolAddress &&
+          stakingPoolAddress !== "0x0000000000000000000000000000000000000000"
+        ) {
+          const connected = await publicClient.readContract({
+            address: toHex(GDA_FORWARDER),
+            abi: gdaABI,
+            functionName: "isMemberConnected",
+            args: [toHex(stakingPoolAddress), toHex(walletAddress!)],
+          });
+          if (!connected) {
+            toast.loading("Connecting to reward pool...", { id: toastId });
+            const gdaIface = new Interface([
+              "function connectPool(address pool, bytes calldata userData) external returns (bool)",
+            ]);
+            const connectData = gdaIface.encodeFunctionData("connectPool", [
+              toHex(stakingPoolAddress),
+              "0x",
+            ]);
+            const connectTxResult = await provider.request({
+              method: "eth_sendTransaction",
+              params: [
+                {
+                  to: toHex(GDA_FORWARDER),
+                  from: toHex(walletAddress!),
+                  data: toHex(connectData),
+                },
+              ],
+            });
+            connectTxHash = connectTxResult as `0x${string}`;
+            if (!connectTxHash)
+              throw new Error("Pool conn tx hash not received (Privy).");
+            await publicClient.waitForTransactionReceipt({
+              hash: connectTxHash,
+            });
+            toast.success("Connected to reward pool!", { id: toastId });
+            onPoolConnect?.();
+          }
         }
-
-        onPoolConnect?.();
       }
-
-      // Refresh balance after successful stake
+      // Common success path if all transactions succeeded
       await fetchBalance();
       onSuccess?.();
-    } catch (error) {
-      console.error("Staking error:", error);
+      setIsModalOpen(false); // This will close the StakeModal
+    } catch (error: unknown) {
+      console.error("StakeButton caught error:", error);
+      let message = "Stake operation failed.";
+      let errorDetails = "";
+      if (typeof error === "object" && error !== null) {
+        errorDetails = JSON.stringify(error, Object.getOwnPropertyNames(error));
+      }
+      console.error("StakeButton error details (stringified):", errorDetails);
+
+      if (typeof error === "object" && error !== null) {
+        if (
+          "message" in error &&
+          typeof (error as { message: unknown }).message === "string"
+        ) {
+          const errorMessage = (error as { message: string }).message;
+          if (
+            errorMessage.includes("User rejected") ||
+            errorMessage.includes("cancelled") ||
+            errorMessage.includes("hash not received")
+          ) {
+            message = "Transaction rejected or cancelled.";
+          } else {
+            message = errorMessage.substring(0, 100);
+          }
+        } else if (
+          "shortMessage" in error &&
+          typeof (error as { shortMessage: unknown }).shortMessage === "string"
+        ) {
+          message = (error as { shortMessage: string }).shortMessage;
+        } else if (
+          errorDetails.includes("UserRejected") ||
+          errorDetails.includes("User denied") ||
+          errorDetails.includes("rejected by user")
+        ) {
+          message = "Transaction rejected by user.";
+        }
+      }
+      toast.error(message, { id: toastId });
+      // Rethrow the error so that StakeModal's internal catch block can also handle it if needed for its UI
+      // Or, ensure StakeModal's onStake is not trying to set its own success state if this promise rejects.
+      // The current StakeModal updates its UI based on onStake promise resolution.
+      // So, throwing here is correct to signal failure to StakeModal.
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleModalOpen = async () => {
-    await fetchBalance(); // Refresh balance before opening modal
+    await fetchBalance();
     setIsModalOpen(true);
   };
 
@@ -264,22 +437,22 @@ export function StakeButton({
     <>
       <button
         onClick={handleModalOpen}
-        disabled={disabled}
+        disabled={disabled || isLoading} // Disable button when loading
         className={className}
       >
-        Stake
+        {isLoading ? "Processing..." : "Stake"}
       </button>
 
       <StakeModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => !isLoading && setIsModalOpen(false)} // Prevent closing modal while loading
         tokenAddress={tokenAddress}
         stakingAddress={stakingAddress}
         balance={balance}
         symbol={symbol}
         totalStakers={totalStakers}
         onStake={handleStake}
-        onSuccess={onSuccess}
+        onSuccess={onSuccess} // Pass onSuccess to modal if it needs to trigger something on close after success
       />
     </>
   );

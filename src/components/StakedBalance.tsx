@@ -10,6 +10,9 @@ interface StakedBalanceProps {
   stakingPool: string;
   symbol: string;
   tokenAddress: string;
+  isMiniApp?: boolean;
+  farcasterAddress?: `0x${string}` | undefined;
+  farcasterIsConnected?: boolean;
 }
 
 interface PoolData {
@@ -25,8 +28,11 @@ export function StakedBalance({
   stakingPool,
   symbol,
   tokenAddress,
+  isMiniApp,
+  farcasterAddress,
+  farcasterIsConnected,
 }: StakedBalanceProps) {
-  const { user } = usePrivy();
+  const { user } = usePrivy(); // Keep for non-mini-app path
   const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
   const [poolPercentage, setPoolPercentage] = useState<string>("0");
   const [flowRate, setFlowRate] = useState<string>("0");
@@ -35,11 +41,21 @@ export function StakedBalance({
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  const effectiveIsConnected = isMiniApp
+    ? farcasterIsConnected
+    : !!user?.wallet?.address;
+  const effectiveAddress = isMiniApp ? farcasterAddress : user?.wallet?.address;
+
   const refresh = () => setRefreshTrigger((prev) => prev + 1);
 
-  // Combine balance fetching and pool data into a single effect
   useEffect(() => {
-    if (!user?.wallet?.address || !stakingAddress || !stakingPool) return;
+    if (
+      !effectiveIsConnected ||
+      !effectiveAddress ||
+      !stakingAddress ||
+      !stakingPool
+    )
+      return;
 
     const fetchData = async () => {
       try {
@@ -56,7 +72,7 @@ export function StakedBalance({
             },
           ],
           functionName: "balanceOf",
-          args: [user?.wallet?.address as `0x${string}`],
+          args: [effectiveAddress as `0x${string}`],
         });
         setStakedBalance(staked);
 
@@ -73,11 +89,10 @@ export function StakedBalance({
             },
           ],
           functionName: "balanceOf",
-          args: [user?.wallet?.address as `0x${string}`],
+          args: [effectiveAddress as `0x${string}`],
         });
 
         const formattedReceived = Number(formatUnits(received, 18));
-        // console.log("Token balance:", formattedReceived);
         setBaseAmount(formattedReceived);
         setLastUpdateTime(Date.now());
 
@@ -87,7 +102,7 @@ export function StakedBalance({
             pool(id: "${stakingPool.toLowerCase()}") {
               totalUnits
               flowRate
-              poolMembers(where: {account_: {id: "${user?.wallet?.address?.toLowerCase()}"}}) {
+              poolMembers(where: {account_: {id: "${effectiveAddress?.toLowerCase()}"}}) {
                 units
               }
             }
@@ -134,7 +149,8 @@ export function StakedBalance({
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, [
-    user?.wallet?.address,
+    effectiveIsConnected,
+    effectiveAddress,
     stakingAddress,
     stakingPool,
     tokenAddress,
@@ -149,12 +165,6 @@ export function StakedBalance({
       const interval = setInterval(() => {
         const elapsed = (Date.now() - lastUpdateTime) / 1000;
         const newStreamed = userFlowRate * elapsed;
-        // console.log("Stream calculation:", {
-        //   userFlowRate,
-        //   elapsed,
-        //   newStreamed,
-        //   baseAmount,
-        // });
         setStreamedAmount(newStreamed);
       }, 50);
       return () => clearInterval(interval);
@@ -171,13 +181,16 @@ export function StakedBalance({
     }
   }, []);
 
-  if (!user?.wallet?.address) return null;
+  if (!effectiveIsConnected) return null;
 
   const formattedBalance = Number(formatUnits(stakedBalance, 18)).toFixed(4);
   const formattedReceived = (baseAmount + streamedAmount).toFixed(4);
 
   return (
-    <div className="space-y-4 card border-gray-100 border-2 p-4">
+    <div
+      data-staking-balance
+      className="space-y-4 card border-gray-100 border-2 p-4"
+    >
       <div>
         <div className="text-sm opacity-60 mb-1">My Staked Balance</div>
         <div className="font-mono">

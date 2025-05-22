@@ -1,6 +1,14 @@
 "use client";
 
+import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
+
 export function Footer() {
+  const { isMiniAppView } = useAppFrameLogic();
+
+  if (isMiniAppView) {
+    return null;
+  }
+
   return (
     <footer className="mt-auto py-8 border-t border-black/[.1] dark:border-white/[.1]">
       <div className="container mx-auto px-4">

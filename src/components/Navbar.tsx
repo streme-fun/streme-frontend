@@ -8,11 +8,7 @@ import { LaunchTokenModal } from "./LaunchTokenModal";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import sdk from "@farcaster/frame-sdk";
 
-interface NavbarProps {
-  isMiniAppView?: boolean;
-}
-
-export function Navbar({ isMiniAppView }: NavbarProps) {
+export function Navbar() {
   const {
     login: privyLogin,
     logout: privyLogout,
@@ -21,12 +17,13 @@ export function Navbar({ isMiniAppView }: NavbarProps) {
   } = usePrivy();
 
   const {
-    address: wagmiAddress,
-    isConnected: wagmiIsConnected,
+    // address: wagmiAddress,
+    // isConnected: wagmiIsConnected,
     // disconnect: wagmiDisconnect,
     // connect: wagmiConnect,
     // connectors: wagmiConnectors,
     isSDKLoaded,
+    isMiniAppView,
   } = useAppFrameLogic();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -56,13 +53,37 @@ export function Navbar({ isMiniAppView }: NavbarProps) {
   if (isMiniAppView) {
     return (
       <>
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 border-t border-black/[.1] dark:border-white/[.1] bg-white bg-opacity-80">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 pb-4 pt-2 bg-background/80 border-t border-black/[.1] bg-white bg-opacity-80">
           <div className="px-2 sm:px-4 py-2 flex items-center justify-around gap-1 sm:gap-2">
+            {/* Explore Button */}
+            <Link
+              href="/"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 hover:text-primary flex-1"
+            >
+              {/* Placeholder for Home Icon */}
+              <svg
+                className="w-6 h-6 mb-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                ></path>
+              </svg>
+              Home
+            </Link>
+
+            {/* Launch Button */}
             <button
               onClick={async () => {
                 if (isSDKLoaded && sdk) {
                   try {
-                    const castText = `@streme Hey! Could you launch a token for me?\n\nName: [your token name]\nSymbol: $[your ticker]\n\n[Don't forget to attach an image!] 🎨`;
+                    const castText = `@streme Launch a token for me\n\nName: [your token name]\nSymbol: $[your ticker]\n\n[Don't forget to attach an image!] 🎨`;
                     await sdk.actions.composeCast({
                       text: castText,
                       embeds: ["https://streme.fun"],
@@ -78,48 +99,51 @@ export function Navbar({ isMiniAppView }: NavbarProps) {
                   setIsLaunchTokenOpen(true);
                 }
               }}
-              className="btn btn-primary btn-sm flex-1 justify-center text-xs sm:text-sm"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-primary hover:text-primary-focus flex-1"
             >
+              {/* Placeholder for Launch Icon */}
+              <svg
+                className="w-6 h-6 mb-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                ></path>
+              </svg>
               Launch
             </button>
 
-            {wagmiIsConnected && (
-              <a
-                href={`https://explorer.superfluid.finance/base-mainnet/accounts/${wagmiAddress}?tab=pools`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-accent btn-sm flex-1 justify-center text-xs sm:text-sm"
-              >
-                My Stakes
-              </a>
-            )}
-
+            {/* Leaderboard Button */}
             <button
               onClick={() => {
-                setIsHowItWorksOpen(true);
+                // Placeholder for Leaderboard action
+                console.log("Leaderboard clicked");
               }}
-              className="btn btn-ghost btn-sm flex-1 justify-center text-xs sm:text-sm"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 hover:text-primary flex-1"
             >
-              How It Works
+              {/* Placeholder for Leaderboard Icon */}
+              <svg
+                className="w-6 h-6 mb-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                ></path>
+              </svg>
+              Leaderboard
             </button>
-
-            {/* {wagmiIsConnected ? (
-              <button
-                onClick={() => {
-                  wagmiDisconnect();
-                }}
-                className="btn btn-ghost btn-sm flex-1 justify-center text-xs sm:text-sm"
-              >
-                Logout
-              </button>
-            ) : (
-              <button
-                onClick={handleMiniAppConnect}
-                className="btn btn-ghost btn-sm flex-1 justify-center text-xs sm:text-sm"
-              >
-                Login
-              </button>
-            )} */}
           </div>
         </nav>
 

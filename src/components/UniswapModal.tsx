@@ -9,6 +9,7 @@ export function UniswapModal({
   isOpen: boolean;
   onClose: () => void;
   tokenAddress: string;
+  symbol: string;
   onAfterClose?: () => void;
 }) {
   if (!isOpen) return null;

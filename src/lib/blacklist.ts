@@ -1,1 +1,1 @@
-export const SPAMMER_BLACKLIST = ["nexisdao.eth"];
+export const SPAMMER_BLACKLIST = ["nexisdao.eth", "caitlynjenner"];

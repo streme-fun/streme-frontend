@@ -29,7 +29,6 @@ export function TokenPageContent() {
   const {
     isSDKLoaded,
     isMiniAppView,
-    farcasterContext,
     address,
     isConnected,
     isOnCorrectNetwork,
@@ -158,18 +157,38 @@ export function TokenPageContent() {
       : `https://www.geckoterminal.com/base/pools/${token.pool_address}?embed=1&info=0&swaps=1&grayscale=0&light_chart=1`;
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {isMiniAppView && (
-        <div className="mb-4 text-center">
-          <p className="text-sm">Connected: {address}</p>
-          <p className="text-sm">
-            FID: {farcasterContext?.user?.fid?.toString()}
-          </p>
-        </div>
-      )}
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 lg:mt-20 pt-8 pb-12">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8">
-        <div className="lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1]">
-          <div className="card-body p-4">
+        <div className="order-1 lg:order-2 lg:col-span-4 space-y-4">
+          <TokenInfo token={token} />
+          <TokenActions
+            token={token}
+            onStakingChange={handleStakingChange}
+            isMiniAppView={isMiniAppView}
+            address={address}
+            isConnected={isConnected}
+            isOnCorrectNetwork={isOnCorrectNetwork}
+          />
+          <StakedBalance
+            data-staking-balance
+            stakingAddress={token.staking_address}
+            stakingPool={token.staking_pool}
+            symbol={token.symbol}
+            tokenAddress={token.contract_address}
+            isMiniApp={isMiniAppView}
+            farcasterAddress={address}
+            farcasterIsConnected={isConnected}
+          />
+          {isConnected && (
+            <ClaimFeesButton
+              tokenAddress={token.contract_address}
+              creatorAddress={isCreator ? address : undefined}
+            />
+          )}
+        </div>
+
+        <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1]">
+          <div className="card-body p-4 pb-12">
             <iframe
               data-privy-ignore
               title="GeckoTerminal Embed"
@@ -179,24 +198,6 @@ export function TokenPageContent() {
               allowFullScreen
             />
           </div>
-        </div>
-
-        <div className="lg:col-span-4 space-y-4">
-          <TokenInfo token={token} />
-          <TokenActions token={token} onStakingChange={handleStakingChange} />
-          <StakedBalance
-            data-staking-balance
-            stakingAddress={token.staking_address}
-            stakingPool={token.staking_pool}
-            symbol={token.symbol}
-            tokenAddress={token.contract_address}
-          />
-          {isConnected && (
-            <ClaimFeesButton
-              tokenAddress={token.contract_address}
-              creatorAddress={isCreator ? address : undefined}
-            />
-          )}
         </div>
       </div>
     </div>

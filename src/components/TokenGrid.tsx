@@ -16,9 +16,13 @@ interface TokenGridProps {
 
 type SortOption = "stakers" | "newest" | "oldest";
 
-const TokenCardComponent = ({ token }: { token: Token }) => {
-  const [rewards, setRewards] = useState<number>(0);
-  const [totalStakers, setTotalStakers] = useState<number>(0);
+const TokenCardComponent = ({
+  token,
+}: {
+  token: Token & { rewards: number; totalStakers: number };
+}) => {
+  const [rewards, setRewards] = useState<number>(token.rewards);
+  const [totalStakers, setTotalStakers] = useState<number>(token.totalStakers);
 
   useEffect(() => {
     if (!token.creator) {
@@ -38,15 +42,10 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
   }, [token]);
 
   useEffect(() => {
-    calculateRewards(
-      token.created_at,
-      token.contract_address,
-      token.staking_pool
-    ).then(({ totalStreamed, totalStakers: stakers }) => {
-      setRewards(totalStreamed);
-      setTotalStakers(stakers);
-    });
-  }, [token.created_at, token.contract_address, token.staking_pool]);
+    // Initialize state from props
+    setRewards(token.rewards);
+    setTotalStakers(token.totalStakers);
+  }, [token.rewards, token.totalStakers]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -221,76 +220,220 @@ const TokenCardComponent = ({ token }: { token: Token }) => {
 export function TokenGrid({ tokens }: TokenGridProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
-  const [tokenData, setTokenData] = useState<
+  const [displayedTokens, setDisplayedTokens] = useState<
     Array<Token & { rewards: number; totalStakers: number }>
   >([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItemsCount, setTotalItemsCount] = useState(0);
+  // Cache for all tokens when sorted by stakers (if no search query)
+  const [stakersSortedAllTokensCache, setStakersSortedAllTokensCache] =
+    useState<Array<Token & { rewards: number; totalStakers: number }>>([]);
+  const TOKENS_PER_PAGE = 12;
 
-  // Fetch rewards and stakers data for all tokens
+  // Effect to reset pagination and data if the main 'tokens' prop changes significantly
+  // This might be too aggressive if tokens are just appended. Consider refining if needed.
   useEffect(() => {
-    const fetchData = async () => {
-      const enrichedTokens = await Promise.all(
-        tokens
-          .filter(
-            (token) =>
-              !token.creator?.name ||
-              !SPAMMER_BLACKLIST.includes(token.creator.name.toLowerCase())
-          )
-          .map(async (token) => {
-            const { totalStreamed, totalStakers } = await calculateRewards(
-              token.created_at,
-              token.contract_address,
-              token.staking_pool
-            );
-            return {
-              ...token,
-              rewards: totalStreamed,
-              totalStakers,
-            };
-          })
-      );
-      setTokenData(enrichedTokens);
-    };
-    fetchData();
+    setCurrentPage(1);
+    setDisplayedTokens([]);
+    setTotalItemsCount(0);
+    setStakersSortedAllTokensCache([]);
   }, [tokens]);
 
-  // Filter tokens based on search
-  const filteredTokens = tokenData.filter((token) => {
-    // If search is empty, return all tokens
-    if (!searchQuery.trim()) return true;
-
-    const searchLower = searchQuery.toLowerCase().trim();
-    return (
-      token.name?.toLowerCase().includes(searchLower) ||
-      token.symbol?.toLowerCase().includes(searchLower) ||
-      token.creator?.name?.toLowerCase().includes(searchLower)
+  // Helper to enrich a batch of tokens with rewards and stakers data
+  const enrichTokenBatch = async (batch: Token[]) => {
+    return Promise.all(
+      batch.map(async (token) => {
+        // If token already has rewards/stakers (e.g. from stakersSortedAllTokensCache), use them
+        if ("rewards" in token && "totalStakers" in token) {
+          return token as Token & { rewards: number; totalStakers: number };
+        }
+        const { totalStreamed, totalStakers } = await calculateRewards(
+          token.created_at,
+          token.contract_address,
+          token.staking_pool
+        );
+        return {
+          ...token,
+          rewards: totalStreamed,
+          totalStakers,
+        };
+      })
     );
-  });
+  };
 
-  // Sort tokens based on selected option
-  const sortedTokens = [...filteredTokens].sort((a, b) => {
-    switch (sortBy) {
-      case "stakers":
-        return b.totalStakers - a.totalStakers;
-      case "newest":
+  // Helper to sort tokens by date
+  const sortTokensByDate = (
+    tokensToSort: Array<Token & { rewards?: number; totalStakers?: number }>, // Allow optional for initial sort
+    sortOrder: "newest" | "oldest"
+  ) => {
+    return [...tokensToSort].sort((a, b) => {
+      if (sortOrder === "newest") {
         return (
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
-      case "oldest":
+      } else {
+        // oldest
         return (
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
-      default:
-        return 0;
+      }
+    });
+  };
+
+  // Main data processing effect: handles filtering, searching, sorting, and pagination
+  useEffect(() => {
+    const fetchDataAndProcess = async () => {
+      if (!tokens || tokens.length === 0) {
+        if (displayedTokens.length > 0) setDisplayedTokens([]);
+        setTotalItemsCount(0);
+        if (stakersSortedAllTokensCache.length > 0)
+          setStakersSortedAllTokensCache([]);
+        setIsLoadingMore(false);
+        return;
+      }
+
+      setIsLoadingMore(true);
+
+      // 1. Deduplicate and initial blacklist filter from the raw 'tokens' prop
+      const uniqueIncomingTokens = Array.from(
+        new Map(tokens.map((token) => [token.contract_address, token])).values()
+      );
+      const baseFilteredTokens = uniqueIncomingTokens.filter(
+        (token) =>
+          !token.creator?.name ||
+          !SPAMMER_BLACKLIST.includes(token.creator.name.toLowerCase())
+      );
+
+      // 2. Apply search query if present
+      let searchedTokensResult: Token[];
+      if (searchQuery.trim()) {
+        const searchLower = searchQuery.toLowerCase().trim();
+        searchedTokensResult = baseFilteredTokens.filter((token) => {
+          const nameMatch =
+            token.name &&
+            typeof token.name === "string" &&
+            token.name.toLowerCase().includes(searchLower);
+          const symbolMatch =
+            token.symbol &&
+            typeof token.symbol === "string" &&
+            token.symbol.toLowerCase().includes(searchLower);
+          const creatorNameMatch =
+            token.creator &&
+            token.creator.name &&
+            typeof token.creator.name === "string" &&
+            token.creator.name.toLowerCase().includes(searchLower);
+          return nameMatch || symbolMatch || creatorNameMatch;
+        });
+      } else {
+        searchedTokensResult = baseFilteredTokens;
+      }
+
+      // 3. Sort the (potentially searched) tokens
+      let sortedTokens: Array<
+        Token & { rewards: number; totalStakers: number }
+      >;
+
+      if (sortBy === "stakers") {
+        // If searching, we must enrich and sort the searched subset.
+        // If not searching, we can use the cache or build it.
+        if (searchQuery.trim()) {
+          const enrichedSearched = await enrichTokenBatch(searchedTokensResult);
+          sortedTokens = enrichedSearched.sort(
+            (a, b) => b.totalStakers - a.totalStakers
+          );
+        } else {
+          // Not searching, use cache or build it
+          if (stakersSortedAllTokensCache.length > 0 && currentPage > 1) {
+            // Use cache if available and not on the first page (first page might rebuild cache)
+            sortedTokens = stakersSortedAllTokensCache;
+          } else {
+            // Build/rebuild cache for all non-searched tokens
+            const enrichedAll = await enrichTokenBatch(searchedTokensResult); // searchedTokensResult is baseFilteredTokens here
+            sortedTokens = enrichedAll.sort(
+              (a, b) => b.totalStakers - a.totalStakers
+            );
+            setStakersSortedAllTokensCache(sortedTokens);
+          }
+        }
+      } else {
+        // For "newest" or "oldest" sort: Sort by date. Enrichment happens per page.
+        // We cast searchedTokensResult here as its enrichment status is not yet guaranteed.
+        sortedTokens = sortTokensByDate(
+          searchedTokensResult as Array<
+            Token & { rewards?: number; totalStakers?: number }
+          >,
+          sortBy as "newest" | "oldest"
+        ) as Array<Token & { rewards: number; totalStakers: number }>; // Assume enrichment will happen
+        // Clear staker cache if we switch away from staker sort
+        if (stakersSortedAllTokensCache.length > 0)
+          setStakersSortedAllTokensCache([]);
+      }
+
+      setTotalItemsCount(sortedTokens.length);
+
+      // 4. Paginate
+      const startIndex = (currentPage - 1) * TOKENS_PER_PAGE;
+      const endIndex = currentPage * TOKENS_PER_PAGE;
+      const pageBatchUnenriched = sortedTokens.slice(startIndex, endIndex);
+
+      // 5. Enrich current page if not already enriched (e.g., if sorted by date)
+      let finalPageBatch: Array<
+        Token & { rewards: number; totalStakers: number }
+      >;
+      if (sortBy !== "stakers" || searchQuery.trim()) {
+        // Re-enrich if date sort or if staker sort + search
+        finalPageBatch = await enrichTokenBatch(pageBatchUnenriched);
+      } else {
+        // If staker sort and no search, tokens are already enriched from sortedTokens (or cache)
+        finalPageBatch = pageBatchUnenriched as Array<
+          Token & { rewards: number; totalStakers: number }
+        >;
+      }
+
+      if (currentPage === 1) {
+        setDisplayedTokens(finalPageBatch);
+      } else {
+        if (finalPageBatch.length > 0) {
+          // Deduplicate before appending, ensuring keys are unique for React
+          setDisplayedTokens((prev) => {
+            const existingKeys = new Set(prev.map((t) => t.contract_address));
+            const newUniqueTokens = finalPageBatch.filter(
+              (t) => !existingKeys.has(t.contract_address)
+            );
+            return [...prev, ...newUniqueTokens];
+          });
+        }
+      }
+      setIsLoadingMore(false);
+    };
+
+    fetchDataAndProcess();
+  }, [tokens, currentPage, sortBy, searchQuery]); // Main effect dependency array
+
+  // Handle loading more tokens
+  const handleLoadMore = () => {
+    if (!isLoadingMore && displayedTokens.length < totalItemsCount) {
+      setCurrentPage((prev) => prev + 1);
     }
-  });
+  };
+
+  // Calculate if there are more tokens to load
+  const hasMoreTokens =
+    displayedTokens.length < totalItemsCount && displayedTokens.length > 0;
 
   return (
-    <div>
+    <div className="mt-10 pb-24">
       <div className="flex items-center gap-4 mb-4">
         <div className="flex-none">
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            onChange={(e) => {
+              e.preventDefault();
+              setSortBy(e.target.value as SortOption);
+              setCurrentPage(1); // Reset to first page on sort change
+              setDisplayedTokens([]); // Clear current tokens to force reload
+            }}
             className="select select-bordered select-sm w-[140px]"
           >
             <option value="newest">Newest First</option>
@@ -301,18 +444,46 @@ export function TokenGrid({ tokens }: TokenGridProps) {
         <div className="flex-1">
           <SearchBar
             value={searchQuery}
-            onChange={(value) => setSearchQuery(value.trim())}
+            onChange={(value) => {
+              setSearchQuery(value); // No trim() here, effect handles it
+              setCurrentPage(1); // Reset to first page on search
+              setDisplayedTokens([]); // Clear current tokens
+            }}
           />
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {sortedTokens.map((token) => (
+        {displayedTokens.map((token) => (
           <TokenCardComponent key={token.contract_address} token={token} />
         ))}
       </div>
-      {sortedTokens.length === 0 && searchQuery.trim() !== "" && (
-        <div className="text-center py-12 opacity-60">
-          No tokens found matching &quot;{searchQuery.trim()}&quot;
+      {displayedTokens.length === 0 &&
+        totalItemsCount === 0 &&
+        searchQuery.trim() !== "" && (
+          <div className="text-center py-12 opacity-60">
+            No tokens found matching &quot;{searchQuery.trim()}&quot;
+          </div>
+        )}
+      {displayedTokens.length === 0 &&
+        totalItemsCount === 0 &&
+        searchQuery.trim() === "" &&
+        !isLoadingMore && (
+          <div className="text-center py-12 opacity-60">
+            No tokens available.
+          </div>
+        )}
+      {isLoadingMore && displayedTokens.length === 0 && (
+        <div className="text-center py-12 opacity-60">Loading tokens...</div>
+      )}
+      {hasMoreTokens && (
+        <div className="text-center mt-8">
+          <button
+            onClick={handleLoadMore}
+            disabled={isLoadingMore}
+            className="btn btn-primary"
+          >
+            {isLoadingMore ? "Loading..." : "Load More"}
+          </button>
         </div>
       )}
     </div>

@@ -7,24 +7,34 @@ import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { Modal } from "./Modal";
 import { Zap } from "lucide-react";
-import { publicClient } from "@/src/lib/viemClient"; // Import the centralized client
+import { publicClient } from "@/src/lib/viemClient";
+import { sdk } from "@farcaster/frame-sdk"; // Added Farcaster SDK
 
 const WETH = "0x4200000000000000000000000000000000000006";
+const toHex = (address: string) => address as `0x${string}`;
 
 interface ZapStakeButtonProps {
   tokenAddress: string;
   stakingAddress: string;
+  symbol: string;
   className?: string;
   disabled?: boolean;
   onSuccess?: () => void;
+  isMiniApp?: boolean;
+  farcasterAddress?: string;
+  farcasterIsConnected?: boolean;
 }
 
 export function ZapStakeButton({
   tokenAddress,
   stakingAddress,
+  symbol,
   className,
   disabled,
   onSuccess,
+  isMiniApp,
+  farcasterAddress,
+  farcasterIsConnected,
 }: ZapStakeButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [amountIn, setAmountIn] = useState("0.001"); // Default 0.001 ETH
@@ -34,32 +44,43 @@ export function ZapStakeButton({
   const { user } = usePrivy();
   const { wallets } = useWallets();
 
-  // Fetch ETH and WETH balances
+  const effectiveIsConnected = isMiniApp
+    ? farcasterIsConnected
+    : !!user?.wallet?.address;
+  const effectiveAddress = isMiniApp ? farcasterAddress : user?.wallet?.address;
+
+  // Fetch ETH balance
   useEffect(() => {
     const fetchBalances = async () => {
-      if (!user?.wallet?.address) return;
+      if (!effectiveAddress || !effectiveIsConnected) {
+        setEthBalance(0n);
+        return;
+      }
 
       try {
         const eth = await publicClient.getBalance({
-          address: user.wallet.address as `0x${string}`,
+          address: toHex(effectiveAddress),
         });
         setEthBalance(eth);
       } catch (error) {
-        console.error("Error fetching balances:", error);
+        console.error("Error fetching ETH balance:", error);
+        setEthBalance(0n);
       }
     };
 
     fetchBalances();
-    // Set up an interval to refresh the balances
     const interval = setInterval(fetchBalances, 10000);
-
     return () => clearInterval(interval);
-  }, [user?.wallet?.address]);
+  }, [effectiveAddress, effectiveIsConnected]);
 
   // Validate amount and check if transaction would be possible
   const { isValid, validationError } = useMemo(() => {
-    if (!user?.wallet?.address) {
+    if (!effectiveIsConnected) {
       return { isValid: false, validationError: "Wallet not connected" };
+    }
+    if (!effectiveAddress) {
+      // Should not happen if effectiveIsConnected is true, but as a safeguard
+      return { isValid: false, validationError: "Wallet address not found" };
     }
 
     const amount = parseFloat(amountIn);
@@ -69,12 +90,21 @@ export function ZapStakeButton({
 
     try {
       const amountInWei = parseEther(amountIn);
-      // Add estimated gas cost (using conservative estimate)
-      const estimatedGasCost = 300000n * parseEther("0.000000001"); // Assuming 1 gwei gas price for estimation
-      const totalCost = amountInWei + estimatedGasCost;
+      const estimatedGasCostForValidation = 300000n * parseEther("0.000000001"); // Basic gas estimate for UI validation
+      const totalCostForValidation =
+        amountInWei + estimatedGasCostForValidation;
 
-      if (totalCost > ethBalance) {
-        const maxAmount = Number(formatEther(ethBalance - estimatedGasCost));
+      if (totalCostForValidation > ethBalance) {
+        const maxAmount = Math.max(
+          0,
+          Number(
+            formatEther(
+              ethBalance > estimatedGasCostForValidation
+                ? ethBalance - estimatedGasCostForValidation
+                : 0n
+            )
+          )
+        );
         return {
           isValid: false,
           validationError: `Insufficient balance. Max: ${maxAmount.toFixed(
@@ -87,40 +117,24 @@ export function ZapStakeButton({
     } catch {
       return { isValid: false, validationError: "Invalid amount" };
     }
-  }, [amountIn, ethBalance, user?.wallet?.address]);
+  }, [amountIn, ethBalance, effectiveIsConnected, effectiveAddress]);
 
   useEffect(() => {
     setErrorMessage(validationError);
   }, [validationError]);
 
   const handleZapStake = async () => {
-    if (!isValid || !user?.wallet?.address) {
-      toast.error(validationError || "Wallet not connected");
+    if (!isValid || !effectiveAddress || !effectiveIsConnected) {
+      toast.error(validationError || "Wallet not connected or address missing");
       return;
     }
-
     setIsLoading(true);
+    const toastId = toast.loading("Processing Zap & Stake...");
 
-    const zapPromise = async () => {
-      const walletAddress = user.wallet!.address;
-      const wallet = wallets?.find(
-        (w: { address: string }) => w.address === walletAddress
-      );
-
-      if (!wallet) {
-        throw new Error("Wallet not found");
-      }
-
-      const provider = await wallet.getEthereumProvider();
-
-      await provider.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: "0x2105" }], // 0x2105 is hex for 8453 (Base)
-      });
-
+    try {
       const amountInWei = parseEther(amountIn);
 
-      // 1. Get quote from Uniswap Quoter
+      // 1. Get quote (common for both paths)
       const quoterAddress = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
       const quoterAbi = [
         {
@@ -148,7 +162,6 @@ export function ZapStakeButton({
           type: "function",
         },
       ];
-
       const quoteResult = (await publicClient.readContract({
         address: quoterAddress as `0x${string}`,
         abi: quoterAbi,
@@ -156,144 +169,175 @@ export function ZapStakeButton({
         args: [
           {
             tokenIn: WETH,
-            tokenOut: tokenAddress as `0x${string}`,
+            tokenOut: toHex(tokenAddress),
             amountIn: amountInWei,
-            fee: 10000, // 1% fee
+            fee: 10000,
             sqrtPriceLimitX96: 0n,
           },
         ],
       })) as [bigint, bigint, number, bigint];
-
       const amountOut = quoteResult[0];
       const amountOutMin = amountOut - amountOut / 200n; // 0.5% slippage
 
-      // Define zap ABI and interface
-      const zapAddress = "0xeA25b9CD2D9F8Ba6cff45Ed0f6e1eFa2fC79a57E";
+      const zapContractAddress = "0xeA25b9CD2D9F8Ba6cff45Ed0f6e1eFa2fC79a57E";
       const zapAbi = [
         "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
       ];
       const zapIface = new Interface(zapAbi);
       const zapData = zapIface.encodeFunctionData("zap", [
-        tokenAddress,
+        toHex(tokenAddress),
         amountInWei,
         amountOutMin,
-        stakingAddress,
+        toHex(stakingAddress),
       ]) as `0x${string}`;
 
-      // Estimate gas using the actual zapData
-      let estimatedGas;
-      try {
-        estimatedGas = await publicClient.estimateGas({
-          account: walletAddress as `0x${string}`,
-          to: zapAddress as `0x${string}`,
-          value: amountInWei,
-          data: zapData, // Use actual transaction data for estimation
+      let txHash: `0x${string}`;
+
+      if (isMiniApp) {
+        const ethProvider = sdk.wallet.ethProvider;
+        if (!ethProvider)
+          throw new Error("Farcaster Ethereum provider not available.");
+        const currentEthBalance = await publicClient.getBalance({
+          address: toHex(effectiveAddress!),
         });
-      } catch (e: unknown) {
-        console.error("Gas estimation failed:", e);
-        // If estimation fails, use a safe upper limit (e.g., 1.2M, as user reported ~900k usage)
-        // The original 300k was too low.
-        estimatedGas = 1200000n;
-      }
-
-      const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.2)); // Reduced safety margin as estimate should be better
-      // Or if using fixed fallback, 1.2M is already a buffer.
-      // User reported actual usage around 900k. Max 450k default.
-      // Let's try 1.2M as fallback and 20% buffer on estimate.
-      const gas = `0x${gasLimit.toString(16)}` as `0x${string}`;
-
-      const ethBalance = await publicClient.getBalance({
-        address: walletAddress as `0x${string}`,
-      });
-      const gasPrice = await publicClient.getGasPrice();
-      const totalCost = gasLimit * gasPrice + amountInWei;
-
-      if (ethBalance < totalCost) {
-        const requiredEth = Number(formatEther(totalCost));
-        const availableEth = Number(formatEther(ethBalance));
-        throw new Error(
-          `Insufficient funds. You need ~${requiredEth.toFixed(
-            4
-          )} ETH but have ${availableEth.toFixed(4)} ETH (includes gas).`
-        );
-      }
-
-      // Send the transaction
-      const zapTx = await provider.request({
-        method: "eth_sendTransaction",
-        params: [
-          {
-            to: zapAddress,
-            from: walletAddress,
-            data: zapData,
-            value: `0x${amountInWei.toString(16)}`,
-            gas: gas,
-          },
-        ],
-      });
-
-      // Add timeout for transaction confirmation
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(
-          () =>
-            reject(new Error("Transaction confirmation timeout (3 minutes)")),
-          180000
-        )
-      );
-
-      const receipt = (await Promise.race([
-        publicClient.waitForTransactionReceipt({
-          hash: zapTx as `0x${string}`,
-        }),
-        timeoutPromise,
-      ])) as { status: "success" | "reverted" } | undefined; // viem uses "success" | "reverted"
-
-      if (receipt?.status !== "success") {
-        // Check for "success" string
-        throw new Error(
-          receipt
-            ? "Transaction failed or reverted on-chain."
-            : "Transaction timed out or failed to get receipt."
-        );
-      }
-      return receipt; // Return receipt on success
-    };
-
-    toast.promise(zapPromise(), {
-      loading: "Processing Zap & Stake...",
-      success: () => {
-        setIsLoading(false);
-        setShowSuccessModal(true);
-        onSuccess?.();
-        return "Zap & Stake successful!";
-      },
-      error: (err: unknown) => {
-        setIsLoading(false);
-        let message = "Zap & Stake failed. Please try again.";
-        if (err instanceof Error) {
-          if (err.message.includes("User rejected the request")) {
-            message = "Transaction rejected by user.";
-          } else if (err.message.includes("Insufficient funds")) {
-            message = err.message; // Use the detailed insufficient funds message
-          } else if (err.message.includes("Transaction confirmation timeout")) {
-            message =
-              "Transaction timed out. Please check your wallet activity.";
-          } else if (
-            err.message.includes("Transaction failed or reverted on-chain")
-          ) {
-            message =
-              "Transaction failed or reverted. Check a block explorer for details.";
-          } else if (err.message.length > 100) {
-            // Keep messages concise
-            message = err.message.substring(0, 100) + "...";
-          } else {
-            message = err.message;
-          }
+        if (currentEthBalance < amountInWei) {
+          throw new Error(
+            `Insufficient ETH. You have ${formatEther(
+              currentEthBalance
+            )} ETH, need ${formatEther(
+              amountInWei
+            )} ETH for zap (excluding gas).`
+          );
         }
-        console.error("ZapStake error:", err);
-        return message;
-      },
-    });
+        txHash = await ethProvider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: toHex(zapContractAddress),
+              from: toHex(effectiveAddress!),
+              data: zapData,
+              value: `0x${amountInWei.toString(16)}`,
+            },
+          ],
+        });
+      } else {
+        if (!user?.wallet?.address)
+          throw new Error("Privy wallet not connected.");
+        const privyWalletAddress = user.wallet.address;
+        const wallet = wallets?.find((w) => w.address === privyWalletAddress);
+        if (!wallet) throw new Error("Privy Wallet not found");
+        const provider = await wallet.getEthereumProvider();
+        await provider.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x2105" }],
+        });
+        let estimatedGas = 1200000n;
+        try {
+          estimatedGas = await publicClient.estimateGas({
+            account: toHex(privyWalletAddress!),
+            to: toHex(zapContractAddress),
+            value: amountInWei,
+            data: zapData,
+          });
+        } catch (e) {
+          console.error("Gas estimation failed (Privy):", e);
+        }
+        const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.2));
+        const currentEthBalance = await publicClient.getBalance({
+          address: toHex(privyWalletAddress!),
+        });
+        const gasPrice = await publicClient.getGasPrice();
+        const totalCost = gasLimit * gasPrice + amountInWei;
+        if (currentEthBalance < totalCost) {
+          throw new Error(
+            `Insufficient ETH. Need ~${formatEther(
+              totalCost
+            )} ETH (inc. gas), have ${formatEther(currentEthBalance)} ETH.`
+          );
+        }
+        txHash = await provider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: toHex(zapContractAddress),
+              from: toHex(privyWalletAddress!),
+              data: zapData,
+              value: `0x${amountInWei.toString(16)}`,
+              gas: `0x${gasLimit.toString(16)}`,
+            },
+          ],
+        });
+      }
+
+      if (!txHash) {
+        // Explicitly check if txHash is missing (e.g. if user cancelled and provider returned nothing)
+        throw new Error(
+          "Transaction hash not received. User might have cancelled."
+        );
+      }
+
+      toast.loading("Waiting for transaction confirmation...", { id: toastId });
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+      });
+
+      if (receipt.status !== "success") {
+        throw new Error(
+          `Transaction failed or reverted. Status: ${receipt.status}`
+        );
+      }
+
+      toast.success("Zap & Stake successful!", { id: toastId });
+      setShowSuccessModal(true);
+      onSuccess?.();
+    } catch (error: unknown) {
+      console.error("ZapStake caught error:", error); // More detailed logging
+      let message = "Zap & Stake failed. Please try again.";
+
+      // Attempt to stringify the error for more details if it's an object
+      let errorDetails = "";
+      if (typeof error === "object" && error !== null) {
+        errorDetails = JSON.stringify(error, Object.getOwnPropertyNames(error));
+      }
+      console.error("ZapStake error details (stringified):", errorDetails);
+
+      if (typeof error === "object" && error !== null) {
+        if (
+          "message" in error &&
+          typeof (error as { message: unknown }).message === "string"
+        ) {
+          const errorMessage = (error as { message: string }).message;
+          if (
+            errorMessage.includes("User rejected") ||
+            errorMessage.includes("cancelled")
+          ) {
+            message = "Transaction rejected by user.";
+          } else if (errorMessage.includes("Insufficient ETH")) {
+            message = errorMessage;
+          } else if (errorMessage.includes("Transaction hash not received")) {
+            message = "Transaction cancelled or not initiated.";
+          } else {
+            message = errorMessage.substring(0, 100);
+          }
+        } else if (
+          "shortMessage" in error &&
+          typeof (error as { shortMessage: unknown }).shortMessage === "string"
+        ) {
+          message = (error as { shortMessage: string }).shortMessage;
+        } else if (
+          errorDetails.includes("UserRejected") ||
+          errorDetails.includes("User denied") ||
+          errorDetails.includes("rejected by user")
+        ) {
+          message = "Transaction rejected by user."; // Catching stringified error content
+        }
+      }
+      toast.error(message, { id: toastId });
+      // Ensure success modal is not shown
+      setShowSuccessModal(false);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -421,10 +465,11 @@ export function ZapStakeButton({
               `}</style>
             </div>
             <p className="text-center text-sm pb-4">
-              Token rewards are now being streamed directly to your wallet.
+              Successfully staked {symbol}. Token rewards are now being streamed
+              directly to your wallet.
             </p>
             <a
-              href={`https://explorer.superfluid.finance/base-mainnet/accounts/${user?.wallet?.address}?tab=pools`}
+              href={`https://explorer.superfluid.finance/base-mainnet/accounts/${effectiveAddress}?tab=pools`}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-accent w-full"
