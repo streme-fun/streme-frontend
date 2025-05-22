@@ -426,20 +426,25 @@ export function TokenGrid({ tokens }: TokenGridProps) {
     <div className="mt-10 pb-24">
       <div className="flex items-center gap-4 mb-4">
         <div className="flex-none">
-          <select
-            value={sortBy}
-            onChange={(e) => {
-              e.preventDefault();
-              setSortBy(e.target.value as SortOption);
-              setCurrentPage(1); // Reset to first page on sort change
-              setDisplayedTokens([]); // Clear current tokens to force reload
-            }}
-            className="select select-bordered select-sm w-[140px]"
-          >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-            <option value="stakers">Most Stakers</option>
-          </select>
+          <div className="join">
+            {(["newest", "oldest", "stakers"] as SortOption[]).map((option) => (
+              <button
+                key={option}
+                onClick={() => {
+                  setSortBy(option);
+                  setCurrentPage(1);
+                  setDisplayedTokens([]);
+                }}
+                className={`btn btn-sm join-item ${
+                  sortBy === option ? "btn-primary" : "btn-ghost"
+                }`}
+              >
+                {option === "newest" && "Newest"}
+                {option === "oldest" && "Oldest"}
+                {option === "stakers" && "Most Stakers"}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="flex-1">
           <SearchBar
@@ -468,9 +473,7 @@ export function TokenGrid({ tokens }: TokenGridProps) {
         totalItemsCount === 0 &&
         searchQuery.trim() === "" &&
         !isLoadingMore && (
-          <div className="text-center py-12 opacity-60">
-            No tokens available.
-          </div>
+          <div className="text-center py-12 opacity-60">Loading tokens...</div>
         )}
       {isLoadingMore && displayedTokens.length === 0 && (
         <div className="text-center py-12 opacity-60">Loading tokens...</div>
