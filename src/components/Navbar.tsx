@@ -101,7 +101,7 @@ export function Navbar() {
                   setIsLaunchTokenOpen(true);
                 }
               }}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-primary hover:text-primary-focus flex-1"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm hover:text-primary-focus flex-1"
             >
               {/* Placeholder for Launch Icon */}
               <svg

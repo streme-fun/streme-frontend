@@ -4,9 +4,11 @@ import { TokenGrid } from "../components/TokenGrid";
 // import { ViewSwitcher } from "./components/ViewSwitcher";
 import { useState, useEffect, useCallback } from "react";
 import { Hero } from "../components/Hero";
-// import { HeroAnimation } from "../components/HeroAnimation"; // Removed as unused
+import { HeroAnimationMini } from "../components/HeroAnimationMini";
 import { TopStreamer } from "../components/TopStreamer";
 import { Token, TokensResponse } from "./types/token";
+import { SortOption } from "../components/TokenGrid";
+import { SearchBar } from "../components/SearchBar";
 // import { sdk } from "@farcaster/frame-sdk"; // No longer directly needed here for init
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic"; // Import the new hook
 import { Button } from "../components/ui/button"; // Corrected import path based on file structure
@@ -16,6 +18,8 @@ import { truncateAddressShort } from "../lib/truncateAddress";
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
 
   const {
     isSDKLoaded,
@@ -83,8 +87,6 @@ function App() {
         console.warn(
           "Farcaster connector not found. Ensure it's configured in WagmiProvider.tsx and active in the Farcaster client."
         );
-        // Optional: Fallback to the first connector if Farcaster one isn't found,
-        // though this might lead to unexpected behavior if not the Frame connector.
         if (connectors.length > 0) {
           // connect({ connector: connectors[0] });
         }
@@ -93,8 +95,8 @@ function App() {
 
     return (
       <div className="font-[family-name:var(--font-geist-sans)]">
-        <div className="flex flex-col gap-8 row-start-2 items-center w-full p-4">
-          <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-4">
+        <div className="flex flex-col gap-2 row-start-2 items-center w-full p-4 pt-20">
+          <div className="fixed top-0 left-0 right-0 flex justify-between items-center p-4 z-10 bg-base-100/80 backdrop-blur-sm">
             <svg
               width="106"
               height="15"
@@ -147,10 +149,44 @@ function App() {
                 className="fill-secondary"
               />
             </svg>
+            <div className="flex-1 mx-4 max-w-md">
+              <SearchBar
+                value={searchQuery}
+                onChange={(value) => setSearchQuery(value)}
+              />
+            </div>
             <div className="text-sm">{truncateAddressShort(address ?? "")}</div>
           </div>
 
-          <TokenGrid tokens={tokens} />
+          <div className="w-full max-w-md">
+            <div className="flex items-center gap-4 my-2">
+              <div className="flex-none w-full">
+                <div className="join w-full">
+                  {(["newest", "oldest", "stakers"] as SortOption[]).map(
+                    (option) => (
+                      <button
+                        key={option}
+                        onClick={() => setSortBy(option)}
+                        className={`btn btn-sm join-item flex-1 ${
+                          sortBy === option ? "btn-primary" : "btn-ghost"
+                        }`}
+                      >
+                        {option === "newest" && "Newest"}
+                        {option === "oldest" && "Oldest"}
+                        {option === "stakers" && "Stakers"}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <TokenGrid
+            tokens={tokens}
+            searchQuery={searchQuery}
+            sortBy={sortBy}
+          />
 
           {!isConnected ? (
             <Button onClick={handleMiniAppConnect}>Connect Wallet</Button>
@@ -182,6 +218,9 @@ function App() {
             </>
           )}
         </div>
+        <div className="fixed inset-0 -z-10">
+          <HeroAnimationMini />
+        </div>
       </div>
     );
   }
@@ -193,11 +232,42 @@ function App() {
         <div className="flex flex-col row-start-2 items-center w-full">
           <Hero />
           <TopStreamer />
-          <div className="w-full max-w-[1200px]">
+          <div className="w-full max-w-[1200px] px-4">
+            <div className="flex items-center gap-4 my-4">
+              <div className="flex-none">
+                <div className="join">
+                  {(["newest", "oldest", "stakers"] as SortOption[]).map(
+                    (option) => (
+                      <button
+                        key={option}
+                        onClick={() => setSortBy(option)}
+                        className={`btn btn-sm join-item ${
+                          sortBy === option ? "btn-primary" : "btn-ghost"
+                        }`}
+                      >
+                        {option === "newest" && "Newest"}
+                        {option === "oldest" && "Oldest"}
+                        {option === "stakers" && "Most Stakers"}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+              <div className="flex-1">
+                <SearchBar
+                  value={searchQuery}
+                  onChange={(value) => setSearchQuery(value)}
+                />
+              </div>
+            </div>
             {loading && tokens.length === 0 ? (
               <div className="text-center py-8">Loading tokens...</div>
             ) : (
-              <TokenGrid tokens={tokens} />
+              <TokenGrid
+                tokens={tokens}
+                searchQuery={searchQuery}
+                sortBy={sortBy}
+              />
             )}
           </div>
         </div>

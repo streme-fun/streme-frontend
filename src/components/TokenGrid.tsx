@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import FarcasterIcon from "@/public/farcaster.svg";
-import { SearchBar } from "./SearchBar";
+// import { SearchBar } from "./SearchBar";
 // import { SortMenu } from "./SortMenu";
 import { Token } from "../app/types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
@@ -12,9 +12,11 @@ import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
 
 interface TokenGridProps {
   tokens: Token[];
+  searchQuery: string;
+  sortBy: SortOption;
 }
 
-type SortOption = "stakers" | "newest" | "oldest";
+export type SortOption = "stakers" | "newest" | "oldest";
 
 const TokenCardComponent = ({
   token,
@@ -217,22 +219,17 @@ const TokenCardComponent = ({
   );
 };
 
-export function TokenGrid({ tokens }: TokenGridProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<SortOption>("newest");
+export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
   const [displayedTokens, setDisplayedTokens] = useState<
     Array<Token & { rewards: number; totalStakers: number }>
   >([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItemsCount, setTotalItemsCount] = useState(0);
-  // Cache for all tokens when sorted by stakers (if no search query)
   const [stakersSortedAllTokensCache, setStakersSortedAllTokensCache] =
     useState<Array<Token & { rewards: number; totalStakers: number }>>([]);
   const TOKENS_PER_PAGE = 12;
 
-  // Effect to reset pagination and data if the main 'tokens' prop changes significantly
-  // This might be too aggressive if tokens are just appended. Consider refining if needed.
   useEffect(() => {
     setCurrentPage(1);
     setDisplayedTokens([]);
@@ -295,7 +292,6 @@ export function TokenGrid({ tokens }: TokenGridProps) {
 
       setIsLoadingMore(true);
 
-      // 1. Deduplicate and initial blacklist filter from the raw 'tokens' prop
       const uniqueIncomingTokens = Array.from(
         new Map(tokens.map((token) => [token.contract_address, token])).values()
       );
@@ -305,7 +301,7 @@ export function TokenGrid({ tokens }: TokenGridProps) {
           !SPAMMER_BLACKLIST.includes(token.creator.name.toLowerCase())
       );
 
-      // 2. Apply search query if present
+      // Use searchQuery prop for filtering
       let searchedTokensResult: Token[];
       if (searchQuery.trim()) {
         const searchLower = searchQuery.toLowerCase().trim();
@@ -329,11 +325,10 @@ export function TokenGrid({ tokens }: TokenGridProps) {
         searchedTokensResult = baseFilteredTokens;
       }
 
-      // 3. Sort the (potentially searched) tokens
+      // Use sortBy prop for sorting
       let sortedTokens: Array<
         Token & { rewards: number; totalStakers: number }
       >;
-
       if (sortBy === "stakers") {
         // If searching, we must enrich and sort the searched subset.
         // If not searching, we can use the cache or build it.
@@ -372,17 +367,15 @@ export function TokenGrid({ tokens }: TokenGridProps) {
 
       setTotalItemsCount(sortedTokens.length);
 
-      // 4. Paginate
       const startIndex = (currentPage - 1) * TOKENS_PER_PAGE;
       const endIndex = currentPage * TOKENS_PER_PAGE;
       const pageBatchUnenriched = sortedTokens.slice(startIndex, endIndex);
 
-      // 5. Enrich current page if not already enriched (e.g., if sorted by date)
       let finalPageBatch: Array<
         Token & { rewards: number; totalStakers: number }
       >;
+      // Use sortBy prop for logic
       if (sortBy !== "stakers" || searchQuery.trim()) {
-        // Re-enrich if date sort or if staker sort + search
         finalPageBatch = await enrichTokenBatch(pageBatchUnenriched);
       } else {
         // If staker sort and no search, tokens are already enriched from sortedTokens (or cache)
@@ -423,40 +416,7 @@ export function TokenGrid({ tokens }: TokenGridProps) {
     displayedTokens.length < totalItemsCount && displayedTokens.length > 0;
 
   return (
-    <div className="mt-10 pb-24">
-      <div className="flex items-center gap-4 mb-4">
-        <div className="flex-none">
-          <div className="join">
-            {(["newest", "oldest", "stakers"] as SortOption[]).map((option) => (
-              <button
-                key={option}
-                onClick={() => {
-                  setSortBy(option);
-                  setCurrentPage(1);
-                  setDisplayedTokens([]);
-                }}
-                className={`btn btn-sm join-item ${
-                  sortBy === option ? "btn-primary" : "btn-ghost"
-                }`}
-              >
-                {option === "newest" && "Newest"}
-                {option === "oldest" && "Oldest"}
-                {option === "stakers" && "Most Stakers"}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex-1">
-          <SearchBar
-            value={searchQuery}
-            onChange={(value) => {
-              setSearchQuery(value); // No trim() here, effect handles it
-              setCurrentPage(1); // Reset to first page on search
-              setDisplayedTokens([]); // Clear current tokens
-            }}
-          />
-        </div>
-      </div>
+    <div className="mt-2 pb-24">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {displayedTokens.map((token) => (
           <TokenCardComponent key={token.contract_address} token={token} />
