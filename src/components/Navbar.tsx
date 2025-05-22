@@ -23,9 +23,9 @@ export function Navbar({ isMiniAppView }: NavbarProps) {
   const {
     address: wagmiAddress,
     isConnected: wagmiIsConnected,
-    disconnect: wagmiDisconnect,
-    connect: wagmiConnect,
-    connectors: wagmiConnectors,
+    // disconnect: wagmiDisconnect,
+    // connect: wagmiConnect,
+    // connectors: wagmiConnectors,
     isSDKLoaded,
   } = useAppFrameLogic();
 
@@ -39,19 +39,19 @@ export function Navbar({ isMiniAppView }: NavbarProps) {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const handleMiniAppConnect = () => {
-    const fcConnector = wagmiConnectors.find((c) => c.id === "farcaster");
-    if (fcConnector) {
-      wagmiConnect({ connector: fcConnector });
-    } else {
-      console.warn(
-        "Farcaster connector not found. Ensure it's configured in WagmiProvider.tsx and active in the Farcaster client."
-      );
-      if (wagmiConnectors.length > 0) {
-        // wagmiConnect({ connector: wagmiConnectors[0] });
-      }
-    }
-  };
+  // const handleMiniAppConnect = () => {
+  //   const fcConnector = wagmiConnectors.find((c) => c.id === "farcaster");
+  //   if (fcConnector) {
+  //     wagmiConnect({ connector: fcConnector });
+  //   } else {
+  //     console.warn(
+  //       "Farcaster connector not found. Ensure it's configured in WagmiProvider.tsx and active in the Farcaster client."
+  //     );
+  //     if (wagmiConnectors.length > 0) {
+  //       // wagmiConnect({ connector: wagmiConnectors[0] });
+  //     }
+  //   }
+  // };
 
   if (isMiniAppView) {
     return (
@@ -103,7 +103,7 @@ export function Navbar({ isMiniAppView }: NavbarProps) {
               How It Works
             </button>
 
-            {wagmiIsConnected ? (
+            {/* {wagmiIsConnected ? (
               <button
                 onClick={() => {
                   wagmiDisconnect();
@@ -119,7 +119,7 @@ export function Navbar({ isMiniAppView }: NavbarProps) {
               >
                 Login
               </button>
-            )}
+            )} */}
           </div>
         </nav>
 

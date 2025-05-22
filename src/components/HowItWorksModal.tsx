@@ -42,7 +42,7 @@ export function HowItWorksModal({
 
           <div>
             <h3 className="text-lg font-semibold mb-2 text-secondary">
-              Fair Distribution
+              Allocation
             </h3>
             <p className="opacity-80">
               20% of each token&apos;s total supply is allocated to the rewards
@@ -51,14 +51,11 @@ export function HowItWorksModal({
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold mb-2 text-accent">
-              Simple Staking
-            </h3>
+            <h3 className="text-lg font-semibold mb-2 text-accent">Stake</h3>
             <p className="opacity-80">
-              Staking is simple but secure. When you stake tokens, they&apos;re
-              locked for 24 hours. After the lock period, you can unstake
-              anytime. Your rewards continue streaming whether they&apos;re
-              locked or not.
+              When you stake tokens, they&apos;re locked for 24 hours. After the
+              lock period, you can unstake anytime. Your rewards continue
+              streaming whether they&apos;re locked or not.
             </p>
           </div>
 
