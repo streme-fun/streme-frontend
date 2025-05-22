@@ -2,7 +2,7 @@ import {
   SendNotificationRequest,
   sendNotificationResponseSchema,
 } from "@farcaster/frame-sdk";
-import { getUserNotificationDetails } from "~/lib/kv";
+import { getUserNotificationDetails } from "./kv";
 import { APP_URL } from "./constants";
 
 type SendFrameNotificationResult =
