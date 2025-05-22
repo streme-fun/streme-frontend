@@ -107,9 +107,9 @@ export function ZapStakeButton({
         );
         return {
           isValid: false,
-          validationError: `Insufficient balance. Max: ${maxAmount.toFixed(
+          validationError: `Not enough ETH. You can zap a maximum of ${maxAmount.toFixed(
             4
-          )} ETH`,
+          )} ETH (after estimated gas cost).`,
         };
       }
 
