@@ -5,6 +5,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useState } from "react";
 import { HowItWorksModal } from "./HowItWorksModal";
 import { LaunchTokenModal } from "./LaunchTokenModal";
+import { LeaderboardModal } from "./LeaderboardModal";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import sdk from "@farcaster/frame-sdk";
 
@@ -30,6 +31,7 @@ export function Navbar() {
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
   const [isLaunchTokenOpen, setIsLaunchTokenOpen] = useState(false);
   const [isAddressDropdownOpen, setIsAddressDropdownOpen] = useState(false);
+  const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
 
   const truncateAddress = (address: string) => {
     if (!address) return "";
@@ -122,8 +124,7 @@ export function Navbar() {
             {/* Leaderboard Button */}
             <button
               onClick={() => {
-                // Placeholder for Leaderboard action
-                console.log("Leaderboard clicked");
+                setIsLeaderboardModalOpen(true);
               }}
               className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 hover:text-primary flex-1"
             >
@@ -154,6 +155,10 @@ export function Navbar() {
         <LaunchTokenModal
           isOpen={isLaunchTokenOpen}
           onClose={() => setIsLaunchTokenOpen(false)}
+        />
+        <LeaderboardModal
+          isOpen={isLeaderboardModalOpen}
+          onClose={() => setIsLeaderboardModalOpen(false)}
         />
       </>
     );
