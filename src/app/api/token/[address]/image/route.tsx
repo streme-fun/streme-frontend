@@ -141,7 +141,7 @@ export async function GET(
               >
                 S
               </div>
-              streme.fun
+              <div>streme.fun</div>
             </div>
           </div>
 
@@ -202,7 +202,7 @@ export async function GET(
                 textAlign: "center",
               }}
             >
-              <h1
+              <div
                 style={{
                   fontSize: "52px",
                   fontWeight: "bold",
@@ -212,7 +212,7 @@ export async function GET(
                 }}
               >
                 {token.name}
-              </h1>
+              </div>
 
               <div
                 style={{
