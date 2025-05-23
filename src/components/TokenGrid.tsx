@@ -336,7 +336,7 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
   const [stakersSortedAllTokensCache, setStakersSortedAllTokensCache] =
     useState<Array<Token & { rewards: number; totalStakers: number }>>([]);
   const [trendingTokens, setTrendingTokens] = useState<Token[]>([]);
-  const TOKENS_PER_PAGE = 12;
+  const TOKENS_PER_PAGE = 36;
 
   // Fetch trending tokens when sortBy is "trending"
   useEffect(() => {
