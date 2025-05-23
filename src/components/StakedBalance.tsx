@@ -93,8 +93,13 @@ export function StakedBalance({
         });
 
         const formattedReceived = Number(formatUnits(received, 18));
-        setBaseAmount(formattedReceived);
-        setLastUpdateTime(Date.now());
+
+        // Only update base amount and reset timer if the balance has actually changed
+        // This prevents the streaming animation from restarting unnecessarily
+        if (Math.abs(formattedReceived - baseAmount) > 0.0001) {
+          setBaseAmount(formattedReceived);
+          setLastUpdateTime(Date.now());
+        }
 
         // Fetch pool data
         const query = `
