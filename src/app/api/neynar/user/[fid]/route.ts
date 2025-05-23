@@ -3,10 +3,11 @@ import { getNeynarUser } from "@/src/lib/neynar";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { fid: string } }
+  { params }: { params: Promise<{ fid: string }> }
 ) {
   try {
-    const fid = parseInt(params.fid, 10);
+    const { fid: fidParam } = await params;
+    const fid = parseInt(fidParam, 10);
 
     if (isNaN(fid)) {
       return NextResponse.json(
