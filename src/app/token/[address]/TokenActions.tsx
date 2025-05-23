@@ -84,6 +84,7 @@ export function TokenActions({
     connect: fcConnect,
     connectors: fcConnectors,
     switchChain: fcSwitchChain,
+    farcasterContext,
   } = useAppFrameLogic();
 
   const { user: privyUser, ready: privyReady, login: privyLogin } = usePrivy();
@@ -94,7 +95,10 @@ export function TokenActions({
   } = useAccount();
   const { switchChain: wagmiSwitchNetwork } = useSwitchChain();
 
-  const isEffectivelyMiniApp = isMiniAppViewProp ?? detectedMiniAppView;
+  // More robust mini app detection - only consider it a mini app if we have both SDK loaded AND a valid farcaster context
+  const isEffectivelyMiniApp =
+    isMiniAppViewProp ??
+    (detectedMiniAppView && fcSDKLoaded && !!farcasterContext);
 
   let currentAddress: `0x${string}` | undefined;
   let walletIsConnected: boolean;
@@ -143,6 +147,7 @@ export function TokenActions({
       wagmiAddress,
       wagmiIsConnectedGlobal,
       activeChainId: activeChain?.id,
+      farcasterContext: !!farcasterContext,
     });
   }, [
     isEffectivelyMiniApp,
@@ -160,6 +165,7 @@ export function TokenActions({
     wagmiAddress,
     wagmiIsConnectedGlobal,
     activeChain?.id,
+    farcasterContext,
   ]);
 
   useEffect(() => {

@@ -233,10 +233,13 @@ export function TokenPageContent() {
           <ClaimFeesButton
             tokenAddress={token.contract_address}
             creatorAddress={isCreator ? address : undefined}
+            isMiniApp={isMiniAppView}
+            farcasterAddress={address}
+            farcasterIsConnected={isConnected}
           />
         </div>
 
-        <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1]">
+        <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit">
           <div className="card-body p-0 md:p-4 pb-12">
             <iframe
               data-privy-ignore

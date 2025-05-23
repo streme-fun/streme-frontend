@@ -1,32 +1,55 @@
 "use client";
 
 import { useState, useEffect } from "react";
-// import { usePrivy, useWallets } from "@privy-io/react-auth"; // Replaced
+import { usePrivy } from "@privy-io/react-auth";
 import { toast } from "sonner";
-// import { Interface } from "@ethersproject/abi"; // Removed as unused
-import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/src/lib/contracts"; // Assuming LP_FACTORY_ABI includes claimRewards
-// import { publicClient } from "@/src/lib/viemClient"; // Removed as unused
-import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic"; // Added
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi"; // Added Wagmi hooks
+import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/src/lib/contracts";
+import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
+import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 
 interface ClaimFeesButtonProps {
   tokenAddress: string;
-  creatorAddress?: string; // This prop might still be relevant for UI logic, but tx sends to contract logic
+  creatorAddress?: string;
   className?: string;
+  isMiniApp?: boolean;
+  farcasterAddress?: `0x${string}` | undefined;
+  farcasterIsConnected?: boolean;
 }
 
 export function ClaimFeesButton({
   tokenAddress,
-  // creatorAddress, // Not directly used in transaction if contract handles recipient
   className = "btn btn-secondary w-full",
+  isMiniApp: isMiniAppProp,
+  farcasterAddress,
+  farcasterIsConnected,
 }: ClaimFeesButtonProps) {
   const [showSuccess, setShowSuccess] = useState(false);
 
   const {
-    address: connectedAddress, // From useAppFrameLogic
-    isConnected,
-    // We might need chainId from wagmi's useAccount or useChainId if LP_FACTORY_ADDRESS is chain-specific and not on `base`
+    isSDKLoaded: fcSDKLoaded,
+    isMiniAppView: detectedMiniAppView,
+    address: fcAddress,
+    isConnected: fcIsConnected,
+    farcasterContext,
   } = useAppFrameLogic();
+
+  const { user: privyUser, ready: privyReady } = usePrivy();
+
+  // More robust mini app detection
+  const isEffectivelyMiniApp =
+    isMiniAppProp ?? (detectedMiniAppView && fcSDKLoaded && !!farcasterContext);
+
+  // Determine which authentication system to use
+  let currentAddress: `0x${string}` | undefined;
+  let walletIsConnected: boolean;
+
+  if (isEffectivelyMiniApp) {
+    currentAddress = farcasterAddress ?? fcAddress;
+    walletIsConnected = farcasterIsConnected ?? fcIsConnected;
+  } else {
+    currentAddress = privyUser?.wallet?.address as `0x${string}` | undefined;
+    walletIsConnected = privyReady && !!privyUser?.wallet?.address;
+  }
 
   const {
     writeContractAsync,
@@ -43,7 +66,7 @@ export function ClaimFeesButton({
   });
 
   const handleClaimFees = async () => {
-    if (!isConnected || !connectedAddress) {
+    if (!walletIsConnected || !currentAddress) {
       toast.error("Please connect your wallet.");
       return;
     }
@@ -104,11 +127,40 @@ export function ClaimFeesButton({
     }
   }, [isConfirmed, confirmationError, hash]);
 
+  // Debug logging
+  useEffect(() => {
+    console.log("ClaimFeesButton authentication state:", {
+      isEffectivelyMiniApp,
+      isMiniAppProp,
+      detectedMiniAppView,
+      fcSDKLoaded,
+      farcasterContext: !!farcasterContext,
+      currentAddress,
+      walletIsConnected,
+      privyReady,
+      privyUserAddress: privyUser?.wallet?.address,
+      fcAddress,
+      fcIsConnected,
+    });
+  }, [
+    isEffectivelyMiniApp,
+    isMiniAppProp,
+    detectedMiniAppView,
+    fcSDKLoaded,
+    farcasterContext,
+    currentAddress,
+    walletIsConnected,
+    privyReady,
+    privyUser?.wallet?.address,
+    fcAddress,
+    fcIsConnected,
+  ]);
+
   return (
     <div className="space-y-1">
       <button
         onClick={handleClaimFees}
-        disabled={isClaimingFees || isConfirming || !isConnected}
+        disabled={isClaimingFees || isConfirming || !walletIsConnected}
         className={`${className} ${showSuccess ? "btn-success" : ""}`}
       >
         {isClaimingFees || isConfirming ? (
@@ -134,7 +186,7 @@ export function ClaimFeesButton({
             </svg>
             Claimed!
           </>
-        ) : !isConnected ? (
+        ) : !walletIsConnected ? (
           "Connect Wallet"
         ) : (
           "Send Fees to Creator" // UI text, actual recipient is determined by contract
