@@ -128,7 +128,12 @@ export function Navbar() {
               onClick={async () => {
                 if (isSDKLoaded && sdk) {
                   try {
-                    const castText = `@streme Launch a token for me\n\nName: [your token name]\nSymbol: $[your ticker]\n\n[Don't forget to attach an image!] 🎨`;
+                    const castText = `@streme Launch a token for me
+
+Name: [your token name]
+Symbol: $[your ticker]
+
+[Don't forget to attach an image!] 🎨`;
                     await sdk.actions.composeCast({
                       text: castText,
                       embeds: ["https://streme.fun"],

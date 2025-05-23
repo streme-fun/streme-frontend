@@ -94,48 +94,29 @@ export function TokenPageContent() {
   const handleShare = async () => {
     if (!token) return;
 
-    // Format price for sharing - avoid scientific notation
-    const formatPriceForShare = (price: number | undefined) => {
-      if (!price || isNaN(price)) return "N/A";
+    // Simplified market cap formatting without commas
+    const formatMarketCap = (marketCap: string | number | undefined) => {
+      if (!marketCap) return "N/A";
+      const value = parseFloat(marketCap.toString());
+      if (isNaN(value)) return "N/A";
 
-      if (price < 0.01 && price > 0) {
-        const decimalStr = price.toFixed(20).split(".")[1];
-        let zeroCount = 0;
-        while (decimalStr[zeroCount] === "0") {
-          zeroCount++;
-        }
-        return `$0.${"0".repeat(zeroCount)}${decimalStr.slice(
-          zeroCount,
-          zeroCount + 4
-        )}`;
+      if (value >= 1000000) {
+        return `$${(value / 1000000).toFixed(1)}M`;
+      } else if (value >= 1000) {
+        return `$${(value / 1000).toFixed(1)}K`;
+      } else {
+        return `$${value.toFixed(0)}`;
       }
-
-      return `$${price.toLocaleString(undefined, {
-        minimumFractionDigits: 6,
-        maximumFractionDigits: 6,
-      })}`;
-    };
-
-    // Format 24h change same as in TokenInfo.tsx
-    const format24hChange = (change24h: number | undefined) => {
-      if (change24h === undefined || change24h === null) return "";
-      const sign = change24h >= 0 ? "+" : "";
-      return `${sign}${change24h.toFixed(2)}%`;
     };
 
     const shareUrl = `https://streme.fun/token/${pageAddress}`;
-    const change24hText =
-      token.change24h !== undefined
-        ? `\n24h: ${format24hChange(token.change24h)}`
-        : "";
 
-    const castText = `Check out $${
-      token.symbol
-    } on Streme! 🚀\n\nPrice: ${formatPriceForShare(
-      token.price
-    )}\nMarket Cap: $${parseFloat(
-      token.marketCap?.toString() || "0"
-    ).toLocaleString()}${change24hText}\n\n${shareUrl}`;
+    // Simplified cast text with single newlines and no complex formatting
+    const castText = `Check out $${token.symbol} on Streme! 🚀
+
+Market Cap: ${formatMarketCap(token.marketCap)}
+
+${shareUrl}`;
 
     if (isMiniAppView && isSDKLoaded && sdk) {
       try {
