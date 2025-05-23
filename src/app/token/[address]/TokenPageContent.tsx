@@ -110,7 +110,10 @@ export function TokenPageContent() {
         while (decimalStr[zeroCount] === "0") {
           zeroCount++;
         }
-        return `$0.0${zeroCount}${decimalStr.slice(zeroCount, zeroCount + 4)}`;
+        return `$0.${"0".repeat(zeroCount)}${decimalStr.slice(
+          zeroCount,
+          zeroCount + 4
+        )}`;
       }
 
       return `$${price.toLocaleString(undefined, {
