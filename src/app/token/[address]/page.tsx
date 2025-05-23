@@ -5,6 +5,92 @@ type Props = {
   params: Promise<{ address: string }>;
 };
 
+// Define type for cached token data
+interface CachedTokenData {
+  data: {
+    name: string;
+    symbol: string;
+    price?: number;
+    creator?: {
+      name: string;
+    };
+    marketCap?: number;
+  };
+  timestamp: number;
+}
+
+// Simple in-memory cache for token metadata
+const metadataCache = new Map<string, CachedTokenData>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCachedData(address: string): CachedTokenData["data"] | null {
+  const cached = metadataCache.get(address.toLowerCase());
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log(`[Metadata] Using cached data for ${address}`);
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedData(address: string, data: CachedTokenData["data"]): void {
+  metadataCache.set(address.toLowerCase(), {
+    data,
+    timestamp: Date.now(),
+  });
+}
+
+// Helper function to retry API calls with exponential backoff
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // Increased timeout to 8 seconds
+
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      }).finally(() => {
+        clearTimeout(timeoutId);
+      });
+
+      // If we get a 5xx error, retry (except on last attempt)
+      if (response.status >= 500 && attempt < maxRetries) {
+        console.warn(
+          `[Metadata] Attempt ${attempt + 1} failed with status ${
+            response.status
+          }, retrying...`
+        );
+        const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error as Error;
+      console.warn(`[Metadata] Attempt ${attempt + 1} failed:`, error);
+
+      // If this was the last attempt, throw the error
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+
+      // Wait before retrying (exponential backoff)
+      const delay = baseDelay * Math.pow(2, attempt);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError || new Error("All retry attempts failed");
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { address } = await params;
 
@@ -12,22 +98,55 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // Determine the base URL - prefer environment variable, fallback to production URL
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://streme.fun";
 
-    // Fetch token data for metadata
-    const response = await fetch(
-      `${baseUrl}/api/tokens/single?address=${address}`,
-      { cache: "no-store" }
-    );
+    // Add more specific logging
+    console.log(`[Metadata] Generating metadata for token: ${address}`);
+    console.log(`[Metadata] Using base URL: ${baseUrl}`);
 
-    if (!response.ok) {
-      throw new Error("Token not found");
-    }
-
-    const data = await response.json();
-    const token = data.data;
+    // Check cache first
+    const cachedToken = getCachedData(address);
+    let token = cachedToken;
 
     if (!token) {
-      throw new Error("Token not found");
+      // Fetch token data for metadata with retry logic
+      const response = await fetchWithRetry(
+        `${baseUrl}/api/tokens/single?address=${address}`,
+        {
+          cache: "no-store",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      console.log(`[Metadata] API response status: ${response.status}`);
+
+      if (!response.ok) {
+        console.warn(
+          `[Metadata] API call failed with status ${response.status} after retries, using fallback metadata`
+        );
+        throw new Error(`API call failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`[Metadata] API response data:`, data ? "received" : "empty");
+
+      token = data.data;
+
+      if (!token) {
+        console.warn(
+          `[Metadata] No token data received, using fallback metadata`
+        );
+        throw new Error("No token data received");
+      }
+
+      // Cache the successful response
+      setCachedData(address, token);
     }
+
+    console.log(
+      `[Metadata] Successfully loaded token: ${token.name} (${token.symbol})`
+    );
 
     // Format price for title
     const formatPrice = (price: number | undefined) => {
@@ -70,7 +189,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       version: "next",
       imageUrl: imageUrl,
       button: {
-        title: "View Token on Streme",
+        title: `View ${token.name} on Streme`,
         action: {
           type: "launch_frame",
           name: "Streme.fun",
@@ -113,20 +232,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     };
   } catch (error) {
-    console.error("Error generating metadata:", error);
+    console.error(
+      `[Metadata] Error generating metadata for token ${address}:`,
+      error
+    );
 
-    // Fallback metadata
+    // Fallback metadata with basic token info
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://streme.fun";
+    const pageUrl = `${baseUrl}/token/${address}`;
 
     const fallbackFrameEmbed = {
       version: "next",
       imageUrl: `${baseUrl}/streme-og.png`,
       button: {
-        title: "Visit Streme.fun",
+        title: "View Token on Streme",
         action: {
           type: "launch_frame",
           name: "Streme.fun",
-          url: baseUrl,
+          url: pageUrl,
           splashImageUrl: `${baseUrl}/icon.png`,
           splashBackgroundColor: "#ffffff",
         },
@@ -134,7 +257,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
 
     return {
-      title: "Token - Streme.fun",
+      title: `Token ${address.slice(0, 6)}...${address.slice(-4)} - Streme.fun`,
       description:
         "Trade tokens on Streme.fun - The premier memecoin trading platform on Base",
       openGraph: {
@@ -151,7 +274,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         ],
         type: "website",
         siteName: "Streme.fun",
-        url: baseUrl,
+        url: pageUrl,
       },
       twitter: {
         card: "summary_large_image",

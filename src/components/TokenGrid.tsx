@@ -149,7 +149,7 @@ const TokenCardComponent = ({
     e.preventDefault();
     e.stopPropagation();
     window.open(
-      `https://warpcast.com/${token.creator?.name}/${shortenHash(
+      `https://farcaster.xyz/${token.creator?.name}/${shortenHash(
         token.cast_hash
       )}`,
       "_blank",

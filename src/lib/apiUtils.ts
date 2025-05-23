@@ -99,21 +99,47 @@ export async function fetchTokenFromStreme(
   try {
     const normalizedAddress = address.toLowerCase();
     console.log("Fetching token data for:", normalizedAddress);
+
+    // Add timeout to external API call
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
     const response = await fetch(
       `https://api.streme.fun/token/${normalizedAddress}`,
       {
         cache: "no-store",
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Streme.fun/1.0",
+        },
       }
-    );
+    ).finally(() => {
+      clearTimeout(timeoutId);
+    });
+
+    console.log(`External API response status: ${response.status}`);
+
+    // Handle different response statuses more explicitly
+    if (response.status >= 500) {
+      throw new Error(
+        `External service unavailable (status: ${response.status})`
+      );
+    }
+
+    if (response.status === 429) {
+      throw new Error(`Rate limited by external service`);
+    }
+
+    if (!response.ok) {
+      console.warn(`External API returned status ${response.status}`);
+      return null;
+    }
 
     const tokenJson = await response.json();
     console.log("Raw token response:", tokenJson);
 
-    if (
-      !response.ok ||
-      tokenJson.message === "No such document!" ||
-      tokenJson.errors
-    ) {
+    if (tokenJson.message === "No such document!" || tokenJson.errors) {
       console.error("Token fetch failed:", {
         status: response.status,
         data: tokenJson,
@@ -131,18 +157,27 @@ export async function fetchTokenFromStreme(
     return token;
   } catch (error) {
     console.error("Error fetching token:", error);
-    if (
-      error &&
-      typeof error === "object" &&
-      "message" in error &&
-      typeof error.message === "string"
-    ) {
-      if (error.message.includes("rejected")) {
-        console.error("Transaction rejected");
-      } else if (error.message.includes("insufficient funds")) {
-        console.error("Insufficient funds for transaction");
+
+    // Re-throw errors that indicate service issues so they can be retried
+    if (error instanceof Error) {
+      if (error.name === "AbortError") {
+        throw new Error("External service timeout");
+      }
+      if (
+        error.message.includes("fetch") ||
+        error.message.includes("network")
+      ) {
+        throw new Error("Network error connecting to external service");
+      }
+      if (
+        error.message.includes("service unavailable") ||
+        error.message.includes("503")
+      ) {
+        throw error; // Re-throw service unavailable errors
       }
     }
+
+    // For other errors, return null (token not found, etc.)
     return null;
   }
 }

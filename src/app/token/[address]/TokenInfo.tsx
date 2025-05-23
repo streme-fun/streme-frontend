@@ -42,7 +42,13 @@ const shortenHash = (hash: string | undefined) => {
   return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
 };
 
-export function TokenInfo({ token }: { token: Token }) {
+interface TokenInfoProps {
+  token: Token;
+  onShare?: () => Promise<void>;
+  isMiniAppView?: boolean;
+}
+
+export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
   const [rewards, setRewards] = useState<number>(0);
   const [totalStakers, setTotalStakers] = useState<number>(0);
 
@@ -65,7 +71,11 @@ export function TokenInfo({ token }: { token: Token }) {
   }, []);
 
   return (
-    <div className="space-y-3 card border-gray-100 border-2 p-4 mt-12 md:mt-0">
+    <div
+      className={`space-y-3 card bg-base-100 border-gray-100 border-2 p-4 relative z-10 ${
+        isMiniAppView ? "mt-0" : "mt-12 md:mt-0"
+      }`}
+    >
       {/* Token Header */}
       <div className="flex items-center gap-4 flex-wrap">
         {token.img_url ? (
@@ -74,7 +84,7 @@ export function TokenInfo({ token }: { token: Token }) {
               src={token.img_url}
               alt={token.name}
               fill
-              className="object-cover rounded-md"
+              className="object-cover rounded-md "
             />
           </div>
         ) : (
@@ -89,33 +99,33 @@ export function TokenInfo({ token }: { token: Token }) {
           </div>
         </div>
         {token.creator && (
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="avatar">
-              <div className="w-6 h-6 rounded-full">
-                <Image
-                  src={
-                    token.creator.profileImage ??
-                    `/avatars/${token.creator.name}.avif`
-                  }
-                  alt={token.creator.name}
-                  width={24}
-                  height={24}
-                />
-              </div>
-            </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto ml-1">
             <a
-              href={`https://warpcast.com/${token.creator.name}`}
+              href={`https://farcaster.xyz/${token.creator.name}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-base opacity-60 hover:opacity-100 hover:underline"
+              className="text-base opacity-60 hover:opacity-100 hover:underline flex gap-2 items-center"
             >
+              <div className="avatar">
+                <div className="w-4 h-4 rounded-full">
+                  <Image
+                    src={
+                      token.creator.profileImage ??
+                      `/avatars/${token.creator.name}.avif`
+                    }
+                    alt={token.creator.name}
+                    width={24}
+                    height={24}
+                  />
+                </div>
+              </div>
               {token.creator.name}
             </a>
             {token.cast_hash && (
               <a
-                href={`https://warpcast.com/${token.creator.name}/${shortenHash(
-                  token.cast_hash
-                )}`}
+                href={`https://farcaster.xyz/${
+                  token.creator.name
+                }/${shortenHash(token.cast_hash)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-primary inline-flex items-center"
@@ -191,6 +201,28 @@ export function TokenInfo({ token }: { token: Token }) {
           </div>
         </div>
       </div>
+      {/* Share Button for Desktop and Mini App */}
+      {onShare && (
+        <div className="flex mt-2 -ml-1">
+          <button
+            onClick={onShare}
+            className="btn btn-outline btn-sm border-primary/10 flex items-center gap-2 hover:bg-primary/10"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+            >
+              <path
+                fill="#845FC9"
+                d="M18.24.24H5.76A5.76 5.76 0 0 0 0 6v12a5.76 5.76 0 0 0 5.76 5.76h12.48A5.76 5.76 0 0 0 24 18V6A5.76 5.76 0 0 0 18.24.24m.816 17.166v.504a.49.49 0 0 1 .543.48v.568h-5.143v-.569A.49.49 0 0 1 15 17.91v-.504c0-.22.153-.402.358-.458l-.01-4.364c-.158-1.737-1.64-3.098-3.443-3.098s-3.285 1.361-3.443 3.098l-.01 4.358c.228.042.532.208.54.464v.504a.49.49 0 0 1 .543.48v.568H4.392v-.569a.49.49 0 0 1 .543-.479v-.504c0-.253.201-.454.454-.472V9.039h-.49l-.61-2.031H6.93V5.042h9.95v1.966h2.822l-.61 2.03h-.49v7.896c.252.017.453.22.453.472"
+              />
+            </svg>
+            Share
+          </button>
+        </div>
+      )}
     </div>
   );
 }

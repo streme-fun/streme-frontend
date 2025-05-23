@@ -16,7 +16,7 @@ Symbol: $[your ticker]
 
 [Don't forget to attach an image!] 🎨`;
 
-  const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(
+  const warpcastUrl = `https://farcaster.xyz/~/compose?text=${encodeURIComponent(
     launchText
   )}`;
 

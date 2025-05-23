@@ -163,7 +163,7 @@ export function FrameProvider({ children }: { children: React.ReactNode }) {
   const frameContext = useFrame();
 
   if (!frameContext.isSDKLoaded) {
-    return <div>Loading...</div>;
+    return <div></div>;
   }
 
   return (

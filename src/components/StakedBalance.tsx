@@ -194,7 +194,7 @@ export function StakedBalance({
   return (
     <div
       data-staking-balance
-      className="space-y-4 card border-gray-100 border-2 p-4"
+      className="space-y-4 card bg-base-100 border-gray-100 border-2 p-4 relative z-10"
     >
       <div>
         <div className="text-sm opacity-60 mb-1">My Staked Balance</div>

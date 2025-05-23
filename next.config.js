@@ -48,6 +48,10 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "farcaster.xyz",
+      },
+      {
+        protocol: "https",
         hostname: "media.firefly.land",
       },
       {
