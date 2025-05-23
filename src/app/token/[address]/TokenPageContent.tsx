@@ -345,8 +345,14 @@ export function TokenPageContent() {
       ? "https://www.geckoterminal.com/base/pools/0x1035ae3f87a91084c6c5084d0615cc6121c5e228?embed=1&info=0&swaps=1&grayscale=0&light_chart=1"
       : `https://www.geckoterminal.com/base/pools/${token.pool_address}?embed=1&info=0&swaps=1&grayscale=0&light_chart=1`;
 
+  const smallEmbedUrl =
+    pageAddress.toLowerCase() ===
+    "0x1234567890123456789012345678901234567890".toLowerCase()
+      ? "https://www.geckoterminal.com/base/pools/0x1035ae3f87a91084c6c5084d0615cc6121c5e228?embed=1&info=0&swaps=0&grayscale=0&light_chart=1"
+      : `https://www.geckoterminal.com/base/pools/${token.pool_address}?embed=1&info=0&swaps=0&grayscale=0&light_chart=1`;
+
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 lg:mt-20 pt-8 pb-12">
+    <div className="max-w-[1440px] mx-auto sm:px-6 lg:px-8 lg:mt-20 pt-8 pb-12">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8">
         <div className="order-1 lg:order-2 lg:col-span-4 space-y-4">
           <TokenInfo
@@ -382,11 +388,11 @@ export function TokenPageContent() {
         </div>
 
         <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1]">
-          <div className="card-body p-4 pb-12">
+          <div className="card-body p-0 md:p-4 pb-12">
             <iframe
               data-privy-ignore
               title="GeckoTerminal Embed"
-              src={embedUrl}
+              src={isMiniAppView ? smallEmbedUrl : embedUrl}
               className="w-full h-[500px] lg:h-[800px]"
               allow="clipboard-write"
               allowFullScreen
