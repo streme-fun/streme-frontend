@@ -167,37 +167,40 @@ export function TopStreamer() {
               </div>
             )}
             <div className="card-body p-2 gap-2">
-              <div>
-                <div className="flex items-start justify-between">
-                  <h2 className="card-title text-sm group-hover:text-primary transition-colors duration-300">
-                    {token.name}
-                  </h2>
-                  <div className="text-right">
-                    <div className="text-[11px] uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
-                      Market Cap
+              <div className="flex">
+                <div className="flex items-start justify-between w-full">
+                  <div className="flex flex-col gap-2">
+                    <h2 className="card-title text-sm group-hover:text-primary transition-colors duration-300">
+                      {token.name}
+                    </h2>
+
+                    <div className="flex items-center gap-2">
+                      <div className="avatar transition-transform duration-300 group-hover:scale-110">
+                        <div className="rounded-full w-4 h-4">
+                          <Image
+                            src={
+                              token.creator?.profileImage ??
+                              `/avatars/streme.png`
+                            }
+                            alt={token.creator?.name ?? "Anon"}
+                            width={16}
+                            height={16}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+                        {token.creator?.name ?? "Unknown"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end text-right">
+                    <div className="text-right text-xs uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
+                      MKT CAP
                     </div>
                     <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
                       {formatMarketCap(token.marketCap)}
                     </div>
                   </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="avatar transition-transform duration-300 group-hover:scale-110">
-                    <div className="rounded-full w-4 h-4">
-                      <Image
-                        src={
-                          token.creator?.profileImage ?? `/avatars/streme.png`
-                        }
-                        alt={token.creator?.name ?? "Anon"}
-                        width={16}
-                        height={16}
-                      />
-                    </div>
-                  </div>
-                  <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300">
-                    {token.creator?.name ?? "Unknown"}
-                  </span>
                 </div>
               </div>
 

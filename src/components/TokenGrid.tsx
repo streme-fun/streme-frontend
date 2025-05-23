@@ -211,13 +211,81 @@ const TokenCardComponent = ({
           </div>
         )}
         <div className="card-body p-2 gap-2">
-          <div>
-            <h2
-              className="card-title text-sm group-hover:text-primary transition-colors duration-300 truncate max-w-[200px] overflow-hidden"
-              title={token.name}
-            >
-              {token.name}
-            </h2>
+          <div className="flex">
+            <div className="flex items-start justify-between w-full">
+              <div className="flex flex-col gap-2">
+                <h2
+                  className="card-title text-sm group-hover:text-primary transition-colors duration-300 truncate max-w-[200px] overflow-hidden"
+                  title={token.name}
+                >
+                  {token.name}
+                </h2>
+                <div className="flex items-center gap-2">
+                  <div className="avatar transition-transform duration-300 group-hover:scale-110">
+                    <div className="rounded-full w-4 h-4">
+                      <Image
+                        src={
+                          token.creator?.profileImage ??
+                          `/avatars/${token.creator?.name ?? "streme"}.png`
+                        }
+                        alt={token.creator?.name ?? "Anon"}
+                        width={16}
+                        height={16}
+                        sizes="16px"
+                        unoptimized={
+                          (token.creator?.profileImage?.includes(".gif") ||
+                            token.creator?.profileImage?.includes(
+                              "imagedelivery.net"
+                            )) ??
+                          false
+                        }
+                      />
+                    </div>
+                  </div>
+                  <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2 max-w-[120px]">
+                    <span
+                      className="truncate"
+                      title={token.creator?.name ?? "Anon"}
+                    >
+                      {token.creator?.name ?? "Anon"}
+                    </span>
+                    {token.cast_hash && token.creator?.name && (
+                      <button
+                        onClick={handleFarcasterClick}
+                        className="hover:text-primary inline-flex items-center ml-auto"
+                        title={shortenHash(token.cast_hash)}
+                      >
+                        <Image
+                          src={FarcasterIcon}
+                          alt={`View on Farcaster: ${shortenHash(
+                            token.cast_hash
+                          )}`}
+                          width={12}
+                          height={12}
+                          className="opacity-80 group-hover:opacity-100"
+                        />
+                      </button>
+                    )}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end text-right">
+                <div className="text-right text-xs uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
+                  MKT CAP
+                </div>
+                <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
+                  {token.marketCap
+                    ? `$${
+                        token.marketCap >= 1000000
+                          ? (token.marketCap / 1000000).toFixed(1) + "M"
+                          : token.marketCap >= 1000
+                          ? (token.marketCap / 1000).toFixed(1) + "K"
+                          : token.marketCap.toFixed(0)
+                      }`
+                    : "-"}
+                </div>
+              </div>
+            </div>
             {/* Comment out market change display
             <div className="flex items-center justify-between">
               <div
@@ -233,57 +301,10 @@ const TokenCardComponent = ({
               </div>
             </div>
             */}
-
-            <div className="flex items-center gap-2 mt-2">
-              <div className="avatar transition-transform duration-300 group-hover:scale-110">
-                <div className="rounded-full w-4 h-4">
-                  <Image
-                    src={
-                      token.creator?.profileImage ??
-                      `/avatars/${token.creator?.name ?? "streme"}.png`
-                    }
-                    alt={token.creator?.name ?? "Anon"}
-                    width={16}
-                    height={16}
-                    sizes="16px"
-                    unoptimized={
-                      (token.creator?.profileImage?.includes(".gif") ||
-                        token.creator?.profileImage?.includes(
-                          "imagedelivery.net"
-                        )) ??
-                      false
-                    }
-                  />
-                </div>
-              </div>
-              <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2 max-w-[120px]">
-                <span
-                  className="truncate"
-                  title={token.creator?.name ?? "Anon"}
-                >
-                  {token.creator?.name ?? "Anon"}
-                </span>
-                {token.cast_hash && token.creator?.name && (
-                  <button
-                    onClick={handleFarcasterClick}
-                    className="hover:text-primary inline-flex items-center ml-auto"
-                    title={shortenHash(token.cast_hash)}
-                  >
-                    <Image
-                      src={FarcasterIcon}
-                      alt={`View on Farcaster: ${shortenHash(token.cast_hash)}`}
-                      width={12}
-                      height={12}
-                      className="opacity-80 group-hover:opacity-100"
-                    />
-                  </button>
-                )}
-              </span>
-            </div>
           </div>
 
           <div className="card-actions justify-end mt-auto">
-            <div className="w-full flex justify-between flex-col">
+            <div className="w-full px-1">
               <div className="text-[11px] uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
                 Rewards ({totalStakers}{" "}
                 {totalStakers === 1 ? "staker" : "stakers"})
@@ -292,7 +313,10 @@ const TokenCardComponent = ({
                 {rewards.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
-                })}
+                })}{" "}
+                <span className="text-xs font-normal opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+                  ${token.symbol}
+                </span>
               </div>
             </div>
           </div>
