@@ -2,11 +2,11 @@ import { TokenPageContent } from "./TokenPageContent";
 import { Metadata } from "next";
 
 type Props = {
-  params: { address: string };
+  params: Promise<{ address: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { address } = params;
+  const { address } = await params;
 
   try {
     // Determine the base URL - prefer environment variable, fallback to production URL

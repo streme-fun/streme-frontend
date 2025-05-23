@@ -6,9 +6,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { address: string } }
+  context: { params: Promise<{ address: string }> }
 ) {
-  const { address } = params;
+  const { address } = await context.params;
 
   console.log(`[Image Gen] Starting generation for token: ${address}`);
 
