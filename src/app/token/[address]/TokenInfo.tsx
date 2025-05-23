@@ -65,9 +65,9 @@ export function TokenInfo({ token }: { token: Token }) {
   }, []);
 
   return (
-    <div className="space-y-6 card border-gray-100 border-2 p-4">
+    <div className="space-y-3 card border-gray-100 border-2 p-4 mt-12 md:mt-0">
       {/* Token Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         {token.img_url ? (
           <div className="relative w-12 h-12">
             <Image
@@ -82,14 +82,14 @@ export function TokenInfo({ token }: { token: Token }) {
             {token.symbol?.[0] ?? "?"}
           </div>
         )}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h2 className="text-xl font-bold">{token.name}</h2>
           <div className="flex items-center gap-2">
             <span className="text-sm opacity-60">${token.symbol}</span>
           </div>
         </div>
         {token.creator && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="avatar">
               <div className="w-6 h-6 rounded-full">
                 <Image
@@ -137,7 +137,7 @@ export function TokenInfo({ token }: { token: Token }) {
       {/* Price Row */}
       <div className="flex items-end justify-between px-1">
         <div>
-          <div className="text-sm opacity-60 mb-1">Price</div>
+          <div className="text-sm opacity-60 md:mb-1">Price</div>
           <div className="font-mono text-xl font-bold">
             {formatPrice(token.price)}
           </div>
@@ -163,7 +163,7 @@ export function TokenInfo({ token }: { token: Token }) {
       {/* Market Stats */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm opacity-60 mb-1">24h Volume</div>
+          <div className="text-sm opacity-60 md:mb-1">24h Volume</div>
           <div className="font-mono text-lg">
             {formatCurrency(token.volume24h)}
           </div>
@@ -179,7 +179,7 @@ export function TokenInfo({ token }: { token: Token }) {
       {/* Rewards Row */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm opacity-60 mb-1">
+          <div className="text-sm opacity-60 md:mb-1">
             Total Rewards Distributed ({totalStakers}{" "}
             {totalStakers === 1 ? "staker" : "stakers"})
           </div>

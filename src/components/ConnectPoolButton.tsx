@@ -178,7 +178,7 @@ export function ConnectPoolButton({
     <button
       onClick={handleConnectPool}
       disabled={isConnecting || !effectiveIsConnected}
-      className="btn btn-sm btn-primary"
+      className="btn btn-primary w-full"
     >
       {isConnecting ? (
         <>
