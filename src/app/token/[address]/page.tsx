@@ -63,12 +63,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const imageUrl = `${baseUrl}/api/token/${address}/image`;
     const pageUrl = `${baseUrl}/token/${address}`;
 
+    console.log(`[Frame Debug] Token: ${token.name}, Image URL: ${imageUrl}`);
+
     // Create the Farcaster Frame Embed object
     const frameEmbed = {
       version: "next",
       imageUrl: imageUrl,
       button: {
-        title: "View Token",
+        title: "View Token on Streme",
         action: {
           type: "launch_frame",
           name: "Streme.fun",
@@ -89,7 +91,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           {
             url: imageUrl,
             width: 1200,
-            height: 630,
+            height: 800,
             alt: `${token.name} (${token.symbol}) on Streme.fun`,
           },
         ],
@@ -143,7 +145,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           {
             url: `${baseUrl}/streme-og.png`,
             width: 1200,
-            height: 630,
+            height: 800,
             alt: "Streme.fun - Premier memecoin trading platform",
           },
         ],
