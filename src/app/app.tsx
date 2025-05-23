@@ -13,7 +13,7 @@ import { SearchBar } from "../components/SearchBar";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic"; // Import the new hook
 import { Button } from "../components/ui/button"; // Corrected import path based on file structure
 import { base } from "wagmi/chains"; // Only base needed here now
-import { truncateAddressShort } from "../lib/truncateAddress";
+// import { truncateAddressShort } from "../lib/truncateAddress";
 
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -25,7 +25,7 @@ function App() {
     isSDKLoaded,
     isMiniAppView,
     // farcasterContext,
-    address,
+    // address,
     isConnected,
     isOnCorrectNetwork,
     connect,
@@ -155,7 +155,6 @@ function App() {
                 onChange={(value) => setSearchQuery(value)}
               />
             </div>
-            <div className="text-sm">{truncateAddressShort(address ?? "")}</div>
           </div>
 
           <div className="w-full max-w-md">

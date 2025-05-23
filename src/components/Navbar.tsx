@@ -2,12 +2,28 @@
 
 import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Image from "next/image";
 import { HowItWorksModal } from "./HowItWorksModal";
 import { LaunchTokenModal } from "./LaunchTokenModal";
 import { LeaderboardModal } from "./LeaderboardModal";
+import { WalletProfileModal } from "./WalletProfileModal";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import sdk from "@farcaster/frame-sdk";
+
+// Client-side function to fetch user data from our API
+const fetchNeynarUser = async (fid: number) => {
+  try {
+    const response = await fetch(`/api/neynar/user/${fid}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching user from API:", error);
+    return null;
+  }
+};
 
 export function Navbar() {
   const {
@@ -25,6 +41,7 @@ export function Navbar() {
     // connectors: wagmiConnectors,
     isSDKLoaded,
     isMiniAppView,
+    farcasterContext,
   } = useAppFrameLogic();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -32,11 +49,37 @@ export function Navbar() {
   const [isLaunchTokenOpen, setIsLaunchTokenOpen] = useState(false);
   const [isAddressDropdownOpen, setIsAddressDropdownOpen] = useState(false);
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
+  const [isWalletProfileOpen, setIsWalletProfileOpen] = useState(false);
+
+  // Profile picture state for mini-app
+  const [miniAppProfileImage, setMiniAppProfileImage] = useState<string>("");
 
   const truncateAddress = (address: string) => {
     if (!address) return "";
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
+
+  // Fetch profile picture for mini-app view
+  useEffect(() => {
+    const fetchMiniAppProfile = async () => {
+      if (!isMiniAppView || !farcasterContext?.user?.fid) {
+        setMiniAppProfileImage("");
+        return;
+      }
+
+      try {
+        const neynarUser = await fetchNeynarUser(farcasterContext.user.fid);
+        if (neynarUser?.pfp_url) {
+          setMiniAppProfileImage(neynarUser.pfp_url);
+        }
+      } catch (error) {
+        console.error("Error fetching mini-app profile:", error);
+        setMiniAppProfileImage("");
+      }
+    };
+
+    fetchMiniAppProfile();
+  }, [isMiniAppView, farcasterContext?.user?.fid]);
 
   // const handleMiniAppConnect = () => {
   //   const fcConnector = wagmiConnectors.find((c) => c.id === "farcaster");
@@ -145,6 +188,44 @@ export function Navbar() {
               </svg>
               Leaderboard
             </button>
+
+            {/* Profile Button */}
+            <button
+              onClick={() => setIsWalletProfileOpen(true)}
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 hover:text-primary flex-1"
+            >
+              {/* Profile Picture or Default Icon */}
+              {miniAppProfileImage ? (
+                <div className="relative w-6 h-6 mb-0.5 rounded-full overflow-hidden">
+                  <Image
+                    src={miniAppProfileImage}
+                    alt="Profile"
+                    fill
+                    className="object-cover"
+                    unoptimized={
+                      miniAppProfileImage.includes(".gif") ||
+                      miniAppProfileImage.includes("imagedelivery.net")
+                    }
+                  />
+                </div>
+              ) : (
+                <svg
+                  className="w-6 h-6 mb-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  ></path>
+                </svg>
+              )}
+              Profile
+            </button>
           </div>
         </nav>
 
@@ -159,6 +240,10 @@ export function Navbar() {
         <LeaderboardModal
           isOpen={isLeaderboardModalOpen}
           onClose={() => setIsLeaderboardModalOpen(false)}
+        />
+        <WalletProfileModal
+          isOpen={isWalletProfileOpen}
+          onClose={() => setIsWalletProfileOpen(false)}
         />
       </>
     );
