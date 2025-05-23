@@ -118,8 +118,7 @@ export function TokenActions({
       : undefined;
   } else {
     currentAddress = privyUser?.wallet?.address as `0x${string}` | undefined;
-    walletIsConnected =
-      privyReady && !!privyUser?.wallet?.address && wagmiIsConnectedGlobal;
+    walletIsConnected = privyReady && !!privyUser?.wallet?.address;
     onCorrectNetwork = activeChain?.id === base.id;
     effectiveLogin = privyLogin;
     effectiveSwitchNetwork = wagmiSwitchNetwork
