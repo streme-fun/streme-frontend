@@ -16,7 +16,90 @@ interface TokenGridProps {
   sortBy: SortOption;
 }
 
-export type SortOption = "stakers" | "newest" | "oldest";
+export type SortOption = "stakers" | "newest" | "oldest" | "trending";
+
+// Interface for the trending API response
+interface TrendingTokenResponse {
+  id: number;
+  created_at: string;
+  tx_hash: string;
+  contract_address: string;
+  requestor_fid: number;
+  name: string;
+  symbol: string;
+  img_url: string;
+  pool_address: string;
+  cast_hash: string;
+  type: string;
+  pair: string;
+  chain_id: number;
+  metadata: Record<string, unknown>;
+  staking_pool: string;
+  staking_address: string;
+  pfp_url: string;
+  username: string;
+  timestamp: { _seconds: number; _nanoseconds: number };
+  marketData?: {
+    price?: number;
+    marketCap?: number;
+    volume24h?: number;
+    priceChange1h?: number;
+    priceChange24h?: number;
+  };
+  deployer: string;
+  lastTraded?: { _seconds: number; _nanoseconds: number };
+}
+
+// Function to fetch trending tokens from the API
+const fetchTrendingTokens = async (): Promise<Token[]> => {
+  try {
+    const response = await fetch("/api/tokens/trending");
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const trendingData: TrendingTokenResponse[] = await response.json();
+
+    // Transform API response to match Token interface
+    return trendingData.map((apiToken) => ({
+      id: apiToken.id,
+      created_at: apiToken.created_at,
+      tx_hash: apiToken.tx_hash,
+      contract_address: apiToken.contract_address,
+      requestor_fid: apiToken.requestor_fid,
+      name: apiToken.name,
+      symbol: apiToken.symbol,
+      img_url: apiToken.img_url,
+      pool_address: apiToken.pool_address,
+      cast_hash: apiToken.cast_hash,
+      type: apiToken.type,
+      pair: apiToken.pair,
+      chain_id: apiToken.chain_id,
+      metadata: apiToken.metadata,
+      profileImage: null, // Not in API response
+      pool_id: apiToken.pool_address, // Use pool_address as pool_id
+      staking_pool: apiToken.staking_pool,
+      staking_address: apiToken.staking_address,
+      pfp_url: apiToken.pfp_url,
+      username: apiToken.username,
+      timestamp: apiToken.timestamp,
+      price: apiToken.marketData?.price,
+      marketCap: apiToken.marketData?.marketCap,
+      volume24h: apiToken.marketData?.volume24h,
+      change1h: apiToken.marketData?.priceChange1h,
+      change24h: apiToken.marketData?.priceChange24h,
+      creator: {
+        name: apiToken.username,
+        score: 0, // Not available in API
+        recasts: 0, // Not available in API
+        likes: 0, // Not available in API
+        profileImage: apiToken.pfp_url,
+      },
+    }));
+  } catch (error) {
+    console.error("Error fetching trending tokens:", error);
+    return [];
+  }
+};
 
 const TokenCardComponent = ({
   token,
@@ -228,14 +311,26 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
   const [totalItemsCount, setTotalItemsCount] = useState(0);
   const [stakersSortedAllTokensCache, setStakersSortedAllTokensCache] =
     useState<Array<Token & { rewards: number; totalStakers: number }>>([]);
+  const [trendingTokens, setTrendingTokens] = useState<Token[]>([]);
   const TOKENS_PER_PAGE = 12;
+
+  // Fetch trending tokens when sortBy is "trending"
+  useEffect(() => {
+    if (sortBy === "trending") {
+      const fetchTrending = async () => {
+        const trending = await fetchTrendingTokens();
+        setTrendingTokens(trending);
+      };
+      fetchTrending();
+    }
+  }, [sortBy]);
 
   useEffect(() => {
     setCurrentPage(1);
     setDisplayedTokens([]);
     setTotalItemsCount(0);
     setStakersSortedAllTokensCache([]);
-  }, [tokens]);
+  }, [tokens, sortBy]);
 
   // Helper to enrich a batch of tokens with rewards and stakers data
   const enrichTokenBatch = async (batch: Token[]) => {
@@ -281,7 +376,10 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
   // Main data processing effect: handles filtering, searching, sorting, and pagination
   useEffect(() => {
     const fetchDataAndProcess = async () => {
-      if (!tokens || tokens.length === 0) {
+      // Determine which tokens to use based on sortBy
+      const sourceTokens = sortBy === "trending" ? trendingTokens : tokens;
+
+      if (!sourceTokens || sourceTokens.length === 0) {
         if (displayedTokens.length > 0) setDisplayedTokens([]);
         setTotalItemsCount(0);
         if (stakersSortedAllTokensCache.length > 0)
@@ -293,7 +391,9 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
       setIsLoadingMore(true);
 
       const uniqueIncomingTokens = Array.from(
-        new Map(tokens.map((token) => [token.contract_address, token])).values()
+        new Map(
+          sourceTokens.map((token) => [token.contract_address, token])
+        ).values()
       );
       const baseFilteredTokens = uniqueIncomingTokens.filter(
         (token) =>
@@ -351,6 +451,13 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
             setStakersSortedAllTokensCache(sortedTokens);
           }
         }
+      } else if (sortBy === "trending") {
+        // For trending, tokens are already sorted by the API, just enrich them
+        const enrichedTrending = await enrichTokenBatch(searchedTokensResult);
+        sortedTokens = enrichedTrending;
+        // Clear staker cache if we switch to trending
+        if (stakersSortedAllTokensCache.length > 0)
+          setStakersSortedAllTokensCache([]);
       } else {
         // For "newest" or "oldest" sort: Sort by date. Enrichment happens per page.
         // We cast searchedTokensResult here as its enrichment status is not yet guaranteed.
@@ -375,10 +482,13 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
         Token & { rewards: number; totalStakers: number }
       >;
       // Use sortBy prop for logic
-      if (sortBy !== "stakers" || searchQuery.trim()) {
+      if (
+        (sortBy !== "stakers" && sortBy !== "trending") ||
+        searchQuery.trim()
+      ) {
         finalPageBatch = await enrichTokenBatch(pageBatchUnenriched);
       } else {
-        // If staker sort and no search, tokens are already enriched from sortedTokens (or cache)
+        // If staker sort or trending and no search, tokens are already enriched from sortedTokens (or cache)
         finalPageBatch = pageBatchUnenriched as Array<
           Token & { rewards: number; totalStakers: number }
         >;
@@ -402,7 +512,7 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
     };
 
     fetchDataAndProcess();
-  }, [tokens, currentPage, sortBy, searchQuery]); // Main effect dependency array
+  }, [tokens, trendingTokens, currentPage, sortBy, searchQuery]); // Main effect dependency array
 
   // Handle loading more tokens
   const handleLoadMore = () => {

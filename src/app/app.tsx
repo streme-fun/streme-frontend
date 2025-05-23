@@ -19,7 +19,7 @@ function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [sortBy, setSortBy] = useState<SortOption>("trending");
 
   const {
     isSDKLoaded,
@@ -162,21 +162,22 @@ function App() {
             <div className="flex items-center gap-4 my-2">
               <div className="flex-none w-full">
                 <div className="join w-full">
-                  {(["newest", "oldest", "stakers"] as SortOption[]).map(
-                    (option) => (
-                      <button
-                        key={option}
-                        onClick={() => setSortBy(option)}
-                        className={`btn btn-sm join-item flex-1 ${
-                          sortBy === option ? "btn-primary" : "btn-ghost"
-                        }`}
-                      >
-                        {option === "newest" && "Newest"}
-                        {option === "oldest" && "Oldest"}
-                        {option === "stakers" && "Stakers"}
-                      </button>
-                    )
-                  )}
+                  {(
+                    ["trending", "newest", "oldest", "stakers"] as SortOption[]
+                  ).map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => setSortBy(option)}
+                      className={`btn btn-sm join-item flex-1 ${
+                        sortBy === option ? "btn-primary" : "btn-ghost"
+                      }`}
+                    >
+                      {option === "trending" && "Trending"}
+                      {option === "newest" && "Newest"}
+                      {option === "oldest" && "Oldest"}
+                      {option === "stakers" && "Stakers"}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -236,21 +237,22 @@ function App() {
             <div className="flex items-center gap-4 my-4">
               <div className="flex-none">
                 <div className="join">
-                  {(["newest", "oldest", "stakers"] as SortOption[]).map(
-                    (option) => (
-                      <button
-                        key={option}
-                        onClick={() => setSortBy(option)}
-                        className={`btn btn-sm join-item ${
-                          sortBy === option ? "btn-primary" : "btn-ghost"
-                        }`}
-                      >
-                        {option === "newest" && "Newest"}
-                        {option === "oldest" && "Oldest"}
-                        {option === "stakers" && "Most Stakers"}
-                      </button>
-                    )
-                  )}
+                  {(
+                    ["trending", "newest", "oldest", "stakers"] as SortOption[]
+                  ).map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => setSortBy(option)}
+                      className={`btn btn-sm join-item ${
+                        sortBy === option ? "btn-primary" : "btn-ghost"
+                      }`}
+                    >
+                      {option === "trending" && "Trending"}
+                      {option === "newest" && "Newest"}
+                      {option === "oldest" && "Oldest"}
+                      {option === "stakers" && "Most Stakers"}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="flex-1">
