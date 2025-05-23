@@ -234,7 +234,7 @@ function App() {
           <Hero />
           <TopStreamer />
           <div className="w-full max-w-[1200px] px-4">
-            <div className="flex items-center gap-4 my-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 my-4">
               <div className="flex-none">
                 <div className="join">
                   {(

@@ -10,14 +10,76 @@ import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
 export function TopStreamer() {
   const [token, setToken] = useState<Token | null>(null);
   const [rewards, setRewards] = useState(0);
+  const [totalStakers, setTotalStakers] = useState(0);
+
+  // Helper function to format market cap
+  const formatMarketCap = (marketCap: number | undefined) => {
+    if (!marketCap || isNaN(marketCap)) return "-";
+
+    if (marketCap >= 1000000) {
+      return `$${(marketCap / 1000000).toFixed(1)}M`;
+    } else if (marketCap >= 1000) {
+      return `$${(marketCap / 1000).toFixed(1)}K`;
+    } else {
+      return `$${marketCap.toFixed(0)}`;
+    }
+  };
 
   useEffect(() => {
     // Fetch tokens and randomly select one
     async function fetchRandomToken() {
       try {
-        const response = await fetch("/api/tokens");
-        const data = await response.json();
-        const tokens: Token[] = data.data;
+        const response = await fetch("/api/tokens/trending");
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const trendingData = await response.json();
+
+        // Check if trending data is an array
+        if (!Array.isArray(trendingData)) {
+          console.error("Trending data is not an array:", trendingData);
+          setToken(null);
+          return;
+        }
+
+        // Transform API response to match Token interface (same as TokenGrid.tsx)
+        const tokens: Token[] = trendingData.map((apiToken) => ({
+          id: apiToken.id,
+          created_at: apiToken.created_at,
+          tx_hash: apiToken.tx_hash,
+          contract_address: apiToken.contract_address,
+          requestor_fid: apiToken.requestor_fid,
+          name: apiToken.name,
+          symbol: apiToken.symbol,
+          img_url: apiToken.img_url,
+          pool_address: apiToken.pool_address,
+          cast_hash: apiToken.cast_hash,
+          type: apiToken.type,
+          pair: apiToken.pair,
+          chain_id: apiToken.chain_id,
+          metadata: apiToken.metadata,
+          profileImage: null,
+          pool_id: apiToken.pool_address,
+          staking_pool: apiToken.staking_pool,
+          staking_address: apiToken.staking_address,
+          pfp_url: apiToken.pfp_url,
+          username: apiToken.username,
+          timestamp: apiToken.timestamp,
+          price: apiToken.marketData?.price,
+          marketCap: apiToken.marketData?.marketCap,
+          volume24h: apiToken.marketData?.volume24h,
+          change1h: apiToken.marketData?.priceChange1h,
+          change24h: apiToken.marketData?.priceChange24h,
+          creator: {
+            name: apiToken.username,
+            score: 0,
+            recasts: 0,
+            likes: 0,
+            profileImage: apiToken.pfp_url,
+          },
+        }));
 
         // Filter out blacklisted tokens
         const filteredTokens = tokens.filter(
@@ -28,22 +90,29 @@ export function TopStreamer() {
 
         // Randomly select a token from the filtered list
         if (filteredTokens.length === 0) {
-          setToken(null); // Or handle this case as you see fit
+          setToken(null);
           return;
         }
         const randomToken =
           filteredTokens[Math.floor(Math.random() * filteredTokens.length)];
-        setToken(randomToken);
 
-        // Calculate initial rewards
-        if (randomToken) {
-          const { totalStreamed } = await calculateRewards(
+        // Enrich the selected token with rewards and stakers (same as TokenGrid enrichTokenBatch)
+        const { totalStreamed, totalStakers: stakersCount } =
+          await calculateRewards(
             randomToken.created_at,
             randomToken.contract_address,
             randomToken.staking_pool
           );
-          setRewards(totalStreamed);
-        }
+
+        // Set the enriched token with rewards and stakers
+        setToken({
+          ...randomToken,
+          rewards: totalStreamed,
+          totalStakers: stakersCount,
+        } as Token & { rewards: number; totalStakers: number });
+
+        setRewards(totalStreamed);
+        setTotalStakers(stakersCount);
       } catch (error) {
         console.error("Error fetching random token:", error);
       }
@@ -65,10 +134,10 @@ export function TopStreamer() {
   if (!token) return null;
 
   return (
-    <div className="w-full max-w-[1200px] mx-auto mb-8">
+    <div className="hidden md:block w-full max-w-[1200px] mx-auto mb-8">
       <div className="text-center mb-4">
         <h2 className="text-3xl font-bold tracking-tight">
-          🎁 RANDOMLY FEATURED TOKEN
+          🚀 TRENDING STREMER
         </h2>
       </div>
 
@@ -99,11 +168,21 @@ export function TopStreamer() {
             )}
             <div className="card-body p-2 gap-2">
               <div>
-                <h2 className="card-title text-sm group-hover:text-primary transition-colors duration-300">
-                  {token.name}
-                </h2>
+                <div className="flex items-start justify-between">
+                  <h2 className="card-title text-sm group-hover:text-primary transition-colors duration-300">
+                    {token.name}
+                  </h2>
+                  <div className="text-right">
+                    <div className="text-[11px] uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
+                      Market Cap
+                    </div>
+                    <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
+                      {formatMarketCap(token.marketCap)}
+                    </div>
+                  </div>
+                </div>
 
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2">
                   <div className="avatar transition-transform duration-300 group-hover:scale-110">
                     <div className="rounded-full w-4 h-4">
                       <Image
@@ -123,9 +202,10 @@ export function TopStreamer() {
               </div>
 
               <div className="card-actions justify-end mt-auto">
-                <div className="w-full px-1 flex items-center justify-between">
+                <div className="w-full px-1">
                   <div className="text-[11px] uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
-                    Rewards
+                    Rewards ({totalStakers}{" "}
+                    {totalStakers === 1 ? "staker" : "stakers"})
                   </div>
                   <div className="font-mono text-base font-bold group-hover:text-primary transition-colors duration-300">
                     {rewards.toLocaleString(undefined, {

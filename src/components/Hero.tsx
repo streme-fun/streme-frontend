@@ -51,10 +51,10 @@ export function Hero() {
   }, []);
 
   return (
-    <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-20">
+    <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-28 md:mt-20">
       {/* Hero Text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center z-10 text-center">
-        <h1 className="text-7xl md:text-7xl font-extrabold tracking-tight mb-4">
+        <h1 className="text-6xl md:text-7xl font-extrabold tracking-tight mb-4">
           <span className="text-primary drop-shadow-sm">Ape.</span>{" "}
           <span className="text-secondary drop-shadow-sm">Stake.</span>{" "}
           <span className="text-accent drop-shadow-sm">Earn.</span>
