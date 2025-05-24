@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         }))
     );
 
-    const enrichedTokens = await enrichTokensWithData(tokens);
+    const enrichedTokens = await enrichTokensWithData(tokens, true);
 
     // Get the timestamp of the last token for next page
     const lastToken = tokens[tokens.length - 1];
