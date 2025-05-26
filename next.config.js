@@ -32,6 +32,10 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "*.arweave.net",
+      },
+      {
+        protocol: "https",
         hostname: "utfs.io",
       },
       {

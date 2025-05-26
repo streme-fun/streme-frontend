@@ -87,7 +87,7 @@ export function TokenActions({
     farcasterContext,
   } = useAppFrameLogic();
 
-  const { user: privyUser, ready: privyReady, login: privyLogin } = usePrivy();
+  const { ready: privyReady, login: privyLogin } = usePrivy();
   const {
     address: wagmiAddress,
     isConnected: wagmiIsConnectedGlobal,
@@ -121,8 +121,8 @@ export function TokenActions({
       ? () => fcSwitchChain({ chainId: base.id })
       : undefined;
   } else {
-    currentAddress = privyUser?.wallet?.address as `0x${string}` | undefined;
-    walletIsConnected = privyReady && !!privyUser?.wallet?.address;
+    currentAddress = wagmiAddress;
+    walletIsConnected = privyReady && !!wagmiAddress;
     onCorrectNetwork = activeChain?.id === base.id;
     effectiveLogin = privyLogin;
     effectiveSwitchNetwork = wagmiSwitchNetwork
@@ -143,7 +143,6 @@ export function TokenActions({
       fcAddress,
       fcIsConnected,
       fcIsOnCorrectNetwork,
-      privyUserAddress: privyUser?.wallet?.address,
       wagmiAddress,
       wagmiIsConnectedGlobal,
       activeChainId: activeChain?.id,
@@ -161,7 +160,6 @@ export function TokenActions({
     fcAddress,
     fcIsConnected,
     fcIsOnCorrectNetwork,
-    privyUser?.wallet?.address,
     wagmiAddress,
     wagmiIsConnectedGlobal,
     activeChain?.id,

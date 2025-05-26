@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAccount } from "wagmi";
 import { formatUnits } from "viem";
 import { useState, useEffect } from "react";
 import { publicClient } from "@/src/lib/viemClient"; // Import the centralized client
@@ -32,7 +32,7 @@ export function StakedBalance({
   farcasterAddress,
   farcasterIsConnected,
 }: StakedBalanceProps) {
-  const { user } = usePrivy(); // Keep for non-mini-app path
+  const { address: wagmiAddress } = useAccount();
   const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
   const [poolPercentage, setPoolPercentage] = useState<string>("0");
   const [flowRate, setFlowRate] = useState<string>("0");
@@ -43,8 +43,8 @@ export function StakedBalance({
 
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
-    : !!user?.wallet?.address;
-  const effectiveAddress = isMiniApp ? farcasterAddress : user?.wallet?.address;
+    : !!wagmiAddress;
+  const effectiveAddress = isMiniApp ? farcasterAddress : wagmiAddress;
 
   const refresh = () => setRefreshTrigger((prev) => prev + 1);
 

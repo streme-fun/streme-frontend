@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useAccount } from "wagmi";
 import { createWalletClient, custom } from "viem";
 import { base } from "viem/chains";
 import { UnstakeModal } from "./UnstakeModal";
@@ -60,7 +60,7 @@ export function UnstakeButton({
   farcasterAddress,
   farcasterIsConnected,
 }: UnstakeButtonProps) {
-  const { user } = usePrivy();
+  const { address: wagmiAddress } = useAccount();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unlockTime, setUnlockTime] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>("");
@@ -68,8 +68,8 @@ export function UnstakeButton({
 
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
-    : !!user?.wallet?.address;
-  const effectiveAddress = isMiniApp ? farcasterAddress : user?.wallet?.address;
+    : !!wagmiAddress;
+  const effectiveAddress = isMiniApp ? farcasterAddress : wagmiAddress;
 
   const fetchUnlockTime = useCallback(async () => {
     if (!effectiveAddress || !effectiveIsConnected) return;
@@ -176,16 +176,16 @@ export function UnstakeButton({
         }
         toast.success("Unstaking successful!", { id: toastId });
       } else {
-        // Privy Path
-        if (!window.ethereum || !user?.wallet?.address) {
+        // Wagmi Path
+        if (!window.ethereum || !wagmiAddress) {
           throw new Error(
-            "Privy wallet not connected or Ethereum provider missing."
+            "Wagmi wallet not connected or Ethereum provider missing."
           );
         }
-        const walletAddress = user.wallet.address; // Define walletAddress for Privy path
+        const walletAddress = wagmiAddress; // Define walletAddress for Wagmi path
 
         const walletClient = createWalletClient({
-          // Define walletClient for Privy path
+          // Define walletClient for Wagmi path
           chain: base,
           transport: custom(window.ethereum),
           account: toHex(walletAddress),
@@ -208,7 +208,7 @@ export function UnstakeButton({
 
         if (!unstakeTxHash) {
           throw new Error(
-            "Unstake transaction hash not received (Privy). User might have cancelled."
+            "Unstake transaction hash not received (Wagmi). User might have cancelled."
           );
         }
         toast.loading("Waiting for unstake confirmation...", { id: toastId });
@@ -217,7 +217,7 @@ export function UnstakeButton({
           hash: unstakeTxHash,
         });
         if (!unstakeReceipt.status || unstakeReceipt.status !== "success") {
-          throw new Error("Unstake transaction failed (Privy).");
+          throw new Error("Unstake transaction failed (Wagmi).");
         }
         toast.success("Unstaking successful!", { id: toastId });
       }

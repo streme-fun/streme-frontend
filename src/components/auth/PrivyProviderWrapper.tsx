@@ -10,10 +10,25 @@ const PrivyProviderWrapper = ({ children }: { children: React.ReactNode }) => {
       config={{
         defaultChain: base,
         supportedChains: [base],
+        embeddedWallets: {
+          createOnLogin: "users-without-wallets",
+          showWalletUIs: true,
+        },
+        externalWallets: {
+          coinbaseWallet: {
+            connectionOptions: "smartWalletOnly",
+          },
+        },
         appearance: {
-          theme: "light", // or 'light'
-          accentColor: "#676FFF", // Customize this to match your app's theme
-          logo: "https://streme.fun/android-chrome-512x512.png", // URL to your logo
+          theme: "light",
+          accentColor: "#676FFF",
+          logo: "https://streme.fun/android-chrome-512x512.png",
+          showWalletLoginFirst: false,
+          walletChainType: "ethereum-only",
+        },
+        loginMethods: ["wallet", "email", "google", "twitter"],
+        mfa: {
+          noPromptOnMfaRequired: false,
         },
       }}
     >

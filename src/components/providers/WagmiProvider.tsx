@@ -1,4 +1,5 @@
-import { createConfig, http, WagmiProvider } from "wagmi";
+import { http } from "wagmi";
+import { createConfig, WagmiProvider } from "@privy-io/wagmi";
 import {
   base,
   baseSepolia,

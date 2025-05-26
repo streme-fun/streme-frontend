@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useAccount } from "wagmi";
 import { formatUnits, parseUnits } from "viem";
 import { Modal } from "./Modal";
 
@@ -72,7 +72,7 @@ export function StakeModal({
   const [isSuccess, setIsSuccess] = useState(false);
   const [step, setStep] = useState<"idle" | "staking" | "connecting">("idle");
   const [error, setError] = useState<string | null>(null);
-  const { user } = usePrivy();
+  const { address: wagmiAddress } = useAccount();
 
   const handleStake = async () => {
     setError(null);
@@ -197,7 +197,7 @@ export function StakeModal({
             Token rewards are now being streamed directly to your wallet.
           </p>
           <a
-            href={`https://explorer.superfluid.finance/base-mainnet/accounts/${user?.wallet?.address}?tab=pools`}
+            href={`https://explorer.superfluid.finance/base-mainnet/accounts/${wagmiAddress}?tab=pools`}
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn-accent w-full"

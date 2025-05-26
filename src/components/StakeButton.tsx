@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { useWallets } from "@privy-io/react-auth";
+import { useAccount } from "wagmi";
 // import { base } from "viem/chains"; // Removed as it's no longer used
 import { StakeModal } from "./StakeModal";
 import { Interface } from "@ethersproject/abi";
@@ -68,16 +69,16 @@ export function StakeButton({
   farcasterAddress,
   farcasterIsConnected,
 }: StakeButtonProps) {
-  const { user } = usePrivy();
   const { wallets } = useWallets();
+  const { address: wagmiAddress } = useAccount();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [balance, setBalance] = useState<bigint>(0n);
   const [isLoading, setIsLoading] = useState(false); // Added for loading state
 
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
-    : !!user?.wallet?.address;
-  const effectiveAddress = isMiniApp ? farcasterAddress : user?.wallet?.address;
+    : !!wagmiAddress;
+  const effectiveAddress = isMiniApp ? farcasterAddress : wagmiAddress;
 
   const fetchBalance = useCallback(async () => {
     if (!effectiveAddress || !effectiveIsConnected) {
@@ -249,12 +250,11 @@ export function StakeButton({
           }
         }
       } else {
-        // Privy Path (existing logic, ensure it also throws detailed errors)
-        if (!user?.wallet?.address)
-          throw new Error("Privy wallet not connected.");
-        const walletAddress = user.wallet.address;
+        // Wagmi Path (existing logic, ensure it also throws detailed errors)
+        if (!wagmiAddress) throw new Error("Wagmi wallet not connected.");
+        const walletAddress = wagmiAddress;
         const wallet = wallets.find((w) => w.address === walletAddress);
-        if (!wallet) throw new Error("Privy Wallet not found");
+        if (!wallet) throw new Error("Wagmi Wallet not found");
         const provider = await wallet.getEthereumProvider();
         await provider.request({
           method: "wallet_switchEthereumChain",
@@ -284,7 +284,7 @@ export function StakeButton({
           approveTxHash = approveTxResult as `0x${string}`;
           if (!approveTxHash)
             throw new Error(
-              "Approval transaction hash not received (Privy). User might have cancelled."
+              "Approval transaction hash not received (Wagmi). User might have cancelled."
             );
           toast.loading("Waiting for approval confirmation...", {
             id: toastId,
@@ -293,7 +293,7 @@ export function StakeButton({
             hash: approveTxHash,
           });
           if (!approveReceipt.status || approveReceipt.status !== "success")
-            throw new Error("Approval transaction failed (Privy)");
+            throw new Error("Approval transaction failed (Wagmi)");
           toast.success("Approval successful!", { id: toastId });
         }
 
@@ -326,14 +326,14 @@ export function StakeButton({
         stakeTxHash = stakeTxResult as `0x${string}`;
         if (!stakeTxHash)
           throw new Error(
-            "Stake transaction hash not received (Privy). User might have cancelled."
+            "Stake transaction hash not received (Wagmi). User might have cancelled."
           );
         toast.loading("Waiting for stake confirmation...", { id: toastId });
         const stakeReceipt = await publicClient.waitForTransactionReceipt({
           hash: stakeTxHash,
         });
         if (!stakeReceipt.status || stakeReceipt.status !== "success")
-          throw new Error("Stake transaction failed (Privy)");
+          throw new Error("Stake transaction failed (Wagmi)");
         toast.success("Staking successful!", { id: toastId });
 
         if (
@@ -367,7 +367,7 @@ export function StakeButton({
             });
             connectTxHash = connectTxResult as `0x${string}`;
             if (!connectTxHash)
-              throw new Error("Pool conn tx hash not received (Privy).");
+              throw new Error("Pool conn tx hash not received (Wagmi).");
             await publicClient.waitForTransactionReceipt({
               hash: connectTxHash,
             });
