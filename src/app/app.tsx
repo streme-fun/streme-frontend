@@ -2,7 +2,7 @@
 
 import { TokenGrid } from "../components/TokenGrid";
 // import { ViewSwitcher } from "./components/ViewSwitcher";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Hero } from "../components/Hero";
 import { HeroAnimationMini } from "../components/HeroAnimationMini";
 import { TopStreamer } from "../components/TopStreamer";
@@ -20,6 +20,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("trending");
+  const hasInitiallyFetched = useRef(false);
 
   const {
     isSDKLoaded,
@@ -63,10 +64,14 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!isMiniAppView || (isMiniAppView && isOnCorrectNetwork)) {
+    if (
+      (!isMiniAppView || (isMiniAppView && isOnCorrectNetwork)) &&
+      !hasInitiallyFetched.current
+    ) {
+      hasInitiallyFetched.current = true;
       fetchTokens();
     }
-  }, [isMiniAppView, isOnCorrectNetwork, fetchTokens]);
+  }, [isMiniAppView, isOnCorrectNetwork]);
 
   useEffect(() => {
     if (isMiniAppView && isSDKLoaded && promptToAddMiniApp) {

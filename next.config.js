@@ -8,6 +8,10 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "supercast.mypinata.cloud",
+      },
+      {
+        protocol: "https",
         hostname: "imagedelivery.net",
       },
       {

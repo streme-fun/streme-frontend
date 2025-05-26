@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import FarcasterIcon from "@/public/farcaster.svg";
@@ -18,13 +18,14 @@ interface TokenGridProps {
 
 export type SortOption = "stakers" | "newest" | "oldest" | "trending";
 
-// Interface for the trending API response
-interface TrendingTokenResponse {
+// Interface for the streme.fun API response
+interface StremeTokenResponse {
   id: number;
   created_at: string;
   tx_hash: string;
   contract_address: string;
   requestor_fid: number;
+  deployer: string;
   name: string;
   symbol: string;
   img_url: string;
@@ -34,30 +35,41 @@ interface TrendingTokenResponse {
   pair: string;
   chain_id: number;
   metadata: Record<string, unknown>;
+  tokenFactory: string;
+  postDeployHook: string;
+  liquidityFactory: string;
+  postLpHook: string;
+  poolConfig: {
+    tick: number;
+    pairedToken: string;
+    devBuyFee: number;
+  };
+  timestamp: { _seconds: number; _nanoseconds: number };
   staking_pool: string;
   staking_address: string;
   pfp_url: string;
   username: string;
-  timestamp: { _seconds: number; _nanoseconds: number };
+  channel?: string;
   marketData?: {
-    price?: number;
-    marketCap?: number;
-    volume24h?: number;
-    priceChange1h?: number;
-    priceChange24h?: number;
+    marketCap: number;
+    price: number;
+    priceChange1h: number;
+    priceChange24h: number;
+    priceChange5m: number;
+    volume24h: number;
+    lastUpdated: { _seconds: number; _nanoseconds: number };
   };
-  deployer: string;
   lastTraded?: { _seconds: number; _nanoseconds: number };
 }
 
-// Function to fetch trending tokens from the API
+// Function to fetch trending tokens from the streme.fun API
 const fetchTrendingTokens = async (): Promise<Token[]> => {
   try {
     const response = await fetch("/api/tokens/trending");
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    const trendingData: TrendingTokenResponse[] = await response.json();
+    const trendingData: StremeTokenResponse[] = await response.json();
 
     // Transform API response to match Token interface
     return trendingData.map((apiToken) => ({
@@ -82,6 +94,8 @@ const fetchTrendingTokens = async (): Promise<Token[]> => {
       pfp_url: apiToken.pfp_url,
       username: apiToken.username,
       timestamp: apiToken.timestamp,
+      // Use market data directly from streme.fun API
+      marketData: apiToken.marketData,
       price: apiToken.marketData?.price,
       marketCap: apiToken.marketData?.marketCap,
       volume24h: apiToken.marketData?.volume24h,
@@ -335,17 +349,27 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
   const [totalItemsCount, setTotalItemsCount] = useState(0);
   const [stakersSortedAllTokensCache, setStakersSortedAllTokensCache] =
     useState<Array<Token & { rewards: number; totalStakers: number }>>([]);
-  const [trendingTokens, setTrendingTokens] = useState<Token[]>([]);
+  const [isFetchingTrending, setIsFetchingTrending] = useState(false);
+  const trendingTokensRef = useRef<Token[]>([]);
   const TOKENS_PER_PAGE = 36;
 
   // Fetch trending tokens when sortBy is "trending"
   useEffect(() => {
     if (sortBy === "trending") {
+      setIsFetchingTrending(true);
       const fetchTrending = async () => {
-        const trending = await fetchTrendingTokens();
-        setTrendingTokens(trending);
+        try {
+          const trending = await fetchTrendingTokens();
+          trendingTokensRef.current = trending;
+        } finally {
+          setIsFetchingTrending(false);
+        }
       };
       fetchTrending();
+    } else {
+      // Clear trending tokens when not in trending mode
+      trendingTokensRef.current = [];
+      setIsFetchingTrending(false);
     }
   }, [sortBy]);
 
@@ -354,7 +378,7 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
     setDisplayedTokens([]);
     setTotalItemsCount(0);
     setStakersSortedAllTokensCache([]);
-  }, [tokens, sortBy]);
+  }, [tokens, sortBy, searchQuery]); // Added searchQuery to reset pagination when search changes
 
   // Helper to enrich a batch of tokens with rewards and stakers data
   const enrichTokenBatch = async (batch: Token[]) => {
@@ -399,13 +423,20 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
 
   // Main data processing effect: handles filtering, searching, sorting, and pagination
   useEffect(() => {
+    // Don't process if we're still fetching trending tokens
+    if (sortBy === "trending" && isFetchingTrending) {
+      return;
+    }
+
     const fetchDataAndProcess = async () => {
       // Determine which tokens to use based on sortBy
-      const sourceTokens = sortBy === "trending" ? trendingTokens : tokens;
+      const sourceTokens =
+        sortBy === "trending" ? trendingTokensRef.current : tokens;
 
       if (!sourceTokens || sourceTokens.length === 0) {
+        // Only update state if it's actually different to prevent unnecessary re-renders
         if (displayedTokens.length > 0) setDisplayedTokens([]);
-        setTotalItemsCount(0);
+        if (totalItemsCount > 0) setTotalItemsCount(0);
         if (stakersSortedAllTokensCache.length > 0)
           setStakersSortedAllTokensCache([]);
         setIsLoadingMore(false);
@@ -536,7 +567,7 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
     };
 
     fetchDataAndProcess();
-  }, [tokens, trendingTokens, currentPage, sortBy, searchQuery]); // Main effect dependency array
+  }, [tokens, currentPage, sortBy, searchQuery, isFetchingTrending]); // Only depend on props and fetching state to prevent refresh loops
 
   // Handle loading more tokens
   const handleLoadMore = () => {

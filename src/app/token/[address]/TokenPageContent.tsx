@@ -19,6 +19,15 @@ type Deployment = {
   positionId: bigint;
 };
 
+// Interface for GeckoTerminal market data
+interface GeckoTerminalData {
+  price: number;
+  change1h: number;
+  change24h: number;
+  volume24h: number;
+  marketCap: number;
+}
+
 export function TokenPageContent() {
   const params = useParams();
   const pageAddress = params.address as string;
@@ -34,15 +43,73 @@ export function TokenPageContent() {
     isOnCorrectNetwork,
   } = useAppFrameLogic();
 
+  // Function to fetch GeckoTerminal market data
+  const fetchGeckoTerminalData = async (
+    poolAddress: string
+  ): Promise<GeckoTerminalData | null> => {
+    try {
+      const response = await fetch(
+        `/api/geckoterminal?poolAddress=${poolAddress}`
+      );
+      if (!response.ok) {
+        console.warn(`GeckoTerminal API failed with status ${response.status}`);
+        return null;
+      }
+
+      const data = await response.json();
+      if (data.error || !data?.data?.attributes) {
+        console.warn("Invalid GeckoTerminal response:", data);
+        return null;
+      }
+
+      const attrs = data.data.attributes;
+
+      // Helper to clean percentage strings
+      const cleanPercentage = (str: string) =>
+        parseFloat(str.replace(/%/g, "").replace(/[+]/g, ""));
+
+      return {
+        price: parseFloat(attrs.price_in_usd || "0"),
+        change1h: cleanPercentage(attrs.price_percent_changes?.last_1h || "0"),
+        change24h: cleanPercentage(
+          attrs.price_percent_changes?.last_24h || "0"
+        ),
+        volume24h: parseFloat(attrs.from_volume_in_usd || "0"),
+        marketCap: parseFloat(attrs.fully_diluted_valuation || "0"),
+      };
+    } catch (error) {
+      console.error("Error fetching GeckoTerminal data:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     async function fetchToken() {
       try {
+        // Fetch base token data from streme.fun API
         const response = await fetch(
           `/api/tokens/single?address=${pageAddress}`
         );
         const data = await response.json();
         if (data.data) {
-          setToken(data.data);
+          const baseToken = data.data;
+
+          // Fetch more accurate market data from GeckoTerminal
+          const geckoData = await fetchGeckoTerminalData(
+            baseToken.pool_address
+          );
+
+          // Merge the data, preferring GeckoTerminal for market data when available
+          const enhancedToken: Token = {
+            ...baseToken,
+            price: geckoData?.price ?? baseToken.price,
+            change1h: geckoData?.change1h ?? baseToken.change1h,
+            change24h: geckoData?.change24h ?? baseToken.change24h,
+            volume24h: geckoData?.volume24h ?? baseToken.volume24h,
+            marketCap: geckoData?.marketCap ?? baseToken.marketCap,
+          };
+
+          setToken(enhancedToken);
         }
       } catch (error) {
         console.error("Error fetching token:", error);

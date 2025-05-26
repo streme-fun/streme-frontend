@@ -24,6 +24,20 @@ export interface Token {
     _nanoseconds: number;
   };
 
+  // Market data from Streme API
+  marketData?: {
+    marketCap: number;
+    price: number;
+    priceChange1h: number;
+    priceChange24h: number;
+    priceChange5m: number;
+    volume24h: number;
+    lastUpdated: {
+      _seconds: number;
+      _nanoseconds: number;
+    };
+  };
+
   price?: number;
   marketCap?: number;
   marketCapChange?: number;

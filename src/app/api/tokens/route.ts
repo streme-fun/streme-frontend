@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
         }))
     );
 
-    const enrichedTokens = await enrichTokensWithData(tokens, true);
+    // Use market data from Streme API only - no need for additional enrichment
+    const enrichedTokens = await enrichTokensWithData(tokens);
 
     // Get the timestamp of the last token for next page
     const lastToken = tokens[tokens.length - 1];

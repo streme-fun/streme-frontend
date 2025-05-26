@@ -1,5 +1,21 @@
 const GECKOTERMINAL_API = "https://api.geckoterminal.com/api/v2";
 
+// Simple in-memory cache to prevent duplicate API calls
+interface PoolDataResult {
+  price: number;
+  change1h: number;
+  change24h: number;
+  volume24h: number;
+  marketCap: number;
+}
+
+interface CacheEntry {
+  data: PoolDataResult | null;
+  timestamp: number;
+}
+const poolDataCache = new Map<string, CacheEntry>();
+const CACHE_DURATION = 60000; // 1 minute cache
+
 export interface GeckoTerminalToken {
   id: string;
   type: string;
@@ -91,10 +107,18 @@ export interface GeckoTerminalResponse {
   };
 }
 
-export async function fetchPoolData(poolAddress: string) {
+export async function fetchPoolData(
+  poolAddress: string
+): Promise<PoolDataResult | null> {
   if (!poolAddress) {
     console.warn("No pool address provided for GeckoTerminal API");
     return null;
+  }
+
+  // Check cache first
+  const cached = poolDataCache.get(poolAddress);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
   }
 
   try {
@@ -107,6 +131,8 @@ export async function fetchPoolData(poolAddress: string) {
       console.error(
         `GeckoTerminal API error: ${response.status} ${response.statusText}`
       );
+      // Cache null result to prevent repeated failed requests
+      poolDataCache.set(poolAddress, { data: null, timestamp: Date.now() });
       return null;
     }
 
@@ -115,12 +141,14 @@ export async function fetchPoolData(poolAddress: string) {
     // Check for error response
     if (data.error) {
       console.error("GeckoTerminal API error:", data.error);
+      poolDataCache.set(poolAddress, { data: null, timestamp: Date.now() });
       return null;
     }
 
     // Validate data structure
     if (!data?.data?.attributes) {
       console.error("Invalid data structure from GeckoTerminal API");
+      poolDataCache.set(poolAddress, { data: null, timestamp: Date.now() });
       return null;
     }
 
@@ -130,15 +158,22 @@ export async function fetchPoolData(poolAddress: string) {
     const cleanPercentage = (str: string) =>
       parseFloat(str.replace(/%/g, "").replace(/[+]/g, ""));
 
-    return {
+    const result: PoolDataResult = {
       price: parseFloat(attrs.price_in_usd || "0"),
       change1h: cleanPercentage(attrs.price_percent_changes?.last_1h || "0"),
       change24h: cleanPercentage(attrs.price_percent_changes?.last_24h || "0"),
       volume24h: parseFloat(attrs.from_volume_in_usd || "0"),
       marketCap: parseFloat(attrs.fully_diluted_valuation || "0"),
     };
+
+    // Cache the result
+    poolDataCache.set(poolAddress, { data: result, timestamp: Date.now() });
+
+    return result;
   } catch (error) {
     console.error("Error fetching pool data for address:", poolAddress, error);
+    // Cache null result to prevent repeated failed requests
+    poolDataCache.set(poolAddress, { data: null, timestamp: Date.now() });
     return null;
   }
 }

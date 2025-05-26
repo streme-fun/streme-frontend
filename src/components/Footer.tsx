@@ -14,7 +14,7 @@ export function Footer() {
       <div className="container mx-auto px-4">
         <div className="flex flex-wrap items-center justify-center gap-4">
           <div className="text-sm opacity-60">
-            © {new Date().getFullYear()} Streme.Fun
+            © {new Date().getFullYear()} Streme
           </div>
           <a
             href="https://docs.streme.fun"

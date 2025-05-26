@@ -55,8 +55,8 @@ export async function GET(request: Request) {
 
     console.log(`[API] Successfully fetched token: ${token.name || "Unknown"}`);
 
-    // Enrich token with data including market data
-    const enrichedToken = await enrichTokensWithData([token], true);
+    // Enrich token with data using only Streme API market data
+    const enrichedToken = await enrichTokensWithData([token]);
 
     return Response.json({ data: enrichedToken[0] });
   } catch (error) {

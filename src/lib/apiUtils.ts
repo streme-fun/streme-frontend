@@ -1,6 +1,4 @@
 import { Token } from "@/src/app/types/token";
-import { fetchTokensData, fetchPoolData } from "@/src/lib/geckoterminal";
-import { enrichTokenWithMarketData } from "@/src/lib/mockTokens";
 
 export async function fetchTokensFromStreme(
   before?: number,
@@ -39,15 +37,15 @@ type EnrichedToken = Omit<Token, "creator"> & {
 };
 
 export async function enrichTokensWithData(
-  tokens: Token[],
-  includeMarketData: boolean = false
+  tokens: Token[]
 ): Promise<EnrichedToken[]> {
   if (!Array.isArray(tokens)) {
     console.error("Expected tokens array, got:", tokens);
     return [];
   }
 
-  let enrichedTokens = tokens.map((token) => ({
+  // Transform tokens and use only market data from Streme API
+  const enrichedTokens = tokens.map((token) => ({
     ...token,
     creator: token.requestor_fid
       ? {
@@ -58,32 +56,13 @@ export async function enrichTokensWithData(
           profileImage: token.pfp_url || "",
         }
       : undefined,
+    // Use market data from Streme API only
+    price: token.marketData?.price,
+    marketCap: token.marketData?.marketCap,
+    volume24h: token.marketData?.volume24h,
+    change1h: token.marketData?.priceChange1h,
+    change24h: token.marketData?.priceChange24h,
   })) as EnrichedToken[];
-
-  // Only fetch market data if explicitly requested
-  if (includeMarketData) {
-    const addresses = tokens.map((t) => t.contract_address);
-    const geckoData = await fetchTokensData(addresses);
-    const poolDataPromises = tokens.map((token) =>
-      token.pool_address ? fetchPoolData(token.pool_address) : null
-    );
-    const poolData = await Promise.all(poolDataPromises);
-
-    enrichedTokens = await Promise.all(
-      enrichedTokens.map(async (token, index) => {
-        const enrichedToken = await enrichTokenWithMarketData(token, geckoData);
-        if (poolData[index]) {
-          const pool = poolData[index];
-          enrichedToken.price = enrichedToken.price ?? pool?.price;
-          enrichedToken.change1h = enrichedToken.change1h ?? pool?.change1h;
-          enrichedToken.change24h = enrichedToken.change24h ?? pool?.change24h;
-          enrichedToken.volume24h = enrichedToken.volume24h ?? pool?.volume24h;
-          enrichedToken.marketCap = enrichedToken.marketCap ?? pool?.marketCap;
-        }
-        return enrichedToken;
-      })
-    );
-  }
 
   return enrichedTokens;
 }
