@@ -9,6 +9,7 @@ import { HowItWorksModal } from "./HowItWorksModal";
 import { LaunchTokenModal } from "./LaunchTokenModal";
 import { LeaderboardModal } from "./LeaderboardModal";
 import { WalletProfileModal } from "./WalletProfileModal";
+import { MyTokensModal } from "./MyTokensModal";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import sdk from "@farcaster/frame-sdk";
 
@@ -52,6 +53,7 @@ export function Navbar() {
   const [isAddressDropdownOpen, setIsAddressDropdownOpen] = useState(false);
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [isWalletProfileOpen, setIsWalletProfileOpen] = useState(false);
+  const [isMyStakesOpen, setIsMyStakesOpen] = useState(false);
 
   // Profile picture state for mini-app
   const [miniAppProfileImage, setMiniAppProfileImage] = useState<string>("");
@@ -124,6 +126,27 @@ export function Navbar() {
               </svg>
               Home
             </Link>
+            {/* My Stakes Button */}
+            <button
+              onClick={() => setIsMyStakesOpen(true)}
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 hover:text-primary flex-1"
+            >
+              {/* Special E Icon in Circle */}
+              <div className="w-6 h-6 mb-0.5 rounded-full border-2 border-current flex items-center justify-center">
+                <svg
+                  className="w-2 h-3"
+                  viewBox="0 0 21 30"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M0.54794 30V25.071H20.4343V30H0.54794ZM2.97692 17.6847V12.9261H18.1048V17.6847H2.97692ZM1.08771 5.90909V0.90909H19.5252V5.90909H1.08771Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </div>
+              My Tokens
+            </button>
 
             {/* Launch Button */}
             <button
@@ -138,7 +161,7 @@ Symbol: $[your ticker]
 [Don't forget to attach an image!] 🎨`;
                     await sdk.actions.composeCast({
                       text: castText,
-                      embeds: ["https://streme.fun"],
+                      embeds: [],
                     });
                   } catch (error) {
                     console.error("Error composing cast:", error);
@@ -251,6 +274,10 @@ Symbol: $[your ticker]
         <WalletProfileModal
           isOpen={isWalletProfileOpen}
           onClose={() => setIsWalletProfileOpen(false)}
+        />
+        <MyTokensModal
+          isOpen={isMyStakesOpen}
+          onClose={() => setIsMyStakesOpen(false)}
         />
       </>
     );
