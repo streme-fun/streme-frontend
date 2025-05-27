@@ -80,14 +80,35 @@ function App() {
   }, [isMiniAppView, isSDKLoaded, promptToAddMiniApp]);
 
   // Auto-connect to Farcaster wallet if not connected in mini app context
+  // According to Farcaster docs: "If a user already has a connected wallet the connector will automatically connect to it"
   useEffect(() => {
-    if (isMiniAppView && !isConnected && farcasterContext) {
-      const fcConnector = connectors.find((c) => c.id === "farcaster");
-      if (fcConnector) {
-        connect({ connector: fcConnector });
+    if (isMiniAppView && !isConnected && farcasterContext && isSDKLoaded) {
+      // In Farcaster context, the connector should auto-connect if wallet is available
+      // If not connected, we need to prompt the user to connect
+      console.log(
+        "Miniapp detected but not connected, attempting to connect..."
+      );
+      console.log(
+        "Available connectors:",
+        connectors.map((c) => ({ id: c.id, name: c.name }))
+      );
+
+      // Use the farcasterFrame connector (should be at index 0)
+      const farcasterConnector =
+        connectors.find((c) => c.id === "farcaster") || connectors[0];
+      if (farcasterConnector) {
+        console.log("Connecting with connector:", farcasterConnector.id);
+        connect({ connector: farcasterConnector });
       }
     }
-  }, [isMiniAppView, isConnected, farcasterContext, connectors, connect]);
+  }, [
+    isMiniAppView,
+    isConnected,
+    farcasterContext,
+    connectors,
+    connect,
+    isSDKLoaded,
+  ]);
 
   if (!isSDKLoaded) {
     return <div className="text-center py-8">Loading SDK...</div>;

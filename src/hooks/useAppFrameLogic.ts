@@ -16,11 +16,23 @@ export function useAppFrameLogic() {
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { disconnect } = useDisconnect();
 
+  // Use the official sdk.isInMiniApp() method for detection
   useEffect(() => {
     if (isSDKLoaded) {
-      setIsMiniAppView(!!farcasterContext);
+      const checkMiniApp = async () => {
+        try {
+          const isMiniApp = await sdk.isInMiniApp();
+          setIsMiniAppView(isMiniApp);
+        } catch (error) {
+          console.error("Error checking if in mini app:", error);
+          // Fallback to context-based detection
+          setIsMiniAppView(!!farcasterContext);
+        }
+      };
+
+      checkMiniApp();
     }
-  }, [farcasterContext, isSDKLoaded]);
+  }, [isSDKLoaded, farcasterContext]);
 
   // Call ready when the interface is ready to be displayed
   useEffect(() => {
@@ -35,8 +47,9 @@ export function useAppFrameLogic() {
         }
       };
 
+      // Call ready immediately since wallet connection is working
       callReady();
-    } else if (!isMiniAppView) {
+    } else if (!isMiniAppView && isSDKLoaded) {
       setIsReady(true);
     }
   }, [isSDKLoaded, isMiniAppView, isReady]);

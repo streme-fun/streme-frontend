@@ -1,15 +1,11 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider } from "@privy-io/wagmi";
 import PrivyProviderWrapper from "../components/auth/PrivyProviderWrapper";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { FrameProvider } from "../components/providers/FrameProvider";
-import { config } from "../components/providers/WagmiProvider";
+import Provider from "../components/providers/WagmiProvider";
 import { useWalletSync } from "../hooks/useWalletSync";
-
-const queryClient = new QueryClient();
 
 function AppContent({ children }: { children: React.ReactNode }) {
   // Enable automatic wallet switching when users change accounts in browser extension
@@ -31,13 +27,11 @@ export default function ClientLayout({
 }) {
   return (
     <PrivyProviderWrapper>
-      <QueryClientProvider client={queryClient}>
-        <WagmiProvider config={config}>
-          <FrameProvider>
-            <AppContent>{children}</AppContent>
-          </FrameProvider>
-        </WagmiProvider>
-      </QueryClientProvider>
+      <Provider>
+        <FrameProvider>
+          <AppContent>{children}</AppContent>
+        </FrameProvider>
+      </Provider>
     </PrivyProviderWrapper>
   );
 }
