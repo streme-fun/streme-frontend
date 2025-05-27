@@ -115,6 +115,35 @@ const fetchTrendingTokens = async (): Promise<Token[]> => {
   }
 };
 
+const TokenCardSkeleton = () => (
+  <div className="card card-side bg-base-100 rounded-md border-1 border-gray-300 animate-pulse">
+    <div className="w-[120px] h-[120px] bg-gray-100 dark:bg-gray-700"></div>
+    <div className="card-body p-2 gap-2">
+      <div className="flex">
+        <div className="flex items-start justify-between w-full">
+          <div className="flex flex-col gap-2">
+            <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-32"></div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-gray-100 dark:bg-gray-700 rounded-full"></div>
+              <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded w-20"></div>
+            </div>
+          </div>
+          <div className="flex flex-col items-end text-right">
+            <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded w-16 mb-1"></div>
+            <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-20"></div>
+          </div>
+        </div>
+      </div>
+      <div className="card-actions justify-end mt-auto">
+        <div className="w-full px-1">
+          <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded w-24 mb-1"></div>
+          <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-32"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 const TokenCardComponent = ({
   token,
 }: {
@@ -350,7 +379,11 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
   const [stakersSortedAllTokensCache, setStakersSortedAllTokensCache] =
     useState<Array<Token & { rewards: number; totalStakers: number }>>([]);
   const [isFetchingTrending, setIsFetchingTrending] = useState(false);
+  const [isEnrichingTrending, setIsEnrichingTrending] = useState(false);
   const trendingTokensRef = useRef<Token[]>([]);
+  const trendingCacheRef = useRef<
+    Array<Token & { rewards: number; totalStakers: number }>
+  >([]);
   const TOKENS_PER_PAGE = 36;
 
   // Fetch trending tokens when sortBy is "trending"
@@ -361,6 +394,23 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
         try {
           const trending = await fetchTrendingTokens();
           trendingTokensRef.current = trending;
+
+          // Show tokens immediately with placeholder data for fast initial render
+          if (trending.length > 0) {
+            const placeholderTokens = trending
+              .slice(0, TOKENS_PER_PAGE)
+              .map((token) => ({
+                ...token,
+                rewards: 0, // Placeholder
+                totalStakers: 0, // Placeholder
+              }));
+            setDisplayedTokens(placeholderTokens);
+            setTotalItemsCount(trending.length);
+
+            // Start enriching the first page in the background
+            setIsEnrichingTrending(true);
+            enrichFirstPageTrending(trending.slice(0, TOKENS_PER_PAGE));
+          }
         } finally {
           setIsFetchingTrending(false);
         }
@@ -369,9 +419,102 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
     } else {
       // Clear trending tokens when not in trending mode
       trendingTokensRef.current = [];
+      trendingCacheRef.current = [];
       setIsFetchingTrending(false);
+      setIsEnrichingTrending(false);
     }
   }, [sortBy]);
+
+  // Helper function to enrich first page of trending tokens progressively
+  const enrichFirstPageTrending = async (firstPageTokens: Token[]) => {
+    try {
+      // Check if we have cached data for these tokens
+      const cachedTokens = trendingCacheRef.current;
+      const cachedAddresses = new Set(
+        cachedTokens.map((t) => t.contract_address)
+      );
+
+      // Separate tokens that need enrichment vs those that are cached
+      const tokensToEnrich = firstPageTokens.filter(
+        (token) => !cachedAddresses.has(token.contract_address)
+      );
+      const alreadyEnriched = firstPageTokens.map((token) => {
+        const cached = cachedTokens.find(
+          (c) => c.contract_address === token.contract_address
+        );
+        return cached || { ...token, rewards: 0, totalStakers: 0 };
+      });
+
+      // If we have some cached data, show it immediately
+      if (alreadyEnriched.some((t) => t.rewards > 0 || t.totalStakers > 0)) {
+        setDisplayedTokens(alreadyEnriched);
+      }
+
+      // Enrich tokens progressively in smaller batches for better UX
+      const BATCH_SIZE = 6; // Smaller batches for progressive loading
+      const enrichedResults: Array<
+        Token & { rewards: number; totalStakers: number }
+      > = [...alreadyEnriched];
+
+      for (let i = 0; i < tokensToEnrich.length; i += BATCH_SIZE) {
+        const batch = tokensToEnrich.slice(i, i + BATCH_SIZE);
+
+        // Enrich this batch using individual API calls (more reliable)
+        const enrichedBatch = await Promise.all(
+          batch.map(async (token) => {
+            try {
+              const { totalStreamed, totalStakers } = await calculateRewards(
+                token.created_at,
+                token.contract_address,
+                token.staking_pool
+              );
+              return {
+                ...token,
+                rewards: totalStreamed,
+                totalStakers,
+              };
+            } catch (error) {
+              console.warn(
+                `Failed to enrich token ${token.contract_address}:`,
+                error
+              );
+              return {
+                ...token,
+                rewards: 0,
+                totalStakers: 0,
+              };
+            }
+          })
+        );
+
+        // Update the results array with enriched data
+        enrichedBatch.forEach((enrichedToken) => {
+          const index = enrichedResults.findIndex(
+            (t) => t.contract_address === enrichedToken.contract_address
+          );
+          if (index !== -1) {
+            enrichedResults[index] = enrichedToken;
+          }
+        });
+
+        // Update the display immediately with this batch
+        setDisplayedTokens([...enrichedResults]);
+
+        // Update cache
+        const newCacheEntries = enrichedBatch.filter(
+          (token) => !cachedAddresses.has(token.contract_address)
+        );
+        trendingCacheRef.current = [
+          ...trendingCacheRef.current,
+          ...newCacheEntries,
+        ];
+      }
+    } catch (error) {
+      console.error("Error enriching trending tokens:", error);
+    } finally {
+      setIsEnrichingTrending(false);
+    }
+  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -388,6 +531,17 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
         if ("rewards" in token && "totalStakers" in token) {
           return token as Token & { rewards: number; totalStakers: number };
         }
+
+        // Check trending cache first
+        if (sortBy === "trending") {
+          const cached = trendingCacheRef.current.find(
+            (c) => c.contract_address === token.contract_address
+          );
+          if (cached) {
+            return cached;
+          }
+        }
+
         const { totalStreamed, totalStakers } = await calculateRewards(
           token.created_at,
           token.contract_address,
@@ -425,6 +579,16 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
   useEffect(() => {
     // Don't process if we're still fetching trending tokens
     if (sortBy === "trending" && isFetchingTrending) {
+      return;
+    }
+
+    // For trending, if we already have displayed tokens from the fast path, don't override them
+    if (
+      sortBy === "trending" &&
+      displayedTokens.length > 0 &&
+      currentPage === 1 &&
+      !searchQuery.trim()
+    ) {
       return;
     }
 
@@ -586,6 +750,13 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
         {displayedTokens.map((token) => (
           <TokenCardComponent key={token.contract_address} token={token} />
         ))}
+        {/* Show skeleton cards when initially loading trending tokens */}
+        {sortBy === "trending" &&
+          isFetchingTrending &&
+          displayedTokens.length === 0 &&
+          Array.from({ length: 12 }).map((_, index) => (
+            <TokenCardSkeleton key={`skeleton-${index}`} />
+          ))}
       </div>
       {displayedTokens.length === 0 &&
         totalItemsCount === 0 &&
@@ -597,11 +768,19 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
       {displayedTokens.length === 0 &&
         totalItemsCount === 0 &&
         searchQuery.trim() === "" &&
-        !isLoadingMore && (
+        !isLoadingMore &&
+        !isFetchingTrending && (
           <div className="text-center py-12 opacity-60">Loading tokens...</div>
         )}
-      {isLoadingMore && displayedTokens.length === 0 && (
-        <div className="text-center py-12 opacity-60">Loading tokens...</div>
+      {(isLoadingMore || isFetchingTrending) &&
+        displayedTokens.length === 0 &&
+        sortBy !== "trending" && (
+          <div className="text-center py-12 opacity-60">Loading tokens...</div>
+        )}
+      {isEnrichingTrending && displayedTokens.length > 0 && (
+        <div className="text-center mt-4 opacity-60 text-sm">
+          Loading staking data...
+        </div>
       )}
       {hasMoreTokens && (
         <div className="text-center mt-8">
