@@ -26,7 +26,7 @@ const PrivyProviderWrapper = ({ children }: { children: React.ReactNode }) => {
           showWalletLoginFirst: false,
           walletChainType: "ethereum-only",
         },
-        loginMethods: ["wallet", "email", "google", "twitter"],
+        loginMethods: ["wallet"],
         mfa: {
           noPromptOnMfaRequired: false,
         },
