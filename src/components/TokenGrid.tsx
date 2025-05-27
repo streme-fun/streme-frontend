@@ -115,35 +115,6 @@ const fetchTrendingTokens = async (): Promise<Token[]> => {
   }
 };
 
-const TokenCardSkeleton = () => (
-  <div className="card card-side bg-base-100 rounded-md border-1 border-gray-300 animate-pulse">
-    <div className="w-[120px] h-[120px] bg-gray-100 dark:bg-gray-700"></div>
-    <div className="card-body p-2 gap-2">
-      <div className="flex">
-        <div className="flex items-start justify-between w-full">
-          <div className="flex flex-col gap-2">
-            <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-32"></div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-gray-100 dark:bg-gray-700 rounded-full"></div>
-              <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded w-20"></div>
-            </div>
-          </div>
-          <div className="flex flex-col items-end text-right">
-            <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded w-16 mb-1"></div>
-            <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-20"></div>
-          </div>
-        </div>
-      </div>
-      <div className="card-actions justify-end mt-auto">
-        <div className="w-full px-1">
-          <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded w-24 mb-1"></div>
-          <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-32"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
 const TokenCardComponent = ({
   token,
 }: {
@@ -225,7 +196,7 @@ const TokenCardComponent = ({
     <Link href={`/token/${token.contract_address}`} className="block group">
       <div
         className="card card-side bg-base-100 rounded-md border-1 border-gray-300 
-        hover:bg-black/[.02] dark:hover:bg-white/[.02] transition-all duration-300 ease-out
+        hover:bg-black/[.02]  transition-all duration-300 ease-out
         hover:shadow-lg hover:-translate-y-1 group-hover:border-primary/20"
       >
         {token.img_url ? (
@@ -750,13 +721,6 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
         {displayedTokens.map((token) => (
           <TokenCardComponent key={token.contract_address} token={token} />
         ))}
-        {/* Show skeleton cards when initially loading trending tokens */}
-        {sortBy === "trending" &&
-          isFetchingTrending &&
-          displayedTokens.length === 0 &&
-          Array.from({ length: 12 }).map((_, index) => (
-            <TokenCardSkeleton key={`skeleton-${index}`} />
-          ))}
       </div>
       {displayedTokens.length === 0 &&
         totalItemsCount === 0 &&
@@ -773,8 +737,7 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
           <div className="text-center py-12 opacity-60">Loading tokens...</div>
         )}
       {(isLoadingMore || isFetchingTrending) &&
-        displayedTokens.length === 0 &&
-        sortBy !== "trending" && (
+        displayedTokens.length === 0 && (
           <div className="text-center py-12 opacity-60">Loading tokens...</div>
         )}
       {isEnrichingTrending && displayedTokens.length > 0 && (
