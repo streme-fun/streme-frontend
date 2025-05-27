@@ -6,6 +6,7 @@ import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import { Modal } from "./Modal";
 import { formatUnits } from "viem";
 import { StakeButton } from "./StakeButton";
+import { StakeAllButton } from "./StakeAllButton";
 import { UnstakeButton } from "./UnstakeButton";
 import { ConnectPoolButton } from "./ConnectPoolButton";
 import { publicClient } from "../lib/viemClient";
@@ -1174,22 +1175,40 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                       stake.stakingAddress !==
                         "0x0000000000000000000000000000000000000000" ? (
                         <div className="space-y-2">
-                          <StakeButton
-                            tokenAddress={stake.tokenAddress}
-                            stakingAddress={stake.stakingAddress}
-                            stakingPoolAddress={stake.stakingPoolAddress}
-                            symbol={stake.membership.pool.token.symbol}
-                            onSuccess={() =>
-                              handleStakeSuccess(
-                                stake.tokenAddress,
-                                stake.stakingAddress
-                              )
-                            }
-                            className="btn btn-primary btn-sm w-full"
-                            isMiniApp={isMiniAppView}
-                            farcasterAddress={effectiveAddress}
-                            farcasterIsConnected={effectiveIsConnected}
-                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <StakeButton
+                              tokenAddress={stake.tokenAddress}
+                              stakingAddress={stake.stakingAddress}
+                              stakingPoolAddress={stake.stakingPoolAddress}
+                              symbol={stake.membership.pool.token.symbol}
+                              onSuccess={() =>
+                                handleStakeSuccess(
+                                  stake.tokenAddress,
+                                  stake.stakingAddress
+                                )
+                              }
+                              className="btn btn-primary btn-sm"
+                              isMiniApp={isMiniAppView}
+                              farcasterAddress={effectiveAddress}
+                              farcasterIsConnected={effectiveIsConnected}
+                            />
+                            <StakeAllButton
+                              tokenAddress={stake.tokenAddress}
+                              stakingAddress={stake.stakingAddress}
+                              stakingPoolAddress={stake.stakingPoolAddress}
+                              symbol={stake.membership.pool.token.symbol}
+                              onSuccess={() =>
+                                handleStakeSuccess(
+                                  stake.tokenAddress,
+                                  stake.stakingAddress
+                                )
+                              }
+                              className="btn btn-secondary btn-sm"
+                              isMiniApp={isMiniAppView}
+                              farcasterAddress={effectiveAddress}
+                              farcasterIsConnected={effectiveIsConnected}
+                            />
+                          </div>
                           <UnstakeButton
                             stakingAddress={stake.stakingAddress}
                             userStakedBalance={stake.stakedBalance}
@@ -1307,19 +1326,34 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                       {/* Action buttons - show if we have a valid staking address */}
                       {token.stakingAddress ? (
                         <div className="pt-3">
-                          <StakeButton
-                            tokenAddress={token.tokenAddress}
-                            stakingAddress={token.stakingAddress}
-                            stakingPoolAddress="" // Not needed for unstaked tokens
-                            symbol={token.symbol}
-                            onSuccess={() =>
-                              handleSuperTokenStakeSuccess(token.tokenAddress)
-                            }
-                            className="btn btn-primary btn-sm w-full"
-                            isMiniApp={isMiniAppView}
-                            farcasterAddress={effectiveAddress}
-                            farcasterIsConnected={effectiveIsConnected}
-                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <StakeButton
+                              tokenAddress={token.tokenAddress}
+                              stakingAddress={token.stakingAddress}
+                              stakingPoolAddress="" // Not needed for unstaked tokens
+                              symbol={token.symbol}
+                              onSuccess={() =>
+                                handleSuperTokenStakeSuccess(token.tokenAddress)
+                              }
+                              className="btn btn-primary btn-sm"
+                              isMiniApp={isMiniAppView}
+                              farcasterAddress={effectiveAddress}
+                              farcasterIsConnected={effectiveIsConnected}
+                            />
+                            <StakeAllButton
+                              tokenAddress={token.tokenAddress}
+                              stakingAddress={token.stakingAddress}
+                              stakingPoolAddress="" // Not needed for unstaked tokens
+                              symbol={token.symbol}
+                              onSuccess={() =>
+                                handleSuperTokenStakeSuccess(token.tokenAddress)
+                              }
+                              className="btn btn-secondary btn-sm"
+                              isMiniApp={isMiniAppView}
+                              farcasterAddress={effectiveAddress}
+                              farcasterIsConnected={effectiveIsConnected}
+                            />
+                          </div>
                         </div>
                       ) : token.stakingAddress === undefined ? (
                         <div className="pt-3">
