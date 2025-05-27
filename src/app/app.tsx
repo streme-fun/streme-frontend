@@ -81,7 +81,12 @@ function App() {
 
   // Auto-connect to Farcaster wallet if not connected in mini app context
   useEffect(() => {
-    if (isMiniAppView && !isConnected && farcasterContext) {
+    if (
+      isMiniAppView &&
+      !isConnected &&
+      farcasterContext &&
+      connectors.length > 0
+    ) {
       const fcConnector = connectors.find((c) => c.id === "farcaster");
       if (fcConnector) {
         connect({ connector: fcConnector });
