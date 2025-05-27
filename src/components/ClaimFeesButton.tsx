@@ -189,13 +189,12 @@ export function ClaimFeesButton({
         ) : !walletIsConnected ? (
           "Connect Wallet"
         ) : (
-          "Send Fees to Creator" // UI text, actual recipient is determined by contract
+          "Claim Fees" // UI text, actual recipient is determined by contract
         )}
       </button>
       <div className="text-xs opacity-60 text-center">
         <div className="mt-1 text-xs text-amber-500">
-          Note: Fees are sent to the creator&apos;s wallet (as per contract
-          logic).
+          Note: Fees are sent to the creator&apos;s wallet.
         </div>
       </div>
     </div>
