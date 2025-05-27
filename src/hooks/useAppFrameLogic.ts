@@ -5,6 +5,7 @@ import { useFrame } from "../components/providers/FrameProvider"; // Assuming Fr
 import { useAccount, useConnect, useSwitchChain, useDisconnect } from "wagmi";
 import { base } from "wagmi/chains";
 import type { Context as FarcasterContextType } from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/frame-sdk";
 
 export function useAppFrameLogic() {
   const [isMiniAppView, setIsMiniAppView] = useState(false);
@@ -14,10 +15,22 @@ export function useAppFrameLogic() {
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { disconnect } = useDisconnect();
 
-  // Simple mini app detection based on context
+  // Use official sdk.isInMiniApp() method for detection with fallback
   useEffect(() => {
     if (isSDKLoaded) {
-      setIsMiniAppView(!!farcasterContext);
+      const checkMiniApp = async () => {
+        try {
+          // Use the official detection method
+          const isMiniApp = await sdk.isInMiniApp();
+          setIsMiniAppView(isMiniApp);
+        } catch (error) {
+          console.error("Error checking if in mini app:", error);
+          // Fallback to context-based detection to maintain compatibility
+          setIsMiniAppView(!!farcasterContext);
+        }
+      };
+
+      checkMiniApp();
     }
   }, [isSDKLoaded, farcasterContext]);
 

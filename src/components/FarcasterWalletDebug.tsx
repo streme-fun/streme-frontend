@@ -2,11 +2,30 @@
 
 import { useAccount, useConnect } from "wagmi";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
+import { useState, useEffect } from "react";
+import { sdk } from "@farcaster/frame-sdk";
 
 export function FarcasterWalletDebug() {
   const { address, isConnected, connector } = useAccount();
   const { connect, connectors } = useConnect();
   const { isSDKLoaded, isMiniAppView, farcasterContext } = useAppFrameLogic();
+  const [sdkDetection, setSdkDetection] = useState<boolean | null>(null);
+
+  // Test the SDK detection directly
+  useEffect(() => {
+    if (isSDKLoaded) {
+      const testSdkDetection = async () => {
+        try {
+          const result = await sdk.isInMiniApp();
+          setSdkDetection(result);
+        } catch (error) {
+          console.error("SDK detection error:", error);
+          setSdkDetection(null);
+        }
+      };
+      testSdkDetection();
+    }
+  }, [isSDKLoaded]);
 
   if (!isMiniAppView) {
     return null; // Only show in miniapp context
@@ -17,7 +36,11 @@ export function FarcasterWalletDebug() {
       <h3 className="font-bold text-sm mb-2">Farcaster Wallet Debug</h3>
       <div className="text-xs space-y-1">
         <div>SDK Loaded: {isSDKLoaded ? "✅" : "❌"}</div>
-        <div>Mini App: {isMiniAppView ? "✅" : "❌"}</div>
+        <div>
+          SDK Detection:{" "}
+          {sdkDetection === null ? "⏳" : sdkDetection ? "✅" : "❌"}
+        </div>
+        <div>Hook Detection: {isMiniAppView ? "✅" : "❌"}</div>
         <div>Has Context: {farcasterContext ? "✅" : "❌"}</div>
         <div>Connected: {isConnected ? "✅" : "❌"}</div>
         <div>

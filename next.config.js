@@ -74,6 +74,10 @@ const nextConfig = {
         protocol: "https",
         hostname: "*.amazonaws.com",
       },
+      {
+        protocol: "https",
+        hostname: "ipfs.decentralized-content.com",
+      },
     ],
   },
   async headers() {
