@@ -9,7 +9,7 @@ export function FarcasterConnectButton() {
   if (isConnected) {
     return (
       <div className="text-center">
-        <div>You're connected!</div>
+        <div>You&apos;re connected!</div>
         <div>Address: {address}</div>
       </div>
     );
