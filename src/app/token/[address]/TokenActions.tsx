@@ -81,13 +81,13 @@ export function TokenActions({
     address: fcAddress,
     isConnected: fcIsConnected,
     isOnCorrectNetwork: fcIsOnCorrectNetwork,
-    connect,
-    connectors,
+    connect: fcConnect,
+    connectors: fcConnectors,
     switchChain: fcSwitchChain,
     farcasterContext,
   } = useAppFrameLogic();
 
-  const { ready: privyReady, login: privyLogin } = usePrivy();
+  const { user: privyUser, ready: privyReady, login: privyLogin } = usePrivy();
   const {
     address: wagmiAddress,
     isConnected: wagmiIsConnectedGlobal,
@@ -111,19 +111,18 @@ export function TokenActions({
     walletIsConnected = isConnectedProp ?? fcIsConnected;
     onCorrectNetwork = isOnCorrectNetworkProp ?? fcIsOnCorrectNetwork;
     effectiveLogin = () => {
-      const fcConnector = connectors.find((c) => c.id === "farcaster");
-      if (fcConnector) {
-        connect({ connector: fcConnector });
+      if (fcConnect && fcConnectors && fcConnectors.length > 0) {
+        fcConnect({ connector: fcConnectors[0] });
       } else {
-        console.warn("Farcaster connector not found");
+        console.warn("Farcaster connect function not available");
       }
     };
     effectiveSwitchNetwork = fcSwitchChain
       ? () => fcSwitchChain({ chainId: base.id })
       : undefined;
   } else {
-    currentAddress = wagmiAddress;
-    walletIsConnected = privyReady && !!wagmiAddress;
+    currentAddress = privyUser?.wallet?.address as `0x${string}` | undefined;
+    walletIsConnected = privyReady && !!privyUser?.wallet?.address;
     onCorrectNetwork = activeChain?.id === base.id;
     effectiveLogin = privyLogin;
     effectiveSwitchNetwork = wagmiSwitchNetwork
@@ -425,22 +424,6 @@ export function TokenActions({
     onStakingChange,
   ]);
 
-  // Auto-connect to Farcaster wallet if in mini app context and not connected
-  useEffect(() => {
-    if (isEffectivelyMiniApp && !walletIsConnected && farcasterContext) {
-      const fcConnector = connectors.find((c) => c.id === "farcaster");
-      if (fcConnector) {
-        connect({ connector: fcConnector });
-      }
-    }
-  }, [
-    isEffectivelyMiniApp,
-    walletIsConnected,
-    farcasterContext,
-    connectors,
-    connect,
-  ]);
-
   if (isEffectivelyMiniApp && !fcSDKLoaded) {
     return (
       <div className="card bg-base-100 border border-black/[.1]1]">
@@ -478,8 +461,7 @@ export function TokenActions({
               </p>
             )}
           </div>
-          {/* Only show connect button for non-mini app or network switching */}
-          {!isEffectivelyMiniApp || (walletIsConnected && !onCorrectNetwork) ? (
+          <div>
             <UiButton
               onClick={
                 walletIsConnected && !onCorrectNetwork && effectiveSwitchNetwork
@@ -495,16 +477,11 @@ export function TokenActions({
             >
               {walletIsConnected && !onCorrectNetwork
                 ? "Switch Network"
+                : isEffectivelyMiniApp
+                ? "Connect Farcaster Wallet"
                 : "Connect Wallet"}
             </UiButton>
-          ) : (
-            <div className="text-center">
-              <span className="loading loading-spinner loading-sm"></span>
-              <p className="text-sm text-gray-500 mt-2">
-                Connecting to Farcaster wallet...
-              </p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     );

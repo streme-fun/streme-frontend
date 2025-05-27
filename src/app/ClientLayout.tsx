@@ -5,12 +5,8 @@ import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { FrameProvider } from "../components/providers/FrameProvider";
 import Provider from "../components/providers/WagmiProvider";
-import { useWalletSync } from "../hooks/useWalletSync";
 
 function AppContent({ children }: { children: React.ReactNode }) {
-  // Enable automatic wallet switching when users change accounts in browser extension
-  useWalletSync();
-
   return (
     <>
       <Navbar />

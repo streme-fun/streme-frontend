@@ -1,4 +1,4 @@
-import { http, createConfig, WagmiProvider } from "wagmi";
+import { createConfig, http, WagmiProvider } from "wagmi";
 import {
   base,
   baseSepolia,
@@ -42,7 +42,7 @@ function useCoinbaseWalletAutoConnect() {
   useEffect(() => {
     // Auto-connect if in Coinbase Wallet and not already connected
     if (isCoinbaseWallet && !isConnected) {
-      connect({ connector: connectors[1] }); // Coinbase Wallet connector (now at index 1)
+      connect({ connector: connectors[1] }); // Coinbase Wallet connector
     }
   }, [isCoinbaseWallet, isConnected, connect, connectors]);
 
@@ -60,18 +60,18 @@ export const config = createConfig({
     [unichain.id]: http(),
   },
   connectors: [
-    farcasterFrame(), // Farcaster connector first (index 0) for miniapps
-    coinbaseWallet({
-      appName: APP_NAME,
-      appLogoUrl: APP_ICON_URL,
-      preference: "all",
-    }),
     metaMask({
       dappMetadata: {
         name: APP_NAME,
         url: APP_URL,
       },
     }),
+    coinbaseWallet({
+      appName: APP_NAME,
+      appLogoUrl: APP_ICON_URL,
+      preference: "all",
+    }),
+    farcasterFrame(),
   ],
 });
 

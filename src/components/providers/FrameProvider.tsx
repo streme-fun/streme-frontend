@@ -125,7 +125,6 @@ export function useFrame() {
         setLastEvent("Primary button clicked");
       });
 
-      // Don't call ready here - let the app handle it
       // Call ready action
       console.log("Calling ready");
       sdk.actions.ready({});
