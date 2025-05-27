@@ -3,9 +3,12 @@
 import { useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import Image from "next/image";
+import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 
 export function LaunchForm() {
   const { login, authenticated } = usePrivy();
+  const { isMiniAppView, isConnected } = useAppFrameLogic();
+
   const [formData, setFormData] = useState({
     name: "",
     symbol: "",
@@ -27,13 +30,24 @@ export function LaunchForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!authenticated) {
-      login();
+    const isWalletConnected = isMiniAppView ? isConnected : authenticated;
+
+    if (!isWalletConnected) {
+      if (!isMiniAppView) {
+        login();
+      }
       return;
     }
     // TODO: Implement token launch
     console.log("Launching token:", formData);
   };
+
+  const isWalletConnected = isMiniAppView ? isConnected : authenticated;
+  const buttonText = isWalletConnected
+    ? "LAUNCH TOKEN"
+    : isMiniAppView
+    ? "WALLET CONNECTING..."
+    : "CONNECT WALLET TO LAUNCH";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -140,8 +154,9 @@ export function LaunchForm() {
       <button
         type="submit"
         className="btn btn-primary btn-lg w-full font-bold text-lg"
+        disabled={isMiniAppView && !isConnected}
       >
-        {authenticated ? "LAUNCH TOKEN" : "CONNECT WALLET TO LAUNCH"}
+        {buttonText}
       </button>
     </form>
   );

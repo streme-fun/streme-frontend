@@ -81,8 +81,8 @@ export function TokenActions({
     address: fcAddress,
     isConnected: fcIsConnected,
     isOnCorrectNetwork: fcIsOnCorrectNetwork,
-    connect: fcConnect,
-    connectors: fcConnectors,
+    connect,
+    connectors,
     switchChain: fcSwitchChain,
     farcasterContext,
   } = useAppFrameLogic();
@@ -111,10 +111,11 @@ export function TokenActions({
     walletIsConnected = isConnectedProp ?? fcIsConnected;
     onCorrectNetwork = isOnCorrectNetworkProp ?? fcIsOnCorrectNetwork;
     effectiveLogin = () => {
-      if (fcConnect && fcConnectors && fcConnectors.length > 0) {
-        fcConnect({ connector: fcConnectors[0] });
+      const fcConnector = connectors.find((c) => c.id === "farcaster");
+      if (fcConnector) {
+        connect({ connector: fcConnector });
       } else {
-        console.warn("Farcaster connect function not available");
+        console.warn("Farcaster connector not found");
       }
     };
     effectiveSwitchNetwork = fcSwitchChain
@@ -424,6 +425,22 @@ export function TokenActions({
     onStakingChange,
   ]);
 
+  // Auto-connect to Farcaster wallet if in mini app context and not connected
+  useEffect(() => {
+    if (isEffectivelyMiniApp && !walletIsConnected && farcasterContext) {
+      const fcConnector = connectors.find((c) => c.id === "farcaster");
+      if (fcConnector) {
+        connect({ connector: fcConnector });
+      }
+    }
+  }, [
+    isEffectivelyMiniApp,
+    walletIsConnected,
+    farcasterContext,
+    connectors,
+    connect,
+  ]);
+
   if (isEffectivelyMiniApp && !fcSDKLoaded) {
     return (
       <div className="card bg-base-100 border border-black/[.1]1]">
@@ -461,23 +478,33 @@ export function TokenActions({
               </p>
             )}
           </div>
-          <UiButton
-            onClick={
-              walletIsConnected && !onCorrectNetwork && effectiveSwitchNetwork
-                ? effectiveSwitchNetwork
-                : effectiveLogin
-            }
-            className="btn btn-primary btn-sm w-full"
-            disabled={
-              walletIsConnected && !onCorrectNetwork && !effectiveSwitchNetwork
-            }
-          >
-            {walletIsConnected && !onCorrectNetwork
-              ? "Switch Network"
-              : isEffectivelyMiniApp
-              ? "Connect Farcaster Wallet"
-              : "Connect Wallet"}
-          </UiButton>
+          {/* Only show connect button for non-mini app or network switching */}
+          {!isEffectivelyMiniApp || (walletIsConnected && !onCorrectNetwork) ? (
+            <UiButton
+              onClick={
+                walletIsConnected && !onCorrectNetwork && effectiveSwitchNetwork
+                  ? effectiveSwitchNetwork
+                  : effectiveLogin
+              }
+              className="btn btn-primary btn-sm w-full"
+              disabled={
+                walletIsConnected &&
+                !onCorrectNetwork &&
+                !effectiveSwitchNetwork
+              }
+            >
+              {walletIsConnected && !onCorrectNetwork
+                ? "Switch Network"
+                : "Connect Wallet"}
+            </UiButton>
+          ) : (
+            <div className="text-center">
+              <span className="loading loading-spinner loading-sm"></span>
+              <p className="text-sm text-gray-500 mt-2">
+                Connecting to Farcaster wallet...
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );

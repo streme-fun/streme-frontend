@@ -9,6 +9,7 @@ import { sdk } from "@farcaster/frame-sdk"; // Added SDK import
 
 export function useAppFrameLogic() {
   const [isMiniAppView, setIsMiniAppView] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const { context: farcasterContext, isSDKLoaded } = useFrame();
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
@@ -20,6 +21,25 @@ export function useAppFrameLogic() {
       setIsMiniAppView(!!farcasterContext);
     }
   }, [farcasterContext, isSDKLoaded]);
+
+  // Call ready when the interface is ready to be displayed
+  useEffect(() => {
+    if (isSDKLoaded && isMiniAppView && !isReady) {
+      const callReady = async () => {
+        try {
+          await sdk.actions.ready();
+          setIsReady(true);
+        } catch (error) {
+          console.error("Error calling sdk.actions.ready():", error);
+          setIsReady(true); // Set ready anyway to prevent blocking
+        }
+      };
+
+      callReady();
+    } else if (!isMiniAppView) {
+      setIsReady(true);
+    }
+  }, [isSDKLoaded, isMiniAppView, isReady]);
 
   const isOnCorrectNetwork = isConnected && chain?.id === base.id;
 
@@ -50,6 +70,7 @@ export function useAppFrameLogic() {
     isConnected,
     chain,
     isOnCorrectNetwork,
+    isReady,
     connect,
     connectors,
     switchChain,

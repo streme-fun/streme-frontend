@@ -187,7 +187,11 @@ export function ClaimFeesButton({
             Claimed!
           </>
         ) : !walletIsConnected ? (
-          "Connect Wallet"
+          isEffectivelyMiniApp ? (
+            "Wallet Connecting..."
+          ) : (
+            "Connect Wallet"
+          )
         ) : (
           "Send Fees to Creator" // UI text, actual recipient is determined by contract
         )}

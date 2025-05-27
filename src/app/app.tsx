@@ -25,7 +25,7 @@ function App() {
   const {
     isSDKLoaded,
     isMiniAppView,
-    // farcasterContext,
+    farcasterContext,
     // address,
     isConnected,
     isOnCorrectNetwork,
@@ -79,25 +79,21 @@ function App() {
     }
   }, [isMiniAppView, isSDKLoaded, promptToAddMiniApp]);
 
+  // Auto-connect to Farcaster wallet if not connected in mini app context
+  useEffect(() => {
+    if (isMiniAppView && !isConnected && farcasterContext) {
+      const fcConnector = connectors.find((c) => c.id === "farcaster");
+      if (fcConnector) {
+        connect({ connector: fcConnector });
+      }
+    }
+  }, [isMiniAppView, isConnected, farcasterContext, connectors, connect]);
+
   if (!isSDKLoaded) {
     return <div className="text-center py-8">Loading SDK...</div>;
   }
 
   if (isMiniAppView) {
-    const handleMiniAppConnect = () => {
-      const fcConnector = connectors.find((c) => c.id === "farcaster");
-      if (fcConnector) {
-        connect({ connector: fcConnector });
-      } else {
-        console.warn(
-          "Farcaster connector not found. Ensure it's configured in WagmiProvider.tsx and active in the Farcaster client."
-        );
-        if (connectors.length > 0) {
-          // connect({ connector: connectors[0] });
-        }
-      }
-    };
-
     return (
       <div className="font-[family-name:var(--font-geist-sans)]">
         <div className="flex flex-col gap-2 row-start-2 items-center w-full p-4 pt-20">
@@ -193,9 +189,7 @@ function App() {
             sortBy={sortBy}
           />
 
-          {!isConnected ? (
-            <Button onClick={handleMiniAppConnect}>Connect Wallet</Button>
-          ) : !isOnCorrectNetwork ? (
+          {!isOnCorrectNetwork && isConnected ? (
             <Button
               onClick={() => switchChain && switchChain({ chainId: base.id })}
               disabled={isSwitchingChain || !switchChain}
@@ -204,24 +198,7 @@ function App() {
                 ? "Switching to Base..."
                 : "Switch to Base Network"}
             </Button>
-          ) : (
-            <>
-              {/* <p className="text-sm">
-                FID: {farcasterContext?.user?.fid?.toString()}
-              </p> */}
-              {/* <TopStreamer /> */}
-              {/* <div className="w-full max-w-[1200px]">
-                {loading && tokens.length === 0 ? (
-                  <div className="text-center py-8">
-                    Loading tokens for Mini-App...
-                  </div>
-                ) : (
-                  <TokenGrid tokens={tokens} />
-                )}
-              </div> */}
-              {/* <Button onClick={() => disconnect()}>Disconnect Wallet</Button> */}
-            </>
-          )}
+          ) : null}
         </div>
         <div className="fixed inset-0 -z-10">
           <HeroAnimationMini />
