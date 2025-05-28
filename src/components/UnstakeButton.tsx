@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useAccount } from "wagmi";
-import { createWalletClient, custom } from "viem";
-import { base } from "viem/chains";
+import { useState, useEffect } from "react";
+import { useWallets, usePrivy } from "@privy-io/react-auth";
 import { UnstakeModal } from "./UnstakeModal";
 import { publicClient } from "@/src/lib/viemClient";
 import { Interface } from "@ethersproject/abi";
 import { sdk } from "@farcaster/frame-sdk";
 import { toast } from "sonner";
+import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
 const stakingAbiEthers = [
   "function unstake(address to, uint256 amount)",
@@ -60,7 +59,9 @@ export function UnstakeButton({
   farcasterAddress,
   farcasterIsConnected,
 }: UnstakeButtonProps) {
-  const { address: wagmiAddress } = useAccount();
+  const { wallets } = useWallets();
+  const { user } = usePrivy();
+  const { refreshTrigger, primaryAddress } = useWalletAddressChange();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unlockTime, setUnlockTime] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>("");
@@ -68,26 +69,36 @@ export function UnstakeButton({
 
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
-    : !!wagmiAddress;
-  const effectiveAddress = isMiniApp ? farcasterAddress : wagmiAddress;
+    : !!user?.wallet?.address;
+  const effectiveAddress = isMiniApp
+    ? farcasterAddress
+    : primaryAddress || user?.wallet?.address;
 
-  const fetchUnlockTime = useCallback(async () => {
-    if (!effectiveAddress || !effectiveIsConnected) return;
-    try {
-      const timestamp = await publicClient.readContract({
-        address: toHex(stakingAddress),
-        abi: stakingAbiViem,
-        functionName: "depositTimestamps",
-        args: [toHex(effectiveAddress)],
-      });
+  // Fetch unlock time - using direct useEffect pattern like ZapStakeButton
+  useEffect(() => {
+    if (effectiveIsConnected && effectiveAddress) {
+      const fetchUnlockTimeInternal = async () => {
+        try {
+          const timestamp = await publicClient.readContract({
+            address: toHex(stakingAddress),
+            abi: stakingAbiViem,
+            functionName: "depositTimestamps",
+            args: [toHex(effectiveAddress)],
+          });
 
-      const unlockTimeStamp = Number(timestamp) + 86400; // 24 hours in seconds
-      setUnlockTime(unlockTimeStamp);
-    } catch (error) {
-      console.error("Error fetching unlock time:", error);
-      toast.error("Could not fetch unlock time.");
+          const unlockTimeStamp = Number(timestamp) + 86400; // 24 hours in seconds
+          setUnlockTime(unlockTimeStamp);
+        } catch (error) {
+          console.error("Error fetching unlock time:", error);
+          toast.error("Could not fetch unlock time.");
+        }
+      };
+
+      fetchUnlockTimeInternal();
+      const interval = setInterval(fetchUnlockTimeInternal, 30000); // Refresh every 30 seconds
+      return () => clearInterval(interval);
     }
-  }, [effectiveAddress, effectiveIsConnected, stakingAddress]);
+  }, [effectiveAddress, effectiveIsConnected, stakingAddress, refreshTrigger]);
 
   useEffect(() => {
     if (!unlockTime) return;
@@ -116,12 +127,6 @@ export function UnstakeButton({
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [unlockTime]);
-
-  useEffect(() => {
-    if (effectiveIsConnected) {
-      fetchUnlockTime();
-    }
-  }, [fetchUnlockTime, effectiveIsConnected]);
 
   const isLocked = unlockTime
     ? Math.floor(Date.now() / 1000) < unlockTime
@@ -176,54 +181,70 @@ export function UnstakeButton({
         }
         toast.success("Unstaking successful!", { id: toastId });
       } else {
-        // Wagmi Path
-        if (!window.ethereum || !wagmiAddress) {
-          throw new Error(
-            "Wagmi wallet not connected or Ethereum provider missing."
+        // Privy Path
+        if (!user?.wallet?.address) {
+          throw new Error("Privy wallet not connected.");
+        }
+
+        // Find wallet with fallback logic
+        let wallet = wallets?.find((w) => w.address === user.wallet?.address);
+        if (!wallet && wallets && wallets.length > 0) {
+          // Try case-insensitive match
+          wallet = wallets.find(
+            (w) =>
+              w.address?.toLowerCase() === user.wallet?.address?.toLowerCase()
           );
         }
-        const walletAddress = wagmiAddress; // Define walletAddress for Wagmi path
+        if (!wallet && wallets && wallets.length === 1) {
+          // Single wallet fallback
+          wallet = wallets[0];
+        }
+        if (!wallet) throw new Error("Privy Wallet not found");
 
-        const walletClient = createWalletClient({
-          // Define walletClient for Wagmi path
-          chain: base,
-          transport: custom(window.ethereum),
-          account: toHex(walletAddress),
-        });
+        // Use the wallet's actual address, not user.wallet.address
+        const walletAddress = wallet.address;
+        if (!walletAddress) throw new Error("Wallet address not available");
 
-        await walletClient.request({
-          // Switch chain if necessary
+        const provider = await wallet.getEthereumProvider();
+        await provider.request({
           method: "wallet_switchEthereumChain",
-          params: [{ chainId: `0x${base.id.toString(16)}` }],
+          params: [{ chainId: "0x2105" }], // Base Mainnet
         });
 
         toast.info("Requesting unstake...", { id: toastId });
-        // writeContract returns the hash directly in Viem
-        unstakeTxHash = await walletClient.writeContract({
-          address: toHex(stakingAddress),
-          abi: stakingAbiViem, // Use Viem ABI for writeContract
-          functionName: "unstake",
-          args: [toHex(walletAddress), amount],
+        const unstakeIface = new Interface(stakingAbiEthers);
+        const unstakeData = unstakeIface.encodeFunctionData("unstake", [
+          toHex(walletAddress),
+          amount,
+        ]);
+
+        unstakeTxHash = await provider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: toHex(stakingAddress),
+              from: toHex(walletAddress),
+              data: toHex(unstakeData),
+            },
+          ],
         });
 
         if (!unstakeTxHash) {
           throw new Error(
-            "Unstake transaction hash not received (Wagmi). User might have cancelled."
+            "Unstake transaction hash not received (Privy). User might have cancelled."
           );
         }
         toast.loading("Waiting for unstake confirmation...", { id: toastId });
-        // Correctly wait for transaction receipt
         const unstakeReceipt = await publicClient.waitForTransactionReceipt({
           hash: unstakeTxHash,
         });
         if (!unstakeReceipt.status || unstakeReceipt.status !== "success") {
-          throw new Error("Unstake transaction failed (Wagmi).");
+          throw new Error("Unstake transaction failed (Privy).");
         }
         toast.success("Unstaking successful!", { id: toastId });
       }
 
       onSuccess?.();
-      fetchUnlockTime();
       setIsModalOpen(false);
     } catch (error: unknown) {
       console.error("UnstakeButton caught error:", error);

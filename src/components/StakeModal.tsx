@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount } from "wagmi";
+import { usePrivy } from "@privy-io/react-auth";
 import { formatUnits, parseUnits } from "viem";
 import { Modal } from "./Modal";
+import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
 interface StakeModalProps {
   isOpen: boolean;
@@ -72,7 +73,11 @@ export function StakeModal({
   const [isSuccess, setIsSuccess] = useState(false);
   const [step, setStep] = useState<"idle" | "staking" | "connecting">("idle");
   const [error, setError] = useState<string | null>(null);
-  const { address: wagmiAddress } = useAccount();
+  const { user } = usePrivy();
+  const { primaryAddress } = useWalletAddressChange();
+
+  // Use primaryAddress for the Superfluid explorer link, fallback to user.wallet.address
+  const effectiveAddress = primaryAddress || user?.wallet?.address;
 
   const handleStake = async () => {
     setError(null);
@@ -197,7 +202,7 @@ export function StakeModal({
             Token rewards are now being streamed directly to your wallet.
           </p>
           <a
-            href={`https://explorer.superfluid.finance/base-mainnet/accounts/${wagmiAddress}?tab=pools`}
+            href={`https://explorer.superfluid.finance/base-mainnet/accounts/${effectiveAddress}?tab=pools`}
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn-accent w-full"

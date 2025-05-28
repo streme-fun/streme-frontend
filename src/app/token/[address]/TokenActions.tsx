@@ -18,8 +18,8 @@ import {
 } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { Button as UiButton } from "@/src/components/ui/button";
-import { useAccount, useSwitchChain } from "wagmi";
-import { base } from "wagmi/chains";
+import { useAccount } from "wagmi";
+import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
 interface TokenActionsProps {
   token: Token;
@@ -27,7 +27,6 @@ interface TokenActionsProps {
   isMiniAppView?: boolean;
   address?: `0x${string}` | undefined;
   isConnected?: boolean;
-  isOnCorrectNetwork?: boolean;
 }
 
 type Deployment = {
@@ -42,7 +41,6 @@ export function TokenActions({
   isMiniAppView: isMiniAppViewProp,
   address: addressProp,
   isConnected: isConnectedProp,
-  isOnCorrectNetwork: isOnCorrectNetworkProp,
 }: TokenActionsProps) {
   const [isUniswapOpen, setIsUniswapOpen] = useState(false);
   const [token, setToken] = useState(initialToken);
@@ -80,81 +78,27 @@ export function TokenActions({
     isMiniAppView: detectedMiniAppView,
     address: fcAddress,
     isConnected: fcIsConnected,
-    isOnCorrectNetwork: fcIsOnCorrectNetwork,
     connect: fcConnect,
     connectors: fcConnectors,
-    switchChain: fcSwitchChain,
     farcasterContext,
   } = useAppFrameLogic();
 
   const { user: privyUser, ready: privyReady, login: privyLogin } = usePrivy();
   const { wallets } = useWallets();
-  const {
-    address: wagmiAddress,
-    isConnected: wagmiIsConnectedGlobal,
-    chain: activeChain,
-  } = useAccount();
-  const { switchChain: wagmiSwitchNetwork } = useSwitchChain();
+  const { address: wagmiAddress, isConnected: wagmiIsConnectedGlobal } =
+    useAccount();
+  const { refreshTrigger, primaryAddress } = useWalletAddressChange();
 
   // Simplified mini app detection - use the improved detection from useAppFrameLogic
   const isEffectivelyMiniApp = isMiniAppViewProp ?? detectedMiniAppView;
 
-  // State for enhanced chain detection
-  const [actualChainId, setActualChainId] = useState<number | undefined>(
-    undefined
-  );
-  const [isChainDetectionComplete, setIsChainDetectionComplete] =
-    useState(false);
-
-  // Enhanced chain detection for mobile browsers
-  useEffect(() => {
-    const checkActualChain = async () => {
-      if (
-        !isEffectivelyMiniApp &&
-        privyUser?.wallet?.address &&
-        wallets.length > 0
-      ) {
-        try {
-          const wallet = wallets.find(
-            (w) => w.address === privyUser.wallet?.address
-          );
-          if (wallet) {
-            const provider = await wallet.getEthereumProvider();
-            const chainId = await provider.request({ method: "eth_chainId" });
-            const numericChainId = parseInt(chainId, 16);
-            setActualChainId(numericChainId);
-            setIsChainDetectionComplete(true);
-            console.log(
-              "Actual chain ID from wallet provider:",
-              numericChainId
-            );
-          } else {
-            setIsChainDetectionComplete(true);
-          }
-        } catch (error) {
-          console.error("Error checking actual chain:", error);
-          setActualChainId(undefined);
-          setIsChainDetectionComplete(true);
-        }
-      } else {
-        // For mini app or when no wallet is connected, mark detection as complete
-        setIsChainDetectionComplete(true);
-      }
-    };
-
-    checkActualChain();
-  }, [isEffectivelyMiniApp, privyUser?.wallet?.address, wallets]);
-
   let currentAddress: `0x${string}` | undefined;
   let walletIsConnected: boolean;
-  let onCorrectNetwork: boolean;
   let effectiveLogin: () => void;
-  let effectiveSwitchNetwork: (() => void) | undefined;
 
   if (isEffectivelyMiniApp) {
     currentAddress = addressProp ?? fcAddress;
     walletIsConnected = isConnectedProp ?? fcIsConnected;
-    onCorrectNetwork = isOnCorrectNetworkProp ?? fcIsOnCorrectNetwork;
     effectiveLogin = () => {
       if (fcConnect && fcConnectors && fcConnectors.length > 0) {
         fcConnect({ connector: fcConnectors[0] });
@@ -162,72 +106,80 @@ export function TokenActions({
         console.warn("Farcaster connect function not available");
       }
     };
-    effectiveSwitchNetwork = fcSwitchChain
-      ? () => fcSwitchChain({ chainId: base.id })
-      : undefined;
   } else {
-    currentAddress = privyUser?.wallet?.address as `0x${string}` | undefined;
-    walletIsConnected = privyReady && !!privyUser?.wallet?.address;
+    // For non-mini apps, use primaryAddress from useWalletAddressChange hook for better wallet switching support
+    currentAddress = (primaryAddress || privyUser?.wallet?.address) as
+      | `0x${string}`
+      | undefined;
+    // Check if Privy is ready, user has a wallet, and wallets array is populated
+    const hasPrivyWallet = privyReady && !!privyUser?.wallet?.address;
+    const walletsReady = wallets && wallets.length > 0;
+    const exactWalletMatch =
+      walletsReady &&
+      wallets.some((w) => w.address === privyUser?.wallet?.address);
+    const caseInsensitiveMatch =
+      walletsReady &&
+      wallets.some(
+        (w) =>
+          w.address?.toLowerCase() === privyUser?.wallet?.address?.toLowerCase()
+      );
+    const singleWalletFallback =
+      walletsReady && wallets.length === 1 && hasPrivyWallet;
 
-    // For mobile browsers with Privy, use the actual chain ID from wallet provider if available
-    const wagmiChainId = activeChain?.id;
-    const effectiveChainId = actualChainId || wagmiChainId;
-
-    // Only determine network correctness if we have completed chain detection
-    // or if we have a wagmi chain ID (fallback)
-    if (isChainDetectionComplete || wagmiChainId) {
-      onCorrectNetwork = walletIsConnected && effectiveChainId === base.id;
-    } else {
-      // Still detecting chain, assume correct network to avoid false negatives
-      onCorrectNetwork = walletIsConnected;
-    }
-
+    walletIsConnected =
+      hasPrivyWallet &&
+      walletsReady &&
+      (exactWalletMatch || caseInsensitiveMatch || singleWalletFallback);
     effectiveLogin = privyLogin;
-    effectiveSwitchNetwork = wagmiSwitchNetwork
-      ? () => wagmiSwitchNetwork({ chainId: base.id })
-      : undefined;
   }
 
   useEffect(() => {
+    // Calculate the same wallet detection logic for debugging
+    const hasPrivyWallet = privyReady && !!privyUser?.wallet?.address;
+    const walletsReady = wallets && wallets.length > 0;
+    const exactWalletMatch =
+      walletsReady &&
+      wallets.some((w) => w.address === privyUser?.wallet?.address);
+    const caseInsensitiveMatch =
+      walletsReady &&
+      wallets.some(
+        (w) =>
+          w.address?.toLowerCase() === privyUser?.wallet?.address?.toLowerCase()
+      );
+    const singleWalletFallback =
+      walletsReady && wallets.length === 1 && hasPrivyWallet;
+
     console.log("TokenActions Wallet state:", {
       isEffectivelyMiniApp,
       fcSDKLoaded,
       privyReady,
       currentAddress,
       walletIsConnected,
-      onCorrectNetwork,
       detectedMiniAppView,
       isMiniAppViewProp,
       fcAddress,
       fcIsConnected,
-      fcIsOnCorrectNetwork,
       wagmiAddress,
       wagmiIsConnectedGlobal,
-      activeChainId: activeChain?.id,
-      baseChainId: base.id,
       farcasterContext: !!farcasterContext,
       userAgent: typeof window !== "undefined" ? navigator.userAgent : "SSR",
       isInIframe:
         typeof window !== "undefined" ? window !== window.parent : false,
-      // Additional debugging for mobile chain detection
       privyUserExists: !!privyUser,
       privyWalletExists: !!privyUser?.wallet,
       privyWalletAddress: privyUser?.wallet?.address,
-      wagmiChainName: activeChain?.name,
-      wagmiChainId: activeChain?.id,
-      chainDetectionLogic: !isEffectivelyMiniApp
-        ? {
-            wagmiChainId: activeChain?.id,
-            actualChainId: actualChainId,
-            effectiveChainId: actualChainId || activeChain?.id,
-            isBaseChain: (actualChainId || activeChain?.id) === base.id,
-            walletIsConnected: walletIsConnected,
-            isChainDetectionComplete: isChainDetectionComplete,
-            finalResult:
-              walletIsConnected &&
-              (actualChainId || activeChain?.id) === base.id,
-          }
-        : "mini-app-mode",
+      walletsLength: wallets?.length,
+      walletsAddresses: wallets?.map((w) => w.address),
+      // New debug info for wallet detection
+      hasPrivyWallet,
+      walletsReady,
+      exactWalletMatch,
+      caseInsensitiveMatch,
+      singleWalletFallback,
+      finalWalletConnected:
+        hasPrivyWallet &&
+        walletsReady &&
+        (exactWalletMatch || caseInsensitiveMatch || singleWalletFallback),
     });
   }, [
     isEffectivelyMiniApp,
@@ -235,19 +187,15 @@ export function TokenActions({
     privyReady,
     currentAddress,
     walletIsConnected,
-    onCorrectNetwork,
     detectedMiniAppView,
     isMiniAppViewProp,
     fcAddress,
     fcIsConnected,
-    fcIsOnCorrectNetwork,
     wagmiAddress,
     wagmiIsConnectedGlobal,
-    activeChain?.id,
     farcasterContext,
     privyUser,
-    actualChainId,
-    isChainDetectionComplete,
+    wallets,
   ]);
 
   useEffect(() => {
@@ -430,7 +378,7 @@ export function TokenActions({
       }
     };
     checkStakedBalance();
-  }, [currentAddress, walletIsConnected, stakingAddress]);
+  }, [currentAddress, walletIsConnected, stakingAddress, refreshTrigger]);
 
   useEffect(() => {
     const fetchBalance = async () => {
@@ -456,7 +404,7 @@ export function TokenActions({
       }
     };
     fetchBalance();
-  }, [currentAddress, walletIsConnected, contractAddress]);
+  }, [currentAddress, walletIsConnected, contractAddress, refreshTrigger]);
 
   const hasTokens = walletIsConnected && balance > 0n;
 
@@ -506,6 +454,7 @@ export function TokenActions({
     contractAddress,
     stakingAddress,
     onStakingChange,
+    refreshTrigger,
   ]);
 
   if (isEffectivelyMiniApp && !fcSDKLoaded) {
@@ -530,51 +479,23 @@ export function TokenActions({
     );
   }
 
-  // Show loading state while detecting chain for mobile browsers
-  if (!isEffectivelyMiniApp && walletIsConnected && !isChainDetectionComplete) {
-    return (
-      <div className="card bg-base-100 border border-black/[.1]1]">
-        <div className="card-body items-center justify-center min-h-[100px]">
-          <span className="loading loading-spinner loading-sm"></span>
-          <p className="text-sm text-gray-500">Detecting network...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!walletIsConnected || !onCorrectNetwork) {
+  if (!walletIsConnected) {
     return (
       <div className="card bg-base-100 border border-black/[.1]1]">
         <div className="card-body items-center">
           <div className="mb-4 text-center">
             <Wallet size={48} className="mx-auto mb-2 text-gray-400" />
             <p className="font-semibold">
-              {isEffectivelyMiniApp ? "Farcaster Wallet" : "Wallet"}
-              {!walletIsConnected ? " Not Connected" : " Wrong Network"}
+              {isEffectivelyMiniApp ? "Farcaster Wallet" : "Wallet"} Not
+              Connected
             </p>
-            {!onCorrectNetwork && walletIsConnected && (
-              <p className="text-xs text-red-500 mt-1">
-                Please switch to Base network (Chain ID: {base.id}).
-              </p>
-            )}
           </div>
           <div>
             <UiButton
-              onClick={
-                walletIsConnected && !onCorrectNetwork && effectiveSwitchNetwork
-                  ? effectiveSwitchNetwork
-                  : effectiveLogin
-              }
+              onClick={effectiveLogin}
               className="btn btn-primary btn-sm w-full"
-              disabled={
-                walletIsConnected &&
-                !onCorrectNetwork &&
-                !effectiveSwitchNetwork
-              }
             >
-              {walletIsConnected && !onCorrectNetwork
-                ? "Switch to Base Network"
-                : isEffectivelyMiniApp
+              {isEffectivelyMiniApp
                 ? "Connect Farcaster Wallet"
                 : "Connect Wallet"}
             </UiButton>

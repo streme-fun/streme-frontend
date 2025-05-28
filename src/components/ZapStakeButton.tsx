@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useWallets } from "@privy-io/react-auth";
-import { useAccount } from "wagmi";
+import { useWallets, usePrivy } from "@privy-io/react-auth";
 import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
@@ -10,6 +9,7 @@ import { Modal } from "./Modal";
 import { Zap } from "lucide-react";
 import { publicClient } from "@/src/lib/viemClient";
 import { sdk } from "@farcaster/frame-sdk"; // Added Farcaster SDK
+import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
 const WETH = "0x4200000000000000000000000000000000000006";
 const toHex = (address: string) => address as `0x${string}`;
@@ -43,12 +43,15 @@ export function ZapStakeButton({
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const { wallets } = useWallets();
-  const { address: wagmiAddress } = useAccount();
+  const { user } = usePrivy();
+  const { refreshTrigger, primaryAddress } = useWalletAddressChange();
 
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
-    : !!wagmiAddress;
-  const effectiveAddress = isMiniApp ? farcasterAddress : wagmiAddress;
+    : !!user?.wallet?.address;
+  const effectiveAddress = isMiniApp
+    ? farcasterAddress
+    : primaryAddress || user?.wallet?.address;
 
   // Fetch ETH balance
   useEffect(() => {
@@ -72,7 +75,7 @@ export function ZapStakeButton({
     fetchBalances();
     const interval = setInterval(fetchBalances, 10000);
     return () => clearInterval(interval);
-  }, [effectiveAddress, effectiveIsConnected]);
+  }, [effectiveAddress, effectiveIsConnected, refreshTrigger]);
 
   // Validate amount and check if transaction would be possible
   const { isValid, validationError } = useMemo(() => {
@@ -222,9 +225,28 @@ export function ZapStakeButton({
           ],
         });
       } else {
-        if (!wagmiAddress) throw new Error("Wagmi wallet not connected.");
-        const wallet = wallets?.find((w) => w.address === wagmiAddress);
-        if (!wallet) throw new Error("Wagmi Wallet not found");
+        if (!user?.wallet?.address)
+          throw new Error("Privy wallet not connected.");
+
+        // Find wallet with fallback logic similar to StakeButton
+        let wallet = wallets?.find((w) => w.address === user.wallet?.address);
+        if (!wallet && wallets && wallets.length > 0) {
+          // Try case-insensitive match
+          wallet = wallets.find(
+            (w) =>
+              w.address?.toLowerCase() === user.wallet?.address?.toLowerCase()
+          );
+        }
+        if (!wallet && wallets && wallets.length === 1) {
+          // Single wallet fallback
+          wallet = wallets[0];
+        }
+        if (!wallet) throw new Error("Privy Wallet not found");
+
+        // Use the wallet's actual address, not user.wallet.address
+        const walletAddress = wallet.address;
+        if (!walletAddress) throw new Error("Wallet address not available");
+
         const provider = await wallet.getEthereumProvider();
         await provider.request({
           method: "wallet_switchEthereumChain",
@@ -233,17 +255,17 @@ export function ZapStakeButton({
         let estimatedGas = 1200000n;
         try {
           estimatedGas = await publicClient.estimateGas({
-            account: toHex(wagmiAddress!),
+            account: toHex(walletAddress),
             to: toHex(zapContractAddress),
             value: amountInWei,
             data: zapData,
           });
         } catch (e) {
-          console.error("Gas estimation failed (Wagmi):", e);
+          console.error("Gas estimation failed (Privy):", e);
         }
         const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.2));
         const currentEthBalance = await publicClient.getBalance({
-          address: toHex(wagmiAddress!),
+          address: toHex(walletAddress),
         });
         const gasPrice = await publicClient.getGasPrice();
         const totalCost = gasLimit * gasPrice + amountInWei;
@@ -259,7 +281,7 @@ export function ZapStakeButton({
           params: [
             {
               to: toHex(zapContractAddress),
-              from: toHex(wagmiAddress!),
+              from: toHex(walletAddress),
               data: zapData,
               value: `0x${amountInWei.toString(16)}`,
               gas: `0x${gasLimit.toString(16)}`,

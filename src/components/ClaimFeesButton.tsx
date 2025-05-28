@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { toast } from "sonner";
-import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/src/lib/contracts";
+import { LP_FACTORY_ADDRESS } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { Interface } from "@ethersproject/abi";
+import { publicClient } from "@/src/lib/viemClient";
+import { sdk } from "@farcaster/frame-sdk";
 
 interface ClaimFeesButtonProps {
   tokenAddress: string;
@@ -24,6 +26,7 @@ export function ClaimFeesButton({
   farcasterIsConnected,
 }: ClaimFeesButtonProps) {
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isClaimingFees, setIsClaimingFees] = useState(false);
 
   const {
     isSDKLoaded: fcSDKLoaded,
@@ -34,6 +37,7 @@ export function ClaimFeesButton({
   } = useAppFrameLogic();
 
   const { user: privyUser, ready: privyReady } = usePrivy();
+  const { wallets } = useWallets();
 
   // More robust mini app detection
   const isEffectivelyMiniApp =
@@ -47,23 +51,27 @@ export function ClaimFeesButton({
     currentAddress = farcasterAddress ?? fcAddress;
     walletIsConnected = farcasterIsConnected ?? fcIsConnected;
   } else {
+    // For non-mini apps, use more robust Privy wallet detection
     currentAddress = privyUser?.wallet?.address as `0x${string}` | undefined;
-    walletIsConnected = privyReady && !!privyUser?.wallet?.address;
+    const hasPrivyWallet = privyReady && !!privyUser?.wallet?.address;
+    const walletsReady = wallets && wallets.length > 0;
+    const exactWalletMatch =
+      walletsReady &&
+      wallets.some((w) => w.address === privyUser?.wallet?.address);
+    const caseInsensitiveMatch =
+      walletsReady &&
+      wallets.some(
+        (w) =>
+          w.address?.toLowerCase() === privyUser?.wallet?.address?.toLowerCase()
+      );
+    const singleWalletFallback =
+      walletsReady && wallets.length === 1 && hasPrivyWallet;
+
+    walletIsConnected =
+      hasPrivyWallet &&
+      walletsReady &&
+      (exactWalletMatch || caseInsensitiveMatch || singleWalletFallback);
   }
-
-  const {
-    writeContractAsync,
-    data: hash,
-    isPending: isClaimingFees, // Use wagmi's pending state
-  } = useWriteContract();
-
-  const {
-    isLoading: isConfirming,
-    isSuccess: isConfirmed,
-    error: confirmationError,
-  } = useWaitForTransactionReceipt({
-    hash,
-  });
 
   const handleClaimFees = async () => {
     if (!walletIsConnected || !currentAddress) {
@@ -71,42 +79,112 @@ export function ClaimFeesButton({
       return;
     }
 
+    setIsClaimingFees(true);
     const toastId = toast.loading("Preparing transaction...");
 
     try {
-      await writeContractAsync({
-        address: LP_FACTORY_ADDRESS,
-        abi: LP_FACTORY_ABI,
-        functionName: "claimRewards",
-        args: [tokenAddress as `0x${string}`],
-      });
+      let txHash: `0x${string}` | undefined;
+
+      if (isEffectivelyMiniApp) {
+        const ethProvider = sdk.wallet.ethProvider;
+        if (!ethProvider) {
+          throw new Error("Farcaster Ethereum provider not available.");
+        }
+
+        const claimIface = new Interface([
+          "function claimRewards(address token) external",
+        ]);
+        const claimData = claimIface.encodeFunctionData("claimRewards", [
+          tokenAddress as `0x${string}`,
+        ]);
+
+        txHash = await ethProvider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: LP_FACTORY_ADDRESS,
+              from: currentAddress,
+              data: claimData as `0x${string}`,
+            },
+          ],
+        });
+      } else {
+        // Privy Path
+        if (!privyUser?.wallet?.address) {
+          throw new Error("Privy wallet not connected.");
+        }
+
+        // Find wallet with fallback logic
+        let wallet = wallets?.find(
+          (w) => w.address === privyUser.wallet?.address
+        );
+        if (!wallet && wallets && wallets.length > 0) {
+          // Try case-insensitive match
+          wallet = wallets.find(
+            (w) =>
+              w.address?.toLowerCase() ===
+              privyUser.wallet?.address?.toLowerCase()
+          );
+        }
+        if (!wallet && wallets && wallets.length === 1) {
+          // Single wallet fallback
+          wallet = wallets[0];
+        }
+        if (!wallet) throw new Error("Privy Wallet not found");
+
+        // Use the wallet's actual address, not user.wallet.address
+        const walletAddress = wallet.address;
+        if (!walletAddress) throw new Error("Wallet address not available");
+
+        const provider = await wallet.getEthereumProvider();
+        await provider.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x2105" }], // Base Mainnet
+        });
+
+        const claimIface = new Interface([
+          "function claimRewards(address token) external",
+        ]);
+        const claimData = claimIface.encodeFunctionData("claimRewards", [
+          tokenAddress as `0x${string}`,
+        ]);
+
+        txHash = await provider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: LP_FACTORY_ADDRESS,
+              from: walletAddress as `0x${string}`,
+              data: claimData as `0x${string}`,
+            },
+          ],
+        });
+      }
+
+      if (!txHash) {
+        throw new Error(
+          "Transaction hash not received. User might have cancelled."
+        );
+      }
 
       toast.loading("Confirming transaction...", { id: toastId });
-    } catch (error: unknown) {
-      console.error("Error claiming fees (writeContractAsync):", error);
-      // Attempt to get a more specific message, default to generic
-      let message = "Failed to send transaction";
-      if (error instanceof Error) {
-        if (error.message.includes("User rejected the request")) {
-          message = "Transaction rejected";
-        } else {
-          message = error.message; // Use the full message from the error object
-        }
-      }
-      toast.error(message, { id: toastId });
-    }
-  };
 
-  // Effect to handle transaction confirmation and success/error UI
-  useEffect(() => {
-    if (isConfirmed) {
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+      });
+
+      if (receipt.status !== "success") {
+        throw new Error("Transaction failed or reverted.");
+      }
+
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
+
       toast.success(
         <div className="flex flex-col gap-2">
           <div>Successfully claimed LP fees!</div>
           <a
-            href={`https://basescan.org/tx/${hash}`}
+            href={`https://basescan.org/tx/${txHash}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs opacity-80 hover:opacity-100 underline"
@@ -114,18 +192,26 @@ export function ClaimFeesButton({
             View on Basescan
           </a>
         </div>,
-        { id: hash || undefined, duration: 8000 }
+        { id: toastId, duration: 8000 }
       );
+    } catch (error: unknown) {
+      console.error("Error claiming fees:", error);
+      let message = "Failed to claim fees";
+      if (error instanceof Error) {
+        if (
+          error.message.includes("User rejected") ||
+          error.message.includes("cancelled")
+        ) {
+          message = "Transaction rejected";
+        } else {
+          message = error.message;
+        }
+      }
+      toast.error(message, { id: toastId });
+    } finally {
+      setIsClaimingFees(false);
     }
-    if (confirmationError) {
-      console.error("Error confirming fees transaction:", confirmationError);
-      // Use confirmationError.message directly as it's more reliable
-      toast.error(
-        confirmationError.message || "Transaction confirmation failed",
-        { id: hash || undefined }
-      );
-    }
-  }, [isConfirmed, confirmationError, hash]);
+  };
 
   // Debug logging
   useEffect(() => {
@@ -160,13 +246,13 @@ export function ClaimFeesButton({
     <div className="space-y-1">
       <button
         onClick={handleClaimFees}
-        disabled={isClaimingFees || isConfirming || !walletIsConnected}
+        disabled={isClaimingFees || !walletIsConnected}
         className={`${className} ${showSuccess ? "btn-success" : ""}`}
       >
-        {isClaimingFees || isConfirming ? (
+        {isClaimingFees ? (
           <>
             <span className="loading loading-spinner"></span>
-            {isConfirming ? "Confirming..." : "Claiming..."}
+            Claiming...
           </>
         ) : showSuccess ? (
           <>

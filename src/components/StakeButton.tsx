@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useWallets } from "@privy-io/react-auth";
-import { useAccount } from "wagmi";
+import { usePrivy } from "@privy-io/react-auth";
 // import { base } from "viem/chains"; // Removed as it's no longer used
 import { StakeModal } from "./StakeModal";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient"; // Import the centralized client
 import { toast } from "sonner"; // Added for Mini App placeholder
 import { sdk } from "@farcaster/frame-sdk"; // Added Farcaster SDK
+import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 
@@ -70,17 +71,20 @@ export function StakeButton({
   farcasterIsConnected,
 }: StakeButtonProps) {
   const { wallets } = useWallets();
-  const { address: wagmiAddress } = useAccount();
+  const { user } = usePrivy();
+  const { refreshTrigger, primaryAddress } = useWalletAddressChange();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [balance, setBalance] = useState<bigint>(0n);
   const [isLoading, setIsLoading] = useState(false); // Added for loading state
 
-  const effectiveIsConnected = isMiniApp
-    ? farcasterIsConnected
-    : !!wagmiAddress;
-  const effectiveAddress = isMiniApp ? farcasterAddress : wagmiAddress;
+  const effectiveIsConnected =
+    farcasterIsConnected ?? (isMiniApp ? false : !!user?.wallet?.address);
+  const effectiveAddress = isMiniApp
+    ? farcasterAddress
+    : primaryAddress || user?.wallet?.address;
 
-  const fetchBalance = useCallback(async () => {
+  // Separate fetchBalance function that can be called from anywhere
+  const fetchBalance = async () => {
     if (!effectiveAddress || !effectiveIsConnected) {
       setBalance(0n);
       return;
@@ -106,11 +110,42 @@ export function StakeButton({
       console.error("Error fetching token balance:", error);
       setBalance(0n);
     }
-  }, [effectiveAddress, effectiveIsConnected, tokenAddress]);
+  };
 
+  // Fetch token balance - using direct useEffect pattern like ZapStakeButton
   useEffect(() => {
-    fetchBalance();
-  }, [fetchBalance]);
+    const fetchBalanceInternal = async () => {
+      if (!effectiveAddress || !effectiveIsConnected) {
+        setBalance(0n);
+        return;
+      }
+
+      try {
+        const bal = await publicClient.readContract({
+          address: toHex(tokenAddress),
+          abi: [
+            {
+              inputs: [{ name: "account", type: "address" }],
+              name: "balanceOf",
+              outputs: [{ name: "", type: "uint256" }],
+              stateMutability: "view",
+              type: "function",
+            },
+          ],
+          functionName: "balanceOf",
+          args: [toHex(effectiveAddress)],
+        });
+        setBalance(bal);
+      } catch (error) {
+        console.error("Error fetching token balance:", error);
+        setBalance(0n);
+      }
+    };
+
+    fetchBalanceInternal();
+    const interval = setInterval(fetchBalanceInternal, 10000); // Refresh every 10 seconds
+    return () => clearInterval(interval);
+  }, [effectiveAddress, effectiveIsConnected, tokenAddress, refreshTrigger]);
 
   const checkAllowance = async () => {
     if (!effectiveAddress || !effectiveIsConnected) return 0n;
@@ -250,11 +285,55 @@ export function StakeButton({
           }
         }
       } else {
-        // Wagmi Path (existing logic, ensure it also throws detailed errors)
-        if (!wagmiAddress) throw new Error("Wagmi wallet not connected.");
-        const walletAddress = wagmiAddress;
-        const wallet = wallets.find((w) => w.address === walletAddress);
-        if (!wallet) throw new Error("Wagmi Wallet not found");
+        // Privy Path (updated from Wagmi to match ConnectPoolButton pattern)
+        console.log(
+          "StakeButton: Privy transaction path - debugging wallet lookup:",
+          {
+            userWalletAddress: user?.wallet?.address,
+            availableWallets: wallets?.map((w) => ({
+              address: w.address,
+              type: w.walletClientType,
+            })),
+            walletsLength: wallets?.length,
+          }
+        );
+
+        if (!user?.wallet?.address)
+          throw new Error("Privy wallet not connected.");
+
+        // Wait for wallets to be ready
+        if (!wallets || wallets.length === 0) {
+          throw new Error("Wallets not ready. Please try again in a moment.");
+        }
+
+        let wallet = wallets.find((w) => w.address === user.wallet?.address);
+
+        // Fallback: if exact match fails, try case-insensitive match
+        if (!wallet) {
+          wallet = wallets.find(
+            (w) =>
+              w.address?.toLowerCase() === user.wallet?.address?.toLowerCase()
+          );
+        }
+
+        // Fallback: if still no match and there's only one wallet, use it
+        if (!wallet && wallets.length === 1) {
+          console.warn("StakeButton: Using fallback to first available wallet");
+          wallet = wallets[0];
+        }
+
+        if (!wallet) {
+          console.error("StakeButton: Wallet not found in available wallets:", {
+            searchingFor: user.wallet.address,
+            availableAddresses: wallets?.map((w) => w.address),
+          });
+          throw new Error("Wallet not found. Please reconnect.");
+        }
+
+        // Use the wallet's actual address, not user.wallet.address
+        const walletAddress = wallet.address;
+        if (!walletAddress) throw new Error("Wallet address not available");
+
         const provider = await wallet.getEthereumProvider();
         await provider.request({
           method: "wallet_switchEthereumChain",
@@ -284,7 +363,7 @@ export function StakeButton({
           approveTxHash = approveTxResult as `0x${string}`;
           if (!approveTxHash)
             throw new Error(
-              "Approval transaction hash not received (Wagmi). User might have cancelled."
+              "Approval transaction hash not received (Privy). User might have cancelled."
             );
           toast.loading("Waiting for approval confirmation...", {
             id: toastId,
@@ -293,7 +372,7 @@ export function StakeButton({
             hash: approveTxHash,
           });
           if (!approveReceipt.status || approveReceipt.status !== "success")
-            throw new Error("Approval transaction failed (Wagmi)");
+            throw new Error("Approval transaction failed (Privy)");
           toast.success("Approval successful!", { id: toastId });
         }
 
@@ -326,14 +405,14 @@ export function StakeButton({
         stakeTxHash = stakeTxResult as `0x${string}`;
         if (!stakeTxHash)
           throw new Error(
-            "Stake transaction hash not received (Wagmi). User might have cancelled."
+            "Stake transaction hash not received (Privy). User might have cancelled."
           );
         toast.loading("Waiting for stake confirmation...", { id: toastId });
         const stakeReceipt = await publicClient.waitForTransactionReceipt({
           hash: stakeTxHash,
         });
         if (!stakeReceipt.status || stakeReceipt.status !== "success")
-          throw new Error("Stake transaction failed (Wagmi)");
+          throw new Error("Stake transaction failed (Privy)");
         toast.success("Staking successful!", { id: toastId });
 
         if (
@@ -344,7 +423,7 @@ export function StakeButton({
             address: toHex(GDA_FORWARDER),
             abi: gdaABI,
             functionName: "isMemberConnected",
-            args: [toHex(stakingPoolAddress), toHex(walletAddress!)],
+            args: [toHex(stakingPoolAddress), toHex(walletAddress)],
           });
           if (!connected) {
             toast.loading("Connecting to reward pool...", { id: toastId });
@@ -360,14 +439,14 @@ export function StakeButton({
               params: [
                 {
                   to: toHex(GDA_FORWARDER),
-                  from: toHex(walletAddress!),
+                  from: toHex(walletAddress),
                   data: toHex(connectData),
                 },
               ],
             });
             connectTxHash = connectTxResult as `0x${string}`;
             if (!connectTxHash)
-              throw new Error("Pool conn tx hash not received (Wagmi).");
+              throw new Error("Pool conn tx hash not received (Privy).");
             await publicClient.waitForTransactionReceipt({
               hash: connectTxHash,
             });
