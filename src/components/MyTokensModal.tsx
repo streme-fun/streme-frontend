@@ -223,7 +223,9 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
         prevStakes.map((stake) => {
           if (stake.userFlowRate > 0) {
             const elapsed = (Date.now() - stake.lastUpdateTime) / 1000;
-            const newStreamed = stake.userFlowRate * elapsed;
+            // Convert from per-day to per-second rate for animation
+            const userFlowRatePerSecond = stake.userFlowRate / 86400;
+            const newStreamed = userFlowRatePerSecond * elapsed;
             return {
               ...stake,
               streamedAmount: newStreamed,
@@ -467,7 +469,8 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
           const totalFlowRate = Number(
             formatUnits(BigInt(membership.pool.flowRate), 18)
           );
-          userFlowRate = (totalFlowRate * (percentage / 100)) / 86400; // per second
+          // Store as per-day rate to match StakedBalance approach
+          userFlowRate = totalFlowRate * (percentage / 100) * 86400; // per day
         }
 
         stakesData.push({
