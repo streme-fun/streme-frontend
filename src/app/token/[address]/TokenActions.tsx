@@ -103,6 +103,8 @@ export function TokenActions({
   const [actualChainId, setActualChainId] = useState<number | undefined>(
     undefined
   );
+  const [isChainDetectionComplete, setIsChainDetectionComplete] =
+    useState(false);
 
   // Enhanced chain detection for mobile browsers
   useEffect(() => {
@@ -121,15 +123,22 @@ export function TokenActions({
             const chainId = await provider.request({ method: "eth_chainId" });
             const numericChainId = parseInt(chainId, 16);
             setActualChainId(numericChainId);
+            setIsChainDetectionComplete(true);
             console.log(
               "Actual chain ID from wallet provider:",
               numericChainId
             );
+          } else {
+            setIsChainDetectionComplete(true);
           }
         } catch (error) {
           console.error("Error checking actual chain:", error);
           setActualChainId(undefined);
+          setIsChainDetectionComplete(true);
         }
+      } else {
+        // For mini app or when no wallet is connected, mark detection as complete
+        setIsChainDetectionComplete(true);
       }
     };
 
@@ -164,8 +173,14 @@ export function TokenActions({
     const wagmiChainId = activeChain?.id;
     const effectiveChainId = actualChainId || wagmiChainId;
 
-    // Check if we're on Base network
-    onCorrectNetwork = walletIsConnected && effectiveChainId === base.id;
+    // Only determine network correctness if we have completed chain detection
+    // or if we have a wagmi chain ID (fallback)
+    if (isChainDetectionComplete || wagmiChainId) {
+      onCorrectNetwork = walletIsConnected && effectiveChainId === base.id;
+    } else {
+      // Still detecting chain, assume correct network to avoid false negatives
+      onCorrectNetwork = walletIsConnected;
+    }
 
     effectiveLogin = privyLogin;
     effectiveSwitchNetwork = wagmiSwitchNetwork
@@ -207,6 +222,7 @@ export function TokenActions({
             effectiveChainId: actualChainId || activeChain?.id,
             isBaseChain: (actualChainId || activeChain?.id) === base.id,
             walletIsConnected: walletIsConnected,
+            isChainDetectionComplete: isChainDetectionComplete,
             finalResult:
               walletIsConnected &&
               (actualChainId || activeChain?.id) === base.id,
@@ -231,6 +247,7 @@ export function TokenActions({
     farcasterContext,
     privyUser,
     actualChainId,
+    isChainDetectionComplete,
   ]);
 
   useEffect(() => {
@@ -508,6 +525,18 @@ export function TokenActions({
         <div className="card-body items-center justify-center min-h-[100px]">
           <span className="loading loading-spinner loading-sm"></span>
           <p className="text-sm text-gray-500">Initializing wallet...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state while detecting chain for mobile browsers
+  if (!isEffectivelyMiniApp && walletIsConnected && !isChainDetectionComplete) {
+    return (
+      <div className="card bg-base-100 border border-black/[.1]1]">
+        <div className="card-body items-center justify-center min-h-[100px]">
+          <span className="loading loading-spinner loading-sm"></span>
+          <p className="text-sm text-gray-500">Detecting network...</p>
         </div>
       </div>
     );
