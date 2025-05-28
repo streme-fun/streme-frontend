@@ -590,24 +590,23 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
         const currentBalance = balanceMap.get(tokenAddress) || BigInt(0);
         const formattedBalance = Number(formatUnits(currentBalance, 18));
 
-        // Only include tokens with positive balance
-        if (formattedBalance > 0) {
-          // Check if this token is already staked (to avoid duplicates)
-          const isAlreadyStaked = currentStakes.some(
-            (stake) =>
-              stake.tokenAddress.toLowerCase() === tokenAddress.toLowerCase()
-          );
+        // Check if this token is already staked (to avoid duplicates)
+        const isAlreadyStaked = currentStakes.some(
+          (stake) =>
+            stake.tokenAddress.toLowerCase() === tokenAddress.toLowerCase()
+        );
 
-          if (!isAlreadyStaked) {
-            superTokensData.push({
-              tokenAddress,
-              symbol: snapshot.token.symbol,
-              balance: formattedBalance,
-              stakingAddress: undefined, // Will be filled by enhancement
-              isNativeAssetSuperToken: snapshot.token.isNativeAssetSuperToken,
-              logo: undefined, // Will be filled by enhancement
-            });
-          }
+        // Include all tokens that aren't already staked, regardless of current balance
+        // This ensures API calls are made for all tokens to fetch staking info
+        if (!isAlreadyStaked) {
+          superTokensData.push({
+            tokenAddress,
+            symbol: snapshot.token.symbol,
+            balance: formattedBalance,
+            stakingAddress: undefined, // Will be filled by enhancement
+            isNativeAssetSuperToken: snapshot.token.isNativeAssetSuperToken,
+            logo: undefined, // Will be filled by enhancement
+          });
         }
       } catch (error) {
         console.error("Error creating initial SuperToken data:", error);
