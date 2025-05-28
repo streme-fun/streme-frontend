@@ -44,10 +44,23 @@ export function useAppFrameLogic() {
       }
     };
 
+    // Add a timeout to ensure detection completes even if SDK detection fails
+    const detectionTimeoutId = setTimeout(() => {
+      if (isSDKLoaded && !isDetectionComplete) {
+        console.log("Mini app detection timeout - defaulting to false");
+        setIsMiniAppView(false);
+        setIsDetectionComplete(true);
+      }
+    }, 2000); // 2 second timeout for detection
+
     // Only run detection when SDK is loaded
     if (isSDKLoaded && !isDetectionComplete) {
       detectMiniApp();
     }
+
+    return () => {
+      clearTimeout(detectionTimeoutId);
+    };
   }, [isSDKLoaded, farcasterContext, isDetectionComplete]);
 
   const isOnCorrectNetwork = isConnected && chain?.id === base.id;

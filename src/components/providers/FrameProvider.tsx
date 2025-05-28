@@ -147,12 +147,25 @@ export function useFrame() {
       }
     };
 
+    // Add a timeout to prevent infinite loading in non-frame environments
+    const timeoutId = setTimeout(() => {
+      if (!isSDKLoaded) {
+        console.log(
+          "SDK initialization timeout - marking as loaded without context"
+        );
+        setIsSDKLoaded(true);
+      }
+    }, 3000); // 3 second timeout
+
     if (sdk && !isSDKLoaded) {
       console.log("Calling load");
       load();
       return () => {
+        clearTimeout(timeoutId);
         sdk.removeAllListeners();
       };
+    } else {
+      clearTimeout(timeoutId);
     }
   }, [isSDKLoaded]);
 
@@ -172,10 +185,7 @@ export function useFrame() {
 export function FrameProvider({ children }: { children: React.ReactNode }) {
   const frameContext = useFrame();
 
-  if (!frameContext.isSDKLoaded) {
-    return <div></div>;
-  }
-
+  // Always render children - the app logic will handle frame vs non-frame UI
   return (
     <FrameContext.Provider value={frameContext}>
       {children}
