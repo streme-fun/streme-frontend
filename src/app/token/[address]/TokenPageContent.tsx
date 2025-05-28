@@ -35,13 +35,8 @@ export function TokenPageContent() {
   const [tokenLoading, setTokenLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
 
-  const {
-    isSDKLoaded,
-    isMiniAppView,
-    address,
-    isConnected,
-    isOnCorrectNetwork,
-  } = useAppFrameLogic();
+  const { isSDKLoaded, isMiniAppView, address, isConnected } =
+    useAppFrameLogic();
 
   const router = useRouter();
 
@@ -294,7 +289,6 @@ ${shareUrl}`;
             isMiniAppView={isMiniAppView}
             address={address}
             isConnected={isConnected}
-            isOnCorrectNetwork={isOnCorrectNetwork}
           />
           <StakedBalance
             data-staking-balance
