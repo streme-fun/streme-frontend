@@ -116,7 +116,7 @@ export async function fetchTokenFromStreme(
     }
 
     const tokenJson = await response.json();
-    console.log("Raw token response:", tokenJson);
+    // console.log("Raw token response:", tokenJson);
 
     if (tokenJson.message === "No such document!" || tokenJson.errors) {
       console.error("Token fetch failed:", {

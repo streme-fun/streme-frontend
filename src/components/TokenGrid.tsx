@@ -489,7 +489,16 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
 
   useEffect(() => {
     setCurrentPage(1);
-    setDisplayedTokens([]);
+    // Only clear displayed tokens if we're actually changing the data source or search
+    // Don't clear when just switching between trending and other sorts if we have data
+    const shouldClearTokens =
+      searchQuery.trim() !== "" || // Always clear for search
+      (sortBy !== "trending" && displayedTokens.length > 0) || // Clear when switching away from trending
+      (sortBy === "trending" && trendingTokensRef.current.length === 0); // Clear trending if no trending data
+
+    if (shouldClearTokens) {
+      setDisplayedTokens([]);
+    }
     setTotalItemsCount(0);
     setStakersSortedAllTokensCache([]);
   }, [tokens, sortBy, searchQuery]); // Added searchQuery to reset pagination when search changes
@@ -569,11 +578,13 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
         sortBy === "trending" ? trendingTokensRef.current : tokens;
 
       if (!sourceTokens || sourceTokens.length === 0) {
-        // Only update state if it's actually different to prevent unnecessary re-renders
-        if (displayedTokens.length > 0) setDisplayedTokens([]);
-        if (totalItemsCount > 0) setTotalItemsCount(0);
-        if (stakersSortedAllTokensCache.length > 0)
-          setStakersSortedAllTokensCache([]);
+        // Only clear state if we're not in a loading state and this isn't the initial render
+        if (!isFetchingTrending && !isLoadingMore) {
+          if (displayedTokens.length > 0) setDisplayedTokens([]);
+          if (totalItemsCount > 0) setTotalItemsCount(0);
+          if (stakersSortedAllTokensCache.length > 0)
+            setStakersSortedAllTokensCache([]);
+        }
         setIsLoadingMore(false);
         return;
       }
@@ -702,7 +713,7 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
     };
 
     fetchDataAndProcess();
-  }, [tokens, currentPage, sortBy, searchQuery, isFetchingTrending]); // Only depend on props and fetching state to prevent refresh loops
+  }, [tokens, currentPage, sortBy, searchQuery]); // Removed isFetchingTrending to prevent refresh loops
 
   // Handle loading more tokens
   const handleLoadMore = () => {
@@ -733,7 +744,8 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
         totalItemsCount === 0 &&
         searchQuery.trim() === "" &&
         !isLoadingMore &&
-        !isFetchingTrending && (
+        !isFetchingTrending &&
+        (sortBy !== "trending" || trendingTokensRef.current.length === 0) && (
           <div className="text-center py-12 opacity-60">Loading tokens...</div>
         )}
       {(isLoadingMore || isFetchingTrending) &&

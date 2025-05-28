@@ -64,9 +64,11 @@ function App() {
   }, []);
 
   useEffect(() => {
+    // Only fetch if we haven't fetched yet and conditions are met
     if (
       (!isMiniAppView || (isMiniAppView && isOnCorrectNetwork)) &&
-      !hasInitiallyFetched.current
+      !hasInitiallyFetched.current &&
+      tokens.length === 0 // Additional check to prevent refetch if we already have tokens
     ) {
       hasInitiallyFetched.current = true;
       fetchTokens();
