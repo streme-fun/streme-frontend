@@ -25,14 +25,12 @@ export function useAppFrameLogic() {
           return;
         }
 
-        // Use the official detection method with a reasonable timeout
-        const isMiniApp = await sdk.isInMiniApp(); // Official method without parameters
+        // Use the official detection method
+        const isMiniApp = await sdk.isInMiniApp();
 
         console.log("Mini app detection result:", {
           isMiniApp,
           hasContext: !!farcasterContext,
-          userAgent: navigator.userAgent,
-          isInIframe: window !== window.parent,
         });
 
         setIsMiniAppView(isMiniApp);
@@ -40,26 +38,8 @@ export function useAppFrameLogic() {
       } catch (error) {
         console.error("Error checking if in mini app:", error);
 
-        // Enhanced fallback detection for mobile wallet browsers
-        const isInIframe = window !== window.parent;
-        const isMobileWallet =
-          /Mobile|Android|iPhone|iPad/.test(navigator.userAgent) &&
-          (window.location !== window.parent.location || isInIframe);
-        const hasValidContext = !!farcasterContext;
-
-        // Consider it a mini app if we have a valid context OR if we're in a mobile iframe
-        const fallbackResult =
-          hasValidContext || (isMobileWallet && isInIframe);
-
-        console.log("Fallback mini app detection:", {
-          fallbackResult,
-          isInIframe,
-          isMobileWallet,
-          hasValidContext,
-          userAgent: navigator.userAgent,
-        });
-
-        setIsMiniAppView(fallbackResult);
+        // If detection fails, default to false
+        setIsMiniAppView(false);
         setIsDetectionComplete(true);
       }
     };

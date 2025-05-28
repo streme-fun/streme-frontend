@@ -563,7 +563,7 @@ export function TokenActions({
             }}
             disabled={balance === 0n || !stakingAddress}
             symbol={token.symbol}
-            className="btn btn-outline border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 w-full"
+            className="btn btn-outline border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 w-full disabled:border-gray-200 disabled:text-gray-400 disabled:bg-gray-50"
             isMiniApp={isEffectivelyMiniApp}
             farcasterAddress={currentAddress}
             farcasterIsConnected={walletIsConnected}
