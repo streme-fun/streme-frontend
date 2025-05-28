@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { Token } from "@/src/app/types/token";
 import { StakeButton } from "@/src/components/StakeButton";
 import { UniswapModal } from "@/src/components/UniswapModal";
@@ -88,6 +88,7 @@ export function TokenActions({
   } = useAppFrameLogic();
 
   const { user: privyUser, ready: privyReady, login: privyLogin } = usePrivy();
+  const { wallets } = useWallets();
   const {
     address: wagmiAddress,
     isConnected: wagmiIsConnectedGlobal,
@@ -97,6 +98,43 @@ export function TokenActions({
 
   // Simplified mini app detection - use the improved detection from useAppFrameLogic
   const isEffectivelyMiniApp = isMiniAppViewProp ?? detectedMiniAppView;
+
+  // State for enhanced chain detection
+  const [actualChainId, setActualChainId] = useState<number | undefined>(
+    undefined
+  );
+
+  // Enhanced chain detection for mobile browsers
+  useEffect(() => {
+    const checkActualChain = async () => {
+      if (
+        !isEffectivelyMiniApp &&
+        privyUser?.wallet?.address &&
+        wallets.length > 0
+      ) {
+        try {
+          const wallet = wallets.find(
+            (w) => w.address === privyUser.wallet?.address
+          );
+          if (wallet) {
+            const provider = await wallet.getEthereumProvider();
+            const chainId = await provider.request({ method: "eth_chainId" });
+            const numericChainId = parseInt(chainId, 16);
+            setActualChainId(numericChainId);
+            console.log(
+              "Actual chain ID from wallet provider:",
+              numericChainId
+            );
+          }
+        } catch (error) {
+          console.error("Error checking actual chain:", error);
+          setActualChainId(undefined);
+        }
+      }
+    };
+
+    checkActualChain();
+  }, [isEffectivelyMiniApp, privyUser?.wallet?.address, wallets]);
 
   let currentAddress: `0x${string}` | undefined;
   let walletIsConnected: boolean;
@@ -121,7 +159,14 @@ export function TokenActions({
   } else {
     currentAddress = privyUser?.wallet?.address as `0x${string}` | undefined;
     walletIsConnected = privyReady && !!privyUser?.wallet?.address;
-    onCorrectNetwork = activeChain?.id === base.id;
+
+    // For mobile browsers with Privy, use the actual chain ID from wallet provider if available
+    const wagmiChainId = activeChain?.id;
+    const effectiveChainId = actualChainId || wagmiChainId;
+
+    // Check if we're on Base network
+    onCorrectNetwork = walletIsConnected && effectiveChainId === base.id;
+
     effectiveLogin = privyLogin;
     effectiveSwitchNetwork = wagmiSwitchNetwork
       ? () => wagmiSwitchNetwork({ chainId: base.id })
@@ -149,6 +194,24 @@ export function TokenActions({
       userAgent: typeof window !== "undefined" ? navigator.userAgent : "SSR",
       isInIframe:
         typeof window !== "undefined" ? window !== window.parent : false,
+      // Additional debugging for mobile chain detection
+      privyUserExists: !!privyUser,
+      privyWalletExists: !!privyUser?.wallet,
+      privyWalletAddress: privyUser?.wallet?.address,
+      wagmiChainName: activeChain?.name,
+      wagmiChainId: activeChain?.id,
+      chainDetectionLogic: !isEffectivelyMiniApp
+        ? {
+            wagmiChainId: activeChain?.id,
+            actualChainId: actualChainId,
+            effectiveChainId: actualChainId || activeChain?.id,
+            isBaseChain: (actualChainId || activeChain?.id) === base.id,
+            walletIsConnected: walletIsConnected,
+            finalResult:
+              walletIsConnected &&
+              (actualChainId || activeChain?.id) === base.id,
+          }
+        : "mini-app-mode",
     });
   }, [
     isEffectivelyMiniApp,
@@ -166,6 +229,8 @@ export function TokenActions({
     wagmiIsConnectedGlobal,
     activeChain?.id,
     farcasterContext,
+    privyUser,
+    actualChainId,
   ]);
 
   useEffect(() => {
