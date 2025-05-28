@@ -95,10 +95,8 @@ export function TokenActions({
   } = useAccount();
   const { switchChain: wagmiSwitchNetwork } = useSwitchChain();
 
-  // More robust mini app detection - only consider it a mini app if we have both SDK loaded AND a valid farcaster context
-  const isEffectivelyMiniApp =
-    isMiniAppViewProp ??
-    (detectedMiniAppView && fcSDKLoaded && !!farcasterContext);
+  // Simplified mini app detection - use the improved detection from useAppFrameLogic
+  const isEffectivelyMiniApp = isMiniAppViewProp ?? detectedMiniAppView;
 
   let currentAddress: `0x${string}` | undefined;
   let walletIsConnected: boolean;
@@ -146,7 +144,11 @@ export function TokenActions({
       wagmiAddress,
       wagmiIsConnectedGlobal,
       activeChainId: activeChain?.id,
+      baseChainId: base.id,
       farcasterContext: !!farcasterContext,
+      userAgent: typeof window !== "undefined" ? navigator.userAgent : "SSR",
+      isInIframe:
+        typeof window !== "undefined" ? window !== window.parent : false,
     });
   }, [
     isEffectivelyMiniApp,
@@ -429,6 +431,7 @@ export function TokenActions({
       <div className="card bg-base-100 border border-black/[.1]1]">
         <div className="card-body items-center justify-center min-h-[100px]">
           <span className="loading loading-spinner loading-sm"></span>
+          <p className="text-sm text-gray-500">Loading Farcaster SDK...</p>
         </div>
       </div>
     );
@@ -452,12 +455,12 @@ export function TokenActions({
           <div className="mb-4 text-center">
             <Wallet size={48} className="mx-auto mb-2 text-gray-400" />
             <p className="font-semibold">
-              {isEffectivelyMiniApp ? "Farcaster Wallet" : "Wallet"} Not
-              Connected
+              {isEffectivelyMiniApp ? "Farcaster Wallet" : "Wallet"}
+              {!walletIsConnected ? " Not Connected" : " Wrong Network"}
             </p>
             {!onCorrectNetwork && walletIsConnected && (
               <p className="text-xs text-red-500 mt-1">
-                Please switch to Base network.
+                Please switch to Base network (Chain ID: {base.id}).
               </p>
             )}
           </div>
@@ -476,7 +479,7 @@ export function TokenActions({
               }
             >
               {walletIsConnected && !onCorrectNetwork
-                ? "Switch Network"
+                ? "Switch to Base Network"
                 : isEffectivelyMiniApp
                 ? "Connect Farcaster Wallet"
                 : "Connect Wallet"}

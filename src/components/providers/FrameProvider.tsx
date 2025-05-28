@@ -84,63 +84,71 @@ export function useFrame() {
 
   useEffect(() => {
     const load = async () => {
-      const context = await sdk.context;
-      setContext(context);
-      setIsSDKLoaded(true);
+      try {
+        console.log("Starting SDK initialization...");
+        const context = await sdk.context;
+        setContext(context);
 
-      // Set up event listeners
-      sdk.on("frameAdded", ({ notificationDetails }) => {
-        console.log("Frame added", notificationDetails);
-        setAdded(true);
-        setNotificationDetails(notificationDetails ?? null);
-        setLastEvent("Frame added");
-      });
+        // Set up event listeners
+        sdk.on("frameAdded", ({ notificationDetails }) => {
+          console.log("Frame added", notificationDetails);
+          setAdded(true);
+          setNotificationDetails(notificationDetails ?? null);
+          setLastEvent("Frame added");
+        });
 
-      sdk.on("frameAddRejected", ({ reason }) => {
-        console.log("Frame add rejected", reason);
-        setAdded(false);
-        setLastEvent(`Frame add rejected: ${reason}`);
-      });
+        sdk.on("frameAddRejected", ({ reason }) => {
+          console.log("Frame add rejected", reason);
+          setAdded(false);
+          setLastEvent(`Frame add rejected: ${reason}`);
+        });
 
-      sdk.on("frameRemoved", () => {
-        console.log("Frame removed");
-        setAdded(false);
-        setLastEvent("Frame removed");
-      });
+        sdk.on("frameRemoved", () => {
+          console.log("Frame removed");
+          setAdded(false);
+          setLastEvent("Frame removed");
+        });
 
-      sdk.on("notificationsEnabled", ({ notificationDetails }) => {
-        console.log("Notifications enabled", notificationDetails);
-        setNotificationDetails(notificationDetails ?? null);
-        setLastEvent("Notifications enabled");
-      });
+        sdk.on("notificationsEnabled", ({ notificationDetails }) => {
+          console.log("Notifications enabled", notificationDetails);
+          setNotificationDetails(notificationDetails ?? null);
+          setLastEvent("Notifications enabled");
+        });
 
-      sdk.on("notificationsDisabled", () => {
-        console.log("Notifications disabled");
-        setNotificationDetails(null);
-        setLastEvent("Notifications disabled");
-      });
+        sdk.on("notificationsDisabled", () => {
+          console.log("Notifications disabled");
+          setNotificationDetails(null);
+          setLastEvent("Notifications disabled");
+        });
 
-      sdk.on("primaryButtonClicked", () => {
-        console.log("Primary button clicked");
-        setLastEvent("Primary button clicked");
-      });
+        sdk.on("primaryButtonClicked", () => {
+          console.log("Primary button clicked");
+          setLastEvent("Primary button clicked");
+        });
 
-      // Call ready action
-      console.log("Calling ready");
-      sdk.actions.ready({});
+        // Call ready action
+        console.log("Calling ready");
+        await sdk.actions.ready({});
 
-      console.log("SDK loaded, context available");
+        console.log("SDK loaded, context available");
 
-      // Set up MIPD Store
-      const store = createStore();
-      store.subscribe((providerDetails) => {
-        console.log("PROVIDER DETAILS", providerDetails);
-      });
+        // Set up MIPD Store
+        const store = createStore();
+        store.subscribe((providerDetails) => {
+          console.log("PROVIDER DETAILS", providerDetails);
+        });
+
+        // Only mark as loaded after everything is initialized
+        setIsSDKLoaded(true);
+      } catch (error) {
+        console.error("Error initializing SDK:", error);
+        // Still mark as loaded to prevent infinite loading, but with no context
+        setIsSDKLoaded(true);
+      }
     };
 
     if (sdk && !isSDKLoaded) {
       console.log("Calling load");
-      setIsSDKLoaded(true);
       load();
       return () => {
         sdk.removeAllListeners();
