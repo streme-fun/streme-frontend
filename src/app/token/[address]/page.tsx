@@ -148,32 +148,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       `[Metadata] Successfully loaded token: ${token.name} (${token.symbol})`
     );
 
-    // Format price for title
-    const formatPrice = (price: number | undefined) => {
-      if (!price || isNaN(price)) return "";
-
-      if (price < 0.01 && price > 0) {
-        const decimalStr = price.toFixed(20).split(".")[1];
-        let zeroCount = 0;
-        while (decimalStr[zeroCount] === "0") {
-          zeroCount++;
-        }
-        return ` | $0.0${zeroCount}${decimalStr.slice(
-          zeroCount,
-          zeroCount + 4
-        )}`;
-      }
-
-      return ` | $${price.toLocaleString(undefined, {
-        minimumFractionDigits: 6,
-        maximumFractionDigits: 6,
-      })}`;
-    };
-
-    const title = `${token.name} (${token.symbol})${formatPrice(
-      token.price
-    )} - Streme.fun`;
-    const description = `Trade ${token.name} (${token.symbol}) on Streme.fun${
+    // Remove the formatPrice function and simplify title generation
+    const title = `${token.name} (${token.symbol}) - Streme`;
+    const description = `Trade ${token.name} (${token.symbol}) on Streme${
       token.creator ? ` - Created by @${token.creator.name}` : ""
     }. ${
       token.marketCap ? `Market Cap: $${token.marketCap.toLocaleString()}` : ""
@@ -192,7 +169,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         title: `View ${token.name} on Streme`,
         action: {
           type: "launch_frame",
-          name: "Streme.fun",
+          name: "Streme",
           url: pageUrl,
           splashImageUrl: `${baseUrl}/icon.png`,
           splashBackgroundColor: "#ffffff",
@@ -211,11 +188,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             url: imageUrl,
             width: 1200,
             height: 800,
-            alt: `${token.name} (${token.symbol}) on Streme.fun`,
+            alt: `${token.name} (${token.symbol}) on Streme`,
           },
         ],
         type: "website",
-        siteName: "Streme.fun",
+        siteName: "Streme",
         url: pageUrl,
       },
       twitter: {
@@ -248,7 +225,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         title: "View Token on Streme",
         action: {
           type: "launch_frame",
-          name: "Streme.fun",
+          name: "Streme",
           url: pageUrl,
           splashImageUrl: `${baseUrl}/icon.png`,
           splashBackgroundColor: "#ffffff",
@@ -257,30 +234,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
 
     return {
-      title: `Token ${address.slice(0, 6)}...${address.slice(-4)} - Streme.fun`,
-      description:
-        "Trade tokens on Streme.fun - The premier memecoin trading platform on Base",
+      title: `Token ${address.slice(0, 6)}...${address.slice(-4)} - Streme`,
+      description: "Trade tokens on Streme",
       openGraph: {
-        title: "Streme.fun",
-        description:
-          "Trade tokens on Streme.fun - The premier memecoin trading platform on Base",
+        title: "Streme",
+        description: "Trade tokens on Streme",
         images: [
           {
             url: `${baseUrl}/streme-og.png`,
             width: 1200,
             height: 800,
-            alt: "Streme.fun - Premier memecoin trading platform",
+            alt: "Streme",
           },
         ],
         type: "website",
-        siteName: "Streme.fun",
+        siteName: "Streme",
         url: pageUrl,
       },
       twitter: {
         card: "summary_large_image",
-        title: "Streme.fun",
-        description:
-          "Trade tokens on Streme.fun - The premier memecoin trading platform on Base",
+        title: "Streme",
+        description: "Trade tokens on Streme",
         images: [`${baseUrl}/streme-og.png`],
         site: "@streme_fun",
       },

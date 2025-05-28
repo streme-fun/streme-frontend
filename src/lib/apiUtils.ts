@@ -90,7 +90,7 @@ export async function fetchTokenFromStreme(
         signal: controller.signal,
         headers: {
           Accept: "application/json",
-          "User-Agent": "Streme.fun/1.0",
+          "User-Agent": "Streme/1.0",
         },
       }
     ).finally(() => {

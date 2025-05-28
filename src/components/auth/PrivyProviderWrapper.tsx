@@ -23,7 +23,7 @@ const PrivyProviderWrapper = ({ children }: { children: React.ReactNode }) => {
           theme: "light",
           accentColor: "#676FFF",
           logo: "https://streme.fun/android-chrome-512x512.png",
-          showWalletLoginFirst: false,
+          showWalletLoginFirst: true,
           walletChainType: "ethereum-only",
         },
         loginMethods: ["wallet"],

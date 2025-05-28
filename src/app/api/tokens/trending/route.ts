@@ -8,7 +8,7 @@ export async function GET() {
     const response = await fetch("https://api.streme.fun/api/tokens/trending", {
       headers: {
         Accept: "application/json",
-        "User-Agent": "Streme.fun/1.0",
+        "User-Agent": "Streme/1.0",
       },
     });
 
