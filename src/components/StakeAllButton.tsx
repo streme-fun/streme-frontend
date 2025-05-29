@@ -38,6 +38,11 @@ const erc20ABI = [
 
 const toHex = (address: string) => address as `0x${string}`;
 
+// Add constant for unlimited allowance
+const MAX_UINT256 = BigInt(
+  "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+);
+
 interface StakeAllButtonProps {
   tokenAddress: string;
   stakingAddress: string;
@@ -149,13 +154,16 @@ export function StakeAllButton({
 
         const currentAllowance = await checkAllowance();
         if (currentAllowance < balance) {
-          toast.info("Requesting approval...", { id: toastId });
+          toast.info(
+            "Requesting unlimited approval for future transactions...",
+            { id: toastId }
+          );
           const approveIface = new Interface([
             "function approve(address spender, uint256 amount) external returns (bool)",
           ]);
           const approveData = approveIface.encodeFunctionData("approve", [
             toHex(stakingAddress),
-            balance,
+            MAX_UINT256,
           ]);
           approveTxHash = await ethProvider.request({
             method: "eth_sendTransaction",
@@ -179,7 +187,14 @@ export function StakeAllButton({
           });
           if (approveReceipt.status !== "success")
             throw new Error("Approval transaction failed");
-          toast.success("Approval successful!", { id: toastId });
+          toast.success(
+            "Approval successful! You won't need to approve again.",
+            { id: toastId }
+          );
+        } else {
+          toast.info("Sufficient allowance found, skipping approval...", {
+            id: toastId,
+          });
         }
 
         toast.loading("Requesting stake...", { id: toastId });
@@ -264,13 +279,16 @@ export function StakeAllButton({
 
         const currentAllowance = await checkAllowance();
         if (currentAllowance < balance) {
-          toast.info("Requesting approval...", { id: toastId });
+          toast.info(
+            "Requesting unlimited approval for future transactions...",
+            { id: toastId }
+          );
           const approveIface = new Interface([
             "function approve(address spender, uint256 amount) external returns (bool)",
           ]);
           const approveData = approveIface.encodeFunctionData("approve", [
             toHex(stakingAddress),
-            balance,
+            MAX_UINT256,
           ]);
           const approveTxResult = await provider.request({
             method: "eth_sendTransaction",
@@ -295,7 +313,14 @@ export function StakeAllButton({
           });
           if (!approveReceipt.status || approveReceipt.status !== "success")
             throw new Error("Approval transaction failed (Wagmi)");
-          toast.success("Approval successful!", { id: toastId });
+          toast.success(
+            "Approval successful! You won't need to approve again.",
+            { id: toastId }
+          );
+        } else {
+          toast.info("Sufficient allowance found, skipping approval...", {
+            id: toastId,
+          });
         }
 
         toast.loading("Requesting stake...", { id: toastId });

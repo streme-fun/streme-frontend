@@ -9,6 +9,7 @@ import { StakeButton } from "./StakeButton";
 import { StakeAllButton } from "./StakeAllButton";
 import { UnstakeButton } from "./UnstakeButton";
 import { ConnectPoolButton } from "./ConnectPoolButton";
+import { TopUpAllStakesButton } from "./TopUpAllStakesButton";
 import { publicClient } from "../lib/viemClient";
 import { GDA_FORWARDER, GDA_ABI } from "../lib/contracts";
 
@@ -889,6 +890,20 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
             </svg>
           </button>
         </div>
+
+        {/* Top-up All Stakes Button - show only when there are stakes */}
+        {stakes.length > 0 && (
+          <div className="mb-4">
+            <TopUpAllStakesButton
+              stakes={stakes}
+              onSuccess={() => handleStakeSuccess()}
+              className="btn btn-tertiary btn-sm w-full"
+              isMiniApp={isMiniAppView}
+              farcasterAddress={effectiveAddress}
+              farcasterIsConnected={effectiveIsConnected}
+            />
+          </div>
+        )}
 
         <div className="space-y-4">
           {!effectiveAddress ? (

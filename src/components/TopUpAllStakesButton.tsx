@@ -376,6 +376,7 @@ export function TopUpAllStakesButton({
       let successCount = 0;
       let errorCount = 0;
       const errors: string[] = [];
+      let wasCancelled = false;
 
       for (let i = 0; i < selectedStakes.length; i++) {
         const stakeData = selectedStakes[i];
@@ -400,17 +401,38 @@ export function TopUpAllStakesButton({
           errors.push(errorMessage);
           console.error(`Failed to stake ${stakeData.symbol}:`, error);
 
-          // Show individual error with progress
-          const progressText = `${currentIndex}/${totalCount}`;
-          const progressPercentage = Math.round(
-            (currentIndex / totalCount) * 100
-          );
-          toast.error(
-            `[${progressText}] Failed to stake ${stakeData.symbol} - ${progressPercentage}% complete`,
-            {
-              duration: 3000,
-            }
-          );
+          // Check if the error indicates user cancellation
+          const isCancellation =
+            errorMessage.includes("cancelled") ||
+            errorMessage.includes("rejected") ||
+            errorMessage.includes("User rejected") ||
+            errorMessage.includes("hash not received") ||
+            errorMessage.includes("User denied");
+
+          if (isCancellation) {
+            wasCancelled = true;
+            // Show cancellation message and stop processing
+            const progressText = `${currentIndex}/${totalCount}`;
+            toast.error(
+              `[${progressText}] Transaction cancelled - stopping batch operation`,
+              {
+                duration: 3000,
+              }
+            );
+            break; // Exit the loop immediately
+          } else {
+            // Show individual error with progress for non-cancellation errors
+            const progressText = `${currentIndex}/${totalCount}`;
+            const progressPercentage = Math.round(
+              (currentIndex / totalCount) * 100
+            );
+            toast.error(
+              `[${progressText}] Failed to stake ${stakeData.symbol} - ${progressPercentage}% complete`,
+              {
+                duration: 3000,
+              }
+            );
+          }
         }
 
         // Update progress after each operation
@@ -418,7 +440,15 @@ export function TopUpAllStakesButton({
       }
 
       // Final summary
-      if (successCount > 0 && errorCount === 0) {
+      if (wasCancelled) {
+        const remainingCount = totalCount - successCount - errorCount;
+        toast.warning(
+          `❌ Batch operation cancelled by user. ${successCount} successful, ${errorCount} failed, ${remainingCount} skipped.`,
+          {
+            id: toastId,
+          }
+        );
+      } else if (successCount > 0 && errorCount === 0) {
         toast.success(
           `✅ Successfully topped up all ${successCount} stakes! (100% complete)`,
           {
