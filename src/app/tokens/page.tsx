@@ -8,6 +8,7 @@ import { StakeButton } from "../../components/StakeButton";
 import { StakeAllButton } from "../../components/StakeAllButton";
 import { UnstakeButton } from "../../components/UnstakeButton";
 import { ConnectPoolButton } from "../../components/ConnectPoolButton";
+import { TopUpAllStakesButton } from "../../components/TopUpAllStakesButton";
 import { publicClient } from "../../lib/viemClient";
 import { GDA_FORWARDER, GDA_ABI } from "../../lib/contracts";
 import Link from "next/link";
@@ -983,7 +984,17 @@ export default function TokensPage() {
             {/* Staked Tokens Section */}
             {stakes.length > 0 && (
               <div>
-                <h2 className="text-2xl font-bold mb-6">Staked Tokens</h2>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold">Staked Tokens</h2>
+                  <TopUpAllStakesButton
+                    stakes={stakes}
+                    onSuccess={() => handleStakeSuccess()}
+                    className="btn btn-primary"
+                    isMiniApp={isMiniAppView}
+                    farcasterAddress={effectiveAddress}
+                    farcasterIsConnected={effectiveIsConnected}
+                  />
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {stakes.map((stake, index) => (
                     <div
