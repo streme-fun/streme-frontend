@@ -376,14 +376,9 @@ Symbol: $[your ticker]
             </button>
 
             {privyAuthenticated && (
-              <a
-                href={`https://explorer.superfluid.finance/base-mainnet/accounts/${wagmiAddress}?tab=pools`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-accent"
-              >
-                My Stakes
-              </a>
+              <Link href="/tokens" className="btn btn-accent">
+                My Tokens
+              </Link>
             )}
 
             <button
@@ -456,15 +451,13 @@ Symbol: $[your ticker]
             </button>
 
             {privyAuthenticated && (
-              <a
-                href={`https://explorer.superfluid.finance/base-mainnet/accounts/${wagmiAddress}?tab=pools`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/tokens"
                 className="btn btn-accent w-full justify-start"
                 onClick={() => setIsMenuOpen(false)}
               >
-                My Stakes
-              </a>
+                My Tokens
+              </Link>
             )}
 
             <button
