@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 
+interface ExternalApiResponse {
+  address: string;
+  amount: number;
+  signature: string;
+  signatureTimestamp: number;
+  signer: string;
+  wallet: string;
+  locker: string;
+  lockerCreated: boolean;
+}
+
 interface UserPointsData {
   fid: number;
   address: string;
@@ -35,6 +46,16 @@ export async function GET(request: NextRequest) {
       "- Token format appears to be:",
       token.includes(".") ? "JWT-like" : "Simple string"
     );
+
+    // Extract FID from JWT token
+    let fid = 0;
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      fid = payload.fid || payload.sub || 0;
+      console.log("- Extracted FID from JWT:", fid);
+    } catch (error) {
+      console.log("- Could not extract FID from JWT:", error);
+    }
 
     // Make the request to the external API
     const externalApiUrl = "https://api.streme.fun/api/sup/points";
@@ -75,27 +96,42 @@ export async function GET(request: NextRequest) {
     }
 
     // Parse the JSON response
-    let userData: UserPointsData;
+    let externalData: ExternalApiResponse;
     try {
-      userData = JSON.parse(responseText);
+      externalData = JSON.parse(responseText);
 
       // Debug: Log the actual response structure
-      console.log("Raw response structure:", JSON.stringify(userData, null, 2));
+      console.log(
+        "Raw response structure:",
+        JSON.stringify(externalData, null, 2)
+      );
     } catch (parseError) {
       console.error("Failed to parse JSON response:", parseError);
       console.error("Response text:", responseText);
       throw new Error("Invalid JSON response from external API");
     }
 
-    console.log("Successfully fetched user data:");
+    // Map external response to expected format
+    const userData: UserPointsData = {
+      fid: fid,
+      address: externalData.address,
+      points: {
+        totalEarned: externalData.amount,
+        currentRate: 0, // Not provided by external API
+        stackSignedData: externalData.signature, // Pass raw signature
+      },
+      fluidLocker: {
+        address: externalData.locker,
+        isCreated: externalData.lockerCreated,
+      },
+    };
+
+    console.log("Successfully fetched and mapped user data:");
     console.log("- FID:", userData.fid);
     console.log("- Address:", userData.address);
-    console.log("- Points object:", userData.points);
-    console.log(
-      "- Points earned:",
-      userData.points?.totalEarned || "undefined"
-    );
-    console.log("- FluidLocker:", userData.fluidLocker);
+    console.log("- Points earned:", userData.points.totalEarned);
+    console.log("- FluidLocker address:", userData.fluidLocker.address);
+    console.log("- FluidLocker created:", userData.fluidLocker.isCreated);
 
     return NextResponse.json(userData);
   } catch (error) {
