@@ -5,6 +5,7 @@ import { useSupPoints } from "../hooks/useSupPoints";
 import { ClaimPointsFlow } from "./ClaimPointsFlow";
 import { useAccount, useConnect } from "wagmi";
 import { useEffect } from "react";
+import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 
 export function FarcasterAuthDemo() {
   const {
@@ -24,9 +25,17 @@ export function FarcasterAuthDemo() {
     clearData: clearPointsData,
   } = useSupPoints();
 
-  const { address: walletAddress, isConnected: isWalletConnected } =
-    useAccount();
+  const { address: wagmiAddress, isConnected: isWagmiConnected } = useAccount();
   const { connect, connectors } = useConnect();
+  const {
+    isMiniAppView,
+    address: fcAddress,
+    isConnected: isFcConnected,
+  } = useAppFrameLogic();
+
+  // Get effective address and connection status based on context (same logic as WalletProfileModal)
+  const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
+  const isWalletConnected = isMiniAppView ? isFcConnected : isWagmiConnected;
 
   // Fetch user points data when authentication succeeds
   useEffect(() => {
@@ -215,8 +224,8 @@ export function FarcasterAuthDemo() {
             </h4>
             {isWalletConnected ? (
               <div className="text-green-600">
-                ✅ Wallet Connected: {walletAddress?.slice(0, 6)}...
-                {walletAddress?.slice(-4)}
+                ✅ Wallet Connected: {effectiveAddress?.slice(0, 6)}...
+                {effectiveAddress?.slice(-4)}
               </div>
             ) : (
               <div className="space-y-2">

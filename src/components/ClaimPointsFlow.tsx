@@ -13,6 +13,7 @@ import {
   FLUID_LOCKER_FACTORY_ABI,
   FLUID_LOCKER_ABI,
 } from "@/src/lib/superfluid-contracts";
+import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 
 interface ClaimPointsFlowProps {
   userData: {
@@ -44,7 +45,11 @@ export function ClaimPointsFlow({
   userData,
   onUserDataUpdate,
 }: ClaimPointsFlowProps) {
-  const { address: userAddress } = useAccount();
+  const { address: wagmiAddress } = useAccount();
+  const { isMiniAppView, address: fcAddress } = useAppFrameLogic();
+
+  // Get effective address based on context (same logic as WalletProfileModal and FarcasterAuthDemo)
+  const userAddress = isMiniAppView ? fcAddress : wagmiAddress;
   const [currentStep, setCurrentStep] = useState<FlowStep>("idle");
   const [error, setError] = useState<string | null>(null);
   const [createdLockerAddress, setCreatedLockerAddress] = useState<
