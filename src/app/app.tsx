@@ -13,6 +13,7 @@ import { SearchBar } from "../components/SearchBar";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic"; // Import the new hook
 import { Button } from "../components/ui/button"; // Corrected import path based on file structure
 import { base } from "wagmi/chains"; // Only base needed here now
+import { useRouter } from "next/navigation";
 // import { truncateAddressShort } from "../lib/truncateAddress";
 
 function App() {
@@ -21,6 +22,13 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("trending");
   const hasInitiallyFetched = useRef(false);
+
+  // Debug mechanism for auth test page
+  const [debugClickCount, setDebugClickCount] = useState(0);
+  const debugClickTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
+  const router = useRouter();
 
   const {
     isSDKLoaded,
@@ -36,6 +44,41 @@ function App() {
     // disconnect,
     promptToAddMiniApp,
   } = useAppFrameLogic(); // Use the hook
+
+  // Debug click handler for logo
+  const handleDebugClick = useCallback(() => {
+    setDebugClickCount((prev) => {
+      const newCount = prev + 1;
+
+      // Clear any existing timeout
+      if (debugClickTimeout.current) {
+        clearTimeout(debugClickTimeout.current);
+      }
+
+      // Navigate to auth test after 5 clicks
+      if (newCount >= 5) {
+        console.log("Debug mode activated! Navigating to auth test...");
+        router.push("/auth-test");
+        return 0; // Reset counter
+      }
+
+      // Reset counter after 2 seconds of no clicks
+      debugClickTimeout.current = setTimeout(() => {
+        setDebugClickCount(0);
+      }, 2000);
+
+      return newCount;
+    });
+  }, [router]);
+
+  // Cleanup effect for debug timeout
+  useEffect(() => {
+    return () => {
+      if (debugClickTimeout.current) {
+        clearTimeout(debugClickTimeout.current);
+      }
+    };
+  }, []);
 
   const fetchTokens = useCallback(async (before?: number) => {
     try {
@@ -73,7 +116,7 @@ function App() {
       hasInitiallyFetched.current = true;
       fetchTokens();
     }
-  }, [isMiniAppView, isOnCorrectNetwork]);
+  }, [fetchTokens, isMiniAppView, isOnCorrectNetwork]);
 
   useEffect(() => {
     if (isMiniAppView && isSDKLoaded && promptToAddMiniApp) {
@@ -127,6 +170,11 @@ function App() {
               viewBox="0 0 212 31"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
+              onClick={handleDebugClick}
+              className="cursor-pointer"
+              style={{
+                opacity: debugClickCount > 0 ? 0.5 + debugClickCount * 0.1 : 1,
+              }}
             >
               <path
                 d="M17.5909 9.27557C17.4773 8.12973 16.9896 7.23958 16.1278 6.60511C15.2661 5.97064 14.0966 5.65341 12.6193 5.65341C11.6155 5.65341 10.768 5.79545 10.0767 6.07955C9.38542 6.35417 8.85511 6.73769 8.4858 7.23011C8.12595 7.72254 7.94602 8.28125 7.94602 8.90625C7.92708 9.42708 8.03598 9.88163 8.27273 10.2699C8.51894 10.6581 8.85511 10.9943 9.28125 11.2784C9.70739 11.553 10.1998 11.7945 10.7585 12.0028C11.3172 12.2017 11.9138 12.3722 12.5483 12.5142L15.1619 13.1392C16.4309 13.4233 17.5956 13.8021 18.6562 14.2756C19.7169 14.7491 20.6354 15.3314 21.4119 16.0227C22.1884 16.714 22.7898 17.5284 23.2159 18.4659C23.6515 19.4034 23.8741 20.4782 23.8835 21.6903C23.8741 23.4706 23.4195 25.0142 22.5199 26.321C21.6297 27.6184 20.3419 28.6269 18.6562 29.3466C16.9801 30.0568 14.9583 30.4119 12.5909 30.4119C10.2424 30.4119 8.19697 30.0521 6.45455 29.3324C4.72159 28.6127 3.36742 27.5473 2.39205 26.1364C1.42614 24.7159 0.919508 22.9593 0.872159 20.8665H6.82386C6.89015 21.8419 7.16951 22.6562 7.66193 23.3097C8.16383 23.9536 8.83144 24.4413 9.66477 24.7727C10.5076 25.0947 11.4593 25.2557 12.5199 25.2557C13.5616 25.2557 14.4659 25.1042 15.233 24.8011C16.0095 24.4981 16.6108 24.0767 17.0369 23.5369C17.4631 22.9972 17.6761 22.3769 17.6761 21.6761C17.6761 21.0227 17.482 20.4735 17.0938 20.0284C16.715 19.5833 16.1563 19.2045 15.4176 18.892C14.6884 18.5795 13.7936 18.2955 12.733 18.0398L9.56534 17.2443C7.11269 16.6477 5.17614 15.715 3.75568 14.446C2.33523 13.1771 1.62973 11.4678 1.6392 9.31818C1.62973 7.55682 2.09848 6.01799 3.04545 4.7017C4.00189 3.38542 5.31345 2.35795 6.98011 1.61932C8.64678 0.880681 10.5407 0.511363 12.6619 0.511363C14.821 0.511363 16.7055 0.880681 18.3153 1.61932C19.9347 2.35795 21.1941 3.38542 22.0938 4.7017C22.9934 6.01799 23.4574 7.54261 23.4858 9.27557H17.5909Z"

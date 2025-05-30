@@ -13,9 +13,11 @@
   },
   "dependencies": {
     "@airstack/node": "^0.0.7",
+    "@farcaster/auth-kit": "^0.8.0",
     "@farcaster/frame-node": "^0.0.29",
-    "@farcaster/frame-sdk": "^0.0.45",
-    "@farcaster/frame-wagmi-connector": "^0.0.34",
+    "@farcaster/frame-sdk": "^0.0.53",
+    "@farcaster/frame-wagmi-connector": "^0.0.42",
+    "@farcaster/quick-auth": "^0.0.6",
     "@neynar/nodejs-sdk": "^2.43.0",
     "@privy-io/react-auth": "^2.4.3",
     "@privy-io/wagmi": "^1.0.3",

@@ -96,6 +96,7 @@ const nextConfig = {
                 https://*.base.org 
                 https://*.llamarpc.com
                 https://auth.privy.io
+                https://auth.farcaster.xyz
                 wss://relay.walletconnect.com
                 wss://relay.walletconnect.org
                 wss://www.walletlink.org
