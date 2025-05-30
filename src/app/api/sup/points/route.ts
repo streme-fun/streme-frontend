@@ -78,6 +78,9 @@ export async function GET(request: NextRequest) {
     let userData: UserPointsData;
     try {
       userData = JSON.parse(responseText);
+
+      // Debug: Log the actual response structure
+      console.log("Raw response structure:", JSON.stringify(userData, null, 2));
     } catch (parseError) {
       console.error("Failed to parse JSON response:", parseError);
       console.error("Response text:", responseText);
@@ -87,7 +90,12 @@ export async function GET(request: NextRequest) {
     console.log("Successfully fetched user data:");
     console.log("- FID:", userData.fid);
     console.log("- Address:", userData.address);
-    console.log("- Points earned:", userData.points.totalEarned);
+    console.log("- Points object:", userData.points);
+    console.log(
+      "- Points earned:",
+      userData.points?.totalEarned || "undefined"
+    );
+    console.log("- FluidLocker:", userData.fluidLocker);
 
     return NextResponse.json(userData);
   } catch (error) {
