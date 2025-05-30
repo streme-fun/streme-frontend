@@ -22,6 +22,7 @@ interface ClaimPointsFlowProps {
       totalEarned: number;
       currentRate: number;
       stackSignedData?: string;
+      signatureTimestamp?: number;
     };
     fluidLocker: {
       address: string | null;
@@ -207,25 +208,28 @@ export function ClaimPointsFlow({
       // Handle raw signature data (not base64-encoded Stack data)
       const rawSignature = userData.points.stackSignedData;
 
-      console.log("Attempting claim with raw signature:", {
-        lockerAddress,
-        signature: rawSignature,
-        totalEarned: userData.points.totalEarned,
-      });
+      // Use the correct transaction parameters
+      const programId = 7692;
+      const totalProgramUnits = userData.points.totalEarned; // Use actual amount from API
+      const nonce = userData.points.signatureTimestamp || 1748439037; // Use actual timestamp from API
 
-      // For now, use mock values since we only have the raw signature
-      const mockProgramId = 7692;
-      const mockNonce = Math.floor(Date.now() / 1000); // Current timestamp
+      console.log("Attempting claim with correct parameters:", {
+        lockerAddress,
+        programId,
+        totalProgramUnits,
+        nonce,
+        signature: rawSignature,
+      });
 
       claimPoints({
         address: lockerAddress as Address,
         abi: FLUID_LOCKER_ABI,
         functionName: "claim",
         args: [
-          BigInt(mockProgramId), // programId: 7692
-          BigInt(userData.points.totalEarned), // totalProgramUnits
-          BigInt(mockNonce), // nonce: current timestamp
-          rawSignature as `0x${string}`, // raw signature from external API
+          BigInt(programId), // programId: 7692
+          BigInt(totalProgramUnits), // totalProgramUnits: should come from Stack API
+          BigInt(nonce), // nonce: signatureTimestamp
+          rawSignature as `0x${string}`, // stackSignature from external API
         ],
       });
     } catch (err) {

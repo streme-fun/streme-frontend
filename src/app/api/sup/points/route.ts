@@ -18,6 +18,7 @@ interface UserPointsData {
     totalEarned: number;
     currentRate: number;
     stackSignedData?: string;
+    signatureTimestamp?: number;
   };
   fluidLocker: {
     address: string | null;
@@ -119,6 +120,7 @@ export async function GET(request: NextRequest) {
         totalEarned: externalData.amount,
         currentRate: 0, // Not provided by external API
         stackSignedData: externalData.signature, // Pass raw signature
+        signatureTimestamp: externalData.signatureTimestamp, // Pass timestamp for nonce
       },
       fluidLocker: {
         address: externalData.locker,
