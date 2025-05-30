@@ -204,28 +204,28 @@ export function ClaimPointsFlow({
     }
 
     try {
-      // Decode the signed data from Stack
-      const stackData = JSON.parse(
-        Buffer.from(userData.points.stackSignedData, "base64").toString()
-      );
+      // Handle raw signature data (not base64-encoded Stack data)
+      const rawSignature = userData.points.stackSignedData;
 
-      console.log("Attempting claim with data:", {
+      console.log("Attempting claim with raw signature:", {
         lockerAddress,
-        programId: stackData.programId,
-        totalProgramUnits: stackData.totalProgramUnits,
-        nonce: stackData.nonce,
-        signatureLength: stackData.signature.length,
+        signature: rawSignature,
+        totalEarned: userData.points.totalEarned,
       });
+
+      // For now, use mock values since we only have the raw signature
+      const mockProgramId = 7692;
+      const mockNonce = Math.floor(Date.now() / 1000); // Current timestamp
 
       claimPoints({
         address: lockerAddress as Address,
         abi: FLUID_LOCKER_ABI,
         functionName: "claim",
         args: [
-          BigInt(stackData.programId), // programId: 7692
-          BigInt(stackData.totalProgramUnits), // totalProgramUnits from Stack
-          BigInt(stackData.nonce), // nonce: signatureTimestamp from Stack
-          stackData.signature as `0x${string}`, // stackSignature from Stack
+          BigInt(mockProgramId), // programId: 7692
+          BigInt(userData.points.totalEarned), // totalProgramUnits
+          BigInt(mockNonce), // nonce: current timestamp
+          rawSignature as `0x${string}`, // raw signature from external API
         ],
       });
     } catch (err) {
