@@ -176,8 +176,8 @@ export function FarcasterAuthDemo() {
                 <strong>FID:</strong> {userData.fid}
               </p>
               <p>
-                <strong>Address:</strong> {userData.address.slice(0, 6)}...
-                {userData.address.slice(-4)}
+                <strong>Address:</strong> {userData.address?.slice(0, 6)}...
+                {userData.address?.slice(-4)}
               </p>
             </div>
             <div>
