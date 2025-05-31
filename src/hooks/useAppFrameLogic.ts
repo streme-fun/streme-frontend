@@ -10,6 +10,7 @@ import { sdk } from "@farcaster/frame-sdk";
 export function useAppFrameLogic() {
   const [isMiniAppView, setIsMiniAppView] = useState(false);
   const [isDetectionComplete, setIsDetectionComplete] = useState(false);
+  const [hasPromptedToAdd, setHasPromptedToAdd] = useState(false);
   const { context: farcasterContext, isSDKLoaded } = useFrame();
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
@@ -66,7 +67,49 @@ export function useAppFrameLogic() {
   const isOnCorrectNetwork = isConnected && chain?.id === base.id;
 
   const promptToAddMiniApp = async () => {
-    // This function is not used in the working version, keeping it for compatibility
+    // Only prompt once per session
+    if (hasPromptedToAdd) {
+      console.log("Already prompted to add mini app this session");
+      return;
+    }
+
+    setHasPromptedToAdd(true);
+
+    try {
+      console.log("Prompting user to add mini app...");
+      const result = await sdk.actions.addFrame();
+
+      console.log("Mini app successfully added!");
+      if (result.notificationDetails) {
+        console.log(
+          "Notification details received:",
+          result.notificationDetails
+        );
+        // You can store these details if you plan to send notifications later
+      }
+    } catch (error) {
+      // Type assertion for error handling
+      const err = error as { name?: string; message: string };
+      if (
+        err &&
+        (err.name === "RejectedByUser" ||
+          err.name === "InvalidDomainManifestJson")
+      ) {
+        console.log("Mini app not added:", err.message);
+        if (err.name === "RejectedByUser") {
+          console.log("User rejected the add frame request");
+        } else if (err.name === "InvalidDomainManifestJson") {
+          console.error(
+            "Invalid domain manifest - check your farcaster.json file"
+          );
+        }
+      } else {
+        console.error(
+          "Error prompting to add mini app:",
+          err?.message || String(error)
+        );
+      }
+    }
   };
 
   return {
@@ -85,5 +128,6 @@ export function useAppFrameLogic() {
     isSwitchingChain,
     disconnect,
     promptToAddMiniApp,
+    hasPromptedToAdd,
   };
 }

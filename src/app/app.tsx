@@ -43,6 +43,7 @@ function App() {
     isSwitchingChain,
     // disconnect,
     promptToAddMiniApp,
+    hasPromptedToAdd,
   } = useAppFrameLogic(); // Use the hook
 
   // Debug click handler for logo
@@ -119,10 +120,15 @@ function App() {
   }, [fetchTokens, isMiniAppView, isOnCorrectNetwork]);
 
   useEffect(() => {
-    if (isMiniAppView && isSDKLoaded && promptToAddMiniApp) {
+    if (
+      isMiniAppView &&
+      isSDKLoaded &&
+      !hasPromptedToAdd &&
+      promptToAddMiniApp
+    ) {
       promptToAddMiniApp();
     }
-  }, [isMiniAppView, isSDKLoaded, promptToAddMiniApp]);
+  }, [isMiniAppView, isSDKLoaded, hasPromptedToAdd, promptToAddMiniApp]);
 
   // Auto-connect to Farcaster wallet if not connected in mini app context
   // According to Farcaster docs: "If a user already has a connected wallet the connector will automatically connect to it"
