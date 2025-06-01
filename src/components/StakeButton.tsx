@@ -557,6 +557,7 @@ export function StakeButton({
         onStake={handleStake}
         onSuccess={onSuccess} // Pass onSuccess to modal if it needs to trigger something on close after success
         onRefreshBalance={fetchBalance} // Pass balance refresh function
+        isMiniApp={isMiniApp}
       />
     </>
   );

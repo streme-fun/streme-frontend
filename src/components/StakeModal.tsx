@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePrivy } from "@privy-io/react-auth";
 import { formatUnits, parseUnits } from "viem";
 import { Modal } from "./Modal";
-import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
 interface StakeModalProps {
   isOpen: boolean;
@@ -17,6 +15,7 @@ interface StakeModalProps {
   totalStakers?: string;
   onSuccess?: () => void;
   onRefreshBalance?: () => Promise<void>;
+  isMiniApp?: boolean;
 }
 
 const LoadingText = ({ text }: { text: string }) => {
@@ -69,6 +68,7 @@ export function StakeModal({
   totalStakers,
   onSuccess,
   onRefreshBalance,
+  isMiniApp,
 }: StakeModalProps) {
   const [amount, setAmount] = useState("");
   const [isStaking, setIsStaking] = useState(false);
@@ -76,11 +76,6 @@ export function StakeModal({
   const [step, setStep] = useState<"idle" | "staking" | "connecting">("idle");
   const [error, setError] = useState<string | null>(null);
   const [isMaxAmount, setIsMaxAmount] = useState(false);
-  const { user } = usePrivy();
-  const { primaryAddress } = useWalletAddressChange();
-
-  // Use primaryAddress for the Superfluid explorer link, fallback to user.wallet.address
-  const effectiveAddress = primaryAddress || user?.wallet?.address;
 
   const handleStake = async () => {
     setError(null);
@@ -166,98 +161,208 @@ export function StakeModal({
   };
 
   if (isSuccess) {
-    return (
-      <Modal isOpen={isOpen} onClose={handleClose}>
-        <div className="p-4 space-y-3">
-          <h3 className="text-lg font-bold">Stake Successful! 🎉</h3>
-          <div className="relative h-24 w-full overflow-hidden rounded-lg">
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="0 0 400 100"
-              preserveAspectRatio="xMidYMid meet"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M0 50 Q100 50 200 50 T400 50"
-                stroke="hsl(220 13% 91%)"
-                strokeWidth="2"
-              />
-              <g
-                className="reward-particle"
-                style={{ offsetPath: "path('M0 50 Q100 50 200 50 T400 50')" }}
-              >
-                <circle r="4" fill="currentColor" className="text-primary" />
-              </g>
-              <g
-                className="reward-particle"
-                style={{
-                  offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
-                  animationDelay: "-0.2s",
-                }}
-              >
-                <circle r="4" fill="currentColor" className="text-primary" />
-              </g>
-              <g
-                className="reward-particle"
-                style={{
-                  offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
-                  animationDelay: "-0.4s",
-                }}
-              >
-                <circle r="4" fill="currentColor" className="text-primary" />
-              </g>
-              <g
-                className="reward-particle"
-                style={{
-                  offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
-                  animationDelay: "-0.6s",
-                }}
-              >
-                <circle r="4" fill="currentColor" className="text-primary" />
-              </g>
-              <g
-                className="reward-particle"
-                style={{
-                  offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
-                  animationDelay: "-0.8s",
-                }}
-              >
-                <circle r="4" fill="currentColor" className="text-primary" />
-              </g>
-            </svg>
-            <style jsx>{`
-              .reward-particle {
-                animation: flow 2s linear infinite;
-              }
-              @keyframes flow {
-                from {
-                  offset-distance: 0%;
-                }
-                to {
-                  offset-distance: 100%;
-                }
-              }
-            `}</style>
+    if (isMiniApp) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={handleClose} />
+          <div className="relative bg-white rounded-t-2xl shadow-xl w-full max-w-md animate-in slide-in-from-bottom duration-300">
+            <div className="p-4 space-y-3">
+              <h3 className="text-lg font-bold">Stake Successful! 🎉</h3>
+              <div className="relative h-24 w-full overflow-hidden rounded-lg">
+                <svg
+                  width="100%"
+                  height="100%"
+                  viewBox="0 0 400 100"
+                  preserveAspectRatio="xMidYMid meet"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M0 50 Q100 50 200 50 T400 50"
+                    stroke="hsl(220 13% 91%)"
+                    strokeWidth="2"
+                  />
+                  <g
+                    className="reward-particle"
+                    style={{
+                      offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                    }}
+                  >
+                    <circle
+                      r="4"
+                      fill="currentColor"
+                      className="text-primary"
+                    />
+                  </g>
+                  <g
+                    className="reward-particle"
+                    style={{
+                      offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                      animationDelay: "-0.2s",
+                    }}
+                  >
+                    <circle
+                      r="4"
+                      fill="currentColor"
+                      className="text-primary"
+                    />
+                  </g>
+                  <g
+                    className="reward-particle"
+                    style={{
+                      offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                      animationDelay: "-0.4s",
+                    }}
+                  >
+                    <circle
+                      r="4"
+                      fill="currentColor"
+                      className="text-primary"
+                    />
+                  </g>
+                  <g
+                    className="reward-particle"
+                    style={{
+                      offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                      animationDelay: "-0.6s",
+                    }}
+                  >
+                    <circle
+                      r="4"
+                      fill="currentColor"
+                      className="text-primary"
+                    />
+                  </g>
+                  <g
+                    className="reward-particle"
+                    style={{
+                      offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                      animationDelay: "-0.8s",
+                    }}
+                  >
+                    <circle
+                      r="4"
+                      fill="currentColor"
+                      className="text-primary"
+                    />
+                  </g>
+                </svg>
+                <style jsx>{`
+                  .reward-particle {
+                    animation: flow 2s linear infinite;
+                  }
+                  @keyframes flow {
+                    from {
+                      offset-distance: 0%;
+                    }
+                    to {
+                      offset-distance: 100%;
+                    }
+                  }
+                `}</style>
+              </div>
+              <p className="text-center text-sm pb-4">
+                Token rewards are now being streamed directly to your wallet.
+              </p>
+              <a href="/tokens" className="btn btn-accent w-full">
+                Manage Stakes
+              </a>
+              <button onClick={handleClose} className="btn btn-ghost w-full">
+                Close
+              </button>
+            </div>
           </div>
-          <p className="text-center text-sm pb-4">
-            Token rewards are now being streamed directly to your wallet.
-          </p>
-          <a
-            href={`https://explorer.superfluid.finance/base-mainnet/accounts/${effectiveAddress}?tab=pools`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-accent w-full"
-          >
-            Manage Stakes
-          </a>
-          <button onClick={handleClose} className="btn btn-ghost w-full">
-            Close
-          </button>
         </div>
-      </Modal>
-    );
+      );
+    } else {
+      return (
+        <Modal isOpen={isOpen} onClose={handleClose}>
+          <div className="p-4 space-y-3">
+            <h3 className="text-lg font-bold">Stake Successful! 🎉</h3>
+            <div className="relative h-24 w-full overflow-hidden rounded-lg">
+              <svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 400 100"
+                preserveAspectRatio="xMidYMid meet"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M0 50 Q100 50 200 50 T400 50"
+                  stroke="hsl(220 13% 91%)"
+                  strokeWidth="2"
+                />
+                <g
+                  className="reward-particle"
+                  style={{ offsetPath: "path('M0 50 Q100 50 200 50 T400 50')" }}
+                >
+                  <circle r="4" fill="currentColor" className="text-primary" />
+                </g>
+                <g
+                  className="reward-particle"
+                  style={{
+                    offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                    animationDelay: "-0.2s",
+                  }}
+                >
+                  <circle r="4" fill="currentColor" className="text-primary" />
+                </g>
+                <g
+                  className="reward-particle"
+                  style={{
+                    offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                    animationDelay: "-0.4s",
+                  }}
+                >
+                  <circle r="4" fill="currentColor" className="text-primary" />
+                </g>
+                <g
+                  className="reward-particle"
+                  style={{
+                    offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                    animationDelay: "-0.6s",
+                  }}
+                >
+                  <circle r="4" fill="currentColor" className="text-primary" />
+                </g>
+                <g
+                  className="reward-particle"
+                  style={{
+                    offsetPath: "path('M0 50 Q100 50 200 50 T400 50')",
+                    animationDelay: "-0.8s",
+                  }}
+                >
+                  <circle r="4" fill="currentColor" className="text-primary" />
+                </g>
+              </svg>
+              <style jsx>{`
+                .reward-particle {
+                  animation: flow 2s linear infinite;
+                }
+                @keyframes flow {
+                  from {
+                    offset-distance: 0%;
+                  }
+                  to {
+                    offset-distance: 100%;
+                  }
+                }
+              `}</style>
+            </div>
+            <p className="text-center text-sm pb-4">
+              Token rewards are now being streamed directly to your wallet.
+            </p>
+            <a href="/tokens" className="btn btn-accent w-full">
+              Manage Stakes
+            </a>
+            <button onClick={handleClose} className="btn btn-ghost w-full">
+              Close
+            </button>
+          </div>
+        </Modal>
+      );
+    }
   }
 
   return (
