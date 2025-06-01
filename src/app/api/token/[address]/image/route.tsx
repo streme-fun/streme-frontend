@@ -20,6 +20,33 @@ export async function GET(
 
     console.log(`[Image Gen] Base URL: ${baseUrl}`);
 
+    // Fetch background image and convert to data URL
+    const bgImageUrl = `${baseUrl}/og-bg.png`;
+    console.log(`[Image Gen] Background image URL: ${bgImageUrl}`);
+
+    let backgroundDataUrl = null;
+    try {
+      const bgResponse = await fetch(bgImageUrl);
+      console.log(
+        `[Image Gen] Background image fetch status: ${bgResponse.status}`
+      );
+
+      if (bgResponse.ok) {
+        const bgBuffer = await bgResponse.arrayBuffer();
+        const bgBase64 = Buffer.from(bgBuffer).toString("base64");
+        backgroundDataUrl = `data:image/png;base64,${bgBase64}`;
+        console.log(
+          `[Image Gen] Background image converted to data URL, length: ${backgroundDataUrl.length}`
+        );
+      } else {
+        console.error(
+          `[Image Gen] Background image fetch failed: ${bgResponse.status}`
+        );
+      }
+    } catch (bgError) {
+      console.error(`[Image Gen] Background image fetch error:`, bgError);
+    }
+
     // Fetch token data with better error handling
     const tokenApiUrl = `${baseUrl}/api/tokens/single?address=${address}`;
     console.log(`[Image Gen] Fetching: ${tokenApiUrl}`);
@@ -60,7 +87,13 @@ export async function GET(
       `[Image Gen] Generating image for: ${token.name} (${token.symbol})`
     );
 
-    // Create the image response
+    console.log(
+      `[Image Gen] Using background: ${
+        backgroundDataUrl ? "data URL" : "fallback gradient"
+      }`
+    );
+
+    // Create the image response with background
     const imageResponse = new ImageResponse(
       (
         <div
@@ -71,42 +104,41 @@ export async function GET(
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: "white",
             fontFamily: "system-ui, -apple-system, sans-serif",
+            backgroundColor: "#1a1a2e",
+            backgroundImage: backgroundDataUrl
+              ? `url(${backgroundDataUrl})`
+              : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            gap: "20px",
           }}
         >
-          {/* Token Image */}
-          {token.img_url ? (
-            <img
-              src={token.img_url}
-              alt={token.name}
-              width="400"
-              height="400"
-              style={{
-                borderRadius: "40px",
-                objectFit: "cover",
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                width: "400px",
-                height: "400px",
-                backgroundColor: "#f8fafc",
-                borderRadius: "40px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "120px",
-                fontWeight: "bold",
-                color: "#64748b",
-                fontFamily: "monospace",
-                border: "4px solid #e2e8f0",
-              }}
-            >
-              {token.symbol?.[0] ?? "?"}
-            </div>
-          )}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "20px",
+            }}
+          >
+            {/* Token Image */}
+            {token.img_url && (
+              <img
+                src={token.img_url}
+                alt={token.name}
+                width="300"
+                height="300"
+                style={{
+                  borderRadius: "30px",
+                  objectFit: "cover",
+                  border: "4px solid rgba(255, 255, 255, 0.9)",
+                  boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3)",
+                }}
+              />
+            )}
+          </div>
         </div>
       ),
       {
