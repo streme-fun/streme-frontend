@@ -73,11 +73,6 @@ export async function GET(
             justifyContent: "center",
             backgroundColor: "white",
             fontFamily: "system-ui, -apple-system, sans-serif",
-            position: "relative",
-            backgroundImage: `url(${baseUrl}/stream-frame.png)`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
           }}
         >
           {/* Token Image */}
@@ -90,8 +85,6 @@ export async function GET(
               style={{
                 borderRadius: "40px",
                 objectFit: "cover",
-                position: "relative",
-                zIndex: 1,
               }}
             />
           ) : (
@@ -109,8 +102,6 @@ export async function GET(
                 color: "#64748b",
                 fontFamily: "monospace",
                 border: "4px solid #e2e8f0",
-                position: "relative",
-                zIndex: 1,
               }}
             >
               {token.symbol?.[0] ?? "?"}

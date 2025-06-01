@@ -9,7 +9,6 @@ import { StakeAllButton } from "../../components/StakeAllButton";
 import { UnstakeButton } from "../../components/UnstakeButton";
 import { ConnectPoolButton } from "../../components/ConnectPoolButton";
 import { TopUpAllStakesButton } from "../../components/TopUpAllStakesButton";
-import { HeroAnimationMini } from "../../components/HeroAnimationMini";
 import { publicClient } from "../../lib/viemClient";
 import { GDA_FORWARDER, GDA_ABI } from "../../lib/contracts";
 import Link from "next/link";
@@ -1383,9 +1382,6 @@ export default function TokensPage() {
             )}
           </div>
         )}
-      </div>
-      <div className="fixed inset-0 -z-10">
-        <HeroAnimationMini />
       </div>
     </div>
   );

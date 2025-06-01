@@ -191,14 +191,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             alt: `${token.name} (${token.symbol}) on Streme`,
           },
         ],
-        videos: [
-          {
-            url: `${baseUrl}/api/token/${address}/video`,
-            width: 1200,
-            height: 800,
-            type: "video/mp4",
-          },
-        ],
         type: "website",
         siteName: "Streme",
         url: pageUrl,
@@ -214,11 +206,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       other: {
         // Farcaster Frame metadata - correct format
         "fc:frame": JSON.stringify(frameEmbed),
-        // Additional og:video meta tags for better platform support
-        "og:video": `${baseUrl}/api/token/${address}/video`,
-        "og:video:type": "video/mp4",
-        "og:video:width": "1200",
-        "og:video:height": "800",
       },
     };
   } catch (error) {
