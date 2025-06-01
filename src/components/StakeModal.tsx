@@ -99,7 +99,14 @@ export function StakeModal({
       if (isMaxAmount) {
         // Round down by 0.1% to leave a small buffer
         const buffer = balance / 1000n; // 0.1% buffer
-        stakeAmount = balance - buffer;
+        const rawAmount = balance - buffer;
+
+        // Round to 6 decimal places to prevent contract precision issues
+        const amountInTokens = formatUnits(rawAmount, 18);
+        const roundedAmount =
+          Math.floor(parseFloat(amountInTokens) * 1000000) / 1000000; // 6 decimal places
+        stakeAmount = parseUnits(roundedAmount.toString(), 18);
+
         // Ensure we don't go below zero
         if (stakeAmount <= 0n) {
           stakeAmount = balance;
@@ -152,8 +159,10 @@ export function StakeModal({
   };
 
   const handleMaxClick = () => {
-    setAmount(formatUnits(balance, 18));
-    setIsMaxAmount(true); // Set flag to use exact balance
+    // Display a clean rounded amount in the UI (4 decimal places)
+    const displayAmount = parseFloat(formatUnits(balance, 18)).toFixed(4);
+    setAmount(displayAmount);
+    setIsMaxAmount(true); // Set flag to use exact balance (with buffer) for transaction
   };
 
   if (isSuccess) {

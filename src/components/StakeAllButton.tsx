@@ -7,6 +7,7 @@ import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
 import { sdk } from "@farcaster/frame-sdk";
+import { formatUnits, parseUnits } from "viem";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 
@@ -141,7 +142,13 @@ export function StakeAllButton({
 
     // Apply a small buffer (0.1%) to account for potential timing issues
     const buffer = balance / 1000n; // 0.1% buffer
-    const stakeAmount = balance - buffer > 0n ? balance - buffer : balance;
+    const rawAmount = balance - buffer > 0n ? balance - buffer : balance;
+
+    // Round to 6 decimal places to prevent contract precision issues
+    const amountInTokens = formatUnits(rawAmount, 18);
+    const roundedAmount =
+      Math.floor(parseFloat(amountInTokens) * 1000000) / 1000000; // 6 decimal places
+    const stakeAmount = parseUnits(roundedAmount.toString(), 18);
 
     setIsLoading(true);
     const toastId = toast.loading("Preparing stake all transaction...");
