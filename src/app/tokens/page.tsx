@@ -134,10 +134,16 @@ export default function TokensPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accountExists, setAccountExists] = useState<boolean | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   // Get effective address based on context
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
   const effectiveIsConnected = isMiniAppView ? fcIsConnected : !!wagmiAddress;
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Helper function to fetch token data with caching
   const fetchTokenData = async (tokenAddress: string) => {
@@ -806,7 +812,34 @@ export default function TokensPage() {
           {/* <p className="text-gray-600">Manage your Streme tokens</p> */}
         </div>
 
-        {!effectiveAddress ? (
+        {!mounted ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div
+                key={i}
+                className="card bg-base-100 border border-gray-200 animate-pulse"
+              >
+                <div className="card-body p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-300"></div>
+                      <div>
+                        <div className="h-6 bg-gray-300 rounded w-24 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-20"></div>
+                      </div>
+                    </div>
+                    <div className="h-6 bg-gray-300 rounded w-20"></div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="h-4 bg-gray-200 rounded w-full"></div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : !effectiveAddress ? (
           <div className="text-center py-16">
             <div className="mb-6">
               <svg
