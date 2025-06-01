@@ -151,8 +151,19 @@ export function ClaimPointsFlow({
       return;
     }
 
+    // Check if there are any points to claim
+    if (userData.points.totalEarned <= 0) {
+      setError(
+        "No points available to claim. Complete Stack tasks to earn SUP points."
+      );
+      return;
+    }
+
+    // Check if signature data is available
     if (!userData.points.stackSignedData) {
-      setError("No signed points data available");
+      setError(
+        "No signed points data available. This may be a temporary issue - try refreshing."
+      );
       return;
     }
 
@@ -248,6 +259,29 @@ export function ClaimPointsFlow({
   };
 
   const getStepDisplay = () => {
+    // Check if no points to claim
+    if (userData.points.totalEarned <= 0) {
+      return {
+        title: "No Points Available",
+        description:
+          "Complete Stack tasks to earn SUP points that can be claimed.",
+        buttonText: "View Stack Tasks",
+        showButton: true,
+        isExternalAction: true,
+      };
+    }
+
+    // Check if has points but no signature data (shouldn't happen normally)
+    if (userData.points.totalEarned > 0 && !userData.points.stackSignedData) {
+      return {
+        title: "Signature Missing",
+        description: `You have ${userData.points.totalEarned.toLocaleString()} points but signature data is missing. Please refresh or contact support.`,
+        buttonText: "Refresh Data",
+        showButton: true,
+        isExternalAction: true,
+      };
+    }
+
     switch (currentStep) {
       case "idle":
         return {
@@ -297,6 +331,29 @@ export function ClaimPointsFlow({
     }
   };
 
+  const handleButtonClick = () => {
+    if (stepDisplay.isExternalAction) {
+      // Handle external actions
+      if (stepDisplay.buttonText === "Complete Stack Verification") {
+        window.open("https://www.stack.so/", "_blank");
+      } else if (stepDisplay.buttonText === "View Stack Tasks") {
+        window.open("https://www.stack.so/", "_blank");
+      } else if (stepDisplay.buttonText === "Refresh Data") {
+        // Trigger parent data refresh
+        if (onUserDataUpdate) {
+          onUserDataUpdate();
+        }
+      }
+    } else {
+      // Handle normal claim flow
+      if (currentStep === "error") {
+        startClaimFlow();
+      } else {
+        startClaimFlow();
+      }
+    }
+  };
+
   const stepDisplay = getStepDisplay();
   const isLoading =
     currentStep === "checking" ||
@@ -315,9 +372,15 @@ export function ClaimPointsFlow({
 
         {stepDisplay.showButton && (
           <button
-            onClick={currentStep === "error" ? startClaimFlow : startClaimFlow}
-            disabled={isLoading || !userAddress}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transform hover:scale-105 transition-all duration-200 font-semibold"
+            onClick={handleButtonClick}
+            disabled={
+              isLoading || (!userAddress && !stepDisplay.isExternalAction)
+            }
+            className={`${
+              stepDisplay.isExternalAction
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-green-600 hover:bg-green-700"
+            } text-white px-6 py-3 rounded-lg disabled:bg-gray-400 transform hover:scale-105 transition-all duration-200 font-semibold`}
           >
             {isLoading ? "Processing..." : stepDisplay.buttonText}
           </button>
@@ -327,19 +390,6 @@ export function ClaimPointsFlow({
           <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-lg text-sm">
             <h4 className="font-semibold text-red-800 mb-2">Error Details:</h4>
             <p className="text-red-700 mb-3">{error}</p>
-            <div className="text-red-600 text-xs">
-              <strong>Common causes:</strong>
-              <ul className="list-disc list-inside mt-1 space-y-1">
-                <li>Mock signature validation failed (expected in testing)</li>
-                <li>Contract requires real Stack API integration</li>
-                <li>Network connectivity issues</li>
-                <li>Insufficient gas or contract errors</li>
-              </ul>
-              <p className="mt-2">
-                <strong>Note:</strong> This is expected behavior until real
-                Stack API integration is complete.
-              </p>
-            </div>
           </div>
         )}
 
@@ -354,18 +404,48 @@ export function ClaimPointsFlow({
           <ol className="list-decimal list-inside space-y-1 text-gray-600">
             <li
               className={
+                userData.points.totalEarned <= 0
+                  ? "text-orange-600 font-medium"
+                  : "line-through text-gray-400"
+              }
+            >
+              {userData.points.totalEarned > 0
+                ? "✅ Earned SUP points from Stack"
+                : "1. Complete Stack tasks to earn SUP points"}
+            </li>
+            <li
+              className={
                 userData.fluidLocker.isCreated
                   ? "line-through text-gray-400"
-                  : ""
+                  : userData.points.totalEarned > 0
+                  ? ""
+                  : "text-gray-400"
               }
             >
               {userData.fluidLocker.isCreated
                 ? "✅ Locker exists"
-                : "1. Create FluidLocker (if needed)"}
+                : "2. Create FluidLocker (if needed)"}
             </li>
-            <li>2. Get signed points from Stack</li>
-            <li>3. Submit claim transaction</li>
-            <li>4. Receive SUP tokens in your locker</li>
+            <li
+              className={
+                userData.points.totalEarned > 0 &&
+                userData.points.stackSignedData
+                  ? ""
+                  : "text-gray-400"
+              }
+            >
+              3. Submit claim transaction
+            </li>
+            <li
+              className={
+                userData.points.totalEarned > 0 &&
+                userData.points.stackSignedData
+                  ? ""
+                  : "text-gray-400"
+              }
+            >
+              4. Receive SUP tokens in your locker
+            </li>
           </ol>
         </div>
 

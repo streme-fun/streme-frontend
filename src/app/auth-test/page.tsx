@@ -31,15 +31,6 @@ export default function AuthTestPage() {
             </li>
           </ol>
         </div>
-
-        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <h3 className="font-semibold text-yellow-800 mb-2">Note:</h3>
-          <p className="text-yellow-700 text-sm">
-            This currently returns mock data. The TODO items in the API include:
-            implementing real Stack points integration, actual fluidLocker
-            logic, and proper Stack signed data generation.
-          </p>
-        </div>
       </div>
     </div>
   );

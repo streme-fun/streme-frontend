@@ -68,6 +68,3 @@ export const FLUID_LOCKER_ABI = [
     type: "function",
   },
 ] as const;
-
-// Note: All Stack integration is now handled internally with mock signed data
-// No external Stack API calls are needed for the current implementation

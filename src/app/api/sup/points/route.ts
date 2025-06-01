@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
 interface ExternalApiResponse {
-  address: string;
   amount: number;
-  signature: string;
-  signatureTimestamp: number;
-  signer: string;
+  inStack: boolean;
+  fid: number;
   wallet: string;
   locker: string;
   lockerCreated: boolean;
+  signature?: string;
+  signatureTimestamp?: number;
 }
 
 interface UserPointsData {
   fid: number;
-  address: string;
+  wallet: string;
   points: {
     totalEarned: number;
     currentRate: number;
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       token.includes(".") ? "JWT-like" : "Simple string"
     );
 
-    // Extract FID from JWT token
+    // Extract FID from JWT token (fallback only)
     let fid = 0;
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
@@ -114,24 +114,29 @@ export async function GET(request: NextRequest) {
 
     // Map external response to expected format
     const userData: UserPointsData = {
-      fid: fid,
-      address: externalData.address,
+      fid: externalData.fid || fid, // Use FID from response, fallback to JWT
+      wallet: externalData.wallet,
       points: {
         totalEarned: externalData.amount,
         currentRate: 0, // Not provided by external API
-        stackSignedData: externalData.signature, // Pass raw signature
-        signatureTimestamp: externalData.signatureTimestamp, // Pass timestamp for nonce
+        stackSignedData: externalData.signature,
+        signatureTimestamp: externalData.signatureTimestamp,
       },
       fluidLocker: {
-        address: externalData.locker,
+        address:
+          externalData.locker === "0x0000000000000000000000000000000000000000"
+            ? null
+            : externalData.locker,
         isCreated: externalData.lockerCreated,
       },
     };
 
     console.log("Successfully fetched and mapped user data:");
     console.log("- FID:", userData.fid);
-    console.log("- Address:", userData.address);
+    console.log("- Wallet:", userData.wallet);
     console.log("- Points earned:", userData.points.totalEarned);
+    console.log("- In Stack:", externalData.inStack);
+    console.log("- Has signature:", !!externalData.signature);
     console.log("- FluidLocker address:", userData.fluidLocker.address);
     console.log("- FluidLocker created:", userData.fluidLocker.isCreated);
 
