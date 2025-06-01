@@ -139,6 +139,10 @@ export function StakeAllButton({
       return;
     }
 
+    // Apply a small buffer (0.1%) to account for potential timing issues
+    const buffer = balance / 1000n; // 0.1% buffer
+    const stakeAmount = balance - buffer > 0n ? balance - buffer : balance;
+
     setIsLoading(true);
     const toastId = toast.loading("Preparing stake all transaction...");
 
@@ -153,7 +157,7 @@ export function StakeAllButton({
           throw new Error("Farcaster Ethereum provider not available.");
 
         const currentAllowance = await checkAllowance();
-        if (currentAllowance < balance) {
+        if (currentAllowance < stakeAmount) {
           toast.info(
             "Requesting unlimited approval for future transactions...",
             { id: toastId }
@@ -203,7 +207,7 @@ export function StakeAllButton({
         ]);
         const stakeData = stakeIface.encodeFunctionData("stake", [
           toHex(effectiveAddress!),
-          balance,
+          stakeAmount,
         ]);
         stakeTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
@@ -278,7 +282,7 @@ export function StakeAllButton({
         });
 
         const currentAllowance = await checkAllowance();
-        if (currentAllowance < balance) {
+        if (currentAllowance < stakeAmount) {
           toast.info(
             "Requesting unlimited approval for future transactions...",
             { id: toastId }
@@ -329,7 +333,7 @@ export function StakeAllButton({
         ]);
         const stakeData = stakeIface.encodeFunctionData("stake", [
           toHex(walletAddress),
-          balance,
+          stakeAmount,
         ]);
         const estimatedGas = await publicClient.estimateGas({
           account: walletAddress as `0x${string}`,

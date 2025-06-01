@@ -16,6 +16,7 @@ interface StakeModalProps {
   onStake: (amount: bigint) => Promise<void>;
   totalStakers?: string;
   onSuccess?: () => void;
+  onRefreshBalance?: () => Promise<void>;
 }
 
 const LoadingText = ({ text }: { text: string }) => {
@@ -67,12 +68,14 @@ export function StakeModal({
   onStake,
   totalStakers,
   onSuccess,
+  onRefreshBalance,
 }: StakeModalProps) {
   const [amount, setAmount] = useState("");
   const [isStaking, setIsStaking] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [step, setStep] = useState<"idle" | "staking" | "connecting">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [isMaxAmount, setIsMaxAmount] = useState(false);
   const { user } = usePrivy();
   const { primaryAddress } = useWalletAddressChange();
 
@@ -85,7 +88,27 @@ export function StakeModal({
     setStep("staking");
 
     try {
-      await onStake(parseUnits(amount, 18));
+      // Refresh balance when using max amount to ensure accuracy
+      if (isMaxAmount && onRefreshBalance) {
+        await onRefreshBalance();
+      }
+
+      // Use exact balance if max amount is selected to avoid precision loss
+      // But apply a small buffer (0.1%) when using max to account for potential timing issues
+      let stakeAmount: bigint;
+      if (isMaxAmount) {
+        // Round down by 0.1% to leave a small buffer
+        const buffer = balance / 1000n; // 0.1% buffer
+        stakeAmount = balance - buffer;
+        // Ensure we don't go below zero
+        if (stakeAmount <= 0n) {
+          stakeAmount = balance;
+        }
+      } else {
+        stakeAmount = parseUnits(amount, 18);
+      }
+
+      await onStake(stakeAmount);
       setIsSuccess(true);
       onSuccess?.();
     } catch (error: unknown) {
@@ -119,7 +142,18 @@ export function StakeModal({
     setAmount("");
     setIsSuccess(false);
     setError(null);
+    setIsMaxAmount(false);
     onClose();
+  };
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAmount(e.target.value);
+    setIsMaxAmount(false); // Reset max flag when user types
+  };
+
+  const handleMaxClick = () => {
+    setAmount(formatUnits(balance, 18));
+    setIsMaxAmount(true); // Set flag to use exact balance
   };
 
   if (isSuccess) {
@@ -243,14 +277,14 @@ export function StakeModal({
               <input
                 type="number"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={handleAmountChange}
                 placeholder="0.0000"
                 step="0.0001"
                 className="input input-bordered w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <button
                 className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs font-semibold bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600 hover:text-gray-800 transition-all active:scale-95 hover:cursor-pointer"
-                onClick={() => setAmount(formatUnits(balance, 18))}
+                onClick={handleMaxClick}
               >
                 Max
               </button>
@@ -265,8 +299,10 @@ export function StakeModal({
               disabled={
                 isStaking ||
                 !amount ||
-                parseUnits(amount || "0", 18) > balance ||
-                parseUnits(amount || "0", 18) <= 0n
+                (isMaxAmount
+                  ? balance <= 0n
+                  : parseUnits(amount || "0", 18) > balance) ||
+                (isMaxAmount ? false : parseUnits(amount || "0", 18) <= 0n)
               }
             >
               {step === "staking" ? (

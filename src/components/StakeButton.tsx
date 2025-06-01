@@ -556,6 +556,7 @@ export function StakeButton({
         totalStakers={totalStakers}
         onStake={handleStake}
         onSuccess={onSuccess} // Pass onSuccess to modal if it needs to trigger something on close after success
+        onRefreshBalance={fetchBalance} // Pass balance refresh function
       />
     </>
   );
