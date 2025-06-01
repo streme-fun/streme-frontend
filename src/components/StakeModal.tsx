@@ -3,6 +3,10 @@
 import { useState, useEffect } from "react";
 import { formatUnits, parseUnits } from "viem";
 import { Modal } from "./Modal";
+import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
+import { sdk } from "@farcaster/frame-sdk";
+import Image from "next/image";
+import FarcasterIcon from "@/public/farcaster.svg";
 
 interface StakeModalProps {
   isOpen: boolean;
@@ -62,6 +66,7 @@ const formatBalance = (value: bigint, decimals: number = 18) => {
 export function StakeModal({
   isOpen,
   onClose,
+  tokenAddress,
   balance,
   symbol,
   onStake,
@@ -76,6 +81,8 @@ export function StakeModal({
   const [step, setStep] = useState<"idle" | "staking" | "connecting">("idle");
   const [error, setError] = useState<string | null>(null);
   const [isMaxAmount, setIsMaxAmount] = useState(false);
+
+  const { isSDKLoaded } = useAppFrameLogic();
 
   const handleStake = async () => {
     setError(null);
@@ -158,6 +165,39 @@ export function StakeModal({
     const displayAmount = parseFloat(formatUnits(balance, 18)).toFixed(4);
     setAmount(displayAmount);
     setIsMaxAmount(true); // Set flag to use exact balance (with buffer) for transaction
+  };
+
+  const handleShare = async () => {
+    const shareUrl = `https://streme.fun/token/${tokenAddress}`;
+    const shareText = `I just staked $${symbol} on Streme for rewards streamed to my wallet every second. Dilute my share of the rewards pool, I dare you!
+
+${shareUrl}`;
+
+    if (isMiniApp && isSDKLoaded && sdk) {
+      try {
+        await sdk.actions.composeCast({
+          text: shareText,
+          embeds: [shareUrl],
+        });
+      } catch (error) {
+        console.error("Error composing cast:", error);
+        // Fallback to opening Farcaster
+        window.open(
+          `https://farcaster.xyz/~/compose?text=${encodeURIComponent(
+            shareText
+          )}&embeds[]=${encodeURIComponent(shareUrl)}`,
+          "_blank"
+        );
+      }
+    } else {
+      // Desktop version - open Farcaster web compose
+      window.open(
+        `https://farcaster.xyz/~/compose?text=${encodeURIComponent(
+          shareText
+        )}&embeds[]=${encodeURIComponent(shareUrl)}`,
+        "_blank"
+      );
+    }
   };
 
   if (isSuccess) {
@@ -264,9 +304,24 @@ export function StakeModal({
               <p className="text-center text-sm pb-4">
                 Token rewards are now being streamed directly to your wallet.
               </p>
-              <a href="/tokens" className="btn btn-accent w-full">
-                Manage Stakes
-              </a>
+              <div className="flex gap-2">
+                <a href="/tokens" className="btn btn-accent flex-1">
+                  Manage Stakes
+                </a>
+                <button
+                  onClick={handleShare}
+                  className="btn btn-outline flex-1"
+                >
+                  <Image
+                    src={FarcasterIcon}
+                    alt="Share on Farcaster"
+                    width={16}
+                    height={16}
+                    className="opacity-90"
+                  />
+                  Share
+                </button>
+              </div>
               <button onClick={handleClose} className="btn btn-ghost w-full">
                 Close
               </button>
@@ -353,9 +408,21 @@ export function StakeModal({
             <p className="text-center text-sm pb-4">
               Token rewards are now being streamed directly to your wallet.
             </p>
-            <a href="/tokens" className="btn btn-accent w-full">
-              Manage Stakes
-            </a>
+            <div className="flex gap-2">
+              <a href="/tokens" className="btn btn-accent flex-1">
+                Manage Stakes
+              </a>
+              <button onClick={handleShare} className="btn btn-outline flex-1">
+                <Image
+                  src={FarcasterIcon}
+                  alt="Share on Farcaster"
+                  width={16}
+                  height={16}
+                  className="opacity-90"
+                />
+                Share
+              </button>
+            </div>
             <button onClick={handleClose} className="btn btn-ghost w-full">
               Close
             </button>

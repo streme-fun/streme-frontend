@@ -173,6 +173,18 @@ export function StakeButton({
       toast.error("Wallet not connected or address missing");
       throw new Error("Wallet not connected or address missing");
     }
+
+    // Pre-flight checks before attempting the transaction
+    if (amount <= 0n) {
+      toast.error("Invalid stake amount");
+      throw new Error("Invalid stake amount");
+    }
+
+    if (balance < amount) {
+      toast.error("Insufficient token balance for staking");
+      throw new Error("Insufficient token balance for staking");
+    }
+
     setIsLoading(true);
     const toastId = toast.loading("Preparing stake transaction...");
 
@@ -409,25 +421,58 @@ export function StakeButton({
           toHex(walletAddress),
           amount,
         ]);
-        const estimatedGas = await publicClient.estimateGas({
-          account: walletAddress as `0x${string}`,
-          to: toHex(stakingAddress),
-          data: stakeData as `0x${string}`,
-        });
-        const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.5));
-        const gas = `0x${gasLimit.toString(16)}` as `0x${string}`;
-        const stakeTxResult = await provider.request({
-          method: "eth_sendTransaction",
-          params: [
-            {
-              to: toHex(stakingAddress),
-              from: toHex(walletAddress),
-              data: toHex(stakeData),
-              gas: gas,
-            },
-          ],
-        });
-        stakeTxHash = stakeTxResult as `0x${string}`;
+
+        // Try to estimate gas first with better error handling
+        try {
+          const estimatedGas = await publicClient.estimateGas({
+            account: walletAddress as `0x${string}`,
+            to: toHex(stakingAddress),
+            data: stakeData as `0x${string}`,
+          });
+          const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.5));
+          const gas = `0x${gasLimit.toString(16)}` as `0x${string}`;
+
+          const stakeTxResult = await provider.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                to: toHex(stakingAddress),
+                from: toHex(walletAddress),
+                data: toHex(stakeData),
+                gas: gas,
+              },
+            ],
+          });
+          stakeTxHash = stakeTxResult as `0x${string}`;
+        } catch (gasError) {
+          console.error("Gas estimation failed:", gasError);
+          // Provide more specific error messages based on common causes
+          let specificMessage = "Gas estimation failed";
+
+          if (
+            gasError &&
+            typeof gasError === "object" &&
+            "message" in gasError
+          ) {
+            const errorMessage = (gasError as { message: string }).message;
+            if (errorMessage.includes("execution reverted")) {
+              // Try to provide more specific guidance
+              if (amount <= 0n) {
+                specificMessage =
+                  "Invalid stake amount - must be greater than 0";
+              } else if (balance < amount) {
+                specificMessage = "Insufficient token balance for staking";
+              } else {
+                // Check if the staking contract might have minimum requirements
+                specificMessage =
+                  "Staking contract rejected the transaction. This could be due to: minimum staking amount requirements, contract being paused, or insufficient gas. Please try a smaller amount or contact support.";
+              }
+            }
+          }
+
+          throw new Error(specificMessage);
+        }
+
         if (!stakeTxHash)
           throw new Error(
             "Stake transaction hash not received (Privy). User might have cancelled."
@@ -504,6 +549,14 @@ export function StakeButton({
             errorMessage.includes("hash not received")
           ) {
             message = "Transaction rejected or cancelled.";
+          } else if (
+            errorMessage.includes("Insufficient token balance") ||
+            errorMessage.includes("Invalid stake amount") ||
+            errorMessage.includes("Gas estimation failed") ||
+            errorMessage.includes("Staking contract rejected")
+          ) {
+            // Use our custom error messages as-is
+            message = errorMessage;
           } else {
             message = errorMessage.substring(0, 100);
           }
@@ -518,6 +571,9 @@ export function StakeButton({
           errorDetails.includes("rejected by user")
         ) {
           message = "Transaction rejected by user.";
+        } else if (errorDetails.includes("execution reverted")) {
+          message =
+            "Transaction failed. This could be due to insufficient balance, contract restrictions, or minimum staking requirements.";
         }
       }
       toast.error(message, { id: toastId });
