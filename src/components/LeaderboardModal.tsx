@@ -71,6 +71,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
   >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showInfoView, setShowInfoView] = useState(false);
 
   // Claim flow state
   const [claimStep, setClaimStep] = useState<ClaimStep>("idle");
@@ -364,7 +365,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     if (!userData) return "Loading...";
     if (userData.points.totalEarned <= 0) return "No Stream to Claim";
 
-    return "Claim $SUP Stream";
+    return "Claim your SUP stream";
   };
 
   const isClaimLoading =
@@ -577,7 +578,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
       return (
         <div className="text-center py-4">
           <p className="text-gray-600 text-sm mb-3">
-            Sign in with Farcaster to claim $SUP stream
+            Sign in with Farcaster to claim SUP stream
           </p>
           <button
             onClick={signIn}
@@ -612,16 +613,20 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
         {claimStep === "success" && (
           <div className="bg-green-100 border border-green-300 rounded-lg p-4 mb-3">
             <p className="text-green-700 text-sm text-center font-medium mb-3">
-              🎉 $SUP stream claimed successfully!
+              🎉 SUP stream claimed successfully!
             </p>
             <div className="text-center">
               <p className="text-green-600 text-xs mb-3">
-                Continue earning $SUP by using ecosystem apps, staking, and
+                Continue earning SUP by using ecosystem apps, staking, and
                 participating in governance.
               </p>
               <button
                 onClick={handleClaimAirdrop}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
+                className="px-4 py-2 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105"
+                style={{
+                  backgroundColor: "rgb(117, 235, 0)",
+                  color: "black",
+                }}
               >
                 View More Earning Opportunities
               </button>
@@ -649,7 +654,11 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
         <div className="flex space-x-2">
           <button
             onClick={handleClaimClick}
-            className="btn btn-primary flex-1"
+            className="flex-1 px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            style={{
+              backgroundColor: "rgb(117, 235, 0)",
+              color: "black",
+            }}
             disabled={
               isClaimLoading ||
               (userData.points.totalEarned <= 0 && claimStep !== "error") ||
@@ -657,10 +666,129 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
             }
           >
             {isClaimLoading && (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2 inline-block"></div>
             )}
             {getClaimButtonText()}
           </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderInfoView = () => {
+    return (
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              SUP Rewards
+            </h2>
+            <p className="text-gray-600 text-sm">
+              Streme is part of Season 2 of SUP streaming rewards. SUP is the
+              ecosystem token of Superfluid.
+            </p>
+          </div>
+
+          {/* What is SUP */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h3 className="font-semibold text-gray-800 mb-2">What is SUP?</h3>
+            <div className="text-center mb-4">
+              <img
+                src="https://docs.streme.fun/~gitbook/image?url=https%3A%2F%2F1755512155-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FrfU6UkNRL91DlMTjk2m7%252Fuploads%252FCiLpsJHSRIuHRC0xUTrY%252FSuperfluid___Claim_App.png%3Falt%3Dmedia%26token%3D68242eb6-816b-420b-9bd6-91936f3244b4&width=400&dpr=2&quality=100&sign=d002354a&sv=2"
+                alt="The SUP claim page on the Superfluid website"
+                className="max-w-full h-auto rounded"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                The SUP claim page on the Superfluid website
+              </p>
+            </div>
+            <p className="text-sm text-gray-700">
+              Don&apos;t call it an airdrop. Superfluid powers tokens that
+              stream value in real-time, per second. Ongoing engagement with the
+              Superfluid protocol earns you streaming rewards of SUP.
+            </p>
+          </div>
+
+          {/* How to Earn */}
+          <div className="bg-blue-50 rounded-lg p-4">
+            <h3 className="font-semibold text-gray-800 mb-3">
+              How to Earn SUP with Streme
+            </h3>
+            <div className="bg-blue-100 border border-blue-200 rounded p-3 mb-3">
+              <p className="text-sm font-medium text-blue-800">
+                💡 Actions that contribute to the market success of Streme coins
+                will earn the most SUP rewards
+              </p>
+            </div>
+            <div className="space-y-2 text-sm text-gray-700">
+              <div className="flex items-start gap-2">
+                <span className="text-green-600">•</span>
+                <span>
+                  Adding the Streme Farcaster mini app (keep notifications
+                  enabled) ➕
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-yellow-600">•</span>
+                <span>
+                  Creating tokens that nobody buys will count{" "}
+                  <em>very little</em>
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-red-600">🔥</span>
+                <span>Creating tokens with high volume 🔥</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-red-600">🔥</span>
+                <span>
+                  Creating tokens with (sustained) high market cap 🔥🔥
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-red-600">🔥</span>
+                <span>Holding Streme coins 🔥</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-red-600">🔥</span>
+                <span>Holding staked Streme coins 🔥🔥</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-blue-600">👍</span>
+                <span>Spreading the word and referring new users</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Leaderboard */}
+          <div className="bg-green-50 rounded-lg p-4">
+            <h3 className="font-semibold text-gray-800 mb-3">
+              The Leaderboard
+            </h3>
+            <div className="text-center mb-4">
+              <img
+                src="https://docs.streme.fun/~gitbook/image?url=https%3A%2F%2F1755512155-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FrfU6UkNRL91DlMTjk2m7%252Fuploads%252FNbrxsjKOG5dY3BGOOxIZ%252FMini_Apps.png%3Falt%3Dmedia%26token%3D12aef18d-f526-41da-bc80-c36cdd95780a&width=400&dpr=2&quality=100&sign=eb1236c9&sv=2"
+                alt="Leaderboard tab on Streme Farcaster mini app"
+                className="max-w-full h-auto rounded"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Leaderboard tab on Streme Farcaster mini app
+              </p>
+            </div>
+            <p className="text-sm text-gray-700">
+              In the Streme Farcaster app, you can see the current status of the
+              SUP rewards leaderboard.
+            </p>
+          </div>
+
+          {/* Key Message */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-sm font-semibold text-yellow-800 text-center">
+              Most of the rewards will flow to those who contribute to the
+              market success of Streme Coins.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -679,142 +807,185 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <svg
-                className="w-5 h-5 text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-              SUP Airdrop Leaderboard
+              {!showInfoView && (
+                <svg
+                  className="w-5 h-5 text-gray-700"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+              )}
+              {showInfoView ? "SUP Rewards Info" : "SUP Airdrop Leaderboard"}
             </h3>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <X size={20} className="text-gray-500" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowInfoView(!showInfoView)}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              title={showInfoView ? "Show Leaderboard" : "Show Info"}
+            >
+              {showInfoView ? (
+                <svg
+                  className="w-5 h-5 text-gray-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-5 h-5 text-gray-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              )}
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <X size={20} className="text-gray-500" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-4 py-2">
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            </div>
-          ) : error ? (
-            <div className="text-center py-12">
-              <p className="text-red-500 mb-4">{error}</p>
-              <button
-                onClick={fetchLeaderboardData}
-                className="btn btn-primary"
-              >
-                Retry
-              </button>
-            </div>
-          ) : leaderboardData.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500">No leaderboard data available</p>
-            </div>
-          ) : (
-            <div className="">
-              {leaderboardData.map((entry, displayIndex) => {
-                const isTopThree = entry.rank <= 3;
-                const rankColors = [
-                  "text-yellow-500",
-                  "text-gray-400",
-                  "text-amber-600",
-                ];
-                const isCurrentUser = entry.isCurrentUser;
-                const fid = getFarcasterFid(entry);
-                const isClickable = Boolean(fid);
+        {showInfoView ? (
+          renderInfoView()
+        ) : (
+          <div className="flex-1 overflow-y-auto px-4 py-2">
+            {loading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            ) : error ? (
+              <div className="text-center py-12">
+                <p className="text-red-500 mb-4">{error}</p>
+                <button
+                  onClick={fetchLeaderboardData}
+                  className="btn btn-primary"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : leaderboardData.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500">No leaderboard data available</p>
+              </div>
+            ) : (
+              <div className="">
+                {leaderboardData.map((entry, displayIndex) => {
+                  const isTopThree = entry.rank <= 3;
+                  const rankColors = [
+                    "text-yellow-500",
+                    "text-gray-400",
+                    "text-amber-600",
+                  ];
+                  const isCurrentUser = entry.isCurrentUser;
+                  const fid = getFarcasterFid(entry);
+                  const isClickable = Boolean(fid);
 
-                return (
-                  <div
-                    key={`${entry.address}-${displayIndex}`}
-                    className={`flex items-center space-x-3 p-1 py-2 rounded-lg transition-colors border-b border-gray-50 ${
-                      isCurrentUser
-                        ? "bg-blue-50 border-2 border-blue-200"
-                        : isTopThree
-                        ? ""
-                        : ""
-                    }`}
-                  >
-                    {/* Rank */}
+                  return (
                     <div
-                      className={`flex items-center justify-center w-6 h-6 font-bold text-sm ${
+                      key={`${entry.address}-${displayIndex}`}
+                      className={`flex items-center space-x-3 p-1 py-2 rounded-lg transition-colors border-b border-gray-50 ${
                         isCurrentUser
-                          ? "bg-blue-500 text-white"
+                          ? "bg-blue-50 border-2 border-blue-200"
                           : isTopThree
-                          ? `${rankColors[entry.rank - 1]} bg-white`
-                          : "text-gray-600 bg-white "
-                      }`}
-                    >
-                      {entry.rank}
-                    </div>
-
-                    {/* Clickable Profile Section */}
-                    <div
-                      className={`flex items-center space-x-3 flex-1 min-w-0 ${
-                        isClickable
-                          ? "cursor-pointer hover:opacity-80 transition-opacity"
+                          ? ""
                           : ""
                       }`}
-                      onClick={() => isClickable && handleProfileClick(entry)}
                     >
-                      {/* Profile Image */}
-                      <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                        {entry.displayInfo.image ? (
-                          <Image
-                            src={entry.displayInfo.image}
-                            alt={entry.displayInfo.name}
-                            fill
-                            className="object-cover"
-                            unoptimized={
-                              entry.displayInfo.image.includes(".gif") ||
-                              entry.displayInfo.image.includes(
-                                "imagedelivery.net"
-                              )
-                            }
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 text-white font-semibold text-sm">
-                            {entry.displayInfo.name.charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                      {/* Rank */}
+                      <div
+                        className={`flex items-center justify-center w-6 h-6 font-bold text-sm ${
+                          isCurrentUser
+                            ? "bg-blue-500 text-white"
+                            : isTopThree
+                            ? `${rankColors[entry.rank - 1]} bg-white`
+                            : "text-gray-600 bg-white "
+                        }`}
+                      >
+                        {entry.rank}
                       </div>
 
-                      {/* Name and Address */}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 truncate flex items-center gap-2">
-                          {entry.displayInfo.name}
-                          {isCurrentUser && (
-                            <span className="bg-blue-500 text-white px-2 py-0.5 rounded text-xs font-medium">
-                              You
-                            </span>
+                      {/* Clickable Profile Section */}
+                      <div
+                        className={`flex items-center space-x-3 flex-1 min-w-0 ${
+                          isClickable
+                            ? "cursor-pointer hover:opacity-80 transition-opacity"
+                            : ""
+                        }`}
+                        onClick={() => isClickable && handleProfileClick(entry)}
+                      >
+                        {/* Profile Image */}
+                        <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                          {entry.displayInfo.image ? (
+                            <Image
+                              src={entry.displayInfo.image}
+                              alt={entry.displayInfo.name}
+                              fill
+                              className="object-cover"
+                              unoptimized={
+                                entry.displayInfo.image.includes(".gif") ||
+                                entry.displayInfo.image.includes(
+                                  "imagedelivery.net"
+                                )
+                              }
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 text-white font-semibold text-sm">
+                              {entry.displayInfo.name.charAt(0).toUpperCase()}
+                            </div>
                           )}
                         </div>
-                        <div className="text-xs text-gray-500">
-                          <span className="truncate">
-                            {truncateAddress(entry.address)}
-                          </span>
+
+                        {/* Name and Address */}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 truncate flex items-center gap-2">
+                            {entry.displayInfo.name}
+                            {isCurrentUser && (
+                              <span className="bg-blue-500 text-white px-2 py-0.5 rounded text-xs font-medium">
+                                You
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            <span className="truncate">
+                              {truncateAddress(entry.address)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Footer - Updated with Auth & Claim Flow */}
         <div className="px-4 py-2 border-t border-gray-200 space-y-3">

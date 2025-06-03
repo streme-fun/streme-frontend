@@ -78,6 +78,10 @@ const nextConfig = {
         protocol: "https",
         hostname: "ipfs.decentralized-content.com",
       },
+      {
+        protocol: "https",
+        hostname: "cdn.recaster.org",
+      },
     ],
   },
   async headers() {
