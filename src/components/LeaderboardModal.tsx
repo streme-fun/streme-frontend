@@ -357,12 +357,12 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     if (claimStep === "checking") return "Checking...";
     if (claimStep === "creating-locker" || isCreateLockerPending)
       return "Creating Locker...";
-    if (claimStep === "claiming" || isClaimPending) return "Claiming Points...";
+    if (claimStep === "claiming" || isClaimPending) return "Claiming Stream...";
     if (claimStep === "success") return "✅ Claimed Successfully!";
     if (claimStep === "error") return "Try Again";
 
     if (!userData) return "Loading...";
-    if (userData.points.totalEarned <= 0) return "No Points to Claim";
+    if (userData.points.totalEarned <= 0) return "No Stream to Claim";
 
     return "Claim $SUP Stream";
   };
@@ -610,10 +610,22 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
 
         {/* Success Message */}
         {claimStep === "success" && (
-          <div className="bg-green-100 border border-green-300 rounded-lg p-3 mb-3">
-            <p className="text-green-700 text-sm text-center">
-              🎉 SUP points claimed successfully!
+          <div className="bg-green-100 border border-green-300 rounded-lg p-4 mb-3">
+            <p className="text-green-700 text-sm text-center font-medium mb-3">
+              🎉 $SUP stream claimed successfully!
             </p>
+            <div className="text-center">
+              <p className="text-green-600 text-xs mb-3">
+                Continue earning $SUP by using ecosystem apps, staking, and
+                participating in governance.
+              </p>
+              <button
+                onClick={handleClaimAirdrop}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
+              >
+                View More Earning Opportunities
+              </button>
+            </div>
           </div>
         )}
 
