@@ -76,11 +76,59 @@ export function ConnectPoolButton({
           );
         }
       } else {
-        // Privy Path
+        // Privy Path (updated to match StakeButton pattern)
+        console.log(
+          "ConnectPoolButton: Privy transaction path - debugging wallet lookup:",
+          {
+            userWalletAddress: user?.wallet?.address,
+            availableWallets: wallets?.map((w) => ({
+              address: w.address,
+              type: w.walletClientType,
+            })),
+            walletsLength: wallets?.length,
+          }
+        );
+
         if (!user?.wallet?.address)
           throw new Error("Privy wallet not connected.");
-        const wallet = wallets.find((w) => w.address === user.wallet?.address);
-        if (!wallet) throw new Error("Privy Wallet not found");
+
+        // Wait for wallets to be ready
+        if (!wallets || wallets.length === 0) {
+          throw new Error("Wallets not ready. Please try again in a moment.");
+        }
+
+        let wallet = wallets.find((w) => w.address === user.wallet?.address);
+
+        // Fallback: if exact match fails, try case-insensitive match
+        if (!wallet) {
+          wallet = wallets.find(
+            (w) =>
+              w.address?.toLowerCase() === user.wallet?.address?.toLowerCase()
+          );
+        }
+
+        // Fallback: if still no match and there's only one wallet, use it
+        if (!wallet && wallets.length === 1) {
+          console.warn(
+            "ConnectPoolButton: Using fallback to first available wallet"
+          );
+          wallet = wallets[0];
+        }
+
+        if (!wallet) {
+          console.error(
+            "ConnectPoolButton: Wallet not found in available wallets:",
+            {
+              searchingFor: user.wallet.address,
+              availableAddresses: wallets?.map((w) => w.address),
+            }
+          );
+          throw new Error("Wallet not found. Please reconnect.");
+        }
+
+        // Use the wallet's actual address, not user.wallet.address
+        const walletAddress = wallet.address;
+        if (!walletAddress) throw new Error("Wallet address not available");
 
         const provider = await wallet.getEthereumProvider();
         await provider.request({
@@ -93,7 +141,7 @@ export function ConnectPoolButton({
           params: [
             {
               to: toHex(GDA_FORWARDER),
-              from: toHex(user.wallet.address), // Explicitly use privy address here
+              from: toHex(walletAddress), // Use wallet's actual address
               data: toHex(data),
             },
           ],
