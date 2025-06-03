@@ -35,8 +35,14 @@ export function TokenPageContent() {
   const [tokenLoading, setTokenLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
 
-  const { isSDKLoaded, isMiniAppView, address, isConnected } =
-    useAppFrameLogic();
+  const {
+    isSDKLoaded,
+    isMiniAppView,
+    address,
+    isConnected,
+    promptToAddMiniApp,
+    hasPromptedToAdd,
+  } = useAppFrameLogic();
 
   const router = useRouter();
 
@@ -145,6 +151,25 @@ export function TokenPageContent() {
 
     checkIsCreator();
   }, [address, token, isConnected]);
+
+  // Prompt to add mini app when in mini app view
+  useEffect(() => {
+    if (
+      isMiniAppView &&
+      isSDKLoaded &&
+      !hasPromptedToAdd &&
+      promptToAddMiniApp
+    ) {
+      promptToAddMiniApp();
+    }
+  }, [isMiniAppView, isSDKLoaded, hasPromptedToAdd, promptToAddMiniApp]);
+
+  // Call ready when the component is fully loaded in mini app view
+  useEffect(() => {
+    if (isMiniAppView && isSDKLoaded && !tokenLoading && token) {
+      sdk.actions.ready();
+    }
+  }, [isMiniAppView, isSDKLoaded, tokenLoading, token]);
 
   const handleStakingChange = () => {
     const stakedBalanceElement = document.querySelector(
