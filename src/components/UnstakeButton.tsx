@@ -8,6 +8,9 @@ import { Interface } from "@ethersproject/abi";
 import { sdk } from "@farcaster/frame-sdk";
 import { toast } from "sonner";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
+import { usePostHog } from "posthog-js/react";
+import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
+import { formatUnits } from "viem";
 
 const stakingAbiEthers = [
   "function unstake(address to, uint256 amount)",
@@ -66,6 +69,7 @@ export function UnstakeButton({
   const [unlockTime, setUnlockTime] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const postHog = usePostHog();
 
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
@@ -243,6 +247,17 @@ export function UnstakeButton({
         }
         toast.success("Unstaking successful!", { id: toastId });
       }
+
+      // PostHog event tracking - single location for both paths
+      postHog.capture(POSTHOG_EVENTS.UNSTAKE_SUCCESS, {
+        [ANALYTICS_PROPERTIES.STAKING_ADDRESS]: stakingAddress,
+        [ANALYTICS_PROPERTIES.AMOUNT_WEI]: amount.toString(),
+        [ANALYTICS_PROPERTIES.AMOUNT_FORMATTED]: formatUnits(amount, 18),
+        [ANALYTICS_PROPERTIES.USER_ADDRESS]: effectiveAddress,
+        [ANALYTICS_PROPERTIES.IS_MINI_APP]: isMiniApp || false,
+        [ANALYTICS_PROPERTIES.TRANSACTION_HASH]: unstakeTxHash,
+        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isMiniApp ? "farcaster" : "privy",
+      });
 
       onSuccess?.();
       setIsModalOpen(false);

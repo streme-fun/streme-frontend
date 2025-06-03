@@ -21,6 +21,8 @@ import {
   FLUID_LOCKER_FACTORY_ABI,
   FLUID_LOCKER_ABI,
 } from "@/src/lib/superfluid-contracts";
+import { usePostHog } from "posthog-js/react";
+import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 
 interface Identity {
   walletAddress: string;
@@ -145,6 +147,8 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     },
   });
 
+  const postHog = usePostHog();
+
   useEffect(() => {
     if (sdk && sdk.actions) {
       setIsSDKReady(true);
@@ -177,11 +181,28 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
   useEffect(() => {
     if (isCreateLockerSuccess && createLockerHash) {
       console.log("Locker creation transaction confirmed:", createLockerHash);
+      // Wait a moment then check the contract state
       setTimeout(() => {
         refetchLockerData();
       }, 1000);
+
+      // PostHog event tracking for locker creation
+      postHog.capture(POSTHOG_EVENTS.SUP_LOCKER_CREATED, {
+        [ANALYTICS_PROPERTIES.TRANSACTION_HASH]: createLockerHash,
+        [ANALYTICS_PROPERTIES.USER_ADDRESS]: effectiveAddress,
+        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isMiniAppView
+          ? "farcaster"
+          : "wagmi",
+      });
     }
-  }, [isCreateLockerSuccess, createLockerHash, refetchLockerData]);
+  }, [
+    isCreateLockerSuccess,
+    createLockerHash,
+    refetchLockerData,
+    postHog,
+    effectiveAddress,
+    isMiniAppView,
+  ]);
 
   // Handle locker data updates
   useEffect(() => {
@@ -207,8 +228,29 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
         refreshUserData();
         setClaimStep("idle");
       }, 3000);
+
+      // PostHog event tracking for successful SUP claim
+      postHog.capture(POSTHOG_EVENTS.SUP_CLAIM_SUCCESS, {
+        [ANALYTICS_PROPERTIES.TRANSACTION_HASH]: claimHash,
+        [ANALYTICS_PROPERTIES.USER_ADDRESS]: effectiveAddress,
+        [ANALYTICS_PROPERTIES.SUP_POINTS_AMOUNT]:
+          userData?.points.totalEarned || 0,
+        [ANALYTICS_PROPERTIES.LOCKER_ADDRESS]:
+          userData?.fluidLocker.address || "",
+        [ANALYTICS_PROPERTIES.CLAIM_PROGRAM_ID]: 7692,
+        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isMiniAppView
+          ? "farcaster"
+          : "wagmi",
+      });
     }
-  }, [isClaimSuccess, claimHash]);
+  }, [
+    isClaimSuccess,
+    claimHash,
+    postHog,
+    effectiveAddress,
+    isMiniAppView,
+    userData,
+  ]);
 
   // Handle transaction errors
   useEffect(() => {

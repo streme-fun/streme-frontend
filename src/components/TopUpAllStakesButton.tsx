@@ -8,6 +8,8 @@ import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
 import { sdk } from "@farcaster/frame-sdk";
 import { TopUpStakeSelectionModal } from "./TopUpStakeSelectionModal";
+import { usePostHog } from "posthog-js/react";
+import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 
 // Contract addresses
 const STAKING_MACRO_V2 = "0x5c4b8561363E80EE458D3F0f4F14eC671e1F54Af";
@@ -75,6 +77,7 @@ export function TopUpAllStakesButton({
       balance: bigint;
     }>
   >([]);
+  const postHog = usePostHog();
 
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
@@ -206,6 +209,22 @@ export function TopUpAllStakesButton({
       );
 
       onSuccess?.();
+
+      // PostHog event tracking
+      postHog.capture(POSTHOG_EVENTS.TOP_UP_ALL_STAKES_SUCCESS, {
+        [ANALYTICS_PROPERTIES.TOTAL_TOKENS_COUNT]: selectedStakes.length,
+        [ANALYTICS_PROPERTIES.USER_ADDRESS]: effectiveAddress,
+        [ANALYTICS_PROPERTIES.IS_MINI_APP]: isMiniApp || false,
+        [ANALYTICS_PROPERTIES.TRANSACTION_HASH]: macroTxHash,
+        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isMiniApp ? "farcaster" : "wagmi",
+        token_addresses: selectedStakes
+          .map((stake) => stake.tokenAddress)
+          .join(","),
+        token_symbols: selectedStakes.map((stake) => stake.symbol).join(","),
+        total_balance_wei: selectedStakes
+          .reduce((sum, stake) => sum + stake.balance, 0n)
+          .toString(),
+      });
     } catch (error) {
       console.error("Batch staking operation failed:", error);
       let message = "Failed to complete batch staking operation";

@@ -10,6 +10,9 @@ import { publicClient } from "@/src/lib/viemClient"; // Import the centralized c
 import { toast } from "sonner"; // Added for Mini App placeholder
 import { sdk } from "@farcaster/frame-sdk"; // Added Farcaster SDK
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
+import { usePostHog } from "posthog-js/react"; // Added PostHog hook
+import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics"; // Added analytics constants
+import { formatUnits } from "viem"; // Added for amount formatting
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 
@@ -81,6 +84,7 @@ export function StakeButton({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [balance, setBalance] = useState<bigint>(0n);
   const [isLoading, setIsLoading] = useState(false); // Added for loading state
+  const postHog = usePostHog(); // Added PostHog instance
 
   const effectiveIsConnected =
     farcasterIsConnected ?? (isMiniApp ? false : !!user?.wallet?.address);
@@ -528,6 +532,23 @@ export function StakeButton({
       // Common success path if all transactions succeeded
       await fetchBalance();
       onSuccess?.();
+
+      // PostHog event tracking
+      postHog.capture(POSTHOG_EVENTS.STAKE_SUCCESS, {
+        [ANALYTICS_PROPERTIES.TOKEN_ADDRESS]: tokenAddress,
+        [ANALYTICS_PROPERTIES.STAKING_ADDRESS]: stakingAddress,
+        [ANALYTICS_PROPERTIES.STAKING_POOL_ADDRESS]: stakingPoolAddress,
+        [ANALYTICS_PROPERTIES.TOKEN_SYMBOL]: symbol,
+        [ANALYTICS_PROPERTIES.AMOUNT_WEI]: amount.toString(),
+        [ANALYTICS_PROPERTIES.AMOUNT_FORMATTED]: formatUnits(amount, 18),
+        [ANALYTICS_PROPERTIES.USER_ADDRESS]: effectiveAddress,
+        [ANALYTICS_PROPERTIES.IS_MINI_APP]: isMiniApp || false,
+        [ANALYTICS_PROPERTIES.TRANSACTION_HASH]: stakeTxHash,
+        [ANALYTICS_PROPERTIES.HAS_POOL_CONNECTION]:
+          !!stakingPoolAddress &&
+          stakingPoolAddress !== "0x0000000000000000000000000000000000000000",
+        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isMiniApp ? "farcaster" : "privy",
+      });
     } catch (error: unknown) {
       console.error("StakeButton caught error:", error);
       let message = "Stake operation failed.";

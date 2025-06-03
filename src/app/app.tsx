@@ -14,6 +14,7 @@ import { useAppFrameLogic } from "../hooks/useAppFrameLogic"; // Import the new 
 import { Button } from "../components/ui/button"; // Corrected import path based on file structure
 import { base } from "wagmi/chains"; // Only base needed here now
 import { useRouter } from "next/navigation";
+import { usePostHog } from "posthog-js/react"; // Added PostHog hook
 // import { truncateAddressShort } from "../lib/truncateAddress";
 
 function App() {
@@ -34,7 +35,7 @@ function App() {
     isSDKLoaded,
     isMiniAppView,
     farcasterContext,
-    // address,
+    address,
     isConnected,
     isOnCorrectNetwork,
     connect,
@@ -45,6 +46,38 @@ function App() {
     promptToAddMiniApp,
     hasPromptedToAdd,
   } = useAppFrameLogic(); // Use the hook
+
+  const postHog = usePostHog(); // Use the PostHog hook
+
+  // PostHog user identification when wallet connects
+  useEffect(() => {
+    if (isConnected && address && postHog) {
+      // Identify the user with their wallet address
+      postHog.identify(address, {
+        wallet_address: address,
+        is_mini_app: isMiniAppView,
+        wallet_type: isMiniAppView ? "farcaster" : "wagmi",
+        network_connected: isOnCorrectNetwork,
+        sdk_loaded: isSDKLoaded,
+        // Add Farcaster context if available
+        ...(farcasterContext && {
+          farcaster_user_fid: farcasterContext.user?.fid,
+          farcaster_client_name: farcasterContext.client?.clientFid,
+        }),
+      });
+    } else if (!isConnected && postHog) {
+      // Reset identification when wallet disconnects
+      postHog.reset();
+    }
+  }, [
+    isConnected,
+    address,
+    isMiniAppView,
+    isOnCorrectNetwork,
+    isSDKLoaded,
+    farcasterContext,
+    postHog,
+  ]);
 
   // Debug click handler for logo
   const handleDebugClick = useCallback(() => {

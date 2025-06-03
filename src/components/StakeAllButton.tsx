@@ -7,6 +7,9 @@ import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
 import { sdk } from "@farcaster/frame-sdk";
+import { usePostHog } from "posthog-js/react";
+import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
+import { formatUnits } from "viem";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 // Contract addresses for macro system
@@ -69,6 +72,7 @@ export function StakeAllButton({
   const { address: wagmiAddress } = useAccount();
   const [balance, setBalance] = useState<bigint>(0n);
   const [isLoading, setIsLoading] = useState(false);
+  const postHog = usePostHog();
 
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
@@ -261,6 +265,22 @@ export function StakeAllButton({
       onSuccess?.();
       toast.success(`Successfully staked all ${symbol} tokens!`, {
         id: toastId,
+      });
+
+      // PostHog event tracking
+      postHog.capture(POSTHOG_EVENTS.STAKE_ALL_SUCCESS, {
+        [ANALYTICS_PROPERTIES.TOKEN_ADDRESS]: tokenAddress,
+        [ANALYTICS_PROPERTIES.STAKING_POOL_ADDRESS]: stakingPoolAddress,
+        [ANALYTICS_PROPERTIES.TOKEN_SYMBOL]: symbol,
+        [ANALYTICS_PROPERTIES.AMOUNT_WEI]: balance.toString(),
+        [ANALYTICS_PROPERTIES.AMOUNT_FORMATTED]: formatUnits(balance, 18),
+        [ANALYTICS_PROPERTIES.USER_ADDRESS]: effectiveAddress,
+        [ANALYTICS_PROPERTIES.IS_MINI_APP]: isMiniApp || false,
+        [ANALYTICS_PROPERTIES.TRANSACTION_HASH]: stakeTxHash,
+        [ANALYTICS_PROPERTIES.HAS_POOL_CONNECTION]:
+          !!stakingPoolAddress &&
+          stakingPoolAddress !== "0x0000000000000000000000000000000000000000",
+        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isMiniApp ? "farcaster" : "wagmi",
       });
     } catch (error: unknown) {
       console.error("StakeAllButton caught error:", error);
