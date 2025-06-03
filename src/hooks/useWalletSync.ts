@@ -110,6 +110,13 @@ export function useWalletAddressChange() {
   const lastKnownWalletsHash = useRef<string>("");
   const lastKnownBrowserAccount = useRef<string | null>(null);
 
+  // Rate limiting for wallet requests
+  const lastWalletRequestTime = useRef<number>(0);
+  const walletRequestCache = useRef<string | null>(null);
+  const walletRequestCacheTime = useRef<number>(0);
+  const MIN_REQUEST_INTERVAL = 2000; // Minimum 2 seconds between wallet requests
+  const CACHE_DURATION = 5000; // Cache wallet address for 5 seconds
+
   // Get the effective wallet address (similar to component logic)
   const getEffectiveAddress = useCallback(() => {
     if (!user?.wallet?.address || !wallets || wallets.length === 0) return null;
@@ -133,17 +140,39 @@ export function useWalletAddressChange() {
     return wallets[0]?.address || null;
   }, [wallets]);
 
-  // Get the current browser wallet address
+  // Get the current browser wallet address with rate limiting and caching
   const getBrowserWalletAddress = useCallback(async () => {
     if (typeof window !== "undefined" && window.ethereum) {
+      const now = Date.now();
+
+      // Return cached result if still valid
+      if (
+        walletRequestCache.current &&
+        now - walletRequestCacheTime.current < CACHE_DURATION
+      ) {
+        return walletRequestCache.current;
+      }
+
+      // Rate limit requests
+      if (now - lastWalletRequestTime.current < MIN_REQUEST_INTERVAL) {
+        return walletRequestCache.current;
+      }
+
       try {
+        lastWalletRequestTime.current = now;
         const accounts = await window.ethereum.request({
           method: "eth_accounts",
         });
-        return accounts[0] || null;
+        const address = accounts[0] || null;
+
+        // Cache the result
+        walletRequestCache.current = address;
+        walletRequestCacheTime.current = now;
+
+        return address;
       } catch (error) {
         console.error("Error getting browser wallet address:", error);
-        return null;
+        return walletRequestCache.current; // Return cached value on error
       }
     }
     return null;
@@ -157,8 +186,30 @@ export function useWalletAddressChange() {
   // Manual refresh function that components can call
   const manualRefresh = useCallback(() => {
     console.log("useWalletAddressChange: Manual refresh triggered");
+    // Clear cache on manual refresh
+    walletRequestCache.current = null;
+    walletRequestCacheTime.current = 0;
     triggerRefresh();
   }, [triggerRefresh]);
+
+  // Initialize browser wallet address on first load
+  useEffect(() => {
+    const initializeBrowserWallet = async () => {
+      if (
+        typeof window !== "undefined" &&
+        window.ethereum &&
+        !lastKnownBrowserAccount.current
+      ) {
+        const browserAddress = await getBrowserWalletAddress();
+        if (browserAddress) {
+          lastKnownBrowserAccount.current = browserAddress;
+          console.log("Initialized browser wallet address:", browserAddress);
+        }
+      }
+    };
+
+    initializeBrowserWallet();
+  }, [getBrowserWalletAddress]);
 
   // Watch for changes in the effective address
   useEffect(() => {
@@ -203,36 +254,57 @@ export function useWalletAddressChange() {
     }
   }, [wallets, triggerRefresh]);
 
-  // Watch for browser wallet changes and compare with Privy state
+  // Watch for browser wallet changes and compare with Privy state (reduced frequency)
   useEffect(() => {
     const checkBrowserWallet = async () => {
       const browserAddress = await getBrowserWalletAddress();
-      if (
-        browserAddress &&
-        browserAddress !== lastKnownBrowserAccount.current
-      ) {
-        console.log("Browser wallet address changed:", {
-          from: lastKnownBrowserAccount.current,
-          to: browserAddress,
-        });
-        lastKnownBrowserAccount.current = browserAddress;
 
-        // Check if Privy is out of sync with browser wallet
-        const primaryAddress = getPrimaryWalletAddress();
-        if (primaryAddress?.toLowerCase() !== browserAddress.toLowerCase()) {
-          console.log("Privy out of sync with browser wallet, forcing refresh");
-          triggerRefresh();
+      // Only process if we actually got an address and it's different from what we know
+      if (browserAddress) {
+        const normalizedBrowserAddress = browserAddress.toLowerCase();
+        const normalizedLastKnown =
+          lastKnownBrowserAccount.current?.toLowerCase();
+
+        if (normalizedBrowserAddress !== normalizedLastKnown) {
+          console.log("Browser wallet address changed:", {
+            from: lastKnownBrowserAccount.current,
+            to: browserAddress,
+          });
+          lastKnownBrowserAccount.current = browserAddress;
+
+          // Check if Privy is out of sync with browser wallet
+          const primaryAddress = getPrimaryWalletAddress();
+          if (primaryAddress?.toLowerCase() !== normalizedBrowserAddress) {
+            console.log(
+              "Privy out of sync with browser wallet, forcing refresh"
+            );
+            triggerRefresh();
+          }
         }
       }
     };
 
-    // Check immediately and then periodically
-    checkBrowserWallet();
-    const interval = setInterval(checkBrowserWallet, 1000);
-    return () => clearInterval(interval);
-  }, [getBrowserWalletAddress, getPrimaryWalletAddress, triggerRefresh]);
+    // Only check if we have ethereum provider and wallets
+    if (
+      typeof window !== "undefined" &&
+      window.ethereum &&
+      wallets?.length > 0
+    ) {
+      // Check immediately but don't repeat if there's already a listener
+      checkBrowserWallet();
 
-  // Listen for browser wallet account changes
+      // Reduced frequency: check every 10 seconds instead of every second
+      const interval = setInterval(checkBrowserWallet, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [
+    getBrowserWalletAddress,
+    getPrimaryWalletAddress,
+    triggerRefresh,
+    wallets?.length,
+  ]);
+
+  // Listen for browser wallet account changes (this is more efficient than polling)
   useEffect(() => {
     if (typeof window !== "undefined" && window.ethereum) {
       const handleAccountsChanged = (accounts: string[]) => {
@@ -245,6 +317,9 @@ export function useWalletAddressChange() {
 
         if (accounts.length > 0) {
           lastKnownBrowserAccount.current = accounts[0];
+          // Clear cache when accounts change
+          walletRequestCache.current = accounts[0];
+          walletRequestCacheTime.current = Date.now();
         }
 
         // Trigger refresh after a short delay to allow Privy to update

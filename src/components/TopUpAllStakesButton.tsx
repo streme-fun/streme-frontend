@@ -7,50 +7,24 @@ import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
 import { sdk } from "@farcaster/frame-sdk";
-import { formatUnits } from "viem";
 import { TopUpStakeSelectionModal } from "./TopUpStakeSelectionModal";
 
-const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
+// Contract addresses
+const STAKING_MACRO_V2 = "0x5c4b8561363E80EE458D3F0f4F14eC671e1F54Af";
+const MACRO_FORWARDER = "0xFD0268E33111565dE546af2675351A4b1587F89F";
 
-const gdaABI = [
+// ABIs for the new contracts
+const stakingMacroABI = [
   {
-    inputs: [
-      { name: "pool", type: "address" },
-      { name: "member", type: "address" },
-    ],
-    name: "isMemberConnected",
-    outputs: [{ name: "", type: "bool" }],
+    inputs: [{ name: "tokens", type: "address[]" }],
+    name: "getParams",
+    outputs: [{ name: "", type: "bytes" }],
     stateMutability: "view",
     type: "function",
   },
 ] as const;
-
-const erc20ABI = [
-  {
-    inputs: [
-      { name: "owner", type: "address" },
-      { name: "spender", type: "address" },
-    ],
-    name: "allowance",
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-] as const;
-
-const MAX_UINT256 = BigInt(
-  "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-);
 
 const toHex = (address: string) => address as `0x${string}`;
-
-interface StakeData {
-  tokenAddress: string;
-  stakingAddress: string;
-  stakingPoolAddress: string;
-  symbol: string;
-  balance: bigint;
-}
 
 interface TopUpAllStakesButtonProps {
   stakes: Array<{
@@ -107,213 +81,6 @@ export function TopUpAllStakesButton({
     : !!wagmiAddress;
   const effectiveAddress = isMiniApp ? farcasterAddress : wagmiAddress;
 
-  const checkAllowance = async (
-    tokenAddress: string,
-    stakingAddress: string
-  ) => {
-    if (!effectiveAddress || !effectiveIsConnected) return 0n;
-    try {
-      const allowance = await publicClient.readContract({
-        address: toHex(tokenAddress),
-        abi: erc20ABI,
-        functionName: "allowance",
-        args: [toHex(effectiveAddress!), toHex(stakingAddress)],
-      });
-      return allowance;
-    } catch (error) {
-      console.error("Error checking allowance:", error);
-      return 0n;
-    }
-  };
-
-  const executeStakeOperation = async (
-    stakeData: StakeData,
-    provider: any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    userAddress: string,
-    toastId: string | number,
-    current: number,
-    total: number
-  ) => {
-    const {
-      tokenAddress,
-      stakingAddress,
-      stakingPoolAddress,
-      symbol,
-      balance,
-    } = stakeData;
-
-    if (balance === 0n) {
-      console.log(`Skipping ${symbol} - no balance available`);
-      return;
-    }
-
-    // Update progress
-    setCurrentProgress({ current, total });
-
-    const progressText = `${current}/${total}`;
-    const progressPercentage = Math.round((current / total) * 100);
-
-    toast.loading(
-      `[${progressText}] Processing ${symbol} (${formatUnits(balance, 18).slice(
-        0,
-        8
-      )}...) - ${progressPercentage}% complete`,
-      { id: toastId }
-    );
-
-    // Check and approve if needed
-    const currentAllowance = await checkAllowance(tokenAddress, stakingAddress);
-    if (currentAllowance < balance) {
-      toast.loading(
-        `[${progressText}] Approving ${symbol}... - ${progressPercentage}% complete`,
-        { id: toastId }
-      );
-      const approveIface = new Interface([
-        "function approve(address spender, uint256 amount) external returns (bool)",
-      ]);
-      const approveData = approveIface.encodeFunctionData("approve", [
-        toHex(stakingAddress),
-        MAX_UINT256,
-      ]);
-
-      const approveTxHash = await provider.request({
-        method: "eth_sendTransaction",
-        params: [
-          {
-            to: toHex(tokenAddress),
-            from: toHex(userAddress),
-            data: toHex(approveData),
-          },
-        ],
-      });
-
-      if (!approveTxHash) {
-        throw new Error(`Approval for ${symbol} was cancelled`);
-      }
-
-      const approveReceipt = await publicClient.waitForTransactionReceipt({
-        hash: approveTxHash as `0x${string}`,
-      });
-
-      if (approveReceipt.status !== "success") {
-        throw new Error(`Approval for ${symbol} failed`);
-      }
-    }
-
-    // Execute stake
-    toast.loading(
-      `[${progressText}] Staking ${symbol}... - ${progressPercentage}% complete`,
-      { id: toastId }
-    );
-    const stakeIface = new Interface([
-      "function stake(address to, uint256 amount) external",
-    ]);
-    const stakeData_encoded = stakeIface.encodeFunctionData("stake", [
-      toHex(userAddress),
-      balance,
-    ]);
-
-    const stakeTxParams: Record<string, unknown> = {
-      to: toHex(stakingAddress),
-      from: toHex(userAddress),
-      data: toHex(stakeData_encoded),
-    };
-
-    // Add gas estimation for non-miniApp
-    if (!isMiniApp) {
-      try {
-        const estimatedGas = await publicClient.estimateGas({
-          account: userAddress as `0x${string}`,
-          to: toHex(stakingAddress),
-          data: stakeData_encoded as `0x${string}`,
-        });
-        const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.5));
-        stakeTxParams.gas = `0x${gasLimit.toString(16)}`;
-      } catch {
-        console.warn(
-          `Gas estimation failed for ${symbol}, proceeding without limit`
-        );
-      }
-    }
-
-    const stakeTxHash = await provider.request({
-      method: "eth_sendTransaction",
-      params: [stakeTxParams],
-    });
-
-    if (!stakeTxHash) {
-      throw new Error(`Stake transaction for ${symbol} was cancelled`);
-    }
-
-    const stakeReceipt = await publicClient.waitForTransactionReceipt({
-      hash: stakeTxHash as `0x${string}`,
-    });
-
-    if (stakeReceipt.status !== "success") {
-      throw new Error(`Stake transaction for ${symbol} failed`);
-    }
-
-    // Connect to pool if needed and available
-    if (
-      stakingPoolAddress &&
-      stakingPoolAddress !== "0x0000000000000000000000000000000000000000"
-    ) {
-      try {
-        const connected = await publicClient.readContract({
-          address: toHex(GDA_FORWARDER),
-          abi: gdaABI,
-          functionName: "isMemberConnected",
-          args: [toHex(stakingPoolAddress), toHex(userAddress)],
-        });
-
-        if (!connected) {
-          toast.loading(
-            `[${progressText}] Connecting ${symbol} to reward pool... - ${progressPercentage}% complete`,
-            {
-              id: toastId,
-            }
-          );
-          const gdaIface = new Interface([
-            "function connectPool(address pool, bytes calldata userData) external returns (bool)",
-          ]);
-          const connectData = gdaIface.encodeFunctionData("connectPool", [
-            toHex(stakingPoolAddress),
-            "0x",
-          ]);
-
-          const connectTxHash = await provider.request({
-            method: "eth_sendTransaction",
-            params: [
-              {
-                to: toHex(GDA_FORWARDER),
-                from: toHex(userAddress),
-                data: toHex(connectData),
-              },
-            ],
-          });
-
-          if (connectTxHash) {
-            await publicClient.waitForTransactionReceipt({
-              hash: connectTxHash as `0x${string}`,
-            });
-          }
-        }
-      } catch (poolError) {
-        console.warn(`Pool connection failed for ${symbol}:`, poolError);
-        // Don't fail the entire operation for pool connection issues
-      }
-    }
-
-    // Show individual success with progress
-    toast.success(
-      `[${progressText}] ${symbol} staked successfully! - ${progressPercentage}% complete`,
-      {
-        id: toastId,
-        duration: 2000,
-      }
-    );
-  };
-
   const handleTopUpSelected = async (
     selectedStakes: Array<{
       tokenAddress: string;
@@ -334,18 +101,10 @@ export function TopUpAllStakesButton({
     }
 
     setIsLoading(true);
-    setCurrentProgress({ current: 0, total: 0 });
-    const toastId = toast.loading("Preparing transactions...");
+    setCurrentProgress({ current: 0, total: 1 }); // Just 1 step: execute macro
+    const toastId = toast.loading("Preparing batch operation...");
 
     try {
-      // Initialize progress
-      const totalCount = selectedStakes.length;
-      setCurrentProgress({ current: 0, total: totalCount });
-
-      toast.loading(`Processing ${totalCount} selected token(s)...`, {
-        id: toastId,
-      });
-
       // Get provider
       let provider: any; // eslint-disable-line @typescript-eslint/no-explicit-any
       let userAddress: string;
@@ -372,107 +131,84 @@ export function TopUpAllStakesButton({
         });
       }
 
-      // Execute stakes one by one
-      let successCount = 0;
-      let errorCount = 0;
-      const errors: string[] = [];
-      let wasCancelled = false;
+      // Execute batch operation using MacroForwarder
+      // The macro executes "in first person" and handles everything:
+      // - Checking user balances
+      // - Transferring tokens directly from user
+      // - Staking tokens
+      // - Connecting to reward pools
+      setCurrentProgress({ current: 1, total: 1 });
+      toast.loading("Executing batch staking operation...", { id: toastId });
 
-      for (let i = 0; i < selectedStakes.length; i++) {
-        const stakeData = selectedStakes[i];
-        const currentIndex = i + 1;
+      const tokenAddresses = selectedStakes.map((stake) => stake.tokenAddress);
+      const uniqueTokens = [...new Set(tokenAddresses)];
 
+      // Get encoded parameters from StakingMacroV2
+      const encodedAddresses = await publicClient.readContract({
+        address: toHex(STAKING_MACRO_V2),
+        abi: stakingMacroABI,
+        functionName: "getParams",
+        args: [uniqueTokens.map((addr) => toHex(addr))],
+      });
+
+      // Execute the macro via MacroForwarder
+      // This handles everything in batch "in first person" by the user
+      const macroIface = new Interface([
+        "function runMacro(address macro, bytes calldata params) external",
+      ]);
+      const macroData = macroIface.encodeFunctionData("runMacro", [
+        toHex(STAKING_MACRO_V2),
+        encodedAddresses,
+      ]);
+
+      const macroTxParams: Record<string, unknown> = {
+        to: toHex(MACRO_FORWARDER),
+        from: toHex(userAddress),
+        data: toHex(macroData),
+      };
+
+      // Add gas estimation for non-miniApp
+      if (!isMiniApp) {
         try {
-          await executeStakeOperation(
-            stakeData,
-            provider,
-            userAddress,
-            toastId,
-            currentIndex,
-            totalCount
-          );
-          successCount++;
-        } catch (error) {
-          errorCount++;
-          const errorMessage =
-            error instanceof Error
-              ? error.message
-              : `Failed to stake ${stakeData.symbol}`;
-          errors.push(errorMessage);
-          console.error(`Failed to stake ${stakeData.symbol}:`, error);
-
-          // Check if the error indicates user cancellation
-          const isCancellation =
-            errorMessage.includes("cancelled") ||
-            errorMessage.includes("rejected") ||
-            errorMessage.includes("User rejected") ||
-            errorMessage.includes("hash not received") ||
-            errorMessage.includes("User denied");
-
-          if (isCancellation) {
-            wasCancelled = true;
-            // Show cancellation message and stop processing
-            const progressText = `${currentIndex}/${totalCount}`;
-            toast.error(
-              `[${progressText}] Transaction cancelled - stopping batch operation`,
-              {
-                duration: 3000,
-              }
-            );
-            break; // Exit the loop immediately
-          } else {
-            // Show individual error with progress for non-cancellation errors
-            const progressText = `${currentIndex}/${totalCount}`;
-            const progressPercentage = Math.round(
-              (currentIndex / totalCount) * 100
-            );
-            toast.error(
-              `[${progressText}] Failed to stake ${stakeData.symbol} - ${progressPercentage}% complete`,
-              {
-                duration: 3000,
-              }
-            );
-          }
+          const estimatedGas = await publicClient.estimateGas({
+            account: userAddress as `0x${string}`,
+            to: toHex(MACRO_FORWARDER),
+            data: macroData as `0x${string}`,
+          });
+          const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.5));
+          macroTxParams.gas = `0x${gasLimit.toString(16)}`;
+        } catch {
+          console.warn("Gas estimation failed, proceeding without limit");
         }
-
-        // Update progress after each operation
-        setCurrentProgress({ current: currentIndex, total: totalCount });
       }
 
-      // Final summary
-      if (wasCancelled) {
-        const remainingCount = totalCount - successCount - errorCount;
-        toast.warning(
-          `❌ Batch operation cancelled by user. ${successCount} successful, ${errorCount} failed, ${remainingCount} skipped.`,
-          {
-            id: toastId,
-          }
-        );
-      } else if (successCount > 0 && errorCount === 0) {
-        toast.success(
-          `✅ Successfully topped up all ${successCount} stakes! (100% complete)`,
-          {
-            id: toastId,
-          }
-        );
-      } else if (successCount > 0 && errorCount > 0) {
-        toast.warning(
-          `⚠️ Completed with ${successCount} successes and ${errorCount} failures (100% complete)`,
-          { id: toastId }
-        );
-      } else {
-        toast.error("❌ All stake operations failed (100% complete)", {
-          id: toastId,
-        });
+      const macroTxHash = await provider.request({
+        method: "eth_sendTransaction",
+        params: [macroTxParams],
+      });
+
+      if (!macroTxHash) {
+        throw new Error("Batch staking operation was cancelled");
       }
 
-      // Trigger success callback if at least one stake succeeded
-      if (successCount > 0) {
-        onSuccess?.();
+      const macroReceipt = await publicClient.waitForTransactionReceipt({
+        hash: macroTxHash as `0x${string}`,
+      });
+
+      if (macroReceipt.status !== "success") {
+        throw new Error("Batch staking operation failed");
       }
+
+      // Success!
+      toast.success(
+        `✅ Successfully completed batch staking for ${selectedStakes.length} tokens!`,
+        { id: toastId }
+      );
+
+      onSuccess?.();
     } catch (error) {
-      console.error("Top up selected stakes failed:", error);
-      let message = "Failed to top up stakes";
+      console.error("Batch staking operation failed:", error);
+      let message = "Failed to complete batch staking operation";
 
       if (error instanceof Error) {
         if (
