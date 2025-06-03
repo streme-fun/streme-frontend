@@ -865,7 +865,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
                   />
                 </svg>
               )}
-              {showInfoView ? "SUP Rewards Info" : "SUP Airdrop Leaderboard"}
+              {showInfoView ? "SUP Rewards Info" : "SUP Rewards Leaderboard"}
             </h3>
           </div>
           <div className="flex items-center gap-2">
