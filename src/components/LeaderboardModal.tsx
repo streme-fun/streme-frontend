@@ -6,6 +6,10 @@ import Image from "next/image";
 import { X } from "lucide-react";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { usePrivy } from "@privy-io/react-auth";
+import { useFarcasterAuth } from "../hooks/useFarcasterAuth";
+import { useSupPoints } from "../hooks/useSupPoints";
+import { ClaimPointsFlow } from "./ClaimPointsFlow";
+import { useAccount, useConnect } from "wagmi";
 
 interface Identity {
   walletAddress: string;
@@ -48,14 +52,42 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
   >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showClaimFlow, setShowClaimFlow] = useState(false);
+
+  // Farcaster Authentication
+  const {
+    isAuthenticated,
+    isLoading: authLoading,
+    error: authError,
+    token,
+    signIn,
+  } = useFarcasterAuth();
+
+  // SUP Points Data
+  const {
+    userData,
+    isLoading: pointsLoading,
+    error: pointsError,
+    fetchUserData,
+    clearData: clearPointsData,
+  } = useSupPoints();
+
+  // Wallet connection
+  const { isConnected: isWagmiConnected } = useAccount();
+  const { connect, connectors } = useConnect();
 
   const { user: privyUser } = usePrivy();
-  const { isMiniAppView, address: fcAddress } = useAppFrameLogic();
+  const {
+    isMiniAppView,
+    address: fcAddress,
+    isConnected: isFcConnected,
+  } = useAppFrameLogic();
 
-  // Get effective address based on mini-app context
+  // Get effective address and connection status based on context
   const effectiveAddress = isMiniAppView
     ? fcAddress
     : privyUser?.wallet?.address;
+  const isWalletConnected = isMiniAppView ? isFcConnected : isWagmiConnected;
 
   useEffect(() => {
     if (sdk && sdk.actions) {
@@ -69,8 +101,36 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
   useEffect(() => {
     if (isOpen) {
       fetchLeaderboardData();
+      // Auto-signin when modal opens if not already authenticated
+      if (!isAuthenticated && !authLoading) {
+        handleAutoSignIn();
+      }
     }
   }, [isOpen, effectiveAddress]);
+
+  // Fetch user points data when authentication succeeds
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      fetchUserData(token);
+    } else if (!isAuthenticated) {
+      clearPointsData();
+    }
+  }, [isAuthenticated, token, fetchUserData, clearPointsData]);
+
+  const handleAutoSignIn = async () => {
+    try {
+      console.log("Auto-signing in to Farcaster...");
+      await signIn();
+    } catch (error) {
+      console.warn("Auto sign-in failed, user can manually sign in:", error);
+    }
+  };
+
+  const refreshUserData = async () => {
+    if (token) {
+      await fetchUserData(token);
+    }
+  };
 
   const fetchLeaderboardData = async () => {
     setLoading(true);
@@ -240,6 +300,155 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     }
   };
 
+  const handleClaimClick = async () => {
+    if (!isAuthenticated) {
+      try {
+        await signIn();
+      } catch (error) {
+        console.error("Sign-in failed:", error);
+        return;
+      }
+    }
+    setShowClaimFlow(true);
+  };
+
+  const renderAuthAndClaimSection = () => {
+    // Loading state
+    if (authLoading || pointsLoading) {
+      return (
+        <div className="text-center py-4">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
+          <p className="text-sm text-gray-600">
+            {authLoading ? "Authenticating..." : "Loading points data..."}
+          </p>
+        </div>
+      );
+    }
+
+    // Error state
+    if (authError || pointsError) {
+      return (
+        <div className="text-center py-4">
+          <p className="text-red-600 text-sm mb-2">
+            {authError || pointsError}
+          </p>
+          <button
+            onClick={authError ? signIn : refreshUserData}
+            className="text-blue-600 hover:text-blue-700 text-sm underline"
+          >
+            {authError ? "Try Sign In Again" : "Retry Loading"}
+          </button>
+        </div>
+      );
+    }
+
+    // Not authenticated
+    if (!isAuthenticated) {
+      return (
+        <div className="text-center py-4">
+          <p className="text-gray-600 text-sm mb-3">
+            Sign in with Farcaster to claim SUP points
+          </p>
+          <button
+            onClick={signIn}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm"
+          >
+            🎭 Sign In with Farcaster
+          </button>
+        </div>
+      );
+    }
+
+    // Authenticated but no user data
+    if (!userData) {
+      return (
+        <div className="text-center py-4">
+          <p className="text-gray-600 text-sm">Loading your points data...</p>
+        </div>
+      );
+    }
+
+    // Show claim flow
+    if (showClaimFlow) {
+      return (
+        <div className="py-4">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold text-gray-800">Claim SUP Points</h4>
+            <button
+              onClick={() => setShowClaimFlow(false)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              ← Back
+            </button>
+          </div>
+
+          {/* Wallet Connection Status */}
+          {!isWalletConnected && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+              <div className="text-orange-600 text-sm mb-2">
+                ⚠️ Wallet not connected
+              </div>
+              <button
+                onClick={() =>
+                  connectors[0] && connect({ connector: connectors[0] })
+                }
+                className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+              >
+                Connect Wallet
+              </button>
+            </div>
+          )}
+
+          <ClaimPointsFlow
+            userData={userData}
+            onUserDataUpdate={refreshUserData}
+          />
+        </div>
+      );
+    }
+
+    // Authenticated with data - show summary and claim button
+    return (
+      <div className="py-4">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-green-800">
+                <strong>Your SUP Points:</strong>{" "}
+                {userData.points.totalEarned.toLocaleString()}
+              </p>
+              <p className="text-xs text-green-600">
+                Current Rate: {userData.points.currentRate.toFixed(2)}/day
+              </p>
+            </div>
+            <div className="text-xs text-green-600">
+              {userData.fluidLocker.isCreated
+                ? "✅ Locker Ready"
+                : "🔧 Need Locker"}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex space-x-2">
+          <button
+            onClick={handleClaimClick}
+            className="btn btn-primary flex-1"
+            disabled={userData.points.totalEarned <= 0}
+          >
+            {userData.points.totalEarned <= 0
+              ? "No Points to Claim"
+              : userData.fluidLocker.isCreated
+              ? "Claim SUP Points"
+              : "Create Locker & Claim"}
+          </button>
+          <button onClick={handleClaimAirdrop} className="btn btn-ghost px-3">
+            External Claim
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -390,23 +599,15 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer - Updated with Auth & Claim Flow */}
         <div className="px-4 py-2 border-t border-gray-200 space-y-3">
           <p className="text-xs text-gray-600">
             Launch, ape, and stake on Streme to qualify for the Superfluid $SUP
             airdrop. The hotter your coins, the more you earn.
           </p>
-          <div className="flex space-x-3">
-            <button
-              onClick={handleClaimAirdrop}
-              className="btn btn-primary flex-1"
-            >
-              Claim $SUP Airdrop
-            </button>
-            {/* <button onClick={onClose} className="btn btn-ghost flex-1">
-              Close
-            </button> */}
-          </div>
+
+          {/* Auth and Claim Section */}
+          {renderAuthAndClaimSection()}
         </div>
       </div>
     </div>
