@@ -51,6 +51,7 @@ interface TokenInfoProps {
 export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
   const [rewards, setRewards] = useState<number>(0);
   const [totalStakers, setTotalStakers] = useState<number>(0);
+  const [copySuccess, setCopySuccess] = useState<boolean>(false);
 
   useEffect(() => {
     calculateRewards(
@@ -69,6 +70,16 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
     }, 50);
     return () => clearInterval(interval);
   }, []);
+
+  const handleCopyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(token.contract_address);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy address:", err);
+    }
+  };
 
   return (
     <div
@@ -142,6 +153,60 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
             )}
           </div>
         )}
+      </div>
+
+      {/* Contract Address */}
+      <div className="flex px-1">
+        <div className="min-w-0">
+          <div className="flex items-center">
+            <div className="text-sm opacity-60 mb-1">Contract Address</div>
+
+            <button
+              onClick={handleCopyAddress}
+              className={`btn btn-xs ml-2 transition-all duration-200 ${
+                copySuccess
+                  ? "btn-success text-success-content"
+                  : "btn-ghost hover:btn-outline"
+              }`}
+              title="Copy contract address"
+            >
+              {copySuccess ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
+          <div className="font-mono text-sm break-all">
+            {token.contract_address}
+          </div>
+        </div>
       </div>
 
       {/* Price Row */}

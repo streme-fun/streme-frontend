@@ -273,7 +273,7 @@ ${shareUrl}`;
       : `https://www.geckoterminal.com/base/pools/${token.pool_address}?embed=1&info=0&swaps=0&grayscale=0&light_chart=0`;
 
   return (
-    <div className="max-w-[1440px] mx-auto sm:px-6 lg:px-8 lg:mt-20 pt-8 pb-12">
+    <div className="max-w-[1440px] mx-auto sm:px-6 md:px-8 md:mt-20 pt-8 pb-12">
       {/* Back Arrow Button - Only show in mini app */}
       {isMiniAppView && (
         <div className="mb-4 px-4 sm:px-0">
