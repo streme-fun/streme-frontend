@@ -661,9 +661,6 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
             )}
             {getClaimButtonText()}
           </button>
-          <button onClick={handleClaimAirdrop} className="btn btn-ghost px-3">
-            External Claim
-          </button>
         </div>
       </div>
     );
