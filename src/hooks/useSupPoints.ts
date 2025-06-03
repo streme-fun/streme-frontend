@@ -9,6 +9,7 @@ interface UserPointsData {
     totalEarned: number;
     currentRate: number;
     stackSignedData?: string;
+    signatureTimestamp?: number;
   };
   fluidLocker: {
     address: string | null;

@@ -8,8 +8,19 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { usePrivy } from "@privy-io/react-auth";
 import { useFarcasterAuth } from "../hooks/useFarcasterAuth";
 import { useSupPoints } from "../hooks/useSupPoints";
-import { ClaimPointsFlow } from "./ClaimPointsFlow";
-import { useAccount, useConnect } from "wagmi";
+import {
+  useAccount,
+  useConnect,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useReadContract,
+} from "wagmi";
+import { Address } from "viem";
+import {
+  SUPERFLUID_BASE_CONTRACTS,
+  FLUID_LOCKER_FACTORY_ABI,
+  FLUID_LOCKER_ABI,
+} from "@/src/lib/superfluid-contracts";
 
 interface Identity {
   walletAddress: string;
@@ -45,6 +56,14 @@ interface LeaderboardModalProps {
   onClose: () => void;
 }
 
+type ClaimStep =
+  | "idle"
+  | "checking"
+  | "creating-locker"
+  | "claiming"
+  | "success"
+  | "error";
+
 export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
   const [isSDKReady, setIsSDKReady] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<
@@ -52,7 +71,10 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
   >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showClaimFlow, setShowClaimFlow] = useState(false);
+
+  // Claim flow state
+  const [claimStep, setClaimStep] = useState<ClaimStep>("idle");
+  const [claimError, setClaimError] = useState<string | null>(null);
 
   // Farcaster Authentication
   const {
@@ -76,6 +98,27 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
   const { isConnected: isWagmiConnected } = useAccount();
   const { connect, connectors } = useConnect();
 
+  // Transaction hooks
+  const { writeContract: createLocker, data: createLockerHash } =
+    useWriteContract();
+  const { writeContract: claimPoints, data: claimHash } = useWriteContract();
+
+  const {
+    isLoading: isCreateLockerPending,
+    isSuccess: isCreateLockerSuccess,
+    error: createLockerError,
+  } = useWaitForTransactionReceipt({
+    hash: createLockerHash,
+  });
+
+  const {
+    isLoading: isClaimPending,
+    isSuccess: isClaimSuccess,
+    error: claimTransactionError,
+  } = useWaitForTransactionReceipt({
+    hash: claimHash,
+  });
+
   const { user: privyUser } = usePrivy();
   const {
     isMiniAppView,
@@ -88,6 +131,18 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     ? fcAddress
     : privyUser?.wallet?.address;
   const isWalletConnected = isMiniAppView ? isFcConnected : isWagmiConnected;
+
+  // Check locker status after creation transaction succeeds
+  const { data: lockerData, refetch: refetchLockerData } = useReadContract({
+    address: SUPERFLUID_BASE_CONTRACTS.FLUID_LOCKER_FACTORY,
+    abi: FLUID_LOCKER_FACTORY_ABI,
+    functionName: "getUserLocker",
+    args: effectiveAddress ? [effectiveAddress as Address] : undefined,
+    query: {
+      enabled: !!effectiveAddress && claimStep === "creating-locker",
+      refetchInterval: claimStep === "creating-locker" ? 2000 : false,
+    },
+  });
 
   useEffect(() => {
     if (sdk && sdk.actions) {
@@ -117,6 +172,60 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     }
   }, [isAuthenticated, token, fetchUserData, clearPointsData]);
 
+  // Handle successful locker creation
+  useEffect(() => {
+    if (isCreateLockerSuccess && createLockerHash) {
+      console.log("Locker creation transaction confirmed:", createLockerHash);
+      setTimeout(() => {
+        refetchLockerData();
+      }, 1000);
+    }
+  }, [isCreateLockerSuccess, createLockerHash, refetchLockerData]);
+
+  // Handle locker data updates
+  useEffect(() => {
+    if (lockerData && claimStep === "creating-locker") {
+      const [isCreated, lockerAddress] = lockerData as [boolean, string];
+      if (
+        isCreated &&
+        lockerAddress !== "0x0000000000000000000000000000000000000000"
+      ) {
+        console.log("Locker detected at address:", lockerAddress);
+        setClaimStep("claiming");
+        claimPointsTransaction(lockerAddress);
+      }
+    }
+  }, [lockerData, claimStep]);
+
+  // Handle successful claim
+  useEffect(() => {
+    if (isClaimSuccess && claimHash) {
+      console.log("Claim transaction confirmed:", claimHash);
+      setClaimStep("success");
+      setTimeout(() => {
+        refreshUserData();
+        setClaimStep("idle");
+      }, 3000);
+    }
+  }, [isClaimSuccess, claimHash]);
+
+  // Handle transaction errors
+  useEffect(() => {
+    if (createLockerError) {
+      console.error("Locker creation failed:", createLockerError);
+      setClaimError(`Locker creation failed: ${createLockerError.message}`);
+      setClaimStep("error");
+    }
+  }, [createLockerError]);
+
+  useEffect(() => {
+    if (claimTransactionError) {
+      console.error("Claim transaction failed:", claimTransactionError);
+      setClaimError(`Claim failed: ${claimTransactionError.message}`);
+      setClaimStep("error");
+    }
+  }, [claimTransactionError]);
+
   const handleAutoSignIn = async () => {
     try {
       console.log("Auto-signing in to Farcaster...");
@@ -131,6 +240,139 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
       await fetchUserData(token);
     }
   };
+
+  const startDirectClaimFlow = async () => {
+    if (!effectiveAddress) {
+      setClaimError("Please connect your wallet first");
+      setClaimStep("error");
+      return;
+    }
+
+    if (!userData || userData.points.totalEarned <= 0) {
+      setClaimError(
+        "No points available to claim. Complete Stack tasks to earn SUP points."
+      );
+      setClaimStep("error");
+      return;
+    }
+
+    if (!userData.points.stackSignedData) {
+      setClaimError(
+        "No signed points data available. Please refresh and try again."
+      );
+      setClaimStep("error");
+      return;
+    }
+
+    setClaimStep("checking");
+    setClaimError(null);
+
+    try {
+      if (!userData.fluidLocker.isCreated) {
+        setClaimStep("creating-locker");
+        await createLockerTransaction();
+      } else {
+        setClaimStep("claiming");
+        await claimPointsTransaction(userData.fluidLocker.address!);
+      }
+    } catch (err) {
+      console.error("Claim flow error:", err);
+      setClaimError(
+        err instanceof Error ? err.message : "Unknown error occurred"
+      );
+      setClaimStep("error");
+    }
+  };
+
+  const createLockerTransaction = async () => {
+    try {
+      createLocker({
+        address: SUPERFLUID_BASE_CONTRACTS.FLUID_LOCKER_FACTORY,
+        abi: FLUID_LOCKER_FACTORY_ABI,
+        functionName: "createLockerContract",
+      });
+    } catch (err) {
+      throw new Error(
+        `Failed to create locker: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
+    }
+  };
+
+  const claimPointsTransaction = async (lockerAddress: string) => {
+    if (!userData?.points.stackSignedData) {
+      throw new Error("No signed points data available");
+    }
+
+    try {
+      const rawSignature = userData.points.stackSignedData;
+      const programId = 7692;
+      const totalProgramUnits = userData.points.totalEarned;
+      const nonce = userData.points.signatureTimestamp || 1748439037;
+
+      console.log("Attempting claim with parameters:", {
+        lockerAddress,
+        programId,
+        totalProgramUnits,
+        nonce,
+        signature: rawSignature,
+      });
+
+      claimPoints({
+        address: lockerAddress as Address,
+        abi: FLUID_LOCKER_ABI,
+        functionName: "claim",
+        args: [
+          BigInt(programId),
+          BigInt(totalProgramUnits),
+          BigInt(nonce),
+          rawSignature as `0x${string}`,
+        ],
+      });
+    } catch (err) {
+      console.error("Claim transaction failed:", err);
+      throw new Error(
+        `Failed to claim points: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
+    }
+  };
+
+  const handleClaimClick = async () => {
+    if (!isAuthenticated) {
+      try {
+        await signIn();
+      } catch (error) {
+        console.error("Sign-in failed:", error);
+        return;
+      }
+    } else {
+      await startDirectClaimFlow();
+    }
+  };
+
+  const getClaimButtonText = () => {
+    if (claimStep === "checking") return "Checking...";
+    if (claimStep === "creating-locker" || isCreateLockerPending)
+      return "Creating Locker...";
+    if (claimStep === "claiming" || isClaimPending) return "Claiming Points...";
+    if (claimStep === "success") return "✅ Claimed Successfully!";
+    if (claimStep === "error") return "Try Again";
+
+    if (!userData) return "Loading...";
+    if (userData.points.totalEarned <= 0) return "No Points to Claim";
+
+    return "Claim $SUP Stream";
+  };
+
+  const isClaimLoading =
+    claimStep === "checking" ||
+    claimStep === "creating-locker" ||
+    claimStep === "claiming" ||
+    isCreateLockerPending ||
+    isClaimPending;
 
   const fetchLeaderboardData = async () => {
     setLoading(true);
@@ -300,18 +542,6 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     }
   };
 
-  const handleClaimClick = async () => {
-    if (!isAuthenticated) {
-      try {
-        await signIn();
-      } catch (error) {
-        console.error("Sign-in failed:", error);
-        return;
-      }
-    }
-    setShowClaimFlow(true);
-  };
-
   const renderAuthAndClaimSection = () => {
     // Loading state
     if (authLoading || pointsLoading) {
@@ -347,13 +577,13 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
       return (
         <div className="text-center py-4">
           <p className="text-gray-600 text-sm mb-3">
-            Sign in with Farcaster to claim SUP points
+            Sign in with Farcaster to claim $SUP stream
           </p>
           <button
             onClick={signIn}
             className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm"
           >
-            🎭 Sign In with Farcaster
+            Sign In with Farcaster
           </button>
         </div>
       );
@@ -368,78 +598,56 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
       );
     }
 
-    // Show claim flow
-    if (showClaimFlow) {
-      return (
-        <div className="py-4">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-semibold text-gray-800">Claim SUP Points</h4>
-            <button
-              onClick={() => setShowClaimFlow(false)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              ← Back
-            </button>
-          </div>
-
-          {/* Wallet Connection Status */}
-          {!isWalletConnected && (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
-              <div className="text-orange-600 text-sm mb-2">
-                ⚠️ Wallet not connected
-              </div>
-              <button
-                onClick={() =>
-                  connectors[0] && connect({ connector: connectors[0] })
-                }
-                className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-              >
-                Connect Wallet
-              </button>
-            </div>
-          )}
-
-          <ClaimPointsFlow
-            userData={userData}
-            onUserDataUpdate={refreshUserData}
-          />
-        </div>
-      );
-    }
-
-    // Authenticated with data - show summary and claim button
+    // Authenticated with data - show streamlined claim section
     return (
       <div className="py-4">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-green-800">
-                <strong>Your SUP Points:</strong>{" "}
-                {userData.points.totalEarned.toLocaleString()}
-              </p>
-              <p className="text-xs text-green-600">
-                Current Rate: {userData.points.currentRate.toFixed(2)}/day
-              </p>
-            </div>
-            <div className="text-xs text-green-600">
-              {userData.fluidLocker.isCreated
-                ? "✅ Locker Ready"
-                : "🔧 Need Locker"}
-            </div>
+        {/* Claim Error Display */}
+        {claimStep === "error" && claimError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+            <p className="text-red-600 text-sm">{claimError}</p>
           </div>
-        </div>
+        )}
+
+        {/* Success Message */}
+        {claimStep === "success" && (
+          <div className="bg-green-100 border border-green-300 rounded-lg p-3 mb-3">
+            <p className="text-green-700 text-sm text-center">
+              🎉 SUP points claimed successfully!
+            </p>
+          </div>
+        )}
+
+        {/* Wallet Connection Status */}
+        {!isWalletConnected && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3">
+            <div className="text-orange-600 text-sm mb-2">
+              ⚠️ Wallet not connected
+            </div>
+            <button
+              onClick={() =>
+                connectors[0] && connect({ connector: connectors[0] })
+              }
+              className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+            >
+              Connect Wallet
+            </button>
+          </div>
+        )}
 
         <div className="flex space-x-2">
           <button
             onClick={handleClaimClick}
             className="btn btn-primary flex-1"
-            disabled={userData.points.totalEarned <= 0}
+            disabled={
+              isClaimLoading ||
+              (userData.points.totalEarned <= 0 && claimStep !== "error") ||
+              !isWalletConnected
+            }
           >
-            {userData.points.totalEarned <= 0
-              ? "No Points to Claim"
-              : userData.fluidLocker.isCreated
-              ? "Claim SUP Points"
-              : "Create Locker & Claim"}
+            {isClaimLoading && (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+            )}
+            {getClaimButtonText()}
           </button>
           <button onClick={handleClaimAirdrop} className="btn btn-ghost px-3">
             External Claim
