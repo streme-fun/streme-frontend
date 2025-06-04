@@ -659,8 +659,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
             </p>
             <div className="text-center">
               <p className="text-green-600 text-xs mb-3">
-                Continue earning SUP by using ecosystem apps, staking, and
-                participating in governance.
+                Earn more SUP by using other Superfluid ecosystem apps.
               </p>
               <button
                 onClick={handleClaimAirdrop}
