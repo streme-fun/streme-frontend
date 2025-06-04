@@ -694,24 +694,36 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
         )}
 
         <div className="flex space-x-2">
-          <button
-            onClick={handleClaimClick}
-            className="flex-1 px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-            style={{
-              backgroundColor: "rgb(117, 235, 0)",
-              color: "black",
-            }}
-            disabled={
-              isClaimLoading ||
-              (userData.points.totalEarned <= 0 && claimStep !== "error") ||
-              !isWalletConnected
-            }
-          >
-            {isClaimLoading && (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2 inline-block"></div>
-            )}
-            {getClaimButtonText()}
-          </button>
+          {claimStep === "success" ? (
+            <div
+              className="flex-1 px-6 py-3 rounded-lg font-semibold text-center"
+              style={{
+                backgroundColor: "rgb(117, 235, 0)",
+                color: "black",
+              }}
+            >
+              ✅ Claimed Successfully!
+            </div>
+          ) : (
+            <button
+              onClick={handleClaimClick}
+              className="flex-1 px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              style={{
+                backgroundColor: "rgb(117, 235, 0)",
+                color: "black",
+              }}
+              disabled={
+                isClaimLoading ||
+                (userData.points.totalEarned <= 0 && claimStep !== "error") ||
+                !isWalletConnected
+              }
+            >
+              {isClaimLoading && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2 inline-block"></div>
+              )}
+              {getClaimButtonText()}
+            </button>
+          )}
         </div>
       </div>
     );
