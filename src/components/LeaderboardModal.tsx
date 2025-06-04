@@ -78,6 +78,9 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
   // Claim flow state
   const [claimStep, setClaimStep] = useState<ClaimStep>("idle");
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [processedTransactions, setProcessedTransactions] = useState<
+    Set<string>
+  >(new Set());
 
   // Farcaster Authentication
   const {
@@ -179,8 +182,13 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
 
   // Handle successful locker creation
   useEffect(() => {
-    if (isCreateLockerSuccess && createLockerHash) {
+    if (
+      isCreateLockerSuccess &&
+      createLockerHash &&
+      !processedTransactions.has(createLockerHash)
+    ) {
       console.log("Locker creation transaction confirmed:", createLockerHash);
+      setProcessedTransactions((prev) => new Set(prev).add(createLockerHash));
       // Wait a moment then check the contract state
       setTimeout(() => {
         refetchLockerData();
@@ -198,6 +206,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
   }, [
     isCreateLockerSuccess,
     createLockerHash,
+    processedTransactions,
     refetchLockerData,
     postHog,
     effectiveAddress,
@@ -221,13 +230,10 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
 
   // Handle successful claim
   useEffect(() => {
-    if (isClaimSuccess && claimHash) {
+    if (isClaimSuccess && claimHash && !processedTransactions.has(claimHash)) {
       console.log("Claim transaction confirmed:", claimHash);
+      setProcessedTransactions((prev) => new Set(prev).add(claimHash));
       setClaimStep("success");
-      setTimeout(() => {
-        refreshUserData();
-        setClaimStep("idle");
-      }, 3000);
 
       // PostHog event tracking for successful SUP claim
       postHog.capture(POSTHOG_EVENTS.SUP_CLAIM_SUCCESS, {
@@ -246,10 +252,10 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
   }, [
     isClaimSuccess,
     claimHash,
+    processedTransactions,
     postHog,
     effectiveAddress,
     isMiniAppView,
-    userData,
   ]);
 
   // Handle transaction errors
@@ -275,12 +281,6 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
       await signIn();
     } catch (error) {
       console.warn("Auto sign-in failed, user can manually sign in:", error);
-    }
-  };
-
-  const refreshUserData = async () => {
-    if (token) {
-      await fetchUserData(token);
     }
   };
 
@@ -606,7 +606,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
             {authError || pointsError}
           </p>
           <button
-            onClick={authError ? signIn : refreshUserData}
+            onClick={authError ? signIn : () => token && fetchUserData(token)}
             className="text-blue-600 hover:text-blue-700 text-sm underline"
           >
             {authError ? "Try Sign In Again" : "Retry Loading"}
