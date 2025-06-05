@@ -141,7 +141,7 @@ export function TokenActions({
     effectiveLogin = privyLogin;
   }
 
-  // Enhanced 0x Gasless API integration
+  // Enhanced 0x API integration
   const getGaslessQuote = useCallback(
     async (amount: string, direction: "buy" | "sell") => {
       if (!currentAddress || !amount || parseFloat(amount) <= 0) return null;
@@ -150,20 +150,17 @@ export function TokenActions({
       try {
         let sellToken: string;
         let buyToken: string;
-        let apiEndpoint: string;
 
         if (direction === "buy") {
-          // Use regular API for ETH swaps (buying tokens with ETH)
+          // ETH -> Token swap
           const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
           sellToken = ETH_ADDRESS;
           buyToken = contractAddress;
-          apiEndpoint = "/api/price";
         } else {
-          // Use gasless API for token swaps (selling tokens for ETH)
-          const WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
+          // Token -> ETH swap
+          const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
           sellToken = contractAddress;
-          buyToken = WETH_ADDRESS;
-          apiEndpoint = "/api/gasless/price";
+          buyToken = ETH_ADDRESS;
         }
 
         const sellAmount = parseEther(amount).toString();
@@ -176,7 +173,7 @@ export function TokenActions({
           taker: currentAddress,
         });
 
-        const response = await fetch(`${apiEndpoint}?${params.toString()}`);
+        const response = await fetch(`/api/price?${params.toString()}`);
         if (!response.ok) throw new Error("Failed to get quote");
 
         const data = await response.json();
@@ -208,6 +205,43 @@ export function TokenActions({
 
     return () => clearTimeout(timeoutId);
   }, [tradeAmount, tradeDirection, getGaslessQuote]);
+
+  // Validation for trade amount
+  const getTradeValidation = useCallback(() => {
+    if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
+      return { isValid: true, error: null };
+    }
+
+    const amount = parseFloat(tradeAmount);
+
+    if (tradeDirection === "buy") {
+      const availableEth = Number(ethBalance) / 1e18;
+      if (amount > availableEth) {
+        return {
+          isValid: false,
+          error: `Insufficient ETH balance. You have ${availableEth.toFixed(
+            4
+          )} ETH available.`,
+        };
+      }
+    } else {
+      const availableTokens = Number(balance) / 1e18;
+      if (amount > availableTokens) {
+        return {
+          isValid: false,
+          error: `Insufficient ${
+            token.symbol
+          } balance. You have ${availableTokens.toFixed(6)} ${
+            token.symbol
+          } available.`,
+        };
+      }
+    }
+
+    return { isValid: true, error: null };
+  }, [tradeAmount, tradeDirection, ethBalance, balance, token.symbol]);
+
+  const validation = getTradeValidation();
 
   useEffect(() => {
     const addressToFetch = initialToken.contract_address;
@@ -490,12 +524,7 @@ export function TokenActions({
       } else {
         // For selling, use percentage of token balance
         const tokenAmount = Number(balance) / 1e18;
-        let calculatedAmount = (tokenAmount * percentage) / 100;
-
-        // For 100% selling, apply a small safety buffer to prevent insufficient balance errors
-        if (percentage === 100) {
-          calculatedAmount = calculatedAmount * 0.999; // Use 99.9% to account for small discrepancies
-        }
+        const calculatedAmount = (tokenAmount * percentage) / 100;
 
         return calculatedAmount.toFixed(6);
       }
@@ -603,166 +632,172 @@ export function TokenActions({
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
       <div className="p-6 space-y-4">
         {/* Trading Interface */}
-        {!isEffectivelyMiniApp && (
-          <div className="space-y-4">
-            {/* Buy/Sell Toggle */}
-            <div className="bg-gray-50 rounded-lg p-1 flex">
-              <button
-                onClick={() => setTradeDirection("buy")}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  tradeDirection === "buy"
-                    ? "bg-accent text-white"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
-                }`}
-              >
-                Buy
-              </button>
-              <button
-                onClick={() => setTradeDirection("sell")}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  tradeDirection === "sell"
-                    ? "bg-error text-white"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
-                }`}
-              >
-                Sell
-              </button>
-            </div>
-
-            {/* Available to Trade */}
-            <div className="flex justify-between">
-              <div className="text-sm text-gray-400">Balance</div>
-              <div className="text-sm text-gray-400">
-                {tradeDirection === "buy"
-                  ? `${(Number(ethBalance) / 1e18).toFixed(2)} ETH`
-                  : `${(Number(balance) / 1e18).toFixed(2)} ${token.symbol}`}
-              </div>
-            </div>
-
-            {/* Amount Input */}
-            <div className="space-y-2">
-              {/* <label className="text-sm font-medium text-gray-700">Size</label> */}
-              <div className="relative">
-                <input
-                  type="number"
-                  value={tradeAmount}
-                  onChange={(e) => setTradeAmount(e.target.value)}
-                  placeholder={tradeDirection === "buy" ? "0.001" : ""}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-lg font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  step="0.001"
-                  min="0"
-                />
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                  {tradeDirection === "buy" ? "ETH" : token.symbol}
-                </div>
-              </div>
-
-              {/* Percentage Buttons */}
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {tradeDirection === "buy"
-                  ? // Fixed ETH amounts for buying
-                    [0.001, 0.01, 0.1, 1].map((amount) => (
-                      <button
-                        key={amount}
-                        onClick={() => handleFixedAmountClick(amount)}
-                        className="py-1 px-2 text-xs rounded-md border border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-colors text-gray-500 cursor-pointer"
-                      >
-                        {amount} eth
-                      </button>
-                    ))
-                  : // Percentage buttons for selling
-                    [25, 50, 75, 100].map((percentage) => (
-                      <button
-                        key={percentage}
-                        onClick={() => handlePercentageClick(percentage)}
-                        className="py-1 px-2 text-xs font-medium rounded-md border border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-colors text-gray-500 cursor-pointer"
-                      >
-                        {percentage}%
-                      </button>
-                    ))}
-              </div>
-            </div>
-
-            {/* Quote Display */}
-            {isPriceLoading ? (
-              <div className="text-center text-gray-500">
-                <div className="animate-spin w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full mx-auto"></div>
-                {/* <div className="text-sm mt-1">Getting quote...</div> */}
-              </div>
-            ) : priceQuote && tradeAmount ? (
-              <div className="bg-gray-50 rounded-lg p-3 text-sm">
-                <div className="flex justify-between">
-                  <span>Receive:</span>
-                  <span className="font-semibold">
-                    {(() => {
-                      const amount = Number(priceQuote.buyAmount) / 1e18;
-                      if (tradeDirection === "sell") {
-                        // For selling (receiving ETH), show more decimals if amount is small
-                        if (amount < 0.001) {
-                          return amount.toFixed(8);
-                        } else if (amount < 0.01) {
-                          return amount.toFixed(6);
-                        } else if (amount < 0.1) {
-                          return amount.toFixed(5);
-                        } else {
-                          return amount.toFixed(4);
-                        }
-                      } else {
-                        // For buying (receiving tokens), use standard 3 decimals
-                        return amount.toFixed(3);
-                      }
-                    })()}{" "}
-                    {tradeDirection === "buy" ? token.symbol : "ETH"}
-                  </span>
-                </div>
-              </div>
-            ) : null}
-
-            {/* Action Buttons */}
-            <div className="space-y-2">
-              {/* Swap Button */}
-              <SwapButton
-                tokenAddress={contractAddress as `0x${string}`}
-                direction={tradeDirection}
-                amount={tradeAmount}
-                quote={priceQuote}
-                symbol={token.symbol}
-                onSuccess={() => {
-                  refreshBalances();
-                  // Reset to appropriate default based on trade direction
-                  setTradeAmount(tradeDirection === "buy" ? "0.001" : "");
-                }}
-                isMiniApp={isEffectivelyMiniApp}
-                farcasterAddress={currentAddress}
-                farcasterIsConnected={walletIsConnected}
-                className={`w-full btn ${
-                  tradeDirection === "buy"
-                    ? "border-accent bg-accent/20 text-accent-content hover:bg-accent/30 disabled:!opacity-40 disabled:!border-accent disabled:!bg-accent/5 disabled:!text-accent-content disabled:cursor-not-allowed"
-                    : "border-error bg-error/10 text-error-content hover:bg-error/20 disabled:!opacity-40 disabled:!border-error disabled:!bg-error/10 disabled:!text-error-content disabled:cursor-not-allowed"
-                }`}
-              />
-            </div>
-            {/* Buy & Stake Button (only for buy direction) */}
-            {tradeDirection === "buy" && stakingAddress && (
-              <ZapStakeButton
-                tokenAddress={contractAddress as `0x${string}`}
-                stakingAddress={stakingAddress as `0x${string}`}
-                symbol={token.symbol}
-                onSuccess={() => {
-                  refreshBalances();
-                  onStakingChange();
-                  setTradeAmount("0.001"); // Reset to default ETH amount
-                }}
-                disabled={!stakingAddress}
-                isMiniApp={isEffectivelyMiniApp}
-                farcasterAddress={currentAddress}
-                farcasterIsConnected={walletIsConnected}
-                amount={tradeAmount}
-                className="w-full btn btn-outline relative before:absolute before:inset-0 before:bg-gradient-to-r before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] before:opacity-30 hover:before:opacity-40 border-[#ffa647]/30 hover:border-[#ffa647]/50 shadow-[0_0_5px_rgba(255,166,71,0.3)] hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]"
-              />
-            )}
+        <div className="space-y-4">
+          {/* Buy/Sell Toggle */}
+          <div className="bg-gray-50 rounded-lg p-1 flex">
+            <button
+              onClick={() => setTradeDirection("buy")}
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                tradeDirection === "buy"
+                  ? "bg-accent text-white"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+              }`}
+            >
+              Buy
+            </button>
+            <button
+              onClick={() => setTradeDirection("sell")}
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                tradeDirection === "sell"
+                  ? "bg-error text-white"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+              }`}
+            >
+              Sell
+            </button>
           </div>
-        )}
+
+          {/* Available to Trade */}
+          <div className="flex justify-between">
+            <div className="text-sm text-gray-400">Balance</div>
+            <div className="text-sm text-gray-400">
+              {tradeDirection === "buy"
+                ? `${(Number(ethBalance) / 1e18).toFixed(2)} ETH`
+                : `${(Number(balance) / 1e18).toFixed(2)} ${token.symbol}`}
+            </div>
+          </div>
+
+          {/* Amount Input */}
+          <div className="space-y-2">
+            {/* <label className="text-sm font-medium text-gray-700">Size</label> */}
+            <div className="relative">
+              <input
+                type="number"
+                value={tradeAmount}
+                onChange={(e) => setTradeAmount(e.target.value)}
+                placeholder={tradeDirection === "buy" ? "0.001" : ""}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-lg font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                step="0.001"
+                min="0"
+              />
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                {tradeDirection === "buy" ? "ETH" : token.symbol}
+              </div>
+            </div>
+
+            {/* Percentage Buttons */}
+            <div className="grid grid-cols-4 gap-2 mt-2">
+              {tradeDirection === "buy"
+                ? // Fixed ETH amounts for buying
+                  [0.001, 0.01, 0.1, 1].map((amount) => (
+                    <button
+                      key={amount}
+                      onClick={() => handleFixedAmountClick(amount)}
+                      className="py-1 px-2 text-xs rounded-md border border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-colors text-gray-500 cursor-pointer"
+                    >
+                      {amount} eth
+                    </button>
+                  ))
+                : // Percentage buttons for selling
+                  [25, 50, 75, 100].map((percentage) => (
+                    <button
+                      key={percentage}
+                      onClick={() => handlePercentageClick(percentage)}
+                      className="py-1 px-2 text-xs font-medium rounded-md border border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-colors text-gray-500 cursor-pointer"
+                    >
+                      {percentage}%
+                    </button>
+                  ))}
+            </div>
+          </div>
+
+          {/* Quote Display */}
+          {isPriceLoading ? (
+            <div className="text-center text-gray-500">
+              <div className="animate-spin w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full mx-auto"></div>
+              {/* <div className="text-sm mt-1">Getting quote...</div> */}
+            </div>
+          ) : priceQuote && tradeAmount ? (
+            <div className="bg-gray-50 rounded-lg p-3 text-sm">
+              <div className="flex justify-between">
+                <span>Receive:</span>
+                <span className="font-semibold">
+                  {(() => {
+                    const amount = Number(priceQuote.buyAmount) / 1e18;
+                    if (tradeDirection === "sell") {
+                      // For selling (receiving ETH), show more decimals if amount is small
+                      if (amount < 0.001) {
+                        return amount.toFixed(8);
+                      } else if (amount < 0.01) {
+                        return amount.toFixed(6);
+                      } else if (amount < 0.1) {
+                        return amount.toFixed(5);
+                      } else {
+                        return amount.toFixed(4);
+                      }
+                    } else {
+                      // For buying (receiving tokens), use standard 3 decimals
+                      return amount.toFixed(3);
+                    }
+                  })()}{" "}
+                  {tradeDirection === "buy" ? token.symbol : "ETH"}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Validation Error Display */}
+          {validation.error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
+              {validation.error}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="space-y-2">
+            {/* Swap Button */}
+            <SwapButton
+              tokenAddress={contractAddress as `0x${string}`}
+              direction={tradeDirection}
+              amount={tradeAmount}
+              quote={priceQuote}
+              symbol={token.symbol}
+              onSuccess={() => {
+                refreshBalances();
+                // Reset to appropriate default based on trade direction
+                setTradeAmount(tradeDirection === "buy" ? "0.001" : "");
+              }}
+              isMiniApp={isEffectivelyMiniApp}
+              farcasterAddress={currentAddress}
+              farcasterIsConnected={walletIsConnected}
+              disabled={!validation.isValid}
+              className={`w-full btn ${
+                tradeDirection === "buy"
+                  ? "border-accent bg-accent/20 text-accent-content hover:bg-accent/30 disabled:!opacity-40 disabled:!border-accent disabled:!bg-accent/5 disabled:!text-accent-content disabled:cursor-not-allowed"
+                  : "border-error bg-error/10 text-error-content hover:bg-error/20 disabled:!opacity-40 disabled:!border-error disabled:!bg-error/10 disabled:!text-error-content disabled:cursor-not-allowed"
+              }`}
+            />
+          </div>
+          {/* Buy & Stake Button (only for buy direction) */}
+          {tradeDirection === "buy" && stakingAddress && (
+            <ZapStakeButton
+              tokenAddress={contractAddress as `0x${string}`}
+              stakingAddress={stakingAddress as `0x${string}`}
+              symbol={token.symbol}
+              onSuccess={() => {
+                refreshBalances();
+                onStakingChange();
+                setTradeAmount("0.001"); // Reset to default ETH amount
+              }}
+              disabled={!stakingAddress || !validation.isValid}
+              isMiniApp={isEffectivelyMiniApp}
+              farcasterAddress={currentAddress}
+              farcasterIsConnected={walletIsConnected}
+              amount={tradeAmount}
+              className="w-full btn btn-outline relative before:absolute before:inset-0 before:bg-gradient-to-r before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] before:opacity-30 hover:before:opacity-40 border-[#ffa647]/30 hover:border-[#ffa647]/50 shadow-[0_0_5px_rgba(255,166,71,0.3)] hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]"
+            />
+          )}
+        </div>
         <div className="my-6 h-px bg-gray-100" />
         {/* Staking Actions */}
         {stakingAddress && (
