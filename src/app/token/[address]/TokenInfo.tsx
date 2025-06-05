@@ -139,105 +139,112 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
             <span className="text-sm opacity-60">${token.symbol}</span>
           </div>
         </div>
-        {token.creator && (
-          <div className="flex items-center gap-2 w-full sm:w-auto ml-1">
-            <a
-              href={`https://farcaster.xyz/${token.creator.name}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-base opacity-60 hover:opacity-100 hover:underline flex gap-2 items-center"
-            >
-              <div className="avatar">
-                <div className="w-4 h-4 rounded-full">
-                  <Image
-                    src={
-                      token.creator.profileImage ??
-                      `/avatars/${token.creator.name}.avif`
-                    }
-                    alt={token.creator.name}
-                    width={24}
-                    height={24}
-                  />
-                </div>
-              </div>
-              {token.creator.name}
-            </a>
-            {token.cast_hash && (
-              <a
-                href={`https://farcaster.xyz/${
-                  token.creator.name
-                }/${shortenHash(token.cast_hash)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-primary inline-flex items-center"
-                title="View original cast"
+
+        {/* Top Right Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCopyAddress}
+            className={`btn btn-outline btn-sm transition-all duration-200 ${
+              copySuccess
+                ? "border-success text-success hover:bg-success/10"
+                : "border-primary/10 hover:bg-primary/10"
+            }`}
+            title={copySuccess ? "Address copied!" : "Copy contract address"}
+          >
+            {copySuccess ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
               >
-                <Image
-                  src={FarcasterIcon}
-                  alt="View on Farcaster"
-                  width={14}
-                  height={14}
-                  className="opacity-60 hover:opacity-100"
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
                 />
-              </a>
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                />
+              </svg>
             )}
-          </div>
-        )}
-      </div>
+            {copySuccess ? "Copied!" : "CA"}
+          </button>
 
-      {/* Contract Address */}
-      <div className="flex px-1">
-        <div className="min-w-0">
-          <div className="flex items-center">
-            <div className="text-sm opacity-60 mb-1">Contract Address</div>
-
-            <button
-              onClick={handleCopyAddress}
-              className={`btn btn-xs ml-2 transition-all duration-200 ${
-                copySuccess
-                  ? "btn-ghost text-success-content"
-                  : "btn-ghost hover:btn-outline"
-              }`}
-              title="Copy contract address"
-            >
-              {copySuccess ? (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              )}
-            </button>
-          </div>
-          <div className="font-mono text-xs break-all">
-            {token.contract_address}
-          </div>
+          <button
+            onClick={handleDexscreenerLink}
+            className="btn btn-outline btn-sm border-primary/10 flex items-center gap-2 hover:bg-primary/10"
+            title="View on Dexscreener"
+          >
+            <Image
+              src={DexscreenerIcon}
+              alt="Dexscreener"
+              width={16}
+              height={16}
+            />
+          </button>
         </div>
       </div>
+
+      {/* Creator Information */}
+      {token.creator && (
+        <div className="flex items-center gap-2 ml-1">
+          <a
+            href={`https://farcaster.xyz/${token.creator.name}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-base opacity-60 hover:opacity-100 hover:underline flex gap-2 items-center"
+          >
+            <div className="avatar">
+              <div className="w-4 h-4 rounded-full">
+                <Image
+                  src={
+                    token.creator.profileImage ??
+                    `/avatars/${token.creator.name}.avif`
+                  }
+                  alt={token.creator.name}
+                  width={24}
+                  height={24}
+                />
+              </div>
+            </div>
+            {token.creator.name}
+          </a>
+          {token.cast_hash && (
+            <a
+              href={`https://farcaster.xyz/${token.creator.name}/${shortenHash(
+                token.cast_hash
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-primary inline-flex items-center"
+              title="View original cast"
+            >
+              <Image
+                src={FarcasterIcon}
+                alt="View on Farcaster"
+                width={14}
+                height={14}
+                className="opacity-60 hover:opacity-100"
+              />
+            </a>
+          )}
+        </div>
+      )}
 
       {/* Price Row */}
       <div className="flex items-end justify-between px-1">
@@ -360,19 +367,6 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
               </svg>
             )}
             {shareSuccess ? "Copied!" : "Share Link"}
-          </button>
-
-          <button
-            onClick={handleDexscreenerLink}
-            className="btn btn-outline btn-sm border-primary/10 flex items-center gap-2 hover:bg-primary/10"
-            title="View on Dexscreener"
-          >
-            <Image
-              src={DexscreenerIcon}
-              alt="Dexscreener"
-              width={16}
-              height={16}
-            />
           </button>
         </div>
       )}
