@@ -213,10 +213,11 @@ export function TokenActions({
     }
 
     const amount = parseFloat(tradeAmount);
+    const PRECISION_TOLERANCE = 1e-8; // Small tolerance for floating point comparison
 
     if (tradeDirection === "buy") {
       const availableEth = Number(ethBalance) / 1e18;
-      if (amount > availableEth) {
+      if (amount > availableEth + PRECISION_TOLERANCE) {
         return {
           isValid: false,
           error: `Insufficient ETH balance. You have ${availableEth.toFixed(
@@ -226,7 +227,7 @@ export function TokenActions({
       }
     } else {
       const availableTokens = Number(balance) / 1e18;
-      if (amount > availableTokens) {
+      if (amount > availableTokens + PRECISION_TOLERANCE) {
         return {
           isValid: false,
           error: `Insufficient ${
@@ -524,8 +525,13 @@ export function TokenActions({
       } else {
         // For selling, use percentage of token balance
         const tokenAmount = Number(balance) / 1e18;
-        const calculatedAmount = (tokenAmount * percentage) / 100;
 
+        // Special case for 100% - use exact balance to avoid floating point issues
+        if (percentage === 100) {
+          return tokenAmount.toFixed(6);
+        }
+
+        const calculatedAmount = (tokenAmount * percentage) / 100;
         return calculatedAmount.toFixed(6);
       }
     },
