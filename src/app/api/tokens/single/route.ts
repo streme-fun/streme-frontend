@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       return Response.json({ error: "Address is required" }, { status: 400 });
     }
 
-    console.log(`[API] Fetching token data for: ${address}`);
+    // console.log(`[API] Fetching token data for: ${address}`);
 
     // Fetch single token with retry logic
     const token = await retryWithBackoff(async () => {
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
       return result;
     });
 
-    console.log(`[API] Successfully fetched token: ${token.name || "Unknown"}`);
+    // console.log(`[API] Successfully fetched token: ${token.name || "Unknown"}`);
 
     // Enrich token with data using only Streme API market data
     const enrichedToken = await enrichTokensWithData([token]);

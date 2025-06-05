@@ -165,7 +165,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
               onClick={handleCopyAddress}
               className={`btn btn-xs ml-2 transition-all duration-200 ${
                 copySuccess
-                  ? "btn-success text-success-content"
+                  ? "btn-ghost text-success-content"
                   : "btn-ghost hover:btn-outline"
               }`}
               title="Copy contract address"
@@ -203,7 +203,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
               )}
             </button>
           </div>
-          <div className="font-mono text-sm break-all">
+          <div className="font-mono text-xs break-all">
             {token.contract_address}
           </div>
         </div>

@@ -4,11 +4,11 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { Token } from "@/src/app/types/token";
 import { StakeButton } from "@/src/components/StakeButton";
-import { UniswapModal } from "@/src/components/UniswapModal";
 import { publicClient } from "@/src/lib/viemClient";
 import { UnstakeButton } from "@/src/components/UnstakeButton";
 import { ConnectPoolButton } from "@/src/components/ConnectPoolButton";
 import { ZapStakeButton } from "@/src/components/ZapStakeButton";
+import { SwapButton } from "@/src/components/SwapButton";
 import { Wallet } from "lucide-react";
 import {
   LP_FACTORY_ADDRESS,
@@ -18,8 +18,8 @@ import {
 } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { Button as UiButton } from "@/src/components/ui/button";
-import { useAccount } from "wagmi";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
+import { parseEther } from "viem";
 
 interface TokenActionsProps {
   token: Token;
@@ -42,36 +42,46 @@ export function TokenActions({
   address: addressProp,
   isConnected: isConnectedProp,
 }: TokenActionsProps) {
-  const [isUniswapOpen, setIsUniswapOpen] = useState(false);
   const [token, setToken] = useState(initialToken);
   const [balance, setBalance] = useState<bigint>(BigInt(0));
   const [isConnectedToPool, setIsConnectedToPool] = useState(false);
   const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
+  const [ethBalance, setEthBalance] = useState<bigint>(0n);
+
+  // Trading interface state
+  const [tradeDirection, setTradeDirection] = useState<"buy" | "sell">("buy");
+  const [tradeAmount, setTradeAmount] = useState(""); // Start empty, will be set by useEffect
+  const [priceQuote, setPriceQuote] = useState<{
+    buyAmount: string;
+    sellAmount: string;
+    liquidityAvailable: boolean;
+  } | null>(null);
+  const [isPriceLoading, setIsPriceLoading] = useState(false);
 
   // Create stable references for contract addresses to prevent unnecessary re-renders
   const stakingPoolAddress = useMemo(() => {
     console.log(
       "stakingPoolAddress memoized value changed:",
-      token.staking_pool
+      initialToken.staking_pool
     );
-    return token.staking_pool;
-  }, [token.staking_pool]);
+    return initialToken.staking_pool;
+  }, [initialToken.staking_pool]);
 
   const contractAddress = useMemo(() => {
     console.log(
       "contractAddress memoized value changed:",
-      token.contract_address
+      initialToken.contract_address
     );
-    return token.contract_address;
-  }, [token.contract_address]);
+    return initialToken.contract_address;
+  }, [initialToken.contract_address]);
 
   const stakingAddress = useMemo(() => {
     console.log(
       "stakingAddress memoized value changed:",
-      token.staking_address
+      initialToken.staking_address
     );
-    return token.staking_address;
-  }, [token.staking_address]);
+    return initialToken.staking_address;
+  }, [initialToken.staking_address]);
 
   const {
     isSDKLoaded: fcSDKLoaded,
@@ -80,13 +90,11 @@ export function TokenActions({
     isConnected: fcIsConnected,
     connect: fcConnect,
     connectors: fcConnectors,
-    farcasterContext,
+    // farcasterContext,
   } = useAppFrameLogic();
 
   const { user: privyUser, ready: privyReady, login: privyLogin } = usePrivy();
   const { wallets } = useWallets();
-  const { address: wagmiAddress, isConnected: wagmiIsConnectedGlobal } =
-    useAccount();
   const { refreshTrigger, primaryAddress } = useWalletAddressChange();
 
   // Simplified mini app detection - use the improved detection from useAppFrameLogic
@@ -133,76 +141,79 @@ export function TokenActions({
     effectiveLogin = privyLogin;
   }
 
-  useEffect(() => {
-    // Calculate the same wallet detection logic for debugging
-    const hasPrivyWallet = privyReady && !!privyUser?.wallet?.address;
-    const walletsReady = wallets && wallets.length > 0;
-    const exactWalletMatch =
-      walletsReady &&
-      wallets.some((w) => w.address === privyUser?.wallet?.address);
-    const caseInsensitiveMatch =
-      walletsReady &&
-      wallets.some(
-        (w) =>
-          w.address?.toLowerCase() === privyUser?.wallet?.address?.toLowerCase()
-      );
-    const singleWalletFallback =
-      walletsReady && wallets.length === 1 && hasPrivyWallet;
+  // Enhanced 0x Gasless API integration
+  const getGaslessQuote = useCallback(
+    async (amount: string, direction: "buy" | "sell") => {
+      if (!currentAddress || !amount || parseFloat(amount) <= 0) return null;
 
-    console.log("TokenActions Wallet state:", {
-      isEffectivelyMiniApp,
-      fcSDKLoaded,
-      privyReady,
-      currentAddress,
-      walletIsConnected,
-      detectedMiniAppView,
-      isMiniAppViewProp,
-      fcAddress,
-      fcIsConnected,
-      wagmiAddress,
-      wagmiIsConnectedGlobal,
-      farcasterContext: !!farcasterContext,
-      userAgent: typeof window !== "undefined" ? navigator.userAgent : "SSR",
-      isInIframe:
-        typeof window !== "undefined" ? window !== window.parent : false,
-      privyUserExists: !!privyUser,
-      privyWalletExists: !!privyUser?.wallet,
-      privyWalletAddress: privyUser?.wallet?.address,
-      walletsLength: wallets?.length,
-      walletsAddresses: wallets?.map((w) => w.address),
-      // New debug info for wallet detection
-      hasPrivyWallet,
-      walletsReady,
-      exactWalletMatch,
-      caseInsensitiveMatch,
-      singleWalletFallback,
-      finalWalletConnected:
-        hasPrivyWallet &&
-        walletsReady &&
-        (exactWalletMatch || caseInsensitiveMatch || singleWalletFallback),
-    });
-  }, [
-    isEffectivelyMiniApp,
-    fcSDKLoaded,
-    privyReady,
-    currentAddress,
-    walletIsConnected,
-    detectedMiniAppView,
-    isMiniAppViewProp,
-    fcAddress,
-    fcIsConnected,
-    wagmiAddress,
-    wagmiIsConnectedGlobal,
-    farcasterContext,
-    privyUser,
-    wallets,
-  ]);
+      setIsPriceLoading(true);
+      try {
+        let sellToken: string;
+        let buyToken: string;
+        let apiEndpoint: string;
+
+        if (direction === "buy") {
+          // Use regular API for ETH swaps (buying tokens with ETH)
+          const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+          sellToken = ETH_ADDRESS;
+          buyToken = contractAddress;
+          apiEndpoint = "/api/price";
+        } else {
+          // Use gasless API for token swaps (selling tokens for ETH)
+          const WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
+          sellToken = contractAddress;
+          buyToken = WETH_ADDRESS;
+          apiEndpoint = "/api/gasless/price";
+        }
+
+        const sellAmount = parseEther(amount).toString();
+
+        const params = new URLSearchParams({
+          chainId: "8453",
+          sellToken,
+          buyToken,
+          sellAmount,
+          taker: currentAddress,
+        });
+
+        const response = await fetch(`${apiEndpoint}?${params.toString()}`);
+        if (!response.ok) throw new Error("Failed to get quote");
+
+        const data = await response.json();
+        if (data.liquidityAvailable === false) {
+          throw new Error("No liquidity available for this token pair");
+        }
+
+        return data;
+      } catch (error) {
+        console.error("Quote error:", error);
+        return null;
+      } finally {
+        setIsPriceLoading(false);
+      }
+    },
+    [currentAddress, contractAddress]
+  );
+
+  // Debounced quote fetching
+  useEffect(() => {
+    if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
+      setPriceQuote(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      getGaslessQuote(tradeAmount, tradeDirection).then(setPriceQuote);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [tradeAmount, tradeDirection, getGaslessQuote]);
 
   useEffect(() => {
     const addressToFetch = initialToken.contract_address;
     const fetchTokenData = async () => {
       try {
-        console.log("Fetching token data for:", addressToFetch);
+        // console.log("Fetching token data for:", addressToFetch);
         const response = await fetch(
           `/api/tokens/single?address=${addressToFetch}`
         );
@@ -372,7 +383,7 @@ export function TokenActions({
           functionName: "balanceOf",
           args: [currentAddress as `0x${string}`],
         });
-        setStakedBalance(stakedVal);
+        setStakedBalance(stakedVal as bigint);
       } catch (error) {
         console.error("Error checking staked balance:", error);
       }
@@ -398,7 +409,13 @@ export function TokenActions({
           functionName: "balanceOf",
           args: [currentAddress as `0x${string}`],
         });
-        setBalance(balVal);
+        setBalance(balVal as bigint);
+
+        // Also fetch ETH balance
+        const ethBal = await publicClient.getBalance({
+          address: currentAddress as `0x${string}`,
+        });
+        setEthBalance(ethBal);
       } catch (error) {
         console.error("Error fetching balance:", error);
       }
@@ -425,7 +442,13 @@ export function TokenActions({
         functionName: "balanceOf",
         args: [currentAddress as `0x${string}`],
       });
-      setBalance(balVal);
+      setBalance(balVal as bigint);
+
+      // Also refresh ETH balance
+      const ethBal = await publicClient.getBalance({
+        address: currentAddress as `0x${string}`,
+      });
+      setEthBalance(ethBal);
 
       if (stakingAddress) {
         const stakedVal = await publicClient.readContract({
@@ -442,7 +465,7 @@ export function TokenActions({
           functionName: "balanceOf",
           args: [currentAddress as `0x${string}`],
         });
-        setStakedBalance(stakedVal);
+        setStakedBalance(stakedVal as bigint);
       }
       onStakingChange();
     } catch (error) {
@@ -456,6 +479,59 @@ export function TokenActions({
     onStakingChange,
     refreshTrigger,
   ]);
+
+  // Helper function to calculate amount based on percentage
+  const calculatePercentageAmount = useCallback(
+    (percentage: number) => {
+      if (tradeDirection === "buy") {
+        // For buying, use percentage of ETH balance
+        const ethAmount = Number(ethBalance) / 1e18;
+        return ((ethAmount * percentage) / 100).toFixed(6);
+      } else {
+        // For selling, use percentage of token balance
+        const tokenAmount = Number(balance) / 1e18;
+        let calculatedAmount = (tokenAmount * percentage) / 100;
+
+        // For 100% selling, apply a small safety buffer to prevent insufficient balance errors
+        if (percentage === 100) {
+          calculatedAmount = calculatedAmount * 0.999; // Use 99.9% to account for small discrepancies
+        }
+
+        return calculatedAmount.toFixed(6);
+      }
+    },
+    [tradeDirection, ethBalance, balance]
+  );
+
+  // Handle percentage button clicks
+  const handlePercentageClick = useCallback(
+    (percentage: number) => {
+      const amount = calculatePercentageAmount(percentage);
+      setTradeAmount(amount);
+    },
+    [calculatePercentageAmount]
+  );
+
+  // Handle fixed ETH amount clicks for buying
+  const handleFixedAmountClick = useCallback((amount: number) => {
+    setTradeAmount(amount.toString());
+  }, []);
+
+  // Reset to default amount when switching trade direction
+  useEffect(() => {
+    if (tradeDirection === "buy") {
+      setTradeAmount("0.001"); // Default to 0.001 ETH for buying
+    } else {
+      setTradeAmount(""); // Clear amount for selling
+    }
+  }, [tradeDirection]);
+
+  // Initialize trade amount on component mount
+  useEffect(() => {
+    if (tradeDirection === "buy") {
+      setTradeAmount("0.001");
+    }
+  }, []); // Only run on mount
 
   if (isEffectivelyMiniApp && !fcSDKLoaded) {
     return (
@@ -526,32 +602,169 @@ export function TokenActions({
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
       <div className="p-6 space-y-4">
-        {stakingAddress && (
-          <ZapStakeButton
-            tokenAddress={contractAddress as `0x${string}`}
-            stakingAddress={stakingAddress as `0x${string}`}
-            symbol={token.symbol}
-            onSuccess={() => {
-              refreshBalances();
-              onStakingChange();
-            }}
-            disabled={!stakingAddress}
-            isMiniApp={isEffectivelyMiniApp}
-            farcasterAddress={currentAddress}
-            farcasterIsConnected={walletIsConnected}
-            className="w-full btn btn-outline relative before:absolute before:inset-0 before:bg-gradient-to-r before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] before:opacity-30 hover:before:opacity-40 border-[#ffa647]/30 hover:border-[#ffa647]/50 shadow-[0_0_5px_rgba(255,166,71,0.3)] hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]"
-          />
-        )}
-
+        {/* Trading Interface */}
         {!isEffectivelyMiniApp && (
-          <button
-            className="btn btn-outline border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 w-full"
-            onClick={() => setIsUniswapOpen(true)}
-          >
-            Swap
-          </button>
-        )}
+          <div className="space-y-4">
+            {/* Buy/Sell Toggle */}
+            <div className="bg-gray-50 rounded-lg p-1 flex">
+              <button
+                onClick={() => setTradeDirection("buy")}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  tradeDirection === "buy"
+                    ? "bg-accent text-white"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+                }`}
+              >
+                Buy
+              </button>
+              <button
+                onClick={() => setTradeDirection("sell")}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  tradeDirection === "sell"
+                    ? "bg-error text-white"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+                }`}
+              >
+                Sell
+              </button>
+            </div>
 
+            {/* Available to Trade */}
+            <div className="flex justify-between">
+              <div className="text-sm text-gray-400">Balance</div>
+              <div className="text-sm text-gray-400">
+                {tradeDirection === "buy"
+                  ? `${(Number(ethBalance) / 1e18).toFixed(2)} ETH`
+                  : `${(Number(balance) / 1e18).toFixed(2)} ${token.symbol}`}
+              </div>
+            </div>
+
+            {/* Amount Input */}
+            <div className="space-y-2">
+              {/* <label className="text-sm font-medium text-gray-700">Size</label> */}
+              <div className="relative">
+                <input
+                  type="number"
+                  value={tradeAmount}
+                  onChange={(e) => setTradeAmount(e.target.value)}
+                  placeholder={tradeDirection === "buy" ? "0.001" : ""}
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-lg font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  step="0.001"
+                  min="0"
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                  {tradeDirection === "buy" ? "ETH" : token.symbol}
+                </div>
+              </div>
+
+              {/* Percentage Buttons */}
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {tradeDirection === "buy"
+                  ? // Fixed ETH amounts for buying
+                    [0.001, 0.01, 0.1, 1].map((amount) => (
+                      <button
+                        key={amount}
+                        onClick={() => handleFixedAmountClick(amount)}
+                        className="py-1 px-2 text-xs rounded-md border border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-colors text-gray-500 cursor-pointer"
+                      >
+                        {amount} eth
+                      </button>
+                    ))
+                  : // Percentage buttons for selling
+                    [25, 50, 75, 100].map((percentage) => (
+                      <button
+                        key={percentage}
+                        onClick={() => handlePercentageClick(percentage)}
+                        className="py-1 px-2 text-xs font-medium rounded-md border border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-colors text-gray-500 cursor-pointer"
+                      >
+                        {percentage}%
+                      </button>
+                    ))}
+              </div>
+            </div>
+
+            {/* Quote Display */}
+            {isPriceLoading ? (
+              <div className="text-center text-gray-500">
+                <div className="animate-spin w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full mx-auto"></div>
+                {/* <div className="text-sm mt-1">Getting quote...</div> */}
+              </div>
+            ) : priceQuote && tradeAmount ? (
+              <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                <div className="flex justify-between">
+                  <span>Receive:</span>
+                  <span className="font-semibold">
+                    {(() => {
+                      const amount = Number(priceQuote.buyAmount) / 1e18;
+                      if (tradeDirection === "sell") {
+                        // For selling (receiving ETH), show more decimals if amount is small
+                        if (amount < 0.001) {
+                          return amount.toFixed(8);
+                        } else if (amount < 0.01) {
+                          return amount.toFixed(6);
+                        } else if (amount < 0.1) {
+                          return amount.toFixed(5);
+                        } else {
+                          return amount.toFixed(4);
+                        }
+                      } else {
+                        // For buying (receiving tokens), use standard 3 decimals
+                        return amount.toFixed(3);
+                      }
+                    })()}{" "}
+                    {tradeDirection === "buy" ? token.symbol : "ETH"}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Action Buttons */}
+            <div className="space-y-2">
+              {/* Swap Button */}
+              <SwapButton
+                tokenAddress={contractAddress as `0x${string}`}
+                direction={tradeDirection}
+                amount={tradeAmount}
+                quote={priceQuote}
+                symbol={token.symbol}
+                onSuccess={() => {
+                  refreshBalances();
+                  // Reset to appropriate default based on trade direction
+                  setTradeAmount(tradeDirection === "buy" ? "0.001" : "");
+                }}
+                isMiniApp={isEffectivelyMiniApp}
+                farcasterAddress={currentAddress}
+                farcasterIsConnected={walletIsConnected}
+                className={`w-full btn ${
+                  tradeDirection === "buy"
+                    ? "border-accent bg-accent/20 text-accent-content hover:bg-accent/30 disabled:!opacity-40 disabled:!border-accent disabled:!bg-accent/5 disabled:!text-accent-content disabled:cursor-not-allowed"
+                    : "border-error bg-error/10 text-error-content hover:bg-error/20 disabled:!opacity-40 disabled:!border-error disabled:!bg-error/10 disabled:!text-error-content disabled:cursor-not-allowed"
+                }`}
+              />
+            </div>
+            {/* Buy & Stake Button (only for buy direction) */}
+            {tradeDirection === "buy" && stakingAddress && (
+              <ZapStakeButton
+                tokenAddress={contractAddress as `0x${string}`}
+                stakingAddress={stakingAddress as `0x${string}`}
+                symbol={token.symbol}
+                onSuccess={() => {
+                  refreshBalances();
+                  onStakingChange();
+                  setTradeAmount("0.001"); // Reset to default ETH amount
+                }}
+                disabled={!stakingAddress}
+                isMiniApp={isEffectivelyMiniApp}
+                farcasterAddress={currentAddress}
+                farcasterIsConnected={walletIsConnected}
+                amount={tradeAmount}
+                className="w-full btn btn-outline relative before:absolute before:inset-0 before:bg-gradient-to-r before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] before:opacity-30 hover:before:opacity-40 border-[#ffa647]/30 hover:border-[#ffa647]/50 shadow-[0_0_5px_rgba(255,166,71,0.3)] hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]"
+              />
+            )}
+          </div>
+        )}
+        <div className="my-6 h-px bg-gray-100" />
+        {/* Staking Actions */}
         {stakingAddress && (
           <StakeButton
             tokenAddress={contractAddress as `0x${string}`}
@@ -584,15 +797,6 @@ export function TokenActions({
           farcasterAddress={currentAddress}
           farcasterIsConnected={walletIsConnected}
         />
-
-        {!isEffectivelyMiniApp && (
-          <UniswapModal
-            isOpen={isUniswapOpen}
-            onClose={() => setIsUniswapOpen(false)}
-            tokenAddress={contractAddress}
-            symbol={token.symbol}
-          />
-        )}
 
         {/* Pool Connection Status Indicator */}
         {stakingPoolAddress && (

@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const res = await fetch(
-      `https://api.0x.org/swap/permit2/quote?${searchParams}`,
+      `https://api.0x.org/gasless/quote?${searchParams}`,
       {
         headers: {
           "0x-api-key": process.env.ZEROX_API_KEY as string,
@@ -16,9 +16,9 @@ export async function GET(request: NextRequest) {
 
     if (!res.ok) {
       const errorData = await res.text();
-      console.error("0x API quote error:", res.status, errorData);
+      console.error("0x Gasless API quote error:", res.status, errorData);
       return Response.json(
-        { error: `0x API error: ${res.statusText}` },
+        { error: `0x Gasless API error: ${res.statusText}` },
         { status: res.status }
       );
     }
@@ -26,17 +26,17 @@ export async function GET(request: NextRequest) {
     const data = await res.json();
 
     console.log(
-      "quote api",
-      `https://api.0x.org/swap/permit2/quote?${searchParams}`
+      "gasless quote api",
+      `https://api.0x.org/gasless/quote?${searchParams}`
     );
 
-    console.log("quote data", JSON.stringify(data, null, 2));
+    console.log("gasless quote data", JSON.stringify(data, null, 2));
 
     return Response.json(data);
   } catch (error) {
-    console.error("Quote API error:", error);
+    console.error("Gasless quote API error:", error);
     return Response.json(
-      { error: "Failed to fetch quote data" },
+      { error: "Failed to fetch gasless quote" },
       { status: 500 }
     );
   }

@@ -77,7 +77,7 @@ export async function fetchTokenFromStreme(
 
   try {
     const normalizedAddress = address.toLowerCase();
-    console.log("Fetching token data for:", normalizedAddress);
+    // console.log("Fetching token data for:", normalizedAddress);
 
     // Add timeout to external API call
     const controller = new AbortController();
@@ -97,7 +97,7 @@ export async function fetchTokenFromStreme(
       clearTimeout(timeoutId);
     });
 
-    console.log(`External API response status: ${response.status}`);
+    // console.log(`External API response status: ${response.status}`);
 
     // Handle different response statuses more explicitly
     if (response.status >= 500) {

@@ -279,7 +279,7 @@ ${shareUrl}`;
         <div className="mb-4 px-4 sm:px-0">
           <button
             onClick={() => router.push("/")}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
           >
             <svg
               className="w-4 h-4"

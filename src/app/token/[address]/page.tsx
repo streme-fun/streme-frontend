@@ -99,8 +99,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://streme.fun";
 
     // Add more specific logging
-    console.log(`[Metadata] Generating metadata for token: ${address}`);
-    console.log(`[Metadata] Using base URL: ${baseUrl}`);
+    // console.log(`[Metadata] Generating metadata for token: ${address}`);
+    // console.log(`[Metadata] Using base URL: ${baseUrl}`);
 
     // Check cache first
     const cachedToken = getCachedData(address);
@@ -119,7 +119,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         }
       );
 
-      console.log(`[Metadata] API response status: ${response.status}`);
+      // console.log(`[Metadata] API response status: ${response.status}`);
 
       if (!response.ok) {
         console.warn(
@@ -129,7 +129,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       }
 
       const data = await response.json();
-      console.log(`[Metadata] API response data:`, data ? "received" : "empty");
+      // console.log(`[Metadata] API response data:`, data ? "received" : "empty");
 
       token = data.data;
 
@@ -144,9 +144,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       setCachedData(address, token);
     }
 
-    console.log(
-      `[Metadata] Successfully loaded token: ${token.name} (${token.symbol})`
-    );
+    // console.log(
+    //   `[Metadata] Successfully loaded token: ${token.name} (${token.symbol})`
+    // );
 
     // Remove the formatPrice function and simplify title generation
     const title = `${token.name} (${token.symbol}) - Streme`;
@@ -159,7 +159,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const imageUrl = `${baseUrl}/api/token/${address}/image`;
     const pageUrl = `${baseUrl}/token/${address}`;
 
-    console.log(`[Frame Debug] Token: ${token.name}, Image URL: ${imageUrl}`);
+    // console.log(`[Frame Debug] Token: ${token.name}, Image URL: ${imageUrl}`);
 
     // Create the Farcaster Frame Embed object
     const frameEmbed = {

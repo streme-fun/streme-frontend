@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useWallets, usePrivy } from "@privy-io/react-auth";
 import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
@@ -8,7 +8,7 @@ import { Interface } from "@ethersproject/abi";
 import { Modal } from "./Modal";
 import { Zap } from "lucide-react";
 import { publicClient } from "@/src/lib/viemClient";
-import { sdk } from "@farcaster/frame-sdk"; // Added Farcaster SDK
+import { sdk } from "@farcaster/frame-sdk";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
 const WETH = "0x4200000000000000000000000000000000000006";
@@ -24,6 +24,7 @@ interface ZapStakeButtonProps {
   isMiniApp?: boolean;
   farcasterAddress?: string;
   farcasterIsConnected?: boolean;
+  amount?: string;
 }
 
 export function ZapStakeButton({
@@ -36,15 +37,16 @@ export function ZapStakeButton({
   isMiniApp,
   farcasterAddress,
   farcasterIsConnected,
+  amount: externalAmount,
 }: ZapStakeButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [amountIn, setAmountIn] = useState("0.001"); // Default 0.001 ETH
-  const [ethBalance, setEthBalance] = useState<bigint>(0n);
-  const [errorMessage, setErrorMessage] = useState<string>("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const { wallets } = useWallets();
   const { user } = usePrivy();
-  const { refreshTrigger, primaryAddress } = useWalletAddressChange();
+  const { primaryAddress } = useWalletAddressChange();
+
+  // Use external amount if provided, otherwise default to "0.001"
+  const amountIn = externalAmount || "0.001";
 
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
@@ -53,83 +55,28 @@ export function ZapStakeButton({
     ? farcasterAddress
     : primaryAddress || user?.wallet?.address;
 
-  // Fetch ETH balance
-  useEffect(() => {
-    const fetchBalances = async () => {
-      if (!effectiveAddress || !effectiveIsConnected) {
-        setEthBalance(0n);
-        return;
-      }
-
-      try {
-        const eth = await publicClient.getBalance({
-          address: toHex(effectiveAddress),
-        });
-        setEthBalance(eth);
-      } catch (error) {
-        console.error("Error fetching ETH balance:", error);
-        setEthBalance(0n);
-      }
-    };
-
-    fetchBalances();
-    const interval = setInterval(fetchBalances, 10000);
-    return () => clearInterval(interval);
-  }, [effectiveAddress, effectiveIsConnected, refreshTrigger]);
-
   // Validate amount and check if transaction would be possible
-  const { isValid, validationError } = useMemo(() => {
+  const { isValid } = useMemo(() => {
     if (!effectiveIsConnected) {
-      return { isValid: false, validationError: "Wallet not connected" };
+      return { isValid: false };
     }
     if (!effectiveAddress) {
-      // Should not happen if effectiveIsConnected is true, but as a safeguard
-      return { isValid: false, validationError: "Wallet address not found" };
+      return { isValid: false };
     }
 
     const amount = parseFloat(amountIn);
     if (isNaN(amount) || amount <= 0) {
-      return { isValid: false, validationError: "Invalid amount" };
+      return { isValid: false };
     }
 
-    try {
-      const amountInWei = parseEther(amountIn);
-      const estimatedGasCostForValidation = 300000n * parseEther("0.000000001"); // Basic gas estimate for UI validation
-      const totalCostForValidation =
-        amountInWei + estimatedGasCostForValidation;
-
-      if (totalCostForValidation > ethBalance) {
-        const maxAmount = Math.max(
-          0,
-          Number(
-            formatEther(
-              ethBalance > estimatedGasCostForValidation
-                ? ethBalance - estimatedGasCostForValidation
-                : 0n
-            )
-          )
-        );
-        return {
-          isValid: false,
-          validationError: `Not enough ETH. You can zap a maximum of ${maxAmount.toFixed(
-            4
-          )} ETH (after estimated gas cost).`,
-        };
-      }
-
-      return { isValid: true, validationError: "" };
-    } catch {
-      return { isValid: false, validationError: "Invalid amount" };
-    }
-  }, [amountIn, ethBalance, effectiveIsConnected, effectiveAddress]);
-
-  useEffect(() => {
-    setErrorMessage(validationError);
-  }, [validationError]);
+    // For validation purposes, we'll assume it's valid since we don't have balance here
+    // The actual validation will happen in the transaction
+    return { isValid: true };
+  }, [amountIn, effectiveIsConnected, effectiveAddress]);
 
   const handleZapStake = async () => {
     if (!isValid || !effectiveAddress || !effectiveIsConnected) {
-      toast.error(validationError || "Wallet not connected or address missing");
+      toast.error("Wallet not connected or address missing");
       return;
     }
     setIsLoading(true);
@@ -308,7 +255,15 @@ export function ZapStakeButton({
         );
       }
 
-      toast.success("Zap & Stake successful!", { id: toastId });
+      // Enhanced success message with amount details
+      const ethAmount = parseFloat(amountIn).toFixed(4);
+      toast.success(
+        `⚡ Buy & Stake Complete! Purchased and staked ${symbol} with ${ethAmount} ETH`,
+        {
+          id: toastId,
+          duration: 5000,
+        }
+      );
       setShowSuccessModal(true);
       onSuccess?.();
     } catch (error: unknown) {
@@ -363,48 +318,20 @@ export function ZapStakeButton({
 
   return (
     <>
-      <div className="flex flex-col gap-2">
-        <div className="flex justify-between text-sm">
-          <div className="text-gray-400">
-            Balance: {Number(formatEther(ethBalance)).toFixed(4)} ETH
-          </div>
-        </div>
-        <div className="flex flex-col gap-2">
-          <div className="relative flex-1">
-            <input
-              type="number"
-              value={amountIn}
-              onChange={(e) => setAmountIn(e.target.value)}
-              min="0"
-              step="0.001"
-              placeholder="0.001"
-              className={`input input-bordered w-full pr-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                !isValid && amountIn ? "input-error" : ""
-              }`}
-            />
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
-              ETH
-            </div>
-          </div>
-          {errorMessage && (
-            <div className="text-sm text-error">{errorMessage}</div>
-          )}
-          <button
-            onClick={handleZapStake}
-            disabled={disabled || isLoading || !isValid}
-            className={className}
-          >
-            {isLoading ? (
-              "Processing..."
-            ) : (
-              <span className="flex items-center gap-1">
-                <Zap size={16} />
-                Buy & Stake
-              </span>
-            )}
-          </button>
-        </div>
-      </div>
+      <button
+        onClick={handleZapStake}
+        disabled={disabled || isLoading || !isValid}
+        className={className}
+      >
+        {isLoading ? (
+          "Processing..."
+        ) : (
+          <span className="flex items-center gap-1">
+            <Zap size={16} />
+            Buy & Stake
+          </span>
+        )}
+      </button>
 
       {/* Success Modal */}
       {showSuccessModal && (
@@ -413,7 +340,13 @@ export function ZapStakeButton({
           onClose={() => setShowSuccessModal(false)}
         >
           <div className="p-4 space-y-3">
-            <h3 className="text-lg font-bold">Buy & Stake Successful! 🎉</h3>
+            <h3 className="text-lg font-bold">⚡ Buy & Stake Complete! 🎉</h3>
+            <div className="text-center mb-3">
+              <p className="text-sm text-gray-600">
+                Purchased and staked {symbol} with{" "}
+                {parseFloat(amountIn).toFixed(4)} ETH
+              </p>
+            </div>
             <div className="relative h-24 w-full overflow-hidden rounded-lg">
               <svg
                 width="100%"
@@ -489,12 +422,7 @@ export function ZapStakeButton({
               Successfully staked {symbol}. Token rewards are now being streamed
               directly to your wallet.
             </p>
-            <a
-              href={`https://explorer.superfluid.finance/base-mainnet/accounts/${effectiveAddress}?tab=pools`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-accent w-full"
-            >
+            <a href={`/tokens`} className="btn btn-accent w-full">
               Manage Stakes
             </a>
             <button
