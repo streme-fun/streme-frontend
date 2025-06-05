@@ -122,6 +122,7 @@ const BLACKLISTED_TOKENS = [
   "0x1BA8603DA702602A8657980e825A6DAa03Dee93a",
   "0xfe2224bd9c4aFf648F93B036172444C533DbF116",
   "0xd04383398dd2426297da660f9cca3d439af9ce1b",
+  "0x7ef392131c3ab326016cf7b560f96c91f4f9d4fa",
 ].map((addr) => addr.toLowerCase());
 
 export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
