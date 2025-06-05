@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { publicClient } from "@/src/lib/viemClient";
 import { sdk } from "@farcaster/frame-sdk";
 import { useWalletClient } from "wagmi";
+import confetti from "canvas-confetti";
 
 interface SwapButtonProps {
   tokenAddress: string;
@@ -50,6 +51,16 @@ export function SwapButton({
     ? farcasterAddress
     : walletClient?.account?.address;
 
+  // Confetti function for celebrations
+  const triggerConfetti = () => {
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ["#ff75c3", "#ffa647", "#ffe83f", "#9f7aea", "#4fd1c7"],
+    });
+  };
+
   const performSwap = async () => {
     if (!effectiveAddress || !effectiveIsConnected || !amount || !quote) {
       toast.error("Missing required data for swap");
@@ -57,7 +68,18 @@ export function SwapButton({
     }
 
     setIsLoading(true);
-    const toastId = toast.loading("Processing swap...");
+    const toastId = toast.loading(
+      direction === "buy"
+        ? `Preparing to buy ${symbol}...`
+        : `Preparing to sell ${symbol}...`,
+      {
+        style: {
+          background: "linear-gradient(135deg, #e0f2fe 0%, #f3e8ff 100%)",
+          border: "1px solid #0ea5e9",
+          borderRadius: "8px",
+        },
+      }
+    );
 
     try {
       await performRegularSwap(toastId);
@@ -71,9 +93,11 @@ export function SwapButton({
           errorMessage.includes("User rejected") ||
           errorMessage.includes("cancelled")
         ) {
-          message = "Transaction rejected by user.";
+          message = "Transaction cancelled by user.";
         } else if (errorMessage.includes("Insufficient")) {
           message = errorMessage;
+        } else if (errorMessage.includes("liquidity")) {
+          message = "Insufficient liquidity available for this trade.";
         } else {
           message = errorMessage.substring(0, 100);
         }
@@ -196,13 +220,39 @@ export function SwapButton({
       const requiredAllowance = BigInt(sellAmount);
 
       if (currentAllowance < requiredAllowance) {
-        toast.loading("Approving token spending...", { id: toastId });
+        toast.loading("🔐 Approving token spending...", {
+          id: toastId,
+          style: {
+            background: "linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%)",
+            border: "1px solid #f59e0b",
+            borderRadius: "8px",
+          },
+        });
         await checkAndSetAllowance(allowanceIssue.spender, sellAmount);
-        toast.loading("Approval confirmed, preparing swap...", { id: toastId });
+        toast.loading("✅ Token approval confirmed! Preparing swap...", {
+          id: toastId,
+          style: {
+            background: "linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%)",
+            border: "1px solid #22c55e",
+            borderRadius: "8px",
+          },
+        });
       }
     }
 
-    toast.loading("Please sign the transaction...", { id: toastId });
+    toast.loading(
+      direction === "buy"
+        ? "✍️ Please sign the purchase transaction..."
+        : "✍️ Please sign the sale transaction...",
+      {
+        id: toastId,
+        style: {
+          background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
+          border: "1px solid #0ea5e9",
+          borderRadius: "8px",
+        },
+      }
+    );
 
     let transactionData = quoteData.transaction.data;
 
@@ -224,7 +274,19 @@ export function SwapButton({
       ]);
     }
 
-    toast.loading("Executing swap...", { id: toastId });
+    toast.loading(
+      direction === "buy"
+        ? `⚡ Executing purchase of ${symbol}...`
+        : `⚡ Executing sale of ${symbol}...`,
+      {
+        id: toastId,
+        style: {
+          background: "linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%)",
+          border: "1px solid #f59e0b",
+          borderRadius: "8px",
+        },
+      }
+    );
 
     let txHash: `0x${string}`;
 
@@ -257,30 +319,49 @@ export function SwapButton({
       });
     }
 
-    toast.loading("Waiting for confirmation...", { id: toastId });
+    toast.loading("Confirming transaction on blockchain...", {
+      id: toastId,
+      style: {
+        background: "linear-gradient(135deg, #fef3c7 0%, #ddd6fe 100%)",
+        border: "1px solid #a78bfa",
+        borderRadius: "8px",
+      },
+    });
     await publicClient.waitForTransactionReceipt({ hash: txHash });
-
-    // Enhanced success message with details
-    const inputAmount = parseFloat(amount).toFixed(4);
-    const outputAmount = quote
-      ? (Number(quote.buyAmount) / 1e18).toFixed(6)
-      : "0";
 
     if (direction === "buy") {
       toast.success(
-        `🎉 Purchase Complete! Bought ${outputAmount} ${symbol} for ${inputAmount} ETH`,
-        {
-          id: toastId,
-          duration: 5000,
-        }
+        `🎉 Purchase Successful!\n` +
+          {
+            id: toastId,
+            duration: 8000,
+            style: {
+              minWidth: "320px",
+              background: "linear-gradient(135deg, #fff5f5 0%, #f0fff4 100%)",
+              border: "2px solid #48bb78",
+              borderRadius: "12px",
+              fontSize: "14px",
+              fontWeight: "500",
+            },
+          }
       );
+
+      triggerConfetti();
     } else {
       toast.success(
-        `💰 Sale Complete! Sold ${inputAmount} ${symbol} for ${outputAmount} ETH`,
-        {
-          id: toastId,
-          duration: 5000,
-        }
+        `💰 Sale Successful!\n` +
+          {
+            id: toastId,
+            duration: 8000,
+            style: {
+              minWidth: "320px",
+              background: "linear-gradient(135deg, #fef5e7 0%, #f0f9ff 100%)",
+              border: "2px solid #3182ce",
+              borderRadius: "12px",
+              fontSize: "14px",
+              fontWeight: "500",
+            },
+          }
       );
     }
 

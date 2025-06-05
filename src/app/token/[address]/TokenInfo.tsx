@@ -5,6 +5,8 @@ import { Token } from "@/src/app/types/token";
 import FarcasterIcon from "@/public/farcaster.svg";
 import { useState, useEffect } from "react";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
+import DexscreenerIcon from "@/public/dexscreener.webp";
+import { sdk } from "@farcaster/frame-sdk";
 
 const formatPrice = (price: number | undefined) => {
   if (!price || isNaN(price)) return "-";
@@ -52,6 +54,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
   const [rewards, setRewards] = useState<number>(0);
   const [totalStakers, setTotalStakers] = useState<number>(0);
   const [copySuccess, setCopySuccess] = useState<boolean>(false);
+  const [shareSuccess, setShareSuccess] = useState<boolean>(false);
 
   useEffect(() => {
     calculateRewards(
@@ -78,6 +81,33 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
       setTimeout(() => setCopySuccess(false), 2000);
     } catch (err) {
       console.error("Failed to copy address:", err);
+    }
+  };
+
+  const handleShareLink = async () => {
+    try {
+      const currentUrl = window.location.href;
+      await navigator.clipboard.writeText(currentUrl);
+      setShareSuccess(true);
+      setTimeout(() => setShareSuccess(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy link:", err);
+    }
+  };
+
+  const handleDexscreenerLink = async () => {
+    const dexscreenerUrl = `https://dexscreener.com/base/${token.contract_address}`;
+
+    if (isMiniAppView) {
+      try {
+        await sdk.actions.openUrl(dexscreenerUrl);
+      } catch (err) {
+        console.error("Failed to open URL with Mini App SDK:", err);
+        // Fallback to regular window.open if SDK fails
+        window.open(dexscreenerUrl, "_blank", "noopener,noreferrer");
+      }
+    } else {
+      window.open(dexscreenerUrl, "_blank", "noopener,noreferrer");
     }
   };
 
@@ -268,7 +298,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
       </div>
       {/* Share Button for Desktop and Mini App */}
       {onShare && (
-        <div className="flex mt-2 -ml-1">
+        <div className="flex mt-2 -ml-1 gap-2 flex-wrap">
           <button
             onClick={onShare}
             className="btn btn-outline btn-sm border-primary/10 flex items-center gap-2 hover:bg-primary/10"
@@ -285,6 +315,64 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
               />
             </svg>
             Share on Farcaster
+          </button>
+
+          <button
+            onClick={handleShareLink}
+            className={`btn btn-outline btn-sm border-primary/10 flex items-center gap-2 transition-all duration-200 ${
+              shareSuccess
+                ? "border-success text-success hover:bg-success/10"
+                : "hover:bg-primary/10"
+            }`}
+            title={shareSuccess ? "Link copied!" : "Copy page link"}
+          >
+            {shareSuccess ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"
+                />
+              </svg>
+            )}
+            {shareSuccess ? "Copied!" : "Share Link"}
+          </button>
+
+          <button
+            onClick={handleDexscreenerLink}
+            className="btn btn-outline btn-sm border-primary/10 flex items-center gap-2 hover:bg-primary/10"
+            title="View on Dexscreener"
+          >
+            <Image
+              src={DexscreenerIcon}
+              alt="Dexscreener"
+              width={16}
+              height={16}
+            />
           </button>
         </div>
       )}

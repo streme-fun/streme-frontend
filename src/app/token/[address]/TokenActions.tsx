@@ -57,6 +57,7 @@ export function TokenActions({
     liquidityAvailable: boolean;
   } | null>(null);
   const [isPriceLoading, setIsPriceLoading] = useState(false);
+  const [isRefreshingBalances, setIsRefreshingBalances] = useState(false);
 
   // Create stable references for contract addresses to prevent unnecessary re-renders
   const stakingPoolAddress = useMemo(() => {
@@ -462,6 +463,8 @@ export function TokenActions({
 
   const refreshBalances = useCallback(async () => {
     if (!currentAddress || !walletIsConnected) return;
+
+    setIsRefreshingBalances(true);
     try {
       const balVal = await publicClient.readContract({
         address: contractAddress as `0x${string}`,
@@ -505,6 +508,8 @@ export function TokenActions({
       onStakingChange();
     } catch (error) {
       console.error("Error refreshing balances:", error);
+    } finally {
+      setIsRefreshingBalances(false);
     }
   }, [
     currentAddress,
@@ -666,7 +671,10 @@ export function TokenActions({
           {/* Available to Trade */}
           <div className="flex justify-between">
             <div className="text-sm text-gray-400">Balance</div>
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-gray-400 flex items-center gap-2">
+              {isRefreshingBalances && (
+                <div className="animate-spin w-3 h-3 border border-gray-300 border-t-blue-500 rounded-full"></div>
+              )}
               {tradeDirection === "buy"
                 ? `${(Number(ethBalance) / 1e18).toFixed(2)} ETH`
                 : `${(Number(balance) / 1e18).toFixed(2)} ${token.symbol}`}
