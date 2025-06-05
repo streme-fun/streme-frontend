@@ -329,40 +329,33 @@ export function SwapButton({
     });
     await publicClient.waitForTransactionReceipt({ hash: txHash });
 
+    // Dismiss the loading toast first to prevent conflicts
+    toast.dismiss(toastId);
+
     if (direction === "buy") {
-      toast.success(
-        `🎉 Purchase Successful!\n` +
-          {
-            id: toastId,
-            duration: 8000,
-            style: {
-              minWidth: "320px",
-              background: "linear-gradient(135deg, #fff5f5 0%, #f0fff4 100%)",
-              border: "2px solid #48bb78",
-              borderRadius: "12px",
-              fontSize: "14px",
-              fontWeight: "500",
-            },
-          }
-      );
+      toast.success(`🎉 Purchase Successful!`, {
+        duration: 4000,
+        style: {
+          background: "linear-gradient(135deg, #fff5f5 0%, #f0fff4 100%)",
+          border: "2px solid #48bb78",
+          borderRadius: "12px",
+          fontSize: "14px",
+          fontWeight: "500",
+        },
+      });
 
       triggerConfetti();
     } else {
-      toast.success(
-        `💰 Sale Successful!\n` +
-          {
-            id: toastId,
-            duration: 8000,
-            style: {
-              minWidth: "320px",
-              background: "linear-gradient(135deg, #fef5e7 0%, #f0f9ff 100%)",
-              border: "2px solid #3182ce",
-              borderRadius: "12px",
-              fontSize: "14px",
-              fontWeight: "500",
-            },
-          }
-      );
+      toast.success(`💰 Sale Successful!`, {
+        duration: 4000,
+        style: {
+          background: "linear-gradient(135deg, #fef5e7 0%, #f0f9ff 100%)",
+          border: "2px solid #3182ce",
+          borderRadius: "12px",
+          fontSize: "14px",
+          fontWeight: "500",
+        },
+      });
     }
 
     onSuccess?.();
