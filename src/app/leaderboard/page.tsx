@@ -1,4 +1,4 @@
-import { Leaderboard } from "../../components/Leaderboard";
+import { Leaderboard } from "../../components/TokenLeaderboard";
 import { LeaderboardHeader } from "../../components/LeaderboardHeader";
 import { getTokens } from "@/src/lib/tokens";
 

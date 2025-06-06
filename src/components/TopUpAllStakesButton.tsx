@@ -208,6 +208,11 @@ export function TopUpAllStakesButton({
         { id: toastId }
       );
 
+      // Auto-dismiss the success toast after 4 seconds
+      setTimeout(() => {
+        toast.dismiss(toastId);
+      }, 4000);
+
       onSuccess?.();
 
       // PostHog event tracking
