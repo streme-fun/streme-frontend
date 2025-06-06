@@ -176,20 +176,53 @@ export function SwapButton({
 
     let sellToken: string;
     let buyToken: string;
+    let sellAmount: string;
 
     if (direction === "buy") {
       // ETH -> Token swap
       const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
       sellToken = ETH_ADDRESS;
       buyToken = tokenAddress;
+      sellAmount = parseEther(amount).toString();
     } else {
       // Token -> ETH swap (using regular API instead of gasless)
       const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
       sellToken = tokenAddress;
       buyToken = ETH_ADDRESS;
-    }
 
-    const sellAmount = parseEther(amount).toString();
+      // For selling, check if we're trying to sell the maximum amount
+      // and use the actual balance to avoid rounding errors
+      const userBalance = await publicClient.readContract({
+        address: tokenAddress as `0x${string}`,
+        abi: [
+          {
+            inputs: [{ name: "account", type: "address" }],
+            name: "balanceOf",
+            outputs: [{ name: "", type: "uint256" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ],
+        functionName: "balanceOf",
+        args: [effectiveAddress as `0x${string}`],
+      });
+
+      const parsedAmount = parseEther(amount);
+      const userBalanceBigInt = userBalance as bigint;
+
+      // If the parsed amount is very close to the user's balance, use the exact balance
+      const tolerance = parseEther("0.000001"); // 1e-6 tolerance
+      const diff =
+        parsedAmount > userBalanceBigInt
+          ? parsedAmount - userBalanceBigInt
+          : userBalanceBigInt - parsedAmount;
+
+      if (diff <= tolerance) {
+        sellAmount = userBalanceBigInt.toString();
+      } else {
+        sellAmount = parsedAmount.toString();
+      }
+    }
 
     // Get quote using regular API for both directions
     const quoteParams = new URLSearchParams({
@@ -358,6 +391,7 @@ export function SwapButton({
       });
     }
 
+    // Trigger balance updates in parent components
     onSuccess?.();
   };
 
