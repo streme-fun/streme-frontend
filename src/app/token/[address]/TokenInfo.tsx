@@ -41,7 +41,7 @@ const formatCurrency = (value: number | undefined) => {
 
 const shortenHash = (hash: string | undefined) => {
   if (!hash) return "";
-  return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
+  return hash.slice(0, 10);
 };
 
 interface TokenInfoProps {

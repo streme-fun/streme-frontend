@@ -200,12 +200,12 @@ const TokenCardComponent = ({
         hover:shadow-lg hover:-translate-y-1 group-hover:border-primary/20"
       >
         {token.img_url ? (
-          <figure className="w-[120px] h-[120px] relative overflow-hidden">
+          <figure className="w-[110px] h-[110px] relative overflow-hidden">
             <Image
               src={token.img_url}
               alt={token.name}
               fill
-              sizes="120px"
+              sizes="110px"
               className="object-cover transition-transform duration-300 group-hover:scale-110"
               unoptimized={
                 token.img_url.includes(".gif") ||
@@ -267,13 +267,11 @@ const TokenCardComponent = ({
                       <button
                         onClick={handleFarcasterClick}
                         className="hover:text-primary inline-flex items-center ml-auto"
-                        title={shortenHash(token.cast_hash)}
+                        title="View on Farcaster"
                       >
                         <Image
                           src={FarcasterIcon}
-                          alt={`View on Farcaster: ${shortenHash(
-                            token.cast_hash
-                          )}`}
+                          alt={`View on Farcaster`}
                           width={12}
                           height={12}
                           className="opacity-80 group-hover:opacity-100"
