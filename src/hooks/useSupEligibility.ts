@@ -36,6 +36,7 @@ export function useSupEligibility() {
 
   const fetchEligibility = useCallback(async (address: string) => {
     if (!address) {
+      console.log("useSupEligibility: No address provided");
       setState((prev) => ({
         ...prev,
         error: "No address provided",
@@ -43,16 +44,31 @@ export function useSupEligibility() {
       return;
     }
 
+    console.log(
+      "useSupEligibility: Fetching eligibility for address:",
+      address
+    );
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const response = await fetch(`/api/sup/eligibility?address=${address}`);
+      const url = `/api/sup/eligibility?address=${address}`;
+      console.log("useSupEligibility: Making request to:", url);
+
+      const response = await fetch(url);
+      console.log("useSupEligibility: Response status:", response.status);
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          "useSupEligibility: API error:",
+          response.status,
+          errorText
+        );
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const eligibilityData: SupEligibilityResult = await response.json();
+      console.log("useSupEligibility: Received data:", eligibilityData);
 
       setState((prev) => ({
         ...prev,
@@ -62,7 +78,10 @@ export function useSupEligibility() {
 
       return eligibilityData;
     } catch (error) {
-      console.error("Failed to fetch SUP eligibility:", error);
+      console.error(
+        "useSupEligibility: Failed to fetch SUP eligibility:",
+        error
+      );
       setState((prev) => ({
         ...prev,
         isLoading: false,
