@@ -295,12 +295,13 @@ export function TopUpAllStakesButton({
         }
       }
 
-      toast.dismiss(toastId);
-
       if (stakesWithBalances.length === 0) {
-        toast.error("No tokens available to stake");
+        toast.error("No tokens available to stake", { id: toastId });
         return;
       }
+
+      // Dismiss the loading toast before proceeding
+      toast.dismiss(toastId);
 
       // Store the prepared data and open modal
       setPreparedStakes(stakesWithBalances);
@@ -308,6 +309,11 @@ export function TopUpAllStakesButton({
     } catch (error) {
       console.error("Error preparing stakes:", error);
       toast.error("Failed to load token information", { id: toastId });
+    } finally {
+      // Ensure toast is always dismissed, even if there are unexpected errors
+      setTimeout(() => {
+        toast.dismiss(toastId);
+      }, 100);
     }
   };
 
