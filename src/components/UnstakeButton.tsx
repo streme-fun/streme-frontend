@@ -99,7 +99,7 @@ export function UnstakeButton({
       };
 
       fetchUnlockTimeInternal();
-      const interval = setInterval(fetchUnlockTimeInternal, 30000); // Refresh every 30 seconds
+      const interval = setInterval(fetchUnlockTimeInternal, 60000); // Refresh every 60 seconds instead of 30
       return () => clearInterval(interval);
     }
   }, [effectiveAddress, effectiveIsConnected, stakingAddress, refreshTrigger]);

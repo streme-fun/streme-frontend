@@ -10,17 +10,13 @@ import { ConnectPoolButton } from "@/src/components/ConnectPoolButton";
 import { ZapStakeButton } from "@/src/components/ZapStakeButton";
 import { SwapButton } from "@/src/components/SwapButton";
 import { Wallet } from "lucide-react";
-import {
-  LP_FACTORY_ADDRESS,
-  LP_FACTORY_ABI,
-  GDA_FORWARDER,
-  GDA_ABI,
-} from "@/src/lib/contracts";
+import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { Button as UiButton } from "@/src/components/ui/button";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 import { parseEther } from "viem";
 import { getPrices, convertToUSD } from "@/src/lib/priceUtils";
+import { useTokenBalance } from "@/src/hooks/useTokenData";
 
 interface TokenActionsProps {
   token: Token;
@@ -44,10 +40,20 @@ export function TokenActions({
   isConnected: isConnectedProp,
 }: TokenActionsProps) {
   const [token, setToken] = useState(initialToken);
-  const [balance, setBalance] = useState<bigint>(BigInt(0));
-  const [isConnectedToPool, setIsConnectedToPool] = useState(false);
-  const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
-  const [ethBalance, setEthBalance] = useState<bigint>(0n);
+
+  // Use shared token data hook instead of individual state
+  const {
+    tokenBalance: balance,
+    ethBalance,
+    stakedBalance,
+    isConnectedToPool,
+    refresh: refreshTokenData,
+    isRefreshing: isRefreshingBalances,
+  } = useTokenBalance(
+    initialToken.contract_address,
+    initialToken.staking_address,
+    initialToken.staking_pool
+  );
 
   // Trading interface state
   const [tradeDirection, setTradeDirection] = useState<"buy" | "sell">("buy");
@@ -58,7 +64,6 @@ export function TokenActions({
     liquidityAvailable: boolean;
   } | null>(null);
   const [isPriceLoading, setIsPriceLoading] = useState(false);
-  const [isRefreshingBalances, setIsRefreshingBalances] = useState(false);
 
   // USD price states
   const [usdPrices, setUsdPrices] = useState<{
@@ -106,7 +111,7 @@ export function TokenActions({
 
   const { user: privyUser, ready: privyReady, login: privyLogin } = usePrivy();
   const { wallets } = useWallets();
-  const { refreshTrigger, primaryAddress } = useWalletAddressChange();
+  const { primaryAddress } = useWalletAddressChange();
 
   // Simplified mini app detection - use the improved detection from useAppFrameLogic
   const isEffectivelyMiniApp = isMiniAppViewProp ?? detectedMiniAppView;
@@ -321,7 +326,7 @@ export function TokenActions({
       }
     };
 
-    const intervalId = setInterval(fetchTokenData, 10000);
+    const intervalId = setInterval(fetchTokenData, 60000);
     fetchTokenData();
 
     return () => clearInterval(intervalId);
@@ -359,176 +364,13 @@ export function TokenActions({
     checkIsCreator();
   }, [currentAddress, walletIsConnected, contractAddress]);
 
-  useEffect(() => {
-    console.log("Pool connection useEffect triggered by:", {
-      currentAddress,
-      walletIsConnected,
-      stakingPoolAddress,
-    });
-
-    const checkPoolConnection = async () => {
-      if (!currentAddress || !walletIsConnected) {
-        console.log(
-          "TokenActions: Pool Connection Check: Skipping, no currentAddress or wallet not connected.",
-          { currentAddressPresent: !!currentAddress, walletIsConnected }
-        );
-        setIsConnectedToPool(false);
-        return;
-      }
-      if (!stakingPoolAddress) {
-        console.log(
-          `TokenActions: Pool Connection Check: Skipping, no staking_pool defined for token ${contractAddress}`
-        );
-        setIsConnectedToPool(false);
-        return;
-      }
-
-      try {
-        console.log(
-          `TokenActions: Pool Connection Check: Reading GDA_FORWARDER.isMemberConnected for pool ${stakingPoolAddress}, member ${currentAddress}`
-        );
-        const connectedStatus = await publicClient.readContract({
-          address: GDA_FORWARDER,
-          abi: GDA_ABI,
-          functionName: "isMemberConnected",
-          args: [
-            stakingPoolAddress as `0x${string}`,
-            currentAddress as `0x${string}`,
-          ],
-        });
-        console.log(
-          `TokenActions: Pool Connection Check: Status for pool ${stakingPoolAddress}, member ${currentAddress} is ${connectedStatus}`
-        );
-        setIsConnectedToPool(connectedStatus);
-      } catch (error) {
-        console.error(
-          `TokenActions: Pool Connection Check: Error for pool ${stakingPoolAddress}, member ${currentAddress}`,
-          error
-        );
-        setIsConnectedToPool(false);
-      }
-    };
-    checkPoolConnection();
-  }, [currentAddress, walletIsConnected, stakingPoolAddress]);
-
-  useEffect(() => {
-    const checkStakedBalance = async () => {
-      if (!currentAddress || !walletIsConnected || !stakingAddress) return;
-      try {
-        const stakedVal = await publicClient.readContract({
-          address: stakingAddress as `0x${string}`,
-          abi: [
-            {
-              inputs: [{ name: "account", type: "address" }],
-              name: "balanceOf",
-              outputs: [{ name: "", type: "uint256" }],
-              stateMutability: "view",
-              type: "function",
-            },
-          ],
-          functionName: "balanceOf",
-          args: [currentAddress as `0x${string}`],
-        });
-        setStakedBalance(stakedVal as bigint);
-      } catch (error) {
-        console.error("Error checking staked balance:", error);
-      }
-    };
-    checkStakedBalance();
-  }, [currentAddress, walletIsConnected, stakingAddress, refreshTrigger]);
-
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (!currentAddress || !walletIsConnected) return;
-      try {
-        const balVal = await publicClient.readContract({
-          address: contractAddress as `0x${string}`,
-          abi: [
-            {
-              inputs: [{ name: "account", type: "address" }],
-              name: "balanceOf",
-              outputs: [{ name: "", type: "uint256" }],
-              stateMutability: "view",
-              type: "function",
-            },
-          ],
-          functionName: "balanceOf",
-          args: [currentAddress as `0x${string}`],
-        });
-        setBalance(balVal as bigint);
-
-        // Also fetch ETH balance
-        const ethBal = await publicClient.getBalance({
-          address: currentAddress as `0x${string}`,
-        });
-        setEthBalance(ethBal);
-      } catch (error) {
-        console.error("Error fetching balance:", error);
-      }
-    };
-    fetchBalance();
-  }, [currentAddress, walletIsConnected, contractAddress, refreshTrigger]);
-
   const hasTokens = walletIsConnected && balance > 0n;
 
   const refreshBalances = useCallback(async () => {
-    if (!currentAddress || !walletIsConnected) return;
-
-    setIsRefreshingBalances(true);
-    try {
-      const balVal = await publicClient.readContract({
-        address: contractAddress as `0x${string}`,
-        abi: [
-          {
-            inputs: [{ name: "account", type: "address" }],
-            name: "balanceOf",
-            outputs: [{ name: "", type: "uint256" }],
-            stateMutability: "view",
-            type: "function",
-          },
-        ],
-        functionName: "balanceOf",
-        args: [currentAddress as `0x${string}`],
-      });
-      setBalance(balVal as bigint);
-
-      // Also refresh ETH balance
-      const ethBal = await publicClient.getBalance({
-        address: currentAddress as `0x${string}`,
-      });
-      setEthBalance(ethBal);
-
-      if (stakingAddress) {
-        const stakedVal = await publicClient.readContract({
-          address: stakingAddress as `0x${string}`,
-          abi: [
-            {
-              inputs: [{ name: "account", type: "address" }],
-              name: "balanceOf",
-              outputs: [{ name: "", type: "uint256" }],
-              stateMutability: "view",
-              type: "function",
-            },
-          ],
-          functionName: "balanceOf",
-          args: [currentAddress as `0x${string}`],
-        });
-        setStakedBalance(stakedVal as bigint);
-      }
-      onStakingChange();
-    } catch (error) {
-      console.error("Error refreshing balances:", error);
-    } finally {
-      setIsRefreshingBalances(false);
-    }
-  }, [
-    currentAddress,
-    walletIsConnected,
-    contractAddress,
-    stakingAddress,
-    onStakingChange,
-    refreshTrigger,
-  ]);
+    // Use shared data refresh function
+    await refreshTokenData();
+    onStakingChange();
+  }, [refreshTokenData, onStakingChange]);
 
   // Helper function to calculate amount based on percentage
   const calculatePercentageAmount = useCallback(
@@ -927,7 +769,6 @@ export function TokenActions({
                 <ConnectPoolButton
                   stakingPoolAddress={stakingPoolAddress as `0x${string}`}
                   onSuccess={() => {
-                    setIsConnectedToPool(true);
                     refreshBalances();
                   }}
                   isMiniApp={isEffectivelyMiniApp}
@@ -943,7 +784,6 @@ export function TokenActions({
           <ConnectPoolButton
             stakingPoolAddress={stakingPoolAddress as `0x${string}`}
             onSuccess={() => {
-              setIsConnectedToPool(true);
               refreshBalances();
             }}
             isMiniApp={isEffectivelyMiniApp}

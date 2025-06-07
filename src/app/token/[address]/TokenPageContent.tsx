@@ -12,6 +12,7 @@ import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import sdk from "@farcaster/frame-sdk";
 import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
+import { TokenDataProvider } from "@/src/hooks/useTokenData";
 
 type Deployment = {
   token: string;
@@ -34,6 +35,8 @@ export function TokenPageContent() {
   const [token, setToken] = useState<Token | null>(null);
   const [tokenLoading, setTokenLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [stakingUpdateTrigger, setStakingUpdateTrigger] = useState(0);
 
   const {
     isSDKLoaded,
@@ -88,12 +91,23 @@ export function TokenPageContent() {
 
   useEffect(() => {
     async function fetchToken() {
+      if (!pageAddress) {
+        setTokenLoading(false);
+        return;
+      }
+
       try {
-        // Fetch base token data from streme.fun API
+        setTokenLoading(true);
         const response = await fetch(
           `/api/tokens/single?address=${pageAddress}`
         );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
+
         if (data.data) {
           const baseToken = data.data;
 
@@ -113,9 +127,14 @@ export function TokenPageContent() {
           };
 
           setToken(enhancedToken);
+        } else {
+          throw new Error("No token data found");
         }
-      } catch (error) {
-        console.error("Error fetching token:", error);
+      } catch (err) {
+        console.error("Error fetching token:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch token data"
+        );
       } finally {
         setTokenLoading(false);
       }
@@ -172,12 +191,7 @@ export function TokenPageContent() {
   }, [isMiniAppView, isSDKLoaded, tokenLoading, token]);
 
   const handleStakingChange = () => {
-    const stakedBalanceElement = document.querySelector(
-      "[data-staking-balance]"
-    );
-    if (stakedBalanceElement) {
-      stakedBalanceElement.dispatchEvent(new Event("refresh"));
-    }
+    setStakingUpdateTrigger((prev) => prev + 1);
   };
 
   const handleShare = async () => {
@@ -256,8 +270,17 @@ ${shareUrl}`;
     );
   }
 
-  if (!token) {
-    return <div className="text-center py-8">Token not found</div>;
+  if (error || !token) {
+    return (
+      <div className="min-h-screen bg-background pt-24 pb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
+            <p className="text-gray-600">{error || "Token not found"}</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const embedUrl =
@@ -273,83 +296,86 @@ ${shareUrl}`;
       : `https://www.geckoterminal.com/base/pools/${token.pool_address}?embed=1&info=0&swaps=0&grayscale=0&light_chart=0`;
 
   return (
-    <div className="max-w-[1440px] mx-auto sm:px-6 md:px-8 md:mt-20 pt-8 pb-12">
-      {/* Back Arrow Button - Only show in mini app */}
-      {isMiniAppView && (
-        <div className="mb-4 px-4 sm:px-0">
-          <button
-            onClick={() => router.push("/")}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
+    <TokenDataProvider>
+      <div className="max-w-[1440px] mx-auto sm:px-6 md:px-8 md:mt-20 pt-8 pb-12">
+        {/* Back Arrow Button - Only show in mini app */}
+        {isMiniAppView && (
+          <div className="mb-4 px-4 sm:px-0">
+            <button
+              onClick={() => router.push("/")}
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            Back
-          </button>
-        </div>
-      )}
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              Back
+            </button>
+          </div>
+        )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8">
-        <div className="order-1 lg:order-2 lg:col-span-4 space-y-4">
-          <TokenInfo
-            token={token}
-            onShare={handleShare}
-            isMiniAppView={isMiniAppView}
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8">
+          <div className="order-1 lg:order-2 lg:col-span-4 space-y-4">
+            <TokenInfo
+              token={token}
+              onShare={handleShare}
+              isMiniAppView={isMiniAppView}
+            />
 
-          <TokenActions
-            token={token}
-            onStakingChange={handleStakingChange}
-            isMiniAppView={isMiniAppView}
-            address={address}
-            isConnected={isConnected}
-          />
-          <StakedBalance
-            data-staking-balance
-            stakingAddress={token.staking_address}
-            stakingPool={token.staking_pool}
-            symbol={token.symbol}
-            tokenAddress={token.contract_address}
-            isMiniApp={isMiniAppView}
-            farcasterAddress={address}
-            farcasterIsConnected={isConnected}
-          />
-          <ClaimFeesButton
-            tokenAddress={token.contract_address}
-            creatorAddress={isCreator ? address : undefined}
-            isMiniApp={isMiniAppView}
-            farcasterAddress={address}
-            farcasterIsConnected={isConnected}
-          />
-        </div>
-
-        <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit">
-          <div className="card-body p-0 md:p-4 pb-12">
-            <iframe
-              data-privy-ignore
-              title="GeckoTerminal Embed"
-              src={isMiniAppView ? smallEmbedUrl : embedUrl}
-              className="w-full h-[500px] lg:h-[800px]"
-              allow="clipboard-write"
-              allowFullScreen
+            <TokenActions
+              token={token}
+              onStakingChange={handleStakingChange}
+              isMiniAppView={isMiniAppView}
+              address={address}
+              isConnected={isConnected}
+            />
+            <StakedBalance
+              data-staking-balance
+              stakingAddress={token.staking_address}
+              stakingPool={token.staking_pool}
+              symbol={token.symbol}
+              tokenAddress={token.contract_address}
+              isMiniApp={isMiniAppView}
+              farcasterAddress={address}
+              farcasterIsConnected={isConnected}
+              key={stakingUpdateTrigger}
+            />
+            <ClaimFeesButton
+              tokenAddress={token.contract_address}
+              creatorAddress={isCreator ? address : undefined}
+              isMiniApp={isMiniAppView}
+              farcasterAddress={address}
+              farcasterIsConnected={isConnected}
             />
           </div>
+
+          <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit">
+            <div className="card-body p-0 md:p-4 pb-12">
+              <iframe
+                data-privy-ignore
+                title="GeckoTerminal Embed"
+                src={isMiniAppView ? smallEmbedUrl : embedUrl}
+                className="w-full h-[500px] lg:h-[800px]"
+                allow="clipboard-write"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+        <div className="fixed inset-0 -z-50">
+          <HeroAnimationMini />
         </div>
       </div>
-      <div className="fixed inset-0 -z-50">
-        <HeroAnimationMini />
-      </div>
-    </div>
+    </TokenDataProvider>
   );
 }

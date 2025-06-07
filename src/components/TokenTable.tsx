@@ -40,8 +40,8 @@ const AnimatedReward = ({ value }: { value: number }) => {
 
   useEffect(() => {
     // Smoothly animate to new value
-    const frameDuration = 50; // 20 fps
-    const frames = 20; // 1 second animation
+    const frameDuration = 100; // Changed from 50ms to 100ms (10 fps instead of 20 fps)
+    const frames = 20; // 2 second animation instead of 1 second
     const increment = (value - displayValue) / frames;
 
     let frame = 0;
