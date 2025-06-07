@@ -307,8 +307,8 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
       }
     };
 
-    // Refresh every 10 seconds
-    const interval = setInterval(refreshBalances, 10000);
+    // Refresh every 30 seconds instead of 10 seconds
+    const interval = setInterval(refreshBalances, 30000);
     return () => clearInterval(interval);
   }, [effectiveAddress, stakes.length]);
 

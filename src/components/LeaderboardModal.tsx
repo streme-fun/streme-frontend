@@ -156,7 +156,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     args: effectiveAddress ? [effectiveAddress as Address] : undefined,
     query: {
       enabled: !!effectiveAddress && claimStep === "creating-locker",
-      refetchInterval: claimStep === "creating-locker" ? 2000 : false,
+      refetchInterval: claimStep === "creating-locker" ? 5000 : false,
     },
   });
 

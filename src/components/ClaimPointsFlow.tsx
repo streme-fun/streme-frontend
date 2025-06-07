@@ -84,7 +84,7 @@ export function ClaimPointsFlow({
     args: userAddress ? [userAddress as Address] : undefined,
     query: {
       enabled: !!userAddress && currentStep === "creating-locker",
-      refetchInterval: currentStep === "creating-locker" ? 2000 : false, // Poll every 2s during creation
+      refetchInterval: currentStep === "creating-locker" ? 5000 : false, // Poll every 5s during creation instead of 2s
     },
   });
 

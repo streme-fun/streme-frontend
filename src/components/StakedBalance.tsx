@@ -150,9 +150,29 @@ export function StakedBalance({
       }
     };
 
+    // Only fetch if page is visible to reduce API calls when tab is inactive
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchData();
+      }
+    };
+
     fetchData();
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
+
+    // Set up periodic refresh only if page is visible
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        fetchData();
+      }
+    }, 30000);
+
+    // Listen for visibility changes to fetch fresh data when page becomes visible
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [
     effectiveIsConnected,
     effectiveAddress,

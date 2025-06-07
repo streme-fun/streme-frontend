@@ -304,8 +304,8 @@ export default function TokensPage() {
       }
     };
 
-    const interval = setInterval(refreshBalances, 10000);
-    return () => clearInterval(interval);
+    const refreshInterval = setInterval(refreshBalances, 30000);
+    return () => clearInterval(refreshInterval);
   }, [effectiveAddress, stakes.length]);
 
   const fetchStakesAndTokens = async () => {
