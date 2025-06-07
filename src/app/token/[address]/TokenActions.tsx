@@ -20,6 +20,7 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { Button as UiButton } from "@/src/components/ui/button";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 import { parseEther } from "viem";
+import { getPrices, convertToUSD } from "@/src/lib/priceUtils";
 
 interface TokenActionsProps {
   token: Token;
@@ -58,6 +59,15 @@ export function TokenActions({
   } | null>(null);
   const [isPriceLoading, setIsPriceLoading] = useState(false);
   const [isRefreshingBalances, setIsRefreshingBalances] = useState(false);
+
+  // USD price states
+  const [usdPrices, setUsdPrices] = useState<{
+    eth: number | null;
+    token: number | null;
+  }>({
+    eth: null,
+    token: null,
+  });
 
   // Create stable references for contract addresses to prevent unnecessary re-renders
   const stakingPoolAddress = useMemo(() => {
@@ -573,6 +583,28 @@ export function TokenActions({
     }
   }, []); // Only run on mount
 
+  // Fetch USD prices
+  useEffect(() => {
+    const fetchUSDPrices = async () => {
+      try {
+        const prices = await getPrices([contractAddress]);
+        if (prices) {
+          setUsdPrices({
+            eth: prices.eth,
+            token: prices[contractAddress.toLowerCase()] || token.price || null,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching USD prices:", error);
+      }
+    };
+
+    fetchUSDPrices();
+    // Update prices every minute
+    const interval = setInterval(fetchUSDPrices, 60000);
+    return () => clearInterval(interval);
+  }, [contractAddress, token.price]);
+
   if (isEffectivelyMiniApp && !fcSDKLoaded) {
     return (
       <div className="card bg-base-100 border border-black/[.1]1]">
@@ -682,7 +714,7 @@ export function TokenActions({
           </div>
 
           {/* Amount Input */}
-          <div className="space-y-2">
+          <div className="space-y-2 mb-6">
             {/* <label className="text-sm font-medium text-gray-700">Size</label> */}
             <div className="relative">
               <input
@@ -690,10 +722,20 @@ export function TokenActions({
                 value={tradeAmount}
                 onChange={(e) => setTradeAmount(e.target.value)}
                 placeholder={tradeDirection === "buy" ? "0.001" : ""}
-                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-lg font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full p-5 bg-gray-50 border border-gray-200 rounded-lg text-lg font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 step="0.001"
                 min="0"
               />
+              {/* USD equivalent for trade amount */}
+              {tradeAmount && (
+                <div className="absolute left-5 top-12 text-xs text-gray-400">
+                  {tradeDirection === "buy" && usdPrices.eth
+                    ? `≈ ${convertToUSD(tradeAmount, usdPrices.eth)}`
+                    : tradeDirection === "sell" && usdPrices.token
+                    ? `≈ ${convertToUSD(tradeAmount, usdPrices.token)}`
+                    : null}
+                </div>
+              )}
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
                 {tradeDirection === "buy" ? "ETH" : token.symbol}
               </div>
@@ -735,27 +777,42 @@ export function TokenActions({
             <div className="bg-gray-50 rounded-lg p-3 text-sm">
               <div className="flex justify-between">
                 <span>Receive:</span>
-                <span className="font-semibold">
+                <div className="text-right">
+                  <span className="font-semibold">
+                    {(() => {
+                      const amount = Number(priceQuote.buyAmount) / 1e18;
+                      if (tradeDirection === "sell") {
+                        // For selling (receiving ETH), show more decimals if amount is small
+                        if (amount < 0.001) {
+                          return amount.toFixed(8);
+                        } else if (amount < 0.01) {
+                          return amount.toFixed(6);
+                        } else if (amount < 0.1) {
+                          return amount.toFixed(5);
+                        } else {
+                          return amount.toFixed(4);
+                        }
+                      } else {
+                        // For buying (receiving tokens), use standard 3 decimals
+                        return amount.toFixed(3);
+                      }
+                    })()}{" "}
+                    {tradeDirection === "buy" ? token.symbol : "ETH"}
+                  </span>
+                  {/* USD equivalent for receive amount */}
                   {(() => {
                     const amount = Number(priceQuote.buyAmount) / 1e18;
-                    if (tradeDirection === "sell") {
-                      // For selling (receiving ETH), show more decimals if amount is small
-                      if (amount < 0.001) {
-                        return amount.toFixed(8);
-                      } else if (amount < 0.01) {
-                        return amount.toFixed(6);
-                      } else if (amount < 0.1) {
-                        return amount.toFixed(5);
-                      } else {
-                        return amount.toFixed(4);
-                      }
-                    } else {
-                      // For buying (receiving tokens), use standard 3 decimals
-                      return amount.toFixed(3);
-                    }
-                  })()}{" "}
-                  {tradeDirection === "buy" ? token.symbol : "ETH"}
-                </span>
+                    const price =
+                      tradeDirection === "buy"
+                        ? usdPrices.token
+                        : usdPrices.eth;
+                    return price ? (
+                      <div className="text-xs text-gray-400 mt-1">
+                        ≈ {convertToUSD(amount, price)}
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
               </div>
             </div>
           ) : null}

@@ -9,6 +9,7 @@ import { usePrivy } from "@privy-io/react-auth";
 
 import { truncateAddress } from "@/src/lib/truncateAddress";
 import { QuoteResponse } from "@/src/lib/types/zerox";
+import { getPrices, convertToUSD } from "@/src/lib/priceUtils";
 
 interface Token {
   symbol: string;
@@ -61,6 +62,15 @@ export default function TokenSwap({ token }: { token: string }) {
   const [quote, setQuote] = useState<QuoteResponse>();
 
   const [fetchPriceError, setFetchPriceError] = useState([]);
+
+  // USD price states
+  const [usdPrices, setUsdPrices] = useState<{
+    eth: number | null;
+    token: number | null;
+  }>({
+    eth: null,
+    token: null,
+  });
 
   const { user, login, ready } = usePrivy();
   const address = user?.wallet?.address;
@@ -146,6 +156,28 @@ export default function TokenSwap({ token }: { token: string }) {
     }
   }, [quote, sendTransaction]);
 
+  // Fetch USD prices
+  useEffect(() => {
+    const fetchUSDPrices = async () => {
+      try {
+        const prices = await getPrices([buyToken.address]);
+        if (prices) {
+          setUsdPrices({
+            eth: prices.eth,
+            token: prices[buyToken.address.toLowerCase()] || null,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching USD prices:", error);
+      }
+    };
+
+    fetchUSDPrices();
+    // Update prices every minute
+    const interval = setInterval(fetchUSDPrices, 60000);
+    return () => clearInterval(interval);
+  }, [buyToken.address]);
+
   useEffect(() => {
     const params = {
       chainId: 8453,
@@ -190,9 +222,9 @@ export default function TokenSwap({ token }: { token: string }) {
         )}
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {/* Sell Token Input */}
-        <div className="relative">
+        <div className="relative mb-6">
           <input
             type="number"
             inputMode="decimal"
@@ -201,6 +233,12 @@ export default function TokenSwap({ token }: { token: string }) {
             placeholder="0.0"
             className="input input-bordered w-full"
           />
+          {/* USD equivalent for sell amount */}
+          {sellAmount && usdPrices.eth && (
+            <div className="absolute left-3 bottom-[-20px] text-xs text-gray-500">
+              {convertToUSD(sellAmount, usdPrices.eth)}
+            </div>
+          )}
           <div className="absolute right-2 top-2 flex items-center gap-2 px-2 py-1 rounded-btn">
             <Image
               src={ETH.image}
@@ -214,7 +252,7 @@ export default function TokenSwap({ token }: { token: string }) {
         </div>
 
         {/* Buy Token Input */}
-        <div className="relative">
+        <div className="relative mb-6">
           <input
             type="number"
             inputMode="decimal"
@@ -223,6 +261,12 @@ export default function TokenSwap({ token }: { token: string }) {
             placeholder="0.0"
             className="input input-bordered w-full"
           />
+          {/* USD equivalent for buy amount */}
+          {buyAmount && usdPrices.token && (
+            <div className="absolute left-3 bottom-[-20px] text-xs text-gray-500">
+              {convertToUSD(buyAmount, usdPrices.token)}
+            </div>
+          )}
           {isPriceLoading && (
             <div className="absolute inset-0 flex items-center justify-center  rounded-btn">
               <span className="loading loading-spinner loading-md text-primary" />
@@ -271,9 +315,21 @@ export default function TokenSwap({ token }: { token: string }) {
 
         {quote && (
           <div className="text-sm text-base-content/80">
-            Receive at least:{" "}
-            {formatUnits(BigInt(quote.minBuyAmount), buyToken.decimals)}{" "}
-            {buyToken.symbol}
+            <div>
+              Receive at least:{" "}
+              {formatUnits(BigInt(quote.minBuyAmount), buyToken.decimals)}{" "}
+              {buyToken.symbol}
+            </div>
+            {/* USD equivalent for minimum receive amount */}
+            {usdPrices.token && (
+              <div className="text-xs text-gray-500 mt-1">
+                ≈{" "}
+                {convertToUSD(
+                  formatUnits(BigInt(quote.minBuyAmount), buyToken.decimals),
+                  usdPrices.token
+                )}
+              </div>
+            )}
           </div>
         )}
         {isConfirming && (
