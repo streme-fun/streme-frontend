@@ -118,7 +118,7 @@ const BLACKLISTED_TOKENS = [
   "0x1BA8603DA702602A8657980e825A6DAa03Dee93a",
   "0xfe2224bd9c4aFf648F93B036172444C533DbF116",
   "0xd04383398dd2426297da660f9cca3d439af9ce1b",
-].map((addr) => addr.toLowerCase());
+].map((addr) => addr?.toLowerCase() || "");
 
 export default function TokensPage() {
   const { address: wagmiAddress } = useAccount();
@@ -144,12 +144,48 @@ export default function TokensPage() {
   // Prevent hydration mismatch
   useEffect(() => {
     setMounted(true);
+
+    // Add global error handler for uncaught toLowerCase errors
+    const handleError = (event: ErrorEvent) => {
+      if (event.error?.message?.includes("toLowerCase")) {
+        console.warn("Caught toLowerCase error:", event.error);
+        event.preventDefault();
+        return true;
+      }
+    };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      if (event.reason?.message?.includes("toLowerCase")) {
+        console.warn("Caught toLowerCase promise rejection:", event.reason);
+        event.preventDefault();
+        return true;
+      }
+    };
+
+    window.addEventListener("error", handleError);
+    window.addEventListener("unhandledrejection", handleRejection);
+
+    return () => {
+      window.removeEventListener("error", handleError);
+      window.removeEventListener("unhandledrejection", handleRejection);
+    };
   }, []);
+
+  // Helper function to safely call toLowerCase on potentially null values
+  const safeToLowerCase = (value: string | null | undefined): string => {
+    if (!value || typeof value !== "string") {
+      return "";
+    }
+    return value.toLowerCase();
+  };
 
   // Helper function to fetch token data with caching
   const fetchTokenData = async (tokenAddress: string) => {
     // Don't make API calls for blacklisted tokens
-    if (BLACKLISTED_TOKENS.includes(tokenAddress.toLowerCase())) {
+    if (
+      !tokenAddress ||
+      BLACKLISTED_TOKENS.includes(safeToLowerCase(tokenAddress))
+    ) {
       const fallbackData = {
         staking_address: undefined,
         logo: undefined,
@@ -317,7 +353,12 @@ export default function TokensPage() {
     setAccountExists(null);
 
     try {
-      const accountId = effectiveAddress.toLowerCase();
+      // Additional safety check for effectiveAddress
+      if (!effectiveAddress || typeof effectiveAddress !== "string") {
+        throw new Error("Invalid address provided");
+      }
+
+      const accountId = safeToLowerCase(effectiveAddress);
 
       const query = `
         query GetAccountStakes($accountId: ID!) {
@@ -393,8 +434,9 @@ export default function TokensPage() {
                   membership.units &&
                   parseFloat(membership.units) > 0 &&
                   !membership.pool.token.isNativeAssetSuperToken &&
+                  membership.pool.token.id &&
                   !BLACKLISTED_TOKENS.includes(
-                    membership.pool.token.id.toLowerCase()
+                    safeToLowerCase(membership.pool.token.id)
                   )
               );
 
@@ -445,9 +487,9 @@ export default function TokensPage() {
   ): Promise<StakeData[]> => {
     const stakesData: StakeData[] = [];
 
-    const tokenAddresses = memberships.map(
-      (membership) => membership.pool.token.id
-    );
+    const tokenAddresses = memberships
+      .map((membership) => membership.pool.token.id)
+      .filter(Boolean); // Filter out null/undefined values
     const balanceResults = await fetchBalances(tokenAddresses);
     const balanceMap = new Map(
       balanceResults.map((result) => [result.tokenAddress, result.balance])
@@ -456,6 +498,10 @@ export default function TokensPage() {
     for (const membership of memberships) {
       try {
         const tokenAddress = membership.pool.token.id;
+        if (!tokenAddress) {
+          console.warn("Skipping membership with null token address");
+          continue;
+        }
         const receivedBalance = balanceMap.get(tokenAddress) || BigInt(0);
         const formattedReceived = Number(formatUnits(receivedBalance, 18));
 
@@ -563,7 +609,8 @@ export default function TokensPage() {
         snapshot.balanceUntilUpdatedAt &&
         parseFloat(snapshot.balanceUntilUpdatedAt) > 0 &&
         !snapshot.token.isNativeAssetSuperToken &&
-        !BLACKLISTED_TOKENS.includes(snapshot.token.id.toLowerCase())
+        snapshot.token.id &&
+        !BLACKLISTED_TOKENS.includes(safeToLowerCase(snapshot.token.id))
     );
 
     if (validSnapshots.length === 0) {
@@ -584,7 +631,10 @@ export default function TokensPage() {
 
         const isAlreadyStaked = currentStakes.some(
           (stake) =>
-            stake.tokenAddress.toLowerCase() === tokenAddress.toLowerCase()
+            stake.tokenAddress &&
+            tokenAddress &&
+            safeToLowerCase(stake.tokenAddress) ===
+              safeToLowerCase(tokenAddress)
         );
 
         if (!isAlreadyStaked) {
@@ -622,8 +672,10 @@ export default function TokensPage() {
         if (tokenData.staking_address && effectiveAddress) {
           const correspondingStake = stakes.find(
             (stake) =>
-              stake.tokenAddress.toLowerCase() ===
-              token.tokenAddress.toLowerCase()
+              stake.tokenAddress &&
+              token.tokenAddress &&
+              safeToLowerCase(stake.tokenAddress) ===
+                safeToLowerCase(token.tokenAddress)
           );
           if (correspondingStake?.stakingPoolAddress) {
             isConnectedToPool = await checkPoolConnection(

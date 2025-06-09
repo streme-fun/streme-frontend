@@ -104,10 +104,12 @@ export function StakedBalance({
         // Fetch pool data
         const query = `
           query PoolData {
-            pool(id: "${stakingPool.toLowerCase()}") {
+            pool(id: "${stakingPool?.toLowerCase() || ""}") {
               totalUnits
               flowRate
-              poolMembers(where: {account_: {id: "${effectiveAddress?.toLowerCase()}"}}) {
+              poolMembers(where: {account_: {id: "${
+                effectiveAddress?.toLowerCase() || ""
+              }"}}) {
                 units
               }
             }

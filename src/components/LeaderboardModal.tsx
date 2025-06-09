@@ -482,6 +482,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
       originalRank: index + 1,
       isCurrentUser: Boolean(
         effectiveAddress &&
+          entry.address &&
           entry.address.toLowerCase() === effectiveAddress.toLowerCase()
       ),
       displayInfo: getDisplayInfo(entry),
@@ -491,7 +492,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     const usernameMap = new Map<string, (typeof withDisplayInfo)[0]>();
 
     withDisplayInfo.forEach((entry) => {
-      const username = entry.displayInfo.name.toLowerCase();
+      const username = entry.displayInfo.name?.toLowerCase() || "";
       const existing = usernameMap.get(username);
 
       // Keep the entry with the better rank (lower rank number = higher position)

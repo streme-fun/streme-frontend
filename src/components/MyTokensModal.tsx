@@ -123,7 +123,7 @@ const BLACKLISTED_TOKENS = [
   "0xfe2224bd9c4aFf648F93B036172444C533DbF116",
   "0xd04383398dd2426297da660f9cca3d439af9ce1b",
   "0x7ef392131c3ab326016cf7b560f96c91f4f9d4fa",
-].map((addr) => addr.toLowerCase());
+].map((addr) => addr?.toLowerCase() || "");
 
 export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
   const { address: wagmiAddress } = useAccount();
@@ -145,10 +145,21 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
   const effectiveIsConnected = isMiniAppView ? fcIsConnected : !!wagmiAddress;
 
+  // Helper function to safely call toLowerCase on potentially null values
+  const safeToLowerCase = (value: string | null | undefined): string => {
+    if (!value || typeof value !== "string") {
+      return "";
+    }
+    return value.toLowerCase();
+  };
+
   // Helper function to fetch token data with caching
   const fetchTokenData = async (tokenAddress: string) => {
     // Don't make API calls for blacklisted tokens
-    if (BLACKLISTED_TOKENS.includes(tokenAddress.toLowerCase())) {
+    if (
+      !tokenAddress ||
+      BLACKLISTED_TOKENS.includes(safeToLowerCase(tokenAddress))
+    ) {
       const fallbackData = {
         staking_address: undefined,
         logo: undefined,
@@ -321,7 +332,11 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
     try {
       // Create the account ID for the subgraph query (address in lowercase)
-      const accountId = effectiveAddress.toLowerCase();
+      const accountId = safeToLowerCase(effectiveAddress);
+
+      if (!accountId) {
+        throw new Error("Invalid address provided");
+      }
 
       const query = `
         query GetAccountStakes($accountId: ID!) {
@@ -405,7 +420,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                   parseFloat(membership.units) > 0 &&
                   !membership.pool.token.isNativeAssetSuperToken &&
                   !BLACKLISTED_TOKENS.includes(
-                    membership.pool.token.id.toLowerCase()
+                    safeToLowerCase(membership.pool.token.id)
                   )
               );
               console.log(
@@ -608,7 +623,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
         snapshot.balanceUntilUpdatedAt &&
         parseFloat(snapshot.balanceUntilUpdatedAt) > 0 &&
         !snapshot.token.isNativeAssetSuperToken &&
-        !BLACKLISTED_TOKENS.includes(snapshot.token.id.toLowerCase())
+        !BLACKLISTED_TOKENS.includes(safeToLowerCase(snapshot.token.id))
     );
 
     if (validSnapshots.length === 0) {
@@ -631,7 +646,10 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
         // Check if this token is already staked (to avoid duplicates)
         const isAlreadyStaked = currentStakes.some(
           (stake) =>
-            stake.tokenAddress.toLowerCase() === tokenAddress.toLowerCase()
+            stake.tokenAddress &&
+            tokenAddress &&
+            safeToLowerCase(stake.tokenAddress) ===
+              safeToLowerCase(tokenAddress)
         );
 
         // Include all tokens that aren't already staked, regardless of current balance
@@ -674,8 +692,10 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
           // We can use the stakes data to find the pool address for this token
           const correspondingStake = stakes.find(
             (stake) =>
-              stake.tokenAddress.toLowerCase() ===
-              token.tokenAddress.toLowerCase()
+              stake.tokenAddress &&
+              token.tokenAddress &&
+              safeToLowerCase(stake.tokenAddress) ===
+                safeToLowerCase(token.tokenAddress)
           );
           if (correspondingStake?.stakingPoolAddress) {
             isConnectedToPool = await checkPoolConnection(
