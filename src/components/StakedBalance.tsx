@@ -166,7 +166,7 @@ export function StakedBalance({
       if (!document.hidden) {
         fetchData();
       }
-    }, 30000);
+    }, 300000);
 
     // Listen for visibility changes to fetch fresh data when page becomes visible
     document.addEventListener("visibilitychange", handleVisibilityChange);

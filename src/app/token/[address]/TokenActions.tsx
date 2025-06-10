@@ -326,7 +326,7 @@ export function TokenActions({
       }
     };
 
-    const intervalId = setInterval(fetchTokenData, 60000);
+    const intervalId = setInterval(fetchTokenData, 300000);
     fetchTokenData();
 
     return () => clearInterval(intervalId);
@@ -443,7 +443,7 @@ export function TokenActions({
 
     fetchUSDPrices();
     // Update prices every minute
-    const interval = setInterval(fetchUSDPrices, 60000);
+    const interval = setInterval(fetchUSDPrices, 300000);
     return () => clearInterval(interval);
   }, [contractAddress, token.price]);
 

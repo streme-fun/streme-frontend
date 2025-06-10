@@ -341,7 +341,7 @@ export default function TokensPage() {
       }
     };
 
-    const refreshInterval = setInterval(refreshBalances, 60000);
+    const refreshInterval = setInterval(refreshBalances, 300000);
     return () => clearInterval(refreshInterval);
   }, [effectiveAddress, stakes.length]);
 

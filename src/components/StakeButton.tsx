@@ -152,7 +152,7 @@ export function StakeButton({
     };
 
     fetchBalanceInternal();
-    const interval = setInterval(fetchBalanceInternal, 60000); // Refresh every 60 seconds instead of 30
+    const interval = setInterval(fetchBalanceInternal, 300000); // Changed from 60000 (1 minute) to 300000 (5 minutes)
     return () => clearInterval(interval);
   }, [effectiveAddress, effectiveIsConnected, tokenAddress, refreshTrigger]);
 
