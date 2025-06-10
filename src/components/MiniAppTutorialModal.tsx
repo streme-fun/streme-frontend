@@ -24,12 +24,12 @@ export function MiniAppTutorialModal({
         <div className="space-y-4">
           <p className="text-base opacity-80">
             Every token launched on Streme distributes 20% of its supply to
-            stakers over 365 days.
+            stakers over 365 days as rewards.
           </p>
 
           <p className="text-base opacity-80">
-            Rewards are <span className="font-bold italic">streamed</span> to
-            stakers&apos; wallets every second proportional their stake.
+            Rewards are <span className="italic">streamed</span> to
+            stakers&apos; wallets every second proportional to their stake.
           </p>
           <Image
             src="/onboarding-rewards.gif"
@@ -41,12 +41,12 @@ export function MiniAppTutorialModal({
       ),
     },
     {
-      title: "Qualify for the SUP Token Drop",
+      title: "Streme to qualify for SUP",
       content: (
         <div className="space-y-4">
           <p className="text-base opacity-80">
-            Streme users can get in on Superfluid SUP. We&apos;re tight like
-            that.
+            Streme users can get in on the Superfluid SUP drop. We&apos;re tight
+            like that.
           </p>
           <p className="text-base opacity-80">
             To qualify, do things like add the mini-app, hold or stake tokens,
@@ -69,12 +69,14 @@ export function MiniAppTutorialModal({
         <div className="space-y-4 text-center">
           <div className="text-6xl mb-4">🎊</div>
           <p className="text-base opacity-80">
-            So launch some tokens, stake some others, earn rewards, and have
-            fun. And don&apos;t forget to top-up your stakes and claim your SUP.
+            Play around and explore. Launch, stake, earn rewards streamed to
+            your wallet, top-up your stakes from time to time, and have fun. And
+            don&apos;t forget to and claim your SUP!
           </p>
           <div className="bg-accent/10 p-4 rounded-lg border border-accent/20">
             <p className="text-sm font-medium">
-              💡 Need help? Hit up @zeni.eth or @markcarey on Farcaster
+              💡 Need help or want to help? Hit up @zeni.eth or @markcarey on
+              Farcaster
               <br />
             </p>
           </div>
