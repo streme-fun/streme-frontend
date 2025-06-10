@@ -11,11 +11,22 @@ export function useAppFrameLogic() {
   const [isMiniAppView, setIsMiniAppView] = useState(false);
   const [isDetectionComplete, setIsDetectionComplete] = useState(false);
   const [hasPromptedToAdd, setHasPromptedToAdd] = useState(false);
+  const [hasAddedMiniApp, setHasAddedMiniApp] = useState(false);
   const { context: farcasterContext, isSDKLoaded } = useFrame();
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { disconnect } = useDisconnect();
+
+  // Load mini app addition status from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const hasAdded = localStorage.getItem("streme-miniapp-added");
+      if (hasAdded === "true") {
+        setHasAddedMiniApp(true);
+      }
+    }
+  }, []);
 
   // Enhanced mini app detection with proper timeout and fallback
   useEffect(() => {
@@ -64,6 +75,22 @@ export function useAppFrameLogic() {
     };
   }, [isSDKLoaded, farcasterContext, isDetectionComplete]);
 
+  // Check if mini app is already added when context loads
+  useEffect(() => {
+    if (farcasterContext?.client) {
+      const isAdded = farcasterContext.client.added;
+      console.log("Mini app added status from context:", isAdded);
+
+      if (isAdded) {
+        setHasAddedMiniApp(true);
+        // Also save to localStorage for consistency
+        if (typeof window !== "undefined") {
+          localStorage.setItem("streme-miniapp-added", "true");
+        }
+      }
+    }
+  }, [farcasterContext]);
+
   const isOnCorrectNetwork = isConnected && chain?.id === base.id;
 
   const promptToAddMiniApp = async () => {
@@ -80,6 +107,13 @@ export function useAppFrameLogic() {
       const result = await sdk.actions.addFrame();
 
       console.log("Mini app successfully added!");
+
+      // Mark as successfully added and save to localStorage
+      setHasAddedMiniApp(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("streme-miniapp-added", "true");
+      }
+
       if (result.notificationDetails) {
         console.log(
           "Notification details received:",
@@ -129,5 +163,6 @@ export function useAppFrameLogic() {
     disconnect,
     promptToAddMiniApp,
     hasPromptedToAdd,
+    hasAddedMiniApp,
   };
 }

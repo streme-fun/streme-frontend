@@ -59,6 +59,7 @@ function App() {
     // disconnect,
     promptToAddMiniApp,
     hasPromptedToAdd,
+    hasAddedMiniApp,
   } = useAppFrameLogic();
 
   const postHog = usePostHog();
@@ -184,7 +185,7 @@ function App() {
     if (
       isMiniAppView &&
       isSDKLoaded &&
-      !hasPromptedToAdd &&
+      !hasAddedMiniApp &&
       !hasSkippedTutorial &&
       !showTutorialModal
     ) {
@@ -201,7 +202,7 @@ function App() {
   }, [
     isMiniAppView,
     isSDKLoaded,
-    hasPromptedToAdd,
+    hasAddedMiniApp,
     hasSkippedTutorial,
     showTutorialModal,
     postHog,
