@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import sdk, {
   type Context,
   type FrameNotificationDetails,
@@ -32,6 +32,15 @@ export function useFrame() {
     useState<FrameNotificationDetails | null>(null);
   const [lastEvent, setLastEvent] = useState("");
   const [addFrameResult, setAddFrameResult] = useState("");
+  const initializationRef = useRef(false);
+
+  // Add hook instantiation logging for debugging
+  useEffect(() => {
+    console.log("🟡 useFrame hook INSTANTIATED");
+    return () => {
+      console.log("🟡 useFrame hook CLEANUP");
+    };
+  }, []);
 
   // SDK actions only work in mini app clients, so this pattern supports browser actions as well
   const openUrl = useCallback(
@@ -83,6 +92,14 @@ export function useFrame() {
   }, []);
 
   useEffect(() => {
+    // Prevent multiple initializations
+    if (initializationRef.current) {
+      return;
+    }
+
+    initializationRef.current = true;
+    let storeUnsubscribe: (() => void) | null = null;
+
     const load = async () => {
       try {
         console.log("Starting SDK initialization...");
@@ -132,12 +149,6 @@ export function useFrame() {
 
         console.log("SDK loaded, context available");
 
-        // Set up MIPD Store
-        const store = createStore();
-        store.subscribe((providerDetails) => {
-          console.log("PROVIDER DETAILS", providerDetails);
-        });
-
         // Only mark as loaded after everything is initialized
         setIsSDKLoaded(true);
       } catch (error) {
@@ -146,6 +157,16 @@ export function useFrame() {
         setIsSDKLoaded(true);
       }
     };
+
+    // Set up MIPD Store outside of async function to ensure proper cleanup
+    try {
+      const store = createStore();
+      storeUnsubscribe = store.subscribe((providerDetails) => {
+        console.log("PROVIDER DETAILS", providerDetails);
+      });
+    } catch (error) {
+      console.error("Error setting up MIPD store:", error);
+    }
 
     // Add a timeout to prevent infinite loading in non-frame environments
     const timeoutId = setTimeout(() => {
@@ -157,17 +178,22 @@ export function useFrame() {
       }
     }, 3000); // 3 second timeout
 
-    if (sdk && !isSDKLoaded) {
+    if (sdk) {
       console.log("Calling load");
       load();
-      return () => {
-        clearTimeout(timeoutId);
-        sdk.removeAllListeners();
-      };
     } else {
-      clearTimeout(timeoutId);
+      setIsSDKLoaded(true);
     }
-  }, [isSDKLoaded]);
+
+    return () => {
+      clearTimeout(timeoutId);
+      sdk.removeAllListeners();
+      // Clean up MIPD store subscription
+      if (storeUnsubscribe) {
+        storeUnsubscribe();
+      }
+    };
+  }, []); // Empty dependency array - only run once on mount
 
   return {
     isSDKLoaded,
@@ -184,6 +210,14 @@ export function useFrame() {
 
 export function FrameProvider({ children }: { children: React.ReactNode }) {
   const frameContext = useFrame();
+
+  // Add mount/unmount logging for debugging
+  useEffect(() => {
+    console.log("🔴 FrameProvider MOUNTED");
+    return () => {
+      console.log("🔴 FrameProvider UNMOUNTED");
+    };
+  }, []);
 
   // Always render children - the app logic will handle frame vs non-frame UI
   return (
