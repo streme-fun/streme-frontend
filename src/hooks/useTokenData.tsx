@@ -30,6 +30,9 @@ interface TokenDataContextType {
     poolAddress?: string
   ) => Promise<void>;
   refreshAllData: () => Promise<void>;
+  refreshActiveData: () => Promise<void>;
+  registerActiveToken: (tokenAddress: string) => void;
+  unregisterActiveToken: (tokenAddress: string) => void;
   isRefreshing: boolean;
 }
 
@@ -44,6 +47,7 @@ export function TokenDataProvider({ children }: TokenDataProviderProps) {
     new Map()
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTokens, setActiveTokens] = useState<Set<string>>(new Set());
 
   const { refreshTrigger, primaryAddress } = useWalletAddressChange();
   const { user } = usePrivy();
@@ -58,6 +62,20 @@ export function TokenDataProvider({ children }: TokenDataProviderProps) {
     ? fcAddress
     : primaryAddress || user?.wallet?.address;
   const isConnected = isMiniAppView ? fcIsConnected : !!user?.wallet?.address;
+
+  // Register a token as currently active/visible
+  const registerActiveToken = useCallback((tokenAddress: string) => {
+    setActiveTokens((prev) => new Set(prev).add(tokenAddress));
+  }, []);
+
+  // Unregister a token as no longer active/visible
+  const unregisterActiveToken = useCallback((tokenAddress: string) => {
+    setActiveTokens((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(tokenAddress);
+      return newSet;
+    });
+  }, []);
 
   const refreshTokenData = useCallback(
     async (
@@ -183,16 +201,33 @@ export function TokenDataProvider({ children }: TokenDataProviderProps) {
     }
   }, [effectiveAddress, isConnected, balanceData, refreshTokenData]);
 
-  // Auto-refresh every 10 minutes
+  // Smart refresh: only refresh currently active/visible tokens
+  const refreshActiveData = useCallback(async () => {
+    if (!effectiveAddress || !isConnected || activeTokens.size === 0) return;
+
+    setIsRefreshing(true);
+    try {
+      // Only refresh tokens that are currently active/visible
+      const refreshPromises = Array.from(activeTokens).map((tokenAddress) => {
+        return refreshTokenData(tokenAddress);
+      });
+      await Promise.all(refreshPromises);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [effectiveAddress, isConnected, activeTokens, refreshTokenData]);
+
+  // Auto-refresh every 10 minutes - use smart refresh for active tokens
   useEffect(() => {
-    if (!effectiveAddress || !isConnected || balanceData.size === 0) return;
+    if (!effectiveAddress || !isConnected) return;
 
     const interval = setInterval(() => {
-      refreshAllData();
+      // Use smart refresh instead of refreshing all data
+      refreshActiveData();
     }, 600000);
 
     return () => clearInterval(interval);
-  }, [effectiveAddress, isConnected, balanceData.size, refreshAllData]);
+  }, [effectiveAddress, isConnected, refreshActiveData]);
 
   // Refresh on wallet change
   useEffect(() => {
@@ -205,6 +240,9 @@ export function TokenDataProvider({ children }: TokenDataProviderProps) {
     balanceData,
     refreshTokenData,
     refreshAllData,
+    refreshActiveData,
+    registerActiveToken,
+    unregisterActiveToken,
     isRefreshing,
   };
 
@@ -229,7 +267,13 @@ export function useTokenBalance(
   stakingAddress?: string,
   poolAddress?: string
 ) {
-  const { balanceData, refreshTokenData, isRefreshing } = useTokenData();
+  const {
+    balanceData,
+    refreshTokenData,
+    registerActiveToken,
+    unregisterActiveToken,
+    isRefreshing,
+  } = useTokenData();
   const { primaryAddress } = useWalletAddressChange();
   const { user } = usePrivy();
   const { isMiniAppView, address: fcAddress } = useAppFrameLogic();
@@ -240,6 +284,18 @@ export function useTokenBalance(
 
   const cacheKey = `${tokenAddress}-${effectiveAddress}`;
   const data = balanceData.get(cacheKey);
+
+  // Register this token as active when the hook is used
+  useEffect(() => {
+    if (tokenAddress) {
+      registerActiveToken(tokenAddress);
+
+      // Unregister when component unmounts or token changes
+      return () => {
+        unregisterActiveToken(tokenAddress);
+      };
+    }
+  }, [tokenAddress, registerActiveToken, unregisterActiveToken]);
 
   // Auto-fetch if data doesn't exist
   useEffect(() => {
