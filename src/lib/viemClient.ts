@@ -49,7 +49,7 @@ const readContractWithDebug = async (
     else if (stackTrace.includes("UnstakeButton")) component = "UnstakeButton";
 
     balanceCallTracker.trackCall(
-      args.address.toString(),
+      args.address?.toString() || "unknown",
       (args.args?.[0] as string) || "unknown",
       component
     );
@@ -150,7 +150,7 @@ class RequestBatcher {
               functionName: "balanceOf",
               args: [address as `0x${string}`],
             });
-            return { address, tokenAddress, balance };
+            return { address, tokenAddress, balance: balance as bigint };
           } catch (err) {
             console.warn(`Failed to fetch balance for ${tokenAddress}:`, err);
             return { address, tokenAddress, balance: BigInt(0) };

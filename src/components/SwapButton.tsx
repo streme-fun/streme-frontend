@@ -142,7 +142,7 @@ export function SwapButton({
     const requiredAmountBigInt = BigInt(requiredAmount);
 
     // If allowance is sufficient, no need to approve
-    if (currentAllowance >= requiredAmountBigInt) {
+    if ((currentAllowance as bigint) >= requiredAmountBigInt) {
       return;
     }
 

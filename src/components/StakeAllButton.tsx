@@ -100,7 +100,7 @@ export function StakeAllButton({
         functionName: "balanceOf",
         args: [toHex(effectiveAddress)],
       });
-      setBalance(bal);
+      setBalance(bal as bigint);
     } catch (error) {
       console.error("Error fetching token balance:", error);
       setBalance(0n);

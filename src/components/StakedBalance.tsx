@@ -74,7 +74,7 @@ export function StakedBalance({
           functionName: "balanceOf",
           args: [effectiveAddress as `0x${string}`],
         });
-        setStakedBalance(staked);
+        setStakedBalance(staked as bigint);
 
         // Get real-time received amount using token contract
         const received = await publicClient.readContract({
@@ -92,7 +92,7 @@ export function StakedBalance({
           args: [effectiveAddress as `0x${string}`],
         });
 
-        const formattedReceived = Number(formatUnits(received, 18));
+        const formattedReceived = Number(formatUnits(received as bigint, 18));
 
         // Only update base amount and reset timer if the balance has actually changed
         // This prevents the streaming animation from restarting unnecessarily

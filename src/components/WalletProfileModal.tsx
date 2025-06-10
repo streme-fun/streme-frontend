@@ -139,7 +139,7 @@ export function WalletProfileModal({
           functionName: "balanceOf",
           args: [effectiveAddress as `0x${string}`],
         });
-        setStremeBalance(stremeBal);
+        setStremeBalance(stremeBal as bigint);
       } catch (error) {
         console.error("Error fetching balances:", error);
         setEthBalance(0n);
