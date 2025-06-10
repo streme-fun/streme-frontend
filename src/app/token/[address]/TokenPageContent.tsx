@@ -12,7 +12,6 @@ import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import sdk from "@farcaster/frame-sdk";
 import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
-import { TokenDataProvider } from "@/src/hooks/useTokenData";
 
 type Deployment = {
   token: string;
@@ -296,86 +295,84 @@ ${shareUrl}`;
       : `https://www.geckoterminal.com/base/pools/${token.pool_address}?embed=1&info=0&swaps=0&grayscale=0&light_chart=0`;
 
   return (
-    <TokenDataProvider>
-      <div className="max-w-[1440px] mx-auto sm:px-6 md:px-8 md:mt-20 pt-8 pb-12">
-        {/* Back Arrow Button - Only show in mini app */}
-        {isMiniAppView && (
-          <div className="mb-4 px-4 sm:px-0">
-            <button
-              onClick={() => router.push("/")}
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+    <div className="max-w-[1440px] mx-auto sm:px-6 md:px-8 md:mt-20 pt-8 pb-12">
+      {/* Back Arrow Button - Only show in mini app */}
+      {isMiniAppView && (
+        <div className="mb-4 px-4 sm:px-0">
+          <button
+            onClick={() => router.push("/")}
+            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              Back
-            </button>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8">
-          <div className="order-1 lg:order-2 lg:col-span-4 space-y-4">
-            <TokenInfo
-              token={token}
-              onShare={handleShare}
-              isMiniAppView={isMiniAppView}
-            />
-
-            <TokenActions
-              token={token}
-              onStakingChange={handleStakingChange}
-              isMiniAppView={isMiniAppView}
-              address={address}
-              isConnected={isConnected}
-            />
-            <StakedBalance
-              data-staking-balance
-              stakingAddress={token.staking_address}
-              stakingPool={token.staking_pool}
-              symbol={token.symbol}
-              tokenAddress={token.contract_address}
-              isMiniApp={isMiniAppView}
-              farcasterAddress={address}
-              farcasterIsConnected={isConnected}
-              key={stakingUpdateTrigger}
-            />
-            <ClaimFeesButton
-              tokenAddress={token.contract_address}
-              creatorAddress={isCreator ? address : undefined}
-              isMiniApp={isMiniAppView}
-              farcasterAddress={address}
-              farcasterIsConnected={isConnected}
-            />
-          </div>
-
-          <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit">
-            <div className="card-body p-0 md:p-4 pb-12">
-              <iframe
-                data-privy-ignore
-                title="GeckoTerminal Embed"
-                src={isMiniAppView ? smallEmbedUrl : embedUrl}
-                className="w-full h-[500px] lg:h-[800px]"
-                allow="clipboard-write"
-                allowFullScreen
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
               />
-            </div>
-          </div>
+            </svg>
+            Back
+          </button>
         </div>
-        <div className="fixed inset-0 -z-50">
-          <HeroAnimationMini />
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8">
+        <div className="order-1 lg:order-2 lg:col-span-4 space-y-4">
+          <TokenInfo
+            token={token}
+            onShare={handleShare}
+            isMiniAppView={isMiniAppView}
+          />
+
+          <TokenActions
+            token={token}
+            onStakingChange={handleStakingChange}
+            isMiniAppView={isMiniAppView}
+            address={address}
+            isConnected={isConnected}
+          />
+          <StakedBalance
+            data-staking-balance
+            stakingAddress={token.staking_address}
+            stakingPool={token.staking_pool}
+            symbol={token.symbol}
+            tokenAddress={token.contract_address}
+            isMiniApp={isMiniAppView}
+            farcasterAddress={address}
+            farcasterIsConnected={isConnected}
+            key={stakingUpdateTrigger}
+          />
+          <ClaimFeesButton
+            tokenAddress={token.contract_address}
+            creatorAddress={isCreator ? address : undefined}
+            isMiniApp={isMiniAppView}
+            farcasterAddress={address}
+            farcasterIsConnected={isConnected}
+          />
+        </div>
+
+        <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit">
+          <div className="card-body p-0 md:p-4 pb-12">
+            <iframe
+              data-privy-ignore
+              title="GeckoTerminal Embed"
+              src={isMiniAppView ? smallEmbedUrl : embedUrl}
+              className="w-full h-[500px] lg:h-[800px]"
+              allow="clipboard-write"
+              allowFullScreen
+            />
+          </div>
         </div>
       </div>
-    </TokenDataProvider>
+      <div className="fixed inset-0 -z-50">
+        <HeroAnimationMini />
+      </div>
+    </div>
   );
 }

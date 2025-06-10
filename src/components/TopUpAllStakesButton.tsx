@@ -34,7 +34,6 @@ interface TopUpAllStakesButtonProps {
     stakingAddress: string;
     stakingPoolAddress: string;
     baseAmount: number;
-    streamedAmount: number;
     membership: {
       pool: {
         token: {
@@ -281,7 +280,7 @@ export function TopUpAllStakesButton({
       // Use the balance information that's already available in stakes from the page
       for (const stake of validStakes) {
         // Get current balance from the stake's receivedBalance + streamedAmount
-        const currentBalance = stake.baseAmount + stake.streamedAmount;
+        const currentBalance = stake.baseAmount;
         const balanceInWei = BigInt(Math.floor(currentBalance * 1e18));
 
         if (balanceInWei > 0n) {

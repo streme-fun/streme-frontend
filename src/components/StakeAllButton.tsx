@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useWallets } from "@privy-io/react-auth";
 import { useAccount } from "wagmi";
 import { Interface } from "@ethersproject/abi";
@@ -54,6 +54,7 @@ interface StakeAllButtonProps {
   isMiniApp?: boolean;
   farcasterAddress?: string;
   farcasterIsConnected?: boolean;
+  tokenBalance?: bigint;
 }
 
 export function StakeAllButton({
@@ -67,49 +68,19 @@ export function StakeAllButton({
   isMiniApp,
   farcasterAddress,
   farcasterIsConnected,
+  tokenBalance = BigInt(0),
 }: StakeAllButtonProps) {
   const { wallets } = useWallets();
   const { address: wagmiAddress } = useAccount();
-  const [balance, setBalance] = useState<bigint>(0n);
   const [isLoading, setIsLoading] = useState(false);
   const postHog = usePostHog();
+
+  const balance = tokenBalance;
 
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
     : !!wagmiAddress;
   const effectiveAddress = isMiniApp ? farcasterAddress : wagmiAddress;
-
-  const fetchBalance = useCallback(async () => {
-    if (!effectiveAddress || !effectiveIsConnected) {
-      setBalance(0n);
-      return;
-    }
-
-    try {
-      const bal = await publicClient.readContract({
-        address: toHex(tokenAddress),
-        abi: [
-          {
-            inputs: [{ name: "account", type: "address" }],
-            name: "balanceOf",
-            outputs: [{ name: "", type: "uint256" }],
-            stateMutability: "view",
-            type: "function",
-          },
-        ],
-        functionName: "balanceOf",
-        args: [toHex(effectiveAddress)],
-      });
-      setBalance(bal as bigint);
-    } catch (error) {
-      console.error("Error fetching token balance:", error);
-      setBalance(0n);
-    }
-  }, [effectiveAddress, effectiveIsConnected, tokenAddress]);
-
-  useEffect(() => {
-    fetchBalance();
-  }, [fetchBalance]);
 
   const handleStakeAll = async () => {
     if (!effectiveAddress || !effectiveIsConnected) {
@@ -261,7 +232,6 @@ export function StakeAllButton({
       }
 
       // Success - refresh balance and trigger callbacks
-      await fetchBalance();
       onSuccess?.();
       toast.success(`Successfully staked all ${symbol} tokens!`, {
         id: toastId,

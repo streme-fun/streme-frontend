@@ -13,7 +13,6 @@ import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 import { usePostHog } from "posthog-js/react"; // Added PostHog hook
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics"; // Added analytics constants
 import { formatUnits } from "viem"; // Added for amount formatting
-import { useTokenBalance } from "@/src/hooks/useTokenData";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 
@@ -63,6 +62,7 @@ interface StakeButtonProps {
   isMiniApp?: boolean;
   farcasterAddress?: string;
   farcasterIsConnected?: boolean;
+  tokenBalance?: bigint;
 }
 
 export function StakeButton({
@@ -78,20 +78,17 @@ export function StakeButton({
   isMiniApp,
   farcasterAddress,
   farcasterIsConnected,
+  tokenBalance = BigInt(0),
 }: StakeButtonProps) {
   const { wallets } = useWallets();
   const { user } = usePrivy();
   const { primaryAddress } = useWalletAddressChange();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // Added for loading state
-  const postHog = usePostHog(); // Added PostHog instance
+  const [isLoading, setIsLoading] = useState(false);
+  const postHog = usePostHog();
 
-  // Use shared token data instead of individual polling
-  const { tokenBalance: balance, refresh: refreshBalance } = useTokenBalance(
-    tokenAddress,
-    stakingAddress,
-    stakingPoolAddress
-  );
+  // Use passed balance instead of making additional API calls
+  const balance = tokenBalance;
 
   const effectiveIsConnected =
     farcasterIsConnected ?? (isMiniApp ? false : !!user?.wallet?.address);
@@ -473,7 +470,6 @@ export function StakeButton({
         }
       }
       // Common success path if all transactions succeeded
-      await refreshBalance();
       onSuccess?.();
 
       // PostHog event tracking
@@ -551,8 +547,7 @@ export function StakeButton({
     }
   };
 
-  const handleModalOpen = async () => {
-    await refreshBalance();
+  const handleModalOpen = () => {
     setIsModalOpen(true);
   };
 
@@ -576,7 +571,6 @@ export function StakeButton({
         totalStakers={totalStakers}
         onStake={handleStake}
         onSuccess={onSuccess} // Pass onSuccess to modal if it needs to trigger something on close after success
-        onRefreshBalance={refreshBalance} // Pass balance refresh function
         isMiniApp={isMiniApp}
       />
     </>

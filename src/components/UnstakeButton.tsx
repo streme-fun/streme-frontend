@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useWallets, usePrivy } from "@privy-io/react-auth";
 import { UnstakeModal } from "./UnstakeModal";
 import { publicClient } from "@/src/lib/viemClient";
@@ -64,7 +64,7 @@ export function UnstakeButton({
 }: UnstakeButtonProps) {
   const { wallets } = useWallets();
   const { user } = usePrivy();
-  const { refreshTrigger, primaryAddress } = useWalletAddressChange();
+  const { primaryAddress } = useWalletAddressChange();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unlockTime, setUnlockTime] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>("");
@@ -78,32 +78,39 @@ export function UnstakeButton({
     ? farcasterAddress
     : primaryAddress || user?.wallet?.address;
 
-  // Fetch unlock time - using direct useEffect pattern like ZapStakeButton
-  useEffect(() => {
-    if (effectiveIsConnected && effectiveAddress) {
-      const fetchUnlockTimeInternal = async () => {
-        try {
-          const timestamp = await publicClient.readContract({
-            address: toHex(stakingAddress),
-            abi: stakingAbiViem,
-            functionName: "depositTimestamps",
-            args: [toHex(effectiveAddress)],
-          });
+  // Fetch unlock time only when needed, not on mount
+  const fetchUnlockTime = useCallback(async () => {
+    if (!effectiveIsConnected || !effectiveAddress) return;
 
-          const unlockTimeStamp = Number(timestamp) + 86400; // 24 hours in seconds
-          setUnlockTime(unlockTimeStamp);
-        } catch (error) {
-          console.error("Error fetching unlock time:", error);
-          toast.error("Could not fetch unlock time.");
-        }
-      };
+    try {
+      const timestamp = await publicClient.readContract({
+        address: toHex(stakingAddress),
+        abi: stakingAbiViem,
+        functionName: "depositTimestamps",
+        args: [toHex(effectiveAddress)],
+      });
 
-      fetchUnlockTimeInternal();
-      const interval = setInterval(fetchUnlockTimeInternal, 300000); // Changed from 60000 (1 minute) to 300000 (5 minutes)
-      return () => clearInterval(interval);
+      const unlockTimeStamp = Number(timestamp) + 86400; // 24 hours in seconds
+      setUnlockTime(unlockTimeStamp);
+    } catch (error) {
+      console.error("Error fetching unlock time:", error);
+      toast.error("Could not fetch unlock time.");
     }
-  }, [effectiveAddress, effectiveIsConnected, stakingAddress, refreshTrigger]);
+  }, [effectiveAddress, effectiveIsConnected, stakingAddress]);
 
+  // Only fetch unlock time when button is clicked, not on mount
+  const handleButtonClick = async () => {
+    if (isLoading) return;
+
+    // Fetch unlock time when user wants to unstake
+    if (unlockTime === null) {
+      await fetchUnlockTime();
+    }
+
+    setIsModalOpen(true);
+  };
+
+  // Update timer when unlock time is set
   useEffect(() => {
     if (!unlockTime) return;
 
@@ -310,7 +317,7 @@ export function UnstakeButton({
   return (
     <>
       <button
-        onClick={() => !isLoading && setIsModalOpen(true)}
+        onClick={handleButtonClick}
         disabled={disabled || userStakedBalance <= 0n || isLocked || isLoading}
         className={className}
         title={timeLeft ? `Unlocks in ${timeLeft}` : undefined}

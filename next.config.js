@@ -105,17 +105,29 @@ const nextConfig = {
                 https://base-rpc.publicnode.com
                 https://auth.privy.io
                 https://auth.farcaster.xyz
+                https://farcaster.xyz
+                https://client.farcaster.xyz
+                https://warpcast.com
+                https://client.warpcast.com
+                https://wrpcd.net
+                https://*.wrpcd.net
+                https://privy.farcaster.xyz
+                https://privy.warpcast.com
                 wss://relay.walletconnect.com
                 wss://relay.walletconnect.org
                 wss://www.walletlink.org
+                wss://ws.farcaster.xyz
                 https://*.rpc.privy.systems
                 https://explorer-api.walletconnect.com
+                https://*.walletconnect.com
+                https://*.walletconnect.org
                 https://api.relay.link
                 https://api.testnets.relay.link
                 https://subgraph-endpoints.superfluid.dev
                 https://*.base-mainnet.superfluid.dev
                 https://metamask-sdk.api.cx.metamask.io
-                https://*.base.superfluid.dev;
+                https://*.base.superfluid.dev
+                https://cloudflareinsights.com;
               frame-src 'self'
                 https://auth.privy.io
                 https://verify.walletconnect.com

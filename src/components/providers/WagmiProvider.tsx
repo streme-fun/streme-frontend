@@ -15,6 +15,32 @@ import { useEffect, useState } from "react";
 import { useConnect, useAccount } from "wagmi";
 import React from "react";
 
+// Helper function to safely check wallet provider
+const safeProviderCheck = (providerName: string) => {
+  try {
+    if (typeof window === "undefined" || !window.ethereum) return false;
+
+    // Handle cases where multiple wallets are installed
+    const ethereum = window.ethereum;
+
+    switch (providerName) {
+      case "coinbase":
+        return !!(
+          ethereum.isCoinbaseWallet ||
+          ethereum.isCoinbaseWalletExtension ||
+          ethereum.isCoinbaseWalletBrowser
+        );
+      case "metamask":
+        return !!(ethereum.isMetaMask && !ethereum.isCoinbaseWallet);
+      default:
+        return false;
+    }
+  } catch (error) {
+    console.warn(`Error checking ${providerName} provider:`, error);
+    return false;
+  }
+};
+
 // Custom hook for Coinbase Wallet detection and auto-connection
 function useCoinbaseWalletAutoConnect() {
   const [isCoinbaseWallet, setIsCoinbaseWallet] = useState(false);
@@ -24,25 +50,41 @@ function useCoinbaseWalletAutoConnect() {
   useEffect(() => {
     // Check if we're running in Coinbase Wallet
     const checkCoinbaseWallet = () => {
-      const isInCoinbaseWallet =
-        window.ethereum?.isCoinbaseWallet ||
-        window.ethereum?.isCoinbaseWalletExtension ||
-        window.ethereum?.isCoinbaseWalletBrowser;
-      setIsCoinbaseWallet(!!isInCoinbaseWallet);
+      const isInCoinbaseWallet = safeProviderCheck("coinbase");
+      setIsCoinbaseWallet(isInCoinbaseWallet);
     };
 
     checkCoinbaseWallet();
-    window.addEventListener("ethereum#initialized", checkCoinbaseWallet);
+
+    // Listen for ethereum provider initialization with error handling
+    const handleEthereumInit = () => {
+      try {
+        checkCoinbaseWallet();
+      } catch (error) {
+        console.warn("Error during ethereum provider initialization:", error);
+      }
+    };
+
+    window.addEventListener("ethereum#initialized", handleEthereumInit);
 
     return () => {
-      window.removeEventListener("ethereum#initialized", checkCoinbaseWallet);
+      window.removeEventListener("ethereum#initialized", handleEthereumInit);
     };
   }, []);
 
   useEffect(() => {
     // Auto-connect if in Coinbase Wallet and not already connected
-    if (isCoinbaseWallet && !isConnected) {
-      connect({ connector: connectors[1] }); // Coinbase Wallet connector
+    if (isCoinbaseWallet && !isConnected && connectors.length > 1) {
+      try {
+        const coinbaseConnector = connectors.find(
+          (connector) => connector.id === "coinbaseWallet"
+        );
+        if (coinbaseConnector) {
+          connect({ connector: coinbaseConnector });
+        }
+      } catch (error) {
+        console.warn("Error auto-connecting Coinbase Wallet:", error);
+      }
     }
   }, [isCoinbaseWallet, isConnected, connect, connectors]);
 
