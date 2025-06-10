@@ -81,7 +81,7 @@ export function StakeButton({
 }: StakeButtonProps) {
   const { wallets } = useWallets();
   const { user } = usePrivy();
-  const { refreshTrigger, primaryAddress } = useWalletAddressChange();
+  const { primaryAddress } = useWalletAddressChange();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false); // Added for loading state
   const postHog = usePostHog(); // Added PostHog instance
@@ -108,7 +108,7 @@ export function StakeButton({
         functionName: "allowance",
         args: [toHex(effectiveAddress!), toHex(stakingAddress)],
       });
-      return allowance;
+      return allowance as bigint;
     } catch (error) {
       console.error("Error checking allowance:", error);
       return 0n;
@@ -146,7 +146,7 @@ export function StakeButton({
           throw new Error("Farcaster Ethereum provider not available.");
 
         const currentAllowance = await checkAllowance();
-        if (currentAllowance < amount) {
+        if ((currentAllowance as bigint) < amount) {
           toast.info(
             "Requesting unlimited approval for future transactions...",
             { id: toastId }
@@ -315,7 +315,7 @@ export function StakeButton({
         });
 
         const currentAllowance = await checkAllowance();
-        if (currentAllowance < amount) {
+        if ((currentAllowance as bigint) < amount) {
           toast.info(
             "Requesting unlimited approval for future transactions...",
             { id: toastId }
