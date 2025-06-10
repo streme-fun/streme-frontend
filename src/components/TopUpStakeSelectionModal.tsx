@@ -94,9 +94,6 @@ export function TopUpStakeSelectionModal({
   };
 
   const selectedCount = stakeOptions.filter((option) => option.selected).length;
-  const totalValue = stakeOptions
-    .filter((option) => option.selected)
-    .reduce((sum, option) => sum + Number(formatUnits(option.balance, 18)), 0);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
@@ -179,13 +176,6 @@ export function TopUpStakeSelectionModal({
                   <div>
                     <p className="text-sm text-gray-500">
                       Selected: {selectedCount} tokens
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      Total: ~
-                      {totalValue.toLocaleString("en-US", {
-                        maximumFractionDigits: 2,
-                      })}{" "}
-                      tokens
                     </p>
                   </div>
                 </div>
