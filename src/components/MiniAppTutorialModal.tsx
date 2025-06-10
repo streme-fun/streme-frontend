@@ -19,7 +19,7 @@ export function MiniAppTutorialModal({
 
   const steps = [
     {
-      title: "Streme Tokens Are Different",
+      title: "Streme Tokens Are Built Different",
       content: (
         <div className="space-y-4">
           <p className="text-base opacity-80">
@@ -28,8 +28,8 @@ export function MiniAppTutorialModal({
           </p>
 
           <p className="text-base opacity-80">
-            Rewards are streamed to stakers&apos; wallets every second based on
-            the amount of tokens they stake.
+            Rewards are <span className="font-bold italic">streamed</span> to
+            stakers&apos; wallets every second proportional their stake.
           </p>
           <Image
             src="/onboarding-rewards.gif"
