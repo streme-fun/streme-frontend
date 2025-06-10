@@ -99,6 +99,10 @@ const nextConfig = {
                 https://*.alchemy.com 
                 https://*.base.org 
                 https://*.llamarpc.com
+                https://base.meowrpc.com
+                https://1rpc.io
+                https://base.blockpi.network
+                https://base-rpc.publicnode.com
                 https://auth.privy.io
                 https://auth.farcaster.xyz
                 wss://relay.walletconnect.com

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useWallets } from "@privy-io/react-auth";
 import { usePrivy } from "@privy-io/react-auth";
 // import { base } from "viem/chains"; // Removed as it's no longer used
@@ -13,6 +13,7 @@ import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 import { usePostHog } from "posthog-js/react"; // Added PostHog hook
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics"; // Added analytics constants
 import { formatUnits } from "viem"; // Added for amount formatting
+import { useTokenBalance } from "@/src/hooks/useTokenData";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 
@@ -82,79 +83,21 @@ export function StakeButton({
   const { user } = usePrivy();
   const { refreshTrigger, primaryAddress } = useWalletAddressChange();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [balance, setBalance] = useState<bigint>(0n);
   const [isLoading, setIsLoading] = useState(false); // Added for loading state
   const postHog = usePostHog(); // Added PostHog instance
+
+  // Use shared token data instead of individual polling
+  const { tokenBalance: balance, refresh: refreshBalance } = useTokenBalance(
+    tokenAddress,
+    stakingAddress,
+    stakingPoolAddress
+  );
 
   const effectiveIsConnected =
     farcasterIsConnected ?? (isMiniApp ? false : !!user?.wallet?.address);
   const effectiveAddress = isMiniApp
     ? farcasterAddress
     : primaryAddress || user?.wallet?.address;
-
-  // Separate fetchBalance function that can be called from anywhere
-  const fetchBalance = async () => {
-    if (!effectiveAddress || !effectiveIsConnected) {
-      setBalance(0n);
-      return;
-    }
-
-    try {
-      const bal = await publicClient.readContract({
-        address: toHex(tokenAddress),
-        abi: [
-          {
-            inputs: [{ name: "account", type: "address" }],
-            name: "balanceOf",
-            outputs: [{ name: "", type: "uint256" }],
-            stateMutability: "view",
-            type: "function",
-          },
-        ],
-        functionName: "balanceOf",
-        args: [toHex(effectiveAddress)],
-      });
-      setBalance(bal);
-    } catch (error) {
-      console.error("Error fetching token balance:", error);
-      setBalance(0n);
-    }
-  };
-
-  // Fetch token balance - using direct useEffect pattern like ZapStakeButton
-  useEffect(() => {
-    const fetchBalanceInternal = async () => {
-      if (!effectiveAddress || !effectiveIsConnected) {
-        setBalance(0n);
-        return;
-      }
-
-      try {
-        const bal = await publicClient.readContract({
-          address: toHex(tokenAddress),
-          abi: [
-            {
-              inputs: [{ name: "account", type: "address" }],
-              name: "balanceOf",
-              outputs: [{ name: "", type: "uint256" }],
-              stateMutability: "view",
-              type: "function",
-            },
-          ],
-          functionName: "balanceOf",
-          args: [toHex(effectiveAddress)],
-        });
-        setBalance(bal);
-      } catch (error) {
-        console.error("Error fetching token balance:", error);
-        setBalance(0n);
-      }
-    };
-
-    fetchBalanceInternal();
-    const interval = setInterval(fetchBalanceInternal, 300000); // Changed from 60000 (1 minute) to 300000 (5 minutes)
-    return () => clearInterval(interval);
-  }, [effectiveAddress, effectiveIsConnected, tokenAddress, refreshTrigger]);
 
   const checkAllowance = async () => {
     if (!effectiveAddress || !effectiveIsConnected) return 0n;
@@ -530,7 +473,7 @@ export function StakeButton({
         }
       }
       // Common success path if all transactions succeeded
-      await fetchBalance();
+      await refreshBalance();
       onSuccess?.();
 
       // PostHog event tracking
@@ -609,7 +552,7 @@ export function StakeButton({
   };
 
   const handleModalOpen = async () => {
-    await fetchBalance();
+    await refreshBalance();
     setIsModalOpen(true);
   };
 
@@ -633,7 +576,7 @@ export function StakeButton({
         totalStakers={totalStakers}
         onStake={handleStake}
         onSuccess={onSuccess} // Pass onSuccess to modal if it needs to trigger something on close after success
-        onRefreshBalance={fetchBalance} // Pass balance refresh function
+        onRefreshBalance={refreshBalance} // Pass balance refresh function
         isMiniApp={isMiniApp}
       />
     </>

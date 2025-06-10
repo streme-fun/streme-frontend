@@ -1,20 +1,17 @@
 import { createPublicClient, http, fallback } from "viem";
 import { base } from "viem/chains";
+import { balanceCallTracker } from "./debug";
 
-const alchemyBaseUrl = process.env.NEXT_PUBLIC_ALCHEMY_BASE_URL;
-
-// Multiple RPC endpoints for better reliability and rate limit handling
+// RPC endpoints in order of preference
 const rpcEndpoints = [
-  // Primary: Your Alchemy endpoint (if available)
-  ...(alchemyBaseUrl ? [alchemyBaseUrl] : []),
-  // Fallback public RPCs for Base
-  "https://base.llamarpc.com",
-  "https://base-rpc.publicnode.com",
-  "https://base.blockpi.network/v1/rpc/public",
+  "https://mainnet.base.org",
+  "https://developer-access-mainnet.base.org",
+  process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL!,
+  "https://base.meowrpc.com",
   "https://1rpc.io/base",
 ];
 
-export const publicClient = createPublicClient({
+const originalPublicClient = createPublicClient({
   chain: base,
   transport: fallback(
     rpcEndpoints.map((url) =>
@@ -30,6 +27,49 @@ export const publicClient = createPublicClient({
     }
   ),
 });
+
+// Create a debug wrapper for readContract
+const readContractWithDebug = async (
+  args: Parameters<typeof originalPublicClient.readContract>[0]
+) => {
+  // Log balance calls with component tracking
+  if (args.abi && args.functionName === "balanceOf") {
+    const stackTrace = new Error().stack || "";
+
+    // Try to identify the calling component from stack trace
+    let component = "Unknown";
+    if (stackTrace.includes("TokenActions")) component = "TokenActions";
+    else if (stackTrace.includes("StakeButton")) component = "StakeButton";
+    else if (stackTrace.includes("StakedBalance")) component = "StakedBalance";
+    else if (stackTrace.includes("MyTokensModal")) component = "MyTokensModal";
+    else if (stackTrace.includes("TokensPage")) component = "TokensPage";
+    else if (stackTrace.includes("useTokenBalance"))
+      component = "useTokenBalance";
+    else if (stackTrace.includes("useTokenData")) component = "useTokenData";
+    else if (stackTrace.includes("UnstakeButton")) component = "UnstakeButton";
+
+    balanceCallTracker.trackCall(
+      args.address.toString(),
+      (args.args?.[0] as string) || "unknown",
+      component
+    );
+
+    console.warn(
+      `🔍 ALCHEMY CALL: balanceOf(${args.args?.[0]}) on contract ${args.address} from ${component}`,
+      {
+        timestamp: new Date().toISOString(),
+      }
+    );
+  }
+
+  return originalPublicClient.readContract(args);
+};
+
+// Create public client with debug wrapper
+export const publicClient = {
+  ...originalPublicClient,
+  readContract: readContractWithDebug,
+};
 
 // Request batching utility to reduce RPC calls
 class RequestBatcher {
@@ -95,7 +135,7 @@ class RequestBatcher {
         ...request,
         balance:
           results[index].status === "success"
-            ? results[index].result
+            ? (results[index].result as bigint)
             : BigInt(0),
       }));
     } catch (error) {
