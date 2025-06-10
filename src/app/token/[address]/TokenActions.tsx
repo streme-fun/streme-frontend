@@ -728,6 +728,7 @@ export function TokenActions({
             isMiniApp={isEffectivelyMiniApp}
             farcasterAddress={currentAddress}
             farcasterIsConnected={walletIsConnected}
+            tokenBalance={balance}
           />
         )}
 
