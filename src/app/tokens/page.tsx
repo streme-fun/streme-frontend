@@ -269,7 +269,7 @@ export default function TokensPage() {
         functionName: "isMemberConnected",
         args: [poolAddress as `0x${string}`, userAddress as `0x${string}`],
       });
-      return connectedStatus;
+      return connectedStatus as boolean;
     } catch (error) {
       console.error("Error checking pool connection:", error);
       return false;
@@ -320,18 +320,25 @@ export default function TokensPage() {
 
         setStakes((prevStakes) =>
           prevStakes.map((stake) => {
-            const currentBalance =
-              balanceMap.get(stake.tokenAddress) || BigInt(0);
-            const formattedBalance = Number(formatUnits(currentBalance, 18));
+            if (
+              !tokenAddresses ||
+              tokenAddresses.includes(stake.tokenAddress)
+            ) {
+              const receivedBalance =
+                (balanceMap.get(stake.tokenAddress) as bigint) || BigInt(0);
+              const formattedReceived = Number(
+                formatUnits(receivedBalance, 18)
+              );
 
-            if (Math.abs(formattedBalance - stake.baseAmount) > 0.0001) {
-              return {
-                ...stake,
-                receivedBalance: formattedBalance,
-                baseAmount: formattedBalance,
-                streamedAmount: 0,
-                lastUpdateTime: Date.now(),
-              };
+              if (Math.abs(formattedReceived - stake.baseAmount) > 0.0001) {
+                return {
+                  ...stake,
+                  receivedBalance: formattedReceived,
+                  baseAmount: formattedReceived,
+                  streamedAmount: 0,
+                  lastUpdateTime: Date.now(),
+                };
+              }
             }
             return stake;
           })
@@ -502,7 +509,8 @@ export default function TokensPage() {
           console.warn("Skipping membership with null token address");
           continue;
         }
-        const receivedBalance = balanceMap.get(tokenAddress) || BigInt(0);
+        const receivedBalance =
+          (balanceMap.get(tokenAddress) as bigint) || BigInt(0);
         const formattedReceived = Number(formatUnits(receivedBalance, 18));
 
         const totalUnits = BigInt(membership.pool.totalUnits || "0");
@@ -538,33 +546,126 @@ export default function TokensPage() {
     return stakesData;
   };
 
-  // Enhance stakes with API data
+  // Enhance stakes with API data - optimized to reduce calls
   const enhanceStakesWithApiData = async (initialStakes: StakeData[]) => {
-    const tokenDataPromises = initialStakes.map((stake) =>
+    // Only enhance a maximum of 5 tokens at once to reduce API load
+    const stakesToEnhance = initialStakes.slice(0, 5);
+
+    const tokenDataPromises = stakesToEnhance.map((stake) =>
       fetchTokenData(stake.tokenAddress)
     );
     const tokenDataResults = await Promise.all(tokenDataPromises);
 
-    const enhancedStakes = await Promise.all(
-      initialStakes.map(async (stake, index) => {
-        const tokenData = tokenDataResults[index];
+    // Batch all the staked balance calls together
+    const stakedBalancePromises = stakesToEnhance.map(async (stake, index) => {
+      const tokenData = tokenDataResults[index];
+      const stakingAddress = tokenData.staking_address;
 
-        let isConnectedToPool = false;
-        if (stake.stakingPoolAddress && effectiveAddress) {
-          isConnectedToPool = await checkPoolConnection(
-            stake.stakingPoolAddress,
-            effectiveAddress
-          );
+      if (
+        stakingAddress &&
+        stakingAddress !== "0x0000000000000000000000000000000000000000"
+      ) {
+        try {
+          return await publicClient.readContract({
+            address: stakingAddress as `0x${string}`,
+            abi: [
+              {
+                inputs: [{ name: "account", type: "address" }],
+                name: "balanceOf",
+                outputs: [{ name: "", type: "uint256" }],
+                stateMutability: "view",
+                type: "function",
+              },
+            ],
+            functionName: "balanceOf",
+            args: [effectiveAddress as `0x${string}`],
+          });
+        } catch (error) {
+          console.warn("Could not fetch staked balance:", error);
+          return BigInt(0);
         }
+      }
+      return BigInt(0);
+    });
 
-        let stakedBalance = BigInt(0);
+    // Batch all pool connection calls together
+    const poolConnectionPromises = stakesToEnhance.map(async (stake) => {
+      if (stake.stakingPoolAddress && effectiveAddress) {
+        return await checkPoolConnection(
+          stake.stakingPoolAddress,
+          effectiveAddress
+        );
+      }
+      return false;
+    });
+
+    // Execute both batches in parallel
+    const [stakedBalances, poolConnections] = await Promise.all([
+      Promise.all(stakedBalancePromises),
+      Promise.all(poolConnectionPromises),
+    ]);
+
+    // Build enhanced stakes with the batched results
+    const enhancedStakes = initialStakes.map((stake, index) => {
+      if (index < stakesToEnhance.length) {
+        const tokenData = tokenDataResults[index];
+        return {
+          ...stake,
+          stakingAddress: (tokenData.staking_address || "") as string,
+          stakedBalance: (stakedBalances[index] || BigInt(0)) as bigint,
+          logo: tokenData.logo as string | undefined,
+          marketData: tokenData.marketData as typeof stake.marketData,
+          isConnectedToPool: poolConnections[index] as boolean,
+        };
+      }
+      // Return unenhanced stakes for tokens beyond the limit
+      return {
+        ...stake,
+        stakingAddress: "" as string,
+        stakedBalance: BigInt(0) as bigint,
+        logo: undefined as string | undefined,
+        marketData: undefined as typeof stake.marketData,
+        isConnectedToPool: false as boolean,
+      };
+    });
+
+    setStakes(enhancedStakes);
+
+    // Schedule enhancement of remaining tokens if there are any
+    if (initialStakes.length > 5) {
+      setTimeout(() => {
+        const remainingStakes = initialStakes.slice(5);
+        enhanceRemainingStakes(remainingStakes, 5); // Start from index 5
+      }, 2000); // Wait 2 seconds before enhancing more
+    }
+  };
+
+  // Helper function to enhance remaining stakes in batches
+  const enhanceRemainingStakes = async (
+    remainingStakes: StakeData[],
+    startIndex: number
+  ) => {
+    const batchSize = 3; // Smaller batches for remaining tokens
+    const batch = remainingStakes.slice(0, batchSize);
+
+    if (batch.length === 0) return;
+
+    try {
+      const tokenDataPromises = batch.map((stake) =>
+        fetchTokenData(stake.tokenAddress)
+      );
+      const tokenDataResults = await Promise.all(tokenDataPromises);
+
+      const stakedBalancePromises = batch.map(async (stake, index) => {
+        const tokenData = tokenDataResults[index];
         const stakingAddress = tokenData.staking_address;
+
         if (
           stakingAddress &&
           stakingAddress !== "0x0000000000000000000000000000000000000000"
         ) {
           try {
-            stakedBalance = await publicClient.readContract({
+            return await publicClient.readContract({
               address: stakingAddress as `0x${string}`,
               abi: [
                 {
@@ -580,21 +681,57 @@ export default function TokensPage() {
             });
           } catch (error) {
             console.warn("Could not fetch staked balance:", error);
+            return BigInt(0);
           }
         }
+        return BigInt(0);
+      });
 
-        return {
-          ...stake,
-          stakingAddress: stakingAddress || "",
-          stakedBalance,
-          logo: tokenData.logo,
-          marketData: tokenData.marketData,
-          isConnectedToPool,
-        };
-      })
-    );
+      const poolConnectionPromises = batch.map(async (stake) => {
+        if (stake.stakingPoolAddress && effectiveAddress) {
+          return await checkPoolConnection(
+            stake.stakingPoolAddress,
+            effectiveAddress
+          );
+        }
+        return false;
+      });
 
-    setStakes(enhancedStakes);
+      const [stakedBalances, poolConnections] = await Promise.all([
+        Promise.all(stakedBalancePromises),
+        Promise.all(poolConnectionPromises),
+      ]);
+
+      // Update only the specific stakes that were enhanced
+      setStakes((prevStakes) =>
+        prevStakes.map((stake, globalIndex) => {
+          const batchIndex = globalIndex - startIndex;
+          if (batchIndex >= 0 && batchIndex < batch.length) {
+            const tokenData = tokenDataResults[batchIndex];
+            return {
+              ...stake,
+              stakingAddress: (tokenData.staking_address || "") as string,
+              stakedBalance: (stakedBalances[batchIndex] ||
+                BigInt(0)) as bigint,
+              logo: tokenData.logo as string | undefined,
+              marketData: tokenData.marketData as typeof stake.marketData,
+              isConnectedToPool: poolConnections[batchIndex] as boolean,
+            };
+          }
+          return stake;
+        })
+      );
+
+      // Continue with next batch if there are more
+      const nextBatch = remainingStakes.slice(batchSize);
+      if (nextBatch.length > 0) {
+        setTimeout(() => {
+          enhanceRemainingStakes(nextBatch, startIndex + batchSize);
+        }, 1000); // 1 second delay between batches
+      }
+    } catch (error) {
+      console.error("Error enhancing remaining stakes:", error);
+    }
   };
 
   // Create initial SuperTokens data
@@ -626,7 +763,8 @@ export default function TokensPage() {
     for (const snapshot of validSnapshots) {
       try {
         const tokenAddress = snapshot.token.id;
-        const currentBalance = balanceMap.get(tokenAddress) || BigInt(0);
+        const currentBalance =
+          (balanceMap.get(tokenAddress) as bigint) || BigInt(0);
         const formattedBalance = Number(formatUnits(currentBalance, 18));
 
         const isAlreadyStaked = currentStakes.some(
@@ -655,20 +793,104 @@ export default function TokensPage() {
     return superTokensData;
   };
 
-  // Enhance SuperTokens with API data
+  // Enhance SuperTokens with API data - optimized to reduce unnecessary calls
   const enhanceSuperTokensWithApiData = async (
     initialSuperTokens: SuperTokenData[]
   ) => {
-    const tokenDataPromises = initialSuperTokens.map((token) =>
+    // Only enhance tokens that we actually need to enhance
+    // Skip tokens that are clearly not going to have staking
+    const tokensToEnhance = initialSuperTokens.filter(
+      (token) =>
+        // Only enhance if the token has a reasonable balance or we don't know yet
+        token.balance > 0.01 || token.stakingAddress === undefined
+    );
+
+    // Limit to maximum 8 tokens to reduce API load
+    const limitedTokens = tokensToEnhance.slice(0, 8);
+
+    const tokenDataPromises = limitedTokens.map((token) =>
       fetchTokenData(token.tokenAddress)
     );
     const tokenDataResults = await Promise.all(tokenDataPromises);
 
-    const enhancedSuperTokens = await Promise.all(
-      initialSuperTokens.map(async (token, index) => {
+    // Only check pool connections for tokens that actually have staking addresses
+    const poolConnectionPromises = limitedTokens.map(async (token, index) => {
+      const tokenData = tokenDataResults[index];
+
+      if (tokenData.staking_address && effectiveAddress) {
+        const correspondingStake = stakes.find(
+          (stake) =>
+            stake.tokenAddress &&
+            token.tokenAddress &&
+            safeToLowerCase(stake.tokenAddress) ===
+              safeToLowerCase(token.tokenAddress)
+        );
+        if (correspondingStake?.stakingPoolAddress) {
+          return await checkPoolConnection(
+            correspondingStake.stakingPoolAddress,
+            effectiveAddress
+          );
+        }
+      }
+      return false;
+    });
+
+    const poolConnections = await Promise.all(poolConnectionPromises);
+
+    // Build enhanced tokens
+    const enhancedSuperTokens = initialSuperTokens.map((token) => {
+      const enhanceIndex = limitedTokens.findIndex(
+        (t) => t.tokenAddress === token.tokenAddress
+      );
+
+      if (enhanceIndex >= 0) {
+        const tokenData = tokenDataResults[enhanceIndex];
+        return {
+          ...token,
+          stakingAddress: tokenData.staking_address,
+          logo: tokenData.logo,
+          marketData: tokenData.marketData,
+          isConnectedToPool: poolConnections[enhanceIndex],
+        };
+      }
+
+      // Return unenhanced token
+      return {
+        ...token,
+        stakingAddress: undefined,
+        logo: undefined,
+        marketData: undefined,
+        isConnectedToPool: false,
+      };
+    });
+
+    setOwnedSuperTokens(enhancedSuperTokens);
+
+    // If there are more tokens to enhance, do it later with a delay
+    if (tokensToEnhance.length > 8) {
+      setTimeout(() => {
+        const remainingTokens = tokensToEnhance.slice(8);
+        enhanceRemainingTokens(remainingTokens);
+      }, 3000); // Wait 3 seconds before enhancing more SuperTokens
+    }
+  };
+
+  // Helper to enhance remaining SuperTokens in smaller batches
+  const enhanceRemainingTokens = async (remainingTokens: SuperTokenData[]) => {
+    const batchSize = 4;
+    const batch = remainingTokens.slice(0, batchSize);
+
+    if (batch.length === 0) return;
+
+    try {
+      const tokenDataPromises = batch.map((token) =>
+        fetchTokenData(token.tokenAddress)
+      );
+      const tokenDataResults = await Promise.all(tokenDataPromises);
+
+      const poolConnectionPromises = batch.map(async (token, index) => {
         const tokenData = tokenDataResults[index];
 
-        let isConnectedToPool = false;
         if (tokenData.staking_address && effectiveAddress) {
           const correspondingStake = stakes.find(
             (stake) =>
@@ -678,24 +900,48 @@ export default function TokensPage() {
                 safeToLowerCase(token.tokenAddress)
           );
           if (correspondingStake?.stakingPoolAddress) {
-            isConnectedToPool = await checkPoolConnection(
+            return await checkPoolConnection(
               correspondingStake.stakingPoolAddress,
               effectiveAddress
             );
           }
         }
+        return false;
+      });
 
-        return {
-          ...token,
-          stakingAddress: tokenData.staking_address,
-          logo: tokenData.logo,
-          marketData: tokenData.marketData,
-          isConnectedToPool,
-        };
-      })
-    );
+      const poolConnections = await Promise.all(poolConnectionPromises);
 
-    setOwnedSuperTokens(enhancedSuperTokens);
+      // Update only the specific tokens that were enhanced
+      setOwnedSuperTokens((prevTokens) =>
+        prevTokens.map((token) => {
+          const batchIndex = batch.findIndex(
+            (t) => t.tokenAddress === token.tokenAddress
+          );
+
+          if (batchIndex >= 0) {
+            const tokenData = tokenDataResults[batchIndex];
+            return {
+              ...token,
+              stakingAddress: tokenData.staking_address,
+              logo: tokenData.logo,
+              marketData: tokenData.marketData,
+              isConnectedToPool: poolConnections[batchIndex],
+            };
+          }
+          return token;
+        })
+      );
+
+      // Continue with next batch
+      const nextBatch = remainingTokens.slice(batchSize);
+      if (nextBatch.length > 0) {
+        setTimeout(() => {
+          enhanceRemainingTokens(nextBatch);
+        }, 2000); // 2 second delay between SuperToken batches
+      }
+    } catch (error) {
+      console.error("Error enhancing remaining SuperTokens:", error);
+    }
   };
 
   // Helper functions for updates
@@ -713,17 +959,19 @@ export default function TokensPage() {
       setStakes((prevStakes) =>
         prevStakes.map((stake) => {
           if (!tokenAddresses || tokenAddresses.includes(stake.tokenAddress)) {
-            const currentBalance =
-              balanceMap.get(stake.tokenAddress) || BigInt(0);
-            const formattedBalance = Number(formatUnits(currentBalance, 18));
+            const receivedBalance =
+              (balanceMap.get(stake.tokenAddress) as bigint) || BigInt(0);
+            const formattedReceived = Number(formatUnits(receivedBalance, 18));
 
-            return {
-              ...stake,
-              receivedBalance: formattedBalance,
-              baseAmount: formattedBalance,
-              streamedAmount: 0,
-              lastUpdateTime: Date.now(),
-            };
+            if (Math.abs(formattedReceived - stake.baseAmount) > 0.0001) {
+              return {
+                ...stake,
+                receivedBalance: formattedReceived,
+                baseAmount: formattedReceived,
+                streamedAmount: 0,
+                lastUpdateTime: Date.now(),
+              };
+            }
           }
           return stake;
         })
@@ -760,7 +1008,7 @@ export default function TokensPage() {
           if (stake.tokenAddress === tokenAddress) {
             return {
               ...stake,
-              stakedBalance,
+              stakedBalance: stakedBalance as bigint,
             };
           }
           return stake;
