@@ -15,6 +15,7 @@ import { Button } from "../components/ui/button";
 import { base } from "wagmi/chains";
 import { useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
+import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal";
 
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -29,6 +30,20 @@ function App() {
     undefined
   );
   const router = useRouter();
+
+  // Tutorial modal state
+  const [showTutorialModal, setShowTutorialModal] = useState(false);
+  const [hasSkippedTutorial, setHasSkippedTutorial] = useState(false);
+
+  // Load tutorial skip state from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const skipped = localStorage.getItem("streme-tutorial-skipped");
+      if (skipped === "true") {
+        setHasSkippedTutorial(true);
+      }
+    }
+  }, []);
 
   const {
     isSDKLoaded,
@@ -164,6 +179,34 @@ function App() {
     }
   }, [isMiniAppView, isSDKLoaded, hasPromptedToAdd, promptToAddMiniApp]);
 
+  // Show tutorial modal for mini-app users who haven't added the app
+  useEffect(() => {
+    if (
+      isMiniAppView &&
+      isSDKLoaded &&
+      !hasPromptedToAdd &&
+      !hasSkippedTutorial &&
+      !showTutorialModal
+    ) {
+      // Small delay to ensure everything is loaded
+      const timer = setTimeout(() => {
+        setShowTutorialModal(true);
+        // Track tutorial modal shown
+        postHog?.capture("mini_app_tutorial_shown", {
+          context: "farcaster_mini_app",
+        });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [
+    isMiniAppView,
+    isSDKLoaded,
+    hasPromptedToAdd,
+    hasSkippedTutorial,
+    showTutorialModal,
+    postHog,
+  ]);
+
   // Auto-connect to Farcaster wallet if not connected in mini app context
   useEffect(() => {
     if (isMiniAppView && !isConnected && farcasterContext && isSDKLoaded) {
@@ -192,6 +235,32 @@ function App() {
     isSDKLoaded,
   ]);
 
+  // Tutorial modal handlers
+  const handleCloseTutorial = () => {
+    setShowTutorialModal(false);
+    // Save completion state so user doesn't see tutorial again
+    if (typeof window !== "undefined") {
+      localStorage.setItem("streme-tutorial-skipped", "true");
+    }
+    // Track tutorial completion
+    postHog?.capture("mini_app_tutorial_completed", {
+      context: "farcaster_mini_app",
+    });
+  };
+
+  const handleSkipTutorial = () => {
+    setHasSkippedTutorial(true);
+    setShowTutorialModal(false);
+    // Save to localStorage so user doesn't see tutorial again
+    if (typeof window !== "undefined") {
+      localStorage.setItem("streme-tutorial-skipped", "true");
+    }
+    // Track tutorial skip
+    postHog?.capture("mini_app_tutorial_skipped", {
+      context: "farcaster_mini_app",
+    });
+  };
+
   if (!isSDKLoaded) {
     return <div className="text-center py-8">Loading SDK...</div>;
   }
@@ -200,16 +269,40 @@ function App() {
     return (
       <div className="font-[family-name:var(--font-geist-sans)]">
         <div className="flex flex-col gap-2 row-start-2 items-center w-full p-4 pt-20">
-          <div className="fixed top-0 left-0 right-0 flex justify-between items-center p-4 z-10 bg-base-100/80 backdrop-blur-sm">
-            <Logo
-              onClick={handleDebugClick}
-              debugClickCount={debugClickCount}
-            />
-            <div className="flex-1 mx-4 max-w-md">
+          <div className="fixed top-0 left-0 right-0 flex items-center p-4 z-10 bg-base-100/80 backdrop-blur-sm">
+            <div className="flex-shrink-0">
+              <Logo
+                onClick={handleDebugClick}
+                debugClickCount={debugClickCount}
+              />
+            </div>
+            <div className="flex-1 ml-6 mr-4 max-w-xs">
               <SearchBar
                 value={searchQuery}
                 onChange={(value) => setSearchQuery(value)}
               />
+            </div>
+            <div className="flex-shrink-0">
+              <button
+                onClick={() => setShowTutorialModal(true)}
+                className="btn btn-ghost btn-sm btn-circle bg-white/80 backdrop-blur-sm border border-gray-200 shadow-sm"
+                title="Tutorial"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -245,6 +338,13 @@ function App() {
         <div className="fixed inset-0 -z-10">
           <HeroAnimationMini />
         </div>
+
+        {/* Tutorial Modal */}
+        <MiniAppTutorialModal
+          isOpen={showTutorialModal}
+          onClose={handleCloseTutorial}
+          onSkip={handleSkipTutorial}
+        />
       </div>
     );
   }

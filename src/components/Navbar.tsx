@@ -10,6 +10,7 @@ import { LaunchTokenModal } from "./LaunchTokenModal";
 import { LeaderboardModal } from "./LeaderboardModal";
 import { WalletProfileModal } from "./WalletProfileModal";
 import { MyTokensModal } from "./MyTokensModal";
+import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import sdk from "@farcaster/frame-sdk";
 
@@ -54,6 +55,7 @@ export function Navbar() {
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [isWalletProfileOpen, setIsWalletProfileOpen] = useState(false);
   const [isMyStakesOpen, setIsMyStakesOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
   // Profile picture state for mini-app
   const [miniAppProfileImage, setMiniAppProfileImage] = useState<string>("");
@@ -278,6 +280,11 @@ Symbol: $[your ticker]
         <MyTokensModal
           isOpen={isMyStakesOpen}
           onClose={() => setIsMyStakesOpen(false)}
+        />
+        <MiniAppTutorialModal
+          isOpen={isTutorialOpen}
+          onClose={() => setIsTutorialOpen(false)}
+          onSkip={() => setIsTutorialOpen(false)}
         />
       </>
     );
