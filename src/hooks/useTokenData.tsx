@@ -183,13 +183,13 @@ export function TokenDataProvider({ children }: TokenDataProviderProps) {
     }
   }, [effectiveAddress, isConnected, balanceData, refreshTokenData]);
 
-  // Auto-refresh every 60 seconds
+  // Auto-refresh every 10 minutes
   useEffect(() => {
     if (!effectiveAddress || !isConnected || balanceData.size === 0) return;
 
     const interval = setInterval(() => {
       refreshAllData();
-    }, 60000);
+    }, 600000);
 
     return () => clearInterval(interval);
   }, [effectiveAddress, isConnected, balanceData.size, refreshAllData]);
