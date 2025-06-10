@@ -54,7 +54,7 @@ export function MiniAppTutorialModal({
           </p>
 
           <Image
-            src="/onboarding-sup.png"
+            src="/onboarding-SUP.png"
             alt="Onboarding SUP"
             width={150}
             height={150}
