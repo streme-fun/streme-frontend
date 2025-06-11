@@ -86,44 +86,40 @@ interface MyTokensModalProps {
   onClose: () => void;
 }
 
-// Cache for token data to avoid repeated API calls
+// Optimized cache with better TTL management
 const tokenDataCache = new Map<
   string,
   {
-    staking_address?: string;
-    logo?: string;
-    marketData?: {
-      marketCap: number;
-      price: number;
-      priceChange1h: number;
-      priceChange24h: number;
-      priceChange5m: number;
-      volume24h: number;
-      lastUpdated: { _seconds: number; _nanoseconds: number };
+    data: {
+      staking_address?: string;
+      logo?: string;
+      marketData?: {
+        marketCap: number;
+        price: number;
+        priceChange1h: number;
+        priceChange24h: number;
+        priceChange5m: number;
+        volume24h: number;
+        lastUpdated: { _seconds: number; _nanoseconds: number };
+      };
     };
-  }
->();
-
-// Cache for balance data to avoid repeated API calls
-const balanceCache = new Map<
-  string,
-  {
-    balance: bigint;
     timestamp: number;
   }
 >();
 
-// Cache for pool connection status to reduce repeated calls
-const poolConnectionCache = new Map<
+// Unified cache with shorter TTL for better UX
+const blockchainDataCache = new Map<
   string,
   {
-    isConnected: boolean;
+    balance?: bigint;
+    stakedBalance?: bigint;
+    isConnected?: boolean;
     timestamp: number;
   }
 >();
 
-const BALANCE_CACHE_DURATION = 300000; // 5 minutes cache
-const POOL_CONNECTION_CACHE_DURATION = 600000; // 10 minutes cache for pool connections
+const CACHE_DURATION = 180000; // 3 minutes - shorter for better UX
+const CRITICAL_CACHE_DURATION = 60000; // 1 minute for critical data
 
 // Blacklisted token addresses to filter out
 const BLACKLISTED_TOKENS = [
@@ -174,176 +170,205 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     return value.toLowerCase();
   };
 
-  // Enhanced API rate limiting - much more permissive
-  const rateLimitedFetch = async (url: string, options?: RequestInit) => {
-    // Remove artificial rate limiting for better UX
-    return fetch(url, options);
-  };
-
-  // Helper function to fetch token data with enhanced caching and rate limiting
-  const fetchTokenData = async (tokenAddress: string) => {
-    // Don't make API calls for blacklisted tokens
-    if (
-      !tokenAddress ||
-      BLACKLISTED_TOKENS.includes(safeToLowerCase(tokenAddress))
-    ) {
-      const fallbackData = {
-        staking_address: undefined,
-        logo: undefined,
-        marketData: undefined,
-      };
-      return fallbackData;
-    }
-
-    if (tokenDataCache.has(tokenAddress)) {
-      return tokenDataCache.get(tokenAddress)!;
-    }
-
-    try {
-      const response = await rateLimitedFetch(
-        `/api/tokens/single?address=${tokenAddress}`
-      );
-      if (response.ok) {
-        const result = await response.json();
-        const tokenData = {
-          staking_address: result.data?.staking_address,
-          logo: result.data?.img_url || result.data?.logo || result.data?.image,
-          marketData: result.data?.marketData,
-        };
-        tokenDataCache.set(tokenAddress, tokenData);
-        return tokenData;
-      } else {
-        console.warn(
-          `API returned ${response.status} for token ${tokenAddress}`
-        );
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message === "Rate limited") {
-        console.log("Skipping token data fetch due to rate limiting");
-      } else {
-        console.warn("Could not fetch token data for:", tokenAddress, error);
-      }
-    }
-
-    const fallbackData = {
-      staking_address: undefined,
-      logo: undefined,
-      marketData: undefined,
-    };
-    tokenDataCache.set(tokenAddress, fallbackData);
-    return fallbackData;
-  };
-
-  // Helper function to batch balance calls with basic caching
-  const fetchBalances = async (tokenAddresses: string[]) => {
+  // Optimized batch token data fetcher
+  const fetchTokenDataBatch = async (tokenAddresses: string[]) => {
     const now = Date.now();
+    const results = new Map();
+    const toFetch: string[] = [];
 
-    // Check cache first and only fetch for tokens that need updating
-    const tokensToFetch: string[] = [];
-    const cachedResults: Array<{ tokenAddress: string; balance: bigint }> = [];
+    // Check cache first
+    tokenAddresses.forEach((address) => {
+      if (BLACKLISTED_TOKENS.includes(safeToLowerCase(address))) {
+        results.set(address, {
+          staking_address: undefined,
+          logo: undefined,
+          marketData: undefined,
+        });
+        return;
+      }
 
-    tokenAddresses.forEach((tokenAddress) => {
-      const cached = balanceCache.get(tokenAddress);
-      if (cached && now - cached.timestamp < BALANCE_CACHE_DURATION) {
-        cachedResults.push({ tokenAddress, balance: cached.balance });
+      const cached = tokenDataCache.get(address);
+      if (cached && now - cached.timestamp < CACHE_DURATION) {
+        results.set(address, cached.data);
       } else {
-        tokensToFetch.push(tokenAddress);
+        toFetch.push(address);
       }
     });
 
-    // If all tokens are cached, return cached results
-    if (tokensToFetch.length === 0) {
-      return cachedResults;
-    }
-
-    console.log(
-      `Fetching balances for ${tokensToFetch.length} tokens (${cachedResults.length} cached)`
-    );
-
-    const balancePromises = tokensToFetch.map(async (tokenAddress) => {
+    // Batch fetch remaining tokens
+    if (toFetch.length > 0) {
       try {
-        const balance = await publicClient.readContract({
-          address: tokenAddress as `0x${string}`,
-          abi: [
-            {
-              inputs: [{ name: "account", type: "address" }],
-              name: "balanceOf",
-              outputs: [{ name: "", type: "uint256" }],
-              stateMutability: "view",
-              type: "function",
-            },
-          ],
-          functionName: "balanceOf",
-          args: [effectiveAddress as `0x${string}`],
+        // Use Promise.allSettled to handle partial failures gracefully
+        const fetchPromises = toFetch.map(async (address) => {
+          try {
+            const response = await fetch(
+              `/api/tokens/single?address=${address}`
+            );
+            if (response.ok) {
+              const result = await response.json();
+              const tokenData = {
+                staking_address: result.data?.staking_address,
+                logo:
+                  result.data?.img_url ||
+                  result.data?.logo ||
+                  result.data?.image,
+                marketData: result.data?.marketData,
+              };
+
+              // Cache the result
+              tokenDataCache.set(address, {
+                data: tokenData,
+                timestamp: now,
+              });
+
+              return { address, data: tokenData };
+            }
+            throw new Error(`HTTP ${response.status}`);
+          } catch (error) {
+            console.warn(`Failed to fetch token data for ${address}:`, error);
+            const fallbackData = {
+              staking_address: undefined,
+              logo: undefined,
+              marketData: undefined,
+            };
+            tokenDataCache.set(address, {
+              data: fallbackData,
+              timestamp: now,
+            });
+            return { address, data: fallbackData };
+          }
         });
 
-        // Cache the result
-        balanceCache.set(tokenAddress, {
-          balance: balance as bigint,
-          timestamp: now,
+        const fetchResults = await Promise.allSettled(fetchPromises);
+        fetchResults.forEach((result) => {
+          if (result.status === "fulfilled" && result.value) {
+            results.set(result.value.address, result.value.data);
+          }
         });
-
-        return { tokenAddress, balance: balance as bigint };
       } catch (error) {
-        console.warn("Failed to fetch balance for:", tokenAddress, error);
-        const fallbackBalance = BigInt(0);
+        console.error("Batch token data fetch failed:", error);
+      }
+    }
 
-        // Cache the fallback balance with a shorter duration
-        balanceCache.set(tokenAddress, {
-          balance: fallbackBalance,
-          timestamp: now,
-        });
+    return results;
+  };
 
-        return { tokenAddress, balance: fallbackBalance };
+  // Optimized blockchain data fetcher
+  const fetchBlockchainDataBatch = async (
+    requests: Array<{
+      type: "balance" | "stakedBalance" | "poolConnection";
+      tokenAddress?: string;
+      stakingAddress?: string;
+      poolAddress?: string;
+      userAddress?: string;
+    }>
+  ) => {
+    const now = Date.now();
+    const results = new Map();
+    const toFetch: typeof requests = [];
+
+    // Check cache first
+    requests.forEach((request) => {
+      const cacheKey = `${request.type}-${
+        request.tokenAddress || request.stakingAddress || request.poolAddress
+      }-${request.userAddress}`;
+      const cached = blockchainDataCache.get(cacheKey);
+
+      if (cached && now - cached.timestamp < CRITICAL_CACHE_DURATION) {
+        results.set(cacheKey, cached);
+      } else {
+        toFetch.push(request);
       }
     });
 
-    const fetchedResults = await Promise.all(balancePromises);
+    // Batch fetch remaining data
+    if (toFetch.length > 0) {
+      const fetchPromises = toFetch.map(async (request) => {
+        const cacheKey = `${request.type}-${
+          request.tokenAddress || request.stakingAddress || request.poolAddress
+        }-${request.userAddress}`;
 
-    // Combine cached and fetched results
-    return [...cachedResults, ...fetchedResults];
-  };
+        try {
+          let result: bigint | boolean | undefined;
 
-  // Helper function to check pool connection status with caching
-  const checkPoolConnection = async (
-    poolAddress: string,
-    userAddress: string
-  ): Promise<boolean> => {
-    const cacheKey = `${poolAddress}-${userAddress}`;
-    const cached = poolConnectionCache.get(cacheKey);
-    const now = Date.now();
+          if (request.type === "balance" && request.tokenAddress) {
+            result = (await publicClient.readContract({
+              address: request.tokenAddress as `0x${string}`,
+              abi: [
+                {
+                  inputs: [{ name: "account", type: "address" }],
+                  name: "balanceOf",
+                  outputs: [{ name: "", type: "uint256" }],
+                  stateMutability: "view",
+                  type: "function",
+                },
+              ],
+              functionName: "balanceOf",
+              args: [request.userAddress as `0x${string}`],
+            })) as bigint;
+          } else if (
+            request.type === "stakedBalance" &&
+            request.stakingAddress
+          ) {
+            result = (await publicClient.readContract({
+              address: request.stakingAddress as `0x${string}`,
+              abi: [
+                {
+                  inputs: [{ name: "account", type: "address" }],
+                  name: "balanceOf",
+                  outputs: [{ name: "", type: "uint256" }],
+                  stateMutability: "view",
+                  type: "function",
+                },
+              ],
+              functionName: "balanceOf",
+              args: [request.userAddress as `0x${string}`],
+            })) as bigint;
+          } else if (
+            request.type === "poolConnection" &&
+            request.poolAddress &&
+            request.userAddress
+          ) {
+            result = (await publicClient.readContract({
+              address: GDA_FORWARDER,
+              abi: GDA_ABI,
+              functionName: "isMemberConnected",
+              args: [
+                request.poolAddress as `0x${string}`,
+                request.userAddress as `0x${string}`,
+              ],
+            })) as boolean;
+          }
 
-    // Return cached result if still valid
-    if (cached && now - cached.timestamp < POOL_CONNECTION_CACHE_DURATION) {
-      return cached.isConnected;
+          const cacheData = {
+            [request.type]:
+              result || (request.type === "poolConnection" ? false : BigInt(0)),
+            timestamp: now,
+          };
+
+          blockchainDataCache.set(cacheKey, cacheData);
+          return { cacheKey, data: cacheData };
+        } catch (error) {
+          console.warn(`Failed to fetch ${request.type}:`, error);
+          const fallbackData = {
+            [request.type]:
+              request.type === "poolConnection" ? false : BigInt(0),
+            timestamp: now,
+          };
+          blockchainDataCache.set(cacheKey, fallbackData);
+          return { cacheKey, data: fallbackData };
+        }
+      });
+
+      const fetchResults = await Promise.allSettled(fetchPromises);
+      fetchResults.forEach((result) => {
+        if (result.status === "fulfilled" && result.value) {
+          results.set(result.value.cacheKey, result.value.data);
+        }
+      });
     }
 
-    try {
-      const connectedStatus = await publicClient.readContract({
-        address: GDA_FORWARDER,
-        abi: GDA_ABI,
-        functionName: "isMemberConnected",
-        args: [poolAddress as `0x${string}`, userAddress as `0x${string}`],
-      });
-
-      const isConnected = connectedStatus as boolean;
-
-      // Cache the result
-      poolConnectionCache.set(cacheKey, {
-        isConnected,
-        timestamp: now,
-      });
-
-      return isConnected;
-    } catch (error) {
-      console.error("Error checking pool connection:", error);
-      // Cache negative result for shorter duration
-      poolConnectionCache.set(cacheKey, {
-        isConnected: false,
-        timestamp: now,
-      });
-      return false;
-    }
+    return results;
   };
 
   useEffect(() => {
@@ -352,40 +377,40 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     }
   }, [isOpen, effectiveAddress]);
 
-  // Periodic balance refresh - much less aggressive, only for critical tokens
+  // Simplified periodic refresh for critical streaming data only
   useEffect(() => {
     if (!effectiveAddress || stakes.length === 0) return;
 
-    const refreshBalances = async () => {
+    const refreshCriticalData = async () => {
       try {
-        // Only refresh balances for stakes that have staking addresses and meaningful flow rates
-        const criticalStakes = stakes.filter(
-          (stake) =>
-            stake.stakingAddress &&
-            stake.stakingAddress !== "" &&
-            stake.userFlowRate > 0.1 // Only high-value streaming stakes
+        // Only refresh balances for actively streaming stakes
+        const streamingStakes = stakes.filter(
+          (stake) => stake.userFlowRate > 0.1 && stake.isConnectedToPool
         );
 
-        if (criticalStakes.length === 0) return;
+        if (streamingStakes.length === 0) return;
 
-        // Limit to maximum 2 tokens to reduce Alchemy calls
-        const limitedStakes = criticalStakes.slice(0, 2);
-        const tokenAddresses = limitedStakes.map((stake) => stake.tokenAddress);
-        const balanceResults = await fetchBalances(tokenAddresses);
-        const balanceMap = new Map(
-          balanceResults.map((result) => [result.tokenAddress, result.balance])
-        );
+        // Limit to top 3 most active streams to minimize load
+        const topStreams = streamingStakes
+          .sort((a, b) => b.userFlowRate - a.userFlowRate)
+          .slice(0, 3);
+
+        const balanceRequests = topStreams.map((stake) => ({
+          type: "balance" as const,
+          tokenAddress: stake.tokenAddress,
+          userAddress: effectiveAddress,
+        }));
+
+        const results = await fetchBlockchainDataBatch(balanceRequests);
 
         setStakes((prevStakes) =>
           prevStakes.map((stake) => {
-            if (tokenAddresses.includes(stake.tokenAddress)) {
-              const currentBalance =
-                (balanceMap.get(stake.tokenAddress) as bigint) || BigInt(0);
-              const formattedBalance = Number(formatUnits(currentBalance, 18));
+            const cacheKey = `balance-${stake.tokenAddress}-${effectiveAddress}`;
+            const result = results.get(cacheKey);
 
-              // Only update if there's a significant change (increased threshold)
+            if (result?.balance) {
+              const formattedBalance = Number(formatUnits(result.balance, 18));
               if (Math.abs(formattedBalance - stake.baseAmount) > 0.01) {
-                // Increased from 0.001 to 0.01
                 return {
                   ...stake,
                   receivedBalance: formattedBalance,
@@ -398,14 +423,12 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
           })
         );
       } catch (error) {
-        console.error("Error refreshing balances:", error);
-        // Don't show toast error for background refresh failures
-        // to avoid spamming users with error messages
+        console.error("Error refreshing critical data:", error);
       }
     };
 
-    // Refresh much less frequently - every 20 minutes instead of 10
-    const interval = setInterval(refreshBalances, 1200000); // 20 minutes
+    // Refresh every 30 minutes instead of 20
+    const interval = setInterval(refreshCriticalData, 1800000);
     return () => clearInterval(interval);
   }, [effectiveAddress, stakes.length]);
 
@@ -417,9 +440,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     setAccountExists(null);
 
     try {
-      // Create the account ID for the subgraph query (address in lowercase)
       const accountId = safeToLowerCase(effectiveAddress);
-
       if (!accountId) {
         throw new Error("Invalid address provided");
       }
@@ -455,66 +476,43 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
         }
       `;
 
-      // Try multiple endpoints in case one doesn't work
+      // Simplified endpoint selection - use primary first
       const endpoints = [
         "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",
         "https://api.thegraph.com/subgraphs/name/superfluid-finance/protocol-v1-base",
       ];
 
-      let lastError = null;
+      let accountData = null;
 
       for (const endpoint of endpoints) {
         try {
           const response = await fetch(endpoint, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              query,
-              variables: { accountId },
-            }),
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query, variables: { accountId } }),
           });
 
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
+          if (!response.ok) continue;
 
           const data = await response.json();
+          if (data.errors) continue;
 
-          if (data.errors) {
-            throw new Error(data.errors[0]?.message || "GraphQL query failed");
-          }
-
-          // If we get here, the query was successful
-          const accountData = data.data?.account;
-          console.log("Full GraphQL response:", data);
-          console.log("Account data:", accountData);
-
-          if (accountData) {
-            setAccountExists(true);
-
-            // **CONSOLIDATED APPROACH**: Process all tokens together to avoid duplicates
-            await processAllTokensConsolidated(accountData);
-          } else {
-            // Account doesn't exist in the subgraph yet
-            console.log(
-              "No account data found - account may not have interacted with Superfluid yet"
-            );
-            setAccountExists(false);
-            setStakes([]);
-            setOwnedSuperTokens([]);
-          }
-          return; // Success, exit the function
+          accountData = data.data?.account;
+          break;
         } catch (err) {
-          console.warn(`Failed to fetch from ${endpoint}:`, err);
-          lastError = err;
-          continue; // Try the next endpoint
+          console.warn(`Endpoint ${endpoint} failed:`, err);
+          continue;
         }
       }
 
-      // If we get here, all endpoints failed
-      throw lastError || new Error("All endpoints failed");
+      if (accountData) {
+        setAccountExists(true);
+        await processTokensOptimized(accountData);
+      } else {
+        setAccountExists(false);
+        setStakes([]);
+        setOwnedSuperTokens([]);
+      }
     } catch (err) {
       console.error("Error fetching stakes:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch stakes");
@@ -524,243 +522,206 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     }
   };
 
-  // **NEW CONSOLIDATED FUNCTION**: Process all tokens in one go to eliminate duplicates
-  const processAllTokensConsolidated = async (accountData: {
+  // Optimized processing with lazy loading
+  const processTokensOptimized = async (accountData: {
     poolMemberships?: PoolMembership[];
     accountTokenSnapshots?: AccountTokenSnapshot[];
   }) => {
-    // Step 1: Collect all unique token addresses
-    const allTokenAddresses = new Set<string>();
-    const stakesMembers: PoolMembership[] = [];
-    const superTokenSnapshots: AccountTokenSnapshot[] = [];
+    // Step 1: Quick filtering and data collection
+    const allTokens = new Set<string>();
+    const validMemberships: PoolMembership[] = [];
+    const validSnapshots: AccountTokenSnapshot[] = [];
 
-    // Process pool memberships (stakes)
+    // Filter memberships
     if (accountData.poolMemberships) {
-      const activeMemberships = accountData.poolMemberships.filter(
-        (membership: PoolMembership) =>
+      accountData.poolMemberships.forEach((membership) => {
+        if (
           membership.units &&
           parseFloat(membership.units) > 0 &&
           !membership.pool.token.isNativeAssetSuperToken &&
           !BLACKLISTED_TOKENS.includes(
             safeToLowerCase(membership.pool.token.id)
           )
-      );
-
-      activeMemberships.forEach((membership: PoolMembership) => {
-        allTokenAddresses.add(membership.pool.token.id);
-        stakesMembers.push(membership);
+        ) {
+          allTokens.add(membership.pool.token.id);
+          validMemberships.push(membership);
+        }
       });
     }
 
-    // Process SuperToken snapshots
+    // Filter snapshots
     if (accountData.accountTokenSnapshots) {
-      const validSnapshots = accountData.accountTokenSnapshots.filter(
-        (snapshot: AccountTokenSnapshot) =>
+      accountData.accountTokenSnapshots.forEach((snapshot) => {
+        if (
           snapshot.balanceUntilUpdatedAt &&
           parseFloat(snapshot.balanceUntilUpdatedAt) > 0 &&
           !snapshot.token.isNativeAssetSuperToken &&
           !BLACKLISTED_TOKENS.includes(safeToLowerCase(snapshot.token.id))
-      );
-
-      validSnapshots.forEach((snapshot: AccountTokenSnapshot) => {
-        allTokenAddresses.add(snapshot.token.id);
-        superTokenSnapshots.push(snapshot);
+        ) {
+          allTokens.add(snapshot.token.id);
+          validSnapshots.push(snapshot);
+        }
       });
     }
 
-    const uniqueTokens = Array.from(allTokenAddresses);
-    console.log(`Processing ${uniqueTokens.length} unique tokens total`);
-
+    const uniqueTokens = Array.from(allTokens);
     if (uniqueTokens.length === 0) {
       setStakes([]);
       setOwnedSuperTokens([]);
       return;
     }
 
-    // Step 2: **SINGLE BATCH** - Fetch all data for all tokens at once
-    const [balanceResults, tokenDataResults] = await Promise.all([
-      fetchBalances(uniqueTokens), // One balance call for all tokens
-      Promise.all(uniqueTokens.map(fetchTokenData)), // One token data call for all tokens
+    // Step 2: Fetch essential data in parallel
+    const [tokenDataMap, balanceResults] = await Promise.all([
+      fetchTokenDataBatch(uniqueTokens),
+      fetchBlockchainDataBatch(
+        uniqueTokens.map((token) => ({
+          type: "balance" as const,
+          tokenAddress: token,
+          userAddress: effectiveAddress,
+        }))
+      ),
     ]);
 
-    // Create lookup maps for easy access
-    const balanceMap = new Map(
-      balanceResults.map((result) => [result.tokenAddress, result.balance])
-    );
-    const tokenDataMap = new Map(
-      uniqueTokens.map((token, index) => [token, tokenDataResults[index]])
-    );
-
-    // Step 3: Build initial stakes data using the consolidated results
+    // Step 3: Build initial data structures
     const stakesData: StakeData[] = [];
-    for (const membership of stakesMembers) {
-      try {
-        const tokenAddress = membership.pool.token.id;
-        const receivedBalance =
-          (balanceMap.get(tokenAddress) as bigint) || BigInt(0);
-        const formattedReceived = Number(formatUnits(receivedBalance, 18));
+    const superTokensData: SuperTokenData[] = [];
 
-        // Calculate user flow rate
-        const totalUnits = BigInt(membership.pool.totalUnits || "0");
-        const memberUnits = BigInt(membership.units || "0");
-        let userFlowRate = 0;
+    // Process stakes
+    validMemberships.forEach((membership) => {
+      const tokenAddress = membership.pool.token.id;
+      const tokenData = tokenDataMap.get(tokenAddress);
+      const balanceCacheKey = `balance-${tokenAddress}-${effectiveAddress}`;
+      const balanceData = balanceResults.get(balanceCacheKey);
 
-        if (totalUnits > 0n) {
-          const percentage = (Number(memberUnits) * 100) / Number(totalUnits);
-          const totalFlowRate = Number(
-            formatUnits(BigInt(membership.pool.flowRate), 18)
-          );
-          userFlowRate = totalFlowRate * (percentage / 100) * 86400; // per day
-        }
+      const formattedBalance = balanceData?.balance
+        ? Number(formatUnits(balanceData.balance, 18))
+        : 0;
 
+      // Calculate user flow rate
+      const totalUnits = BigInt(membership.pool.totalUnits || "0");
+      const memberUnits = BigInt(membership.units || "0");
+      let userFlowRate = 0;
+
+      if (totalUnits > 0n) {
+        const percentage = (Number(memberUnits) * 100) / Number(totalUnits);
+        const totalFlowRate = Number(
+          formatUnits(BigInt(membership.pool.flowRate), 18)
+        );
+        userFlowRate = totalFlowRate * (percentage / 100) * 86400;
+      }
+
+      stakesData.push({
+        membership,
+        tokenAddress,
+        stakingAddress: tokenData?.staking_address || "",
+        stakingPoolAddress: membership.pool.id,
+        receivedBalance: formattedBalance,
+        baseAmount: formattedBalance,
+        lastUpdateTime: Date.now(),
+        userFlowRate,
+        stakedBalance: BigInt(0), // Will be loaded lazily
+        logo: tokenData?.logo,
+        marketData: tokenData?.marketData,
+        isConnectedToPool: membership.isConnected, // Use from subgraph initially
+      });
+    });
+
+    // Process super tokens (avoiding duplicates)
+    validSnapshots.forEach((snapshot) => {
+      const tokenAddress = snapshot.token.id;
+      const isAlreadyStaked = stakesData.some(
+        (stake) =>
+          safeToLowerCase(stake.tokenAddress) === safeToLowerCase(tokenAddress)
+      );
+
+      if (!isAlreadyStaked) {
         const tokenData = tokenDataMap.get(tokenAddress);
-        stakesData.push({
-          membership,
+        const balanceCacheKey = `balance-${tokenAddress}-${effectiveAddress}`;
+        const balanceData = balanceResults.get(balanceCacheKey);
+
+        const formattedBalance = balanceData?.balance
+          ? Number(formatUnits(balanceData.balance, 18))
+          : 0;
+
+        superTokensData.push({
           tokenAddress,
-          stakingAddress: tokenData?.staking_address || "",
-          stakingPoolAddress: membership.pool.id,
-          receivedBalance: formattedReceived,
-          baseAmount: formattedReceived,
-          lastUpdateTime: Date.now(),
-          userFlowRate,
-          stakedBalance: BigInt(0), // Will be filled by enhancement
+          symbol: snapshot.token.symbol,
+          balance: formattedBalance,
+          stakingAddress: tokenData?.staking_address,
+          isNativeAssetSuperToken: snapshot.token.isNativeAssetSuperToken,
           logo: tokenData?.logo,
           marketData: tokenData?.marketData,
-          isConnectedToPool: false, // Will be filled by enhancement
+          isConnectedToPool: false,
         });
-      } catch (error) {
-        console.error("Error creating stake data:", error);
       }
-    }
+    });
 
-    // Step 4: Build SuperTokens data using the consolidated results
-    const superTokensData: SuperTokenData[] = [];
-    for (const snapshot of superTokenSnapshots) {
-      try {
-        const tokenAddress = snapshot.token.id;
-        const currentBalance =
-          (balanceMap.get(tokenAddress) as bigint) || BigInt(0);
-        const formattedBalance = Number(formatUnits(currentBalance, 18));
-
-        // Check if this token is already staked (to avoid duplicates)
-        const isAlreadyStaked = stakesData.some(
-          (stake) =>
-            stake.tokenAddress &&
-            tokenAddress &&
-            safeToLowerCase(stake.tokenAddress) ===
-              safeToLowerCase(tokenAddress)
-        );
-
-        if (!isAlreadyStaked) {
-          const tokenData = tokenDataMap.get(tokenAddress);
-          superTokensData.push({
-            tokenAddress,
-            symbol: snapshot.token.symbol,
-            balance: formattedBalance,
-            stakingAddress: tokenData?.staking_address,
-            isNativeAssetSuperToken: snapshot.token.isNativeAssetSuperToken,
-            logo: tokenData?.logo,
-            marketData: tokenData?.marketData,
-            isConnectedToPool: false, // Not needed for SuperTokens initially
-          });
-        }
-      } catch (error) {
-        console.error("Error creating SuperToken data:", error);
-      }
-    }
-
-    // Step 5: Set initial data immediately (users can see and interact with tokens)
+    // Step 4: Set initial data immediately for fast UX
     setStakes(stakesData);
     setOwnedSuperTokens(superTokensData);
 
-    // Step 6: **SINGLE ENHANCEMENT PASS** for remaining blockchain calls
-    await enhanceWithBlockchainData(stakesData);
+    // Step 5: Lazy load additional data for stakes with staking addresses
+    lazyLoadStakeData(stakesData);
   };
 
-  // **SINGLE ENHANCEMENT FUNCTION**: Only fetch staked balances and pool connections
-  const enhanceWithBlockchainData = async (stakesData: StakeData[]) => {
-    if (stakesData.length === 0) return;
-
-    console.log(
-      `Final enhancement: fetching staked balances and pool connections for ${stakesData.length} stakes`
-    );
-
-    // Only make additional blockchain calls for stakes that have staking addresses
+  // Lazy loading for non-critical stake data
+  const lazyLoadStakeData = async (stakesData: StakeData[]) => {
     const stakesWithStaking = stakesData.filter(
-      (stake) =>
-        stake.stakingAddress &&
-        stake.stakingAddress !== "" &&
-        stake.stakingAddress !== "0x0000000000000000000000000000000000000000"
+      (stake) => stake.stakingAddress && stake.stakingAddress !== ""
     );
 
-    if (stakesWithStaking.length === 0) {
-      console.log("No stakes require additional blockchain calls");
-      return;
-    }
+    if (stakesWithStaking.length === 0) return;
 
-    // Fetch staked balances and pool connections in parallel
-    const [stakedBalances, poolConnections] = await Promise.all([
-      // Staked balance calls
-      Promise.all(
-        stakesWithStaking.map(async (stake) => {
-          try {
-            return await publicClient.readContract({
-              address: stake.stakingAddress as `0x${string}`,
-              abi: [
-                {
-                  inputs: [{ name: "account", type: "address" }],
-                  name: "balanceOf",
-                  outputs: [{ name: "", type: "uint256" }],
-                  stateMutability: "view",
-                  type: "function",
-                },
-              ],
-              functionName: "balanceOf",
-              args: [effectiveAddress as `0x${string}`],
-            });
-          } catch (error) {
-            console.warn("Could not fetch staked balance:", error);
-            return BigInt(0);
-          }
-        })
-      ),
-      // Pool connection calls
-      Promise.all(
-        stakesWithStaking.map(async (stake) => {
-          if (stake.stakingPoolAddress && effectiveAddress) {
-            return await checkPoolConnection(
-              stake.stakingPoolAddress,
-              effectiveAddress
-            );
-          }
-          return false;
-        })
-      ),
-    ]);
+    // Prioritize stakes with higher flow rates
+    const prioritizedStakes = stakesWithStaking
+      .sort((a, b) => b.userFlowRate - a.userFlowRate)
+      .slice(0, 10); // Limit to top 10 to avoid overwhelming the system
 
-    // Update only the stakes that had additional data to fetch
-    setStakes((prevStakes) =>
-      prevStakes.map((stake) => {
-        const enhanceIndex = stakesWithStaking.findIndex(
-          (s) => s.tokenAddress === stake.tokenAddress
-        );
+    try {
+      const requests = prioritizedStakes.flatMap((stake) => [
+        {
+          type: "stakedBalance" as const,
+          stakingAddress: stake.stakingAddress,
+          userAddress: effectiveAddress,
+          tokenAddress: stake.tokenAddress,
+        },
+        // Only check pool connection if not already connected according to subgraph
+        ...(stake.isConnectedToPool
+          ? []
+          : [
+              {
+                type: "poolConnection" as const,
+                poolAddress: stake.stakingPoolAddress,
+                userAddress: effectiveAddress,
+                tokenAddress: stake.tokenAddress,
+              },
+            ]),
+      ]);
 
-        if (enhanceIndex >= 0) {
+      const results = await fetchBlockchainDataBatch(requests);
+
+      // Update stakes with the lazy-loaded data
+      setStakes((prevStakes) =>
+        prevStakes.map((stake) => {
+          const stakedBalanceKey = `stakedBalance-${stake.stakingAddress}-${effectiveAddress}`;
+          const poolConnectionKey = `poolConnection-${stake.stakingPoolAddress}-${effectiveAddress}`;
+
+          const stakedBalanceData = results.get(stakedBalanceKey);
+          const poolConnectionData = results.get(poolConnectionKey);
+
           return {
             ...stake,
             stakedBalance:
-              (stakedBalances[enhanceIndex] as bigint) || BigInt(0),
-            isConnectedToPool: poolConnections[enhanceIndex] as boolean,
+              stakedBalanceData?.stakedBalance || stake.stakedBalance,
+            isConnectedToPool:
+              poolConnectionData?.poolConnection ?? stake.isConnectedToPool,
           };
-        }
-
-        return stake;
-      })
-    );
-
-    console.log(
-      `Enhanced ${stakesWithStaking.length} stakes with blockchain data`
-    );
+        })
+      );
+    } catch (error) {
+      console.error("Error lazy loading stake data:", error);
+    }
   };
 
   const calculateSharePercentage = (units: string, totalUnits: string) => {
@@ -801,10 +762,23 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     try {
       const addressesToUpdate =
         tokenAddresses || stakes.map((stake) => stake.tokenAddress);
-      const balanceResults = await fetchBalances(addressesToUpdate);
-      const balanceMap = new Map(
-        balanceResults.map((result) => [result.tokenAddress, result.balance])
+      const balanceResults = await fetchBlockchainDataBatch(
+        addressesToUpdate.map((address) => ({
+          type: "balance" as const,
+          tokenAddress: address,
+          userAddress: effectiveAddress,
+        }))
       );
+
+      // Create balance map from cache results
+      const balanceMap = new Map<string, bigint>();
+      addressesToUpdate.forEach((address) => {
+        const cacheKey = `balance-${address}-${effectiveAddress}`;
+        const result = balanceResults.get(cacheKey);
+        if (result?.balance) {
+          balanceMap.set(address, result.balance as bigint);
+        }
+      });
 
       setStakes((prevStakes) =>
         prevStakes.map((stake) => {
@@ -835,27 +809,25 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     if (!effectiveAddress) return;
 
     try {
-      const stakedBalance = await publicClient.readContract({
-        address: stakingAddress as `0x${string}`,
-        abi: [
-          {
-            inputs: [{ name: "account", type: "address" }],
-            name: "balanceOf",
-            outputs: [{ name: "", type: "uint256" }],
-            stateMutability: "view",
-            type: "function",
-          },
-        ],
-        functionName: "balanceOf",
-        args: [effectiveAddress as `0x${string}`],
-      });
+      const results = await fetchBlockchainDataBatch([
+        {
+          type: "stakedBalance" as const,
+          stakingAddress: stakingAddress,
+          userAddress: effectiveAddress,
+          tokenAddress: tokenAddress,
+        },
+      ]);
+
+      const cacheKey = `stakedBalance-${stakingAddress}-${effectiveAddress}`;
+      const stakedBalanceResult = results.get(cacheKey);
 
       setStakes((prevStakes) =>
         prevStakes.map((stake) => {
           if (stake.tokenAddress === tokenAddress) {
             return {
               ...stake,
-              stakedBalance: stakedBalance as bigint,
+              stakedBalance:
+                (stakedBalanceResult?.stakedBalance as bigint) || BigInt(0),
             };
           }
           return stake;
@@ -873,17 +845,25 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     if (!effectiveAddress) return;
 
     try {
-      const isConnected = await checkPoolConnection(
-        poolAddress,
-        effectiveAddress
-      );
+      const results = await fetchBlockchainDataBatch([
+        {
+          type: "poolConnection" as const,
+          poolAddress: poolAddress,
+          userAddress: effectiveAddress,
+          tokenAddress: tokenAddress,
+        },
+      ]);
+
+      const cacheKey = `poolConnection-${poolAddress}-${effectiveAddress}`;
+      const connectionResult = results.get(cacheKey);
 
       setStakes((prevStakes) =>
         prevStakes.map((stake) => {
           if (stake.tokenAddress === tokenAddress) {
             return {
               ...stake,
-              isConnectedToPool: isConnected,
+              isConnectedToPool:
+                (connectionResult?.poolConnection as boolean) ?? false,
             };
           }
           return stake;
@@ -1001,11 +981,12 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
           </div>
         </div>
 
-        {/* Top-up All Stakes Button - show only when there are stakes */}
-        {stakes.length > 0 && (
+        {/* Top-up All Stakes Button - show only when there are stakes or owned tokens */}
+        {(stakes.length > 0 || ownedSuperTokens.length > 0) && (
           <div className="mb-4">
             <TopUpAllStakesButton
               stakes={stakes}
+              ownedSuperTokens={ownedSuperTokens}
               onSuccess={() => handleStakeSuccess()}
               className="btn btn-tertiary btn-sm w-full"
               isMiniApp={isMiniAppView}

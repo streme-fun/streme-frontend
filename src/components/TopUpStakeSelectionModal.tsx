@@ -100,7 +100,7 @@ export function TopUpStakeSelectionModal({
       <div className="bg-white rounded-lg max-w-md w-full mx-4">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Select Tokens to Top-up</h2>
+            <h2 className="text-xl font-bold">Select Tokens to Stake</h2>
             <button
               onClick={onClose}
               className="btn btn-sm btn-circle btn-ghost"
@@ -151,7 +151,18 @@ export function TopUpStakeSelectionModal({
                       />
                       <div className="flex-1">
                         <div className="flex justify-between items-center">
-                          <span className="font-medium">{option.symbol}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{option.symbol}</span>
+                            {option.stakingPoolAddress ? (
+                              <span className="badge badge-secondary badge-xs">
+                                Top-up
+                              </span>
+                            ) : (
+                              <span className="badge badge-primary badge-xs">
+                                New
+                              </span>
+                            )}
+                          </div>
                           <span className="text-sm text-gray-500">
                             {Number(
                               formatUnits(option.balance, 18)

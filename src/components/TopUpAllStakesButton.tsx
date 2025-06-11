@@ -42,6 +42,12 @@ interface TopUpAllStakesButtonProps {
       };
     };
   }>;
+  ownedSuperTokens?: Array<{
+    tokenAddress: string;
+    symbol: string;
+    balance: number;
+    stakingAddress?: string;
+  }>;
   disabled?: boolean;
   className?: string;
   onSuccess?: () => void;
@@ -52,6 +58,7 @@ interface TopUpAllStakesButtonProps {
 
 export function TopUpAllStakesButton({
   stakes,
+  ownedSuperTokens = [],
   disabled,
   className,
   onSuccess,
@@ -277,7 +284,7 @@ export function TopUpAllStakesButton({
         balance: bigint;
       }> = [];
 
-      // Use the balance information that's already available in stakes from the page
+      // Process already staked tokens
       for (const stake of validStakes) {
         // Get current balance from the stake's receivedBalance + streamedAmount
         const currentBalance = stake.baseAmount;
@@ -291,6 +298,37 @@ export function TopUpAllStakesButton({
             symbol: stake.membership.pool.token.symbol,
             balance: balanceInWei,
           });
+        }
+      }
+
+      // Process owned SuperTokens (not yet staked)
+      for (const superToken of ownedSuperTokens) {
+        // Only include tokens that have staking addresses and positive balances
+        if (
+          superToken.stakingAddress &&
+          superToken.stakingAddress !== "" &&
+          superToken.stakingAddress !==
+            "0x0000000000000000000000000000000000000000" &&
+          superToken.balance > 0
+        ) {
+          const balanceInWei = BigInt(Math.floor(superToken.balance * 1e18));
+
+          // Avoid duplicates - check if this token is already in stakes
+          const isDuplicate = stakesWithBalances.some(
+            (stake) =>
+              stake.tokenAddress.toLowerCase() ===
+              superToken.tokenAddress.toLowerCase()
+          );
+
+          if (!isDuplicate) {
+            stakesWithBalances.push({
+              tokenAddress: superToken.tokenAddress,
+              stakingAddress: superToken.stakingAddress,
+              stakingPoolAddress: "", // SuperTokens don't have existing pool addresses
+              symbol: superToken.symbol,
+              balance: balanceInWei,
+            });
+          }
         }
       }
 
@@ -316,15 +354,32 @@ export function TopUpAllStakesButton({
     }
   };
 
-  // Don't show button if no valid stakes
+  // Calculate total available tokens (both staked and unstaked)
+  // This logic must match exactly what handleButtonClick filters
   const validStakesCount = stakes.filter(
     (stake) =>
       stake.stakingAddress &&
       stake.stakingAddress !== "" &&
-      stake.stakingAddress !== "0x0000000000000000000000000000000000000000"
+      stake.stakingAddress !== "0x0000000000000000000000000000000000000000" &&
+      stake.baseAmount > 0 // Must have positive balance to be stakeable
   ).length;
 
-  if (validStakesCount === 0) {
+  const validSuperTokensCount = ownedSuperTokens.filter(
+    (token) =>
+      token.stakingAddress &&
+      token.stakingAddress !== "" &&
+      token.stakingAddress !== "0x0000000000000000000000000000000000000000" &&
+      token.balance > 0 &&
+      // Avoid counting duplicates with stakes
+      !stakes.some(
+        (stake) =>
+          stake.tokenAddress.toLowerCase() === token.tokenAddress.toLowerCase()
+      )
+  ).length;
+
+  const totalAvailableTokens = validStakesCount + validSuperTokensCount;
+
+  if (totalAvailableTokens === 0) {
     return null;
   }
 
@@ -367,7 +422,7 @@ export function TopUpAllStakesButton({
                 d="M13 10V3L4 14h7v7l9-11h-7z"
               />
             </svg>
-            Top-up All Stakes ({validStakesCount})
+            Top-up All Tokens ({totalAvailableTokens})
           </>
         )}
       </button>
