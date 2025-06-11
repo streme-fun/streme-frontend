@@ -210,7 +210,9 @@ export function TopUpAllStakesButton({
 
       // Success!
       toast.success(
-        `✅ Successfully completed batch staking for ${selectedStakes.length} tokens!`,
+        `Successfully completed batch staking for ${selectedStakes.length} ${
+          selectedStakes.length === 1 ? "token" : "tokens"
+        }!`,
         { id: toastId }
       );
 
