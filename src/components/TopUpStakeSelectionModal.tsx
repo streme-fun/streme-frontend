@@ -168,13 +168,9 @@ export function TopUpStakeSelectionModal({
                               formatUnits(option.balance, 18)
                             ).toLocaleString("en-US", {
                               minimumFractionDigits: 0,
-                              maximumFractionDigits: 6,
+                              maximumFractionDigits: 0,
                             })}
                           </span>
-                        </div>
-                        <div className="text-xs text-gray-400 mt-1">
-                          {option.tokenAddress.slice(0, 6)}...
-                          {option.tokenAddress.slice(-4)}
                         </div>
                       </div>
                     </label>
@@ -182,15 +178,7 @@ export function TopUpStakeSelectionModal({
                 ))}
               </div>
 
-              <div className="mt-6 pt-4 border-t">
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <p className="text-sm text-gray-500">
-                      Selected: {selectedCount} tokens
-                    </p>
-                  </div>
-                </div>
-
+              <div className="mt-2">
                 <div className="flex gap-3">
                   <button onClick={onClose} className="btn btn-outline flex-1">
                     Cancel
