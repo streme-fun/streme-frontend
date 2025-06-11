@@ -4,6 +4,7 @@ import { balanceCallTracker } from "./debug";
 
 // RPC endpoints in order of preference
 const rpcEndpoints = [
+  "https://rpc-endpoints.superfluid.dev/base-mainnet?app=streme-x8fsj6",
   "https://mainnet.base.org",
   "https://developer-access-mainnet.base.org",
   process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL!,
