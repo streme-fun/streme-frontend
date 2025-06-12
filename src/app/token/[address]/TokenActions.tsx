@@ -49,6 +49,7 @@ export function TokenActions({
     isConnectedToPool,
     refresh: refreshTokenData,
     isRefreshing: isRefreshingBalances,
+    lastUpdated,
   } = useTokenBalance(
     initialToken.contract_address,
     initialToken.staking_address,
@@ -228,8 +229,8 @@ export function TokenActions({
       return { isValid: true, error: null };
     }
 
-    // Don't show validation errors while balances are still loading
-    if (isRefreshingBalances) {
+    // Don't show validation errors while balances are still loading or data hasn't been loaded yet
+    if (isRefreshingBalances || !lastUpdated) {
       return { isValid: true, error: null };
     }
 
@@ -268,6 +269,7 @@ export function TokenActions({
     balance,
     token.symbol,
     isRefreshingBalances,
+    lastUpdated,
   ]);
 
   const validation = getTradeValidation();
@@ -377,6 +379,14 @@ export function TokenActions({
   }, [currentAddress, walletIsConnected, contractAddress]);
 
   const hasTokens = walletIsConnected && balance > 0n;
+
+  // Trigger an immediate refresh when wallet connects for the first time
+  useEffect(() => {
+    if (walletIsConnected && currentAddress && !lastUpdated) {
+      // Immediately refresh when wallet first connects
+      refreshTokenData();
+    }
+  }, [walletIsConnected, currentAddress, lastUpdated, refreshTokenData]);
 
   const refreshBalances = useCallback(async () => {
     // Use shared data refresh function
@@ -570,12 +580,16 @@ export function TokenActions({
           <div className="flex justify-between">
             <div className="text-sm text-gray-400">Balance</div>
             <div className="text-sm text-gray-400 flex items-center gap-2">
-              {isRefreshingBalances && (
+              {(isRefreshingBalances || !lastUpdated) && (
                 <div className="animate-spin w-3 h-3 border border-gray-300 border-t-blue-500 rounded-full"></div>
               )}
-              {tradeDirection === "buy"
-                ? `${(Number(ethBalance) / 1e18).toFixed(2)} ETH`
-                : `${(Number(balance) / 1e18).toFixed(2)} ${token.symbol}`}
+              {!lastUpdated ? (
+                <span className="text-gray-300">Loading...</span>
+              ) : tradeDirection === "buy" ? (
+                `${(Number(ethBalance) / 1e18).toFixed(4)} ETH`
+              ) : (
+                `${(Number(balance) / 1e18).toFixed(4)} ${token.symbol}`
+              )}
             </div>
           </div>
 

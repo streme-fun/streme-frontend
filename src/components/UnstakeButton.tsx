@@ -78,7 +78,7 @@ export function UnstakeButton({
     ? farcasterAddress
     : primaryAddress || user?.wallet?.address;
 
-  // Fetch unlock time only when needed, not on mount
+  // Fetch unlock time when user has staked tokens
   const fetchUnlockTime = useCallback(async () => {
     if (!effectiveIsConnected || !effectiveAddress) return;
 
@@ -94,17 +94,45 @@ export function UnstakeButton({
       setUnlockTime(unlockTimeStamp);
     } catch (error) {
       console.error("Error fetching unlock time:", error);
-      toast.error("Could not fetch unlock time.");
+      // Don't show toast error for automatic fetching, only for manual clicks
     }
   }, [effectiveAddress, effectiveIsConnected, stakingAddress]);
 
-  // Only fetch unlock time when button is clicked, not on mount
+  // Reset unlock time when address changes
+  useEffect(() => {
+    setUnlockTime(null);
+  }, [effectiveAddress, stakingAddress]);
+
+  // Fetch unlock time automatically when user has staked tokens
+  useEffect(() => {
+    if (
+      userStakedBalance > 0n &&
+      effectiveIsConnected &&
+      effectiveAddress &&
+      unlockTime === null
+    ) {
+      fetchUnlockTime();
+    }
+  }, [
+    userStakedBalance,
+    effectiveIsConnected,
+    effectiveAddress,
+    unlockTime,
+    fetchUnlockTime,
+  ]);
+
+  // Handle button click
   const handleButtonClick = async () => {
     if (isLoading) return;
 
-    // Fetch unlock time when user wants to unstake
+    // Fetch unlock time if not already fetched
     if (unlockTime === null) {
-      await fetchUnlockTime();
+      try {
+        await fetchUnlockTime();
+      } catch {
+        toast.error("Could not fetch unlock time.");
+        return;
+      }
     }
 
     setIsModalOpen(true);

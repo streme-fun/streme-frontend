@@ -87,10 +87,17 @@ export function TokenDataProvider({ children }: TokenDataProviderProps) {
 
       const cacheKey = `${tokenAddress}-${effectiveAddress}`;
 
+      // Set loading state for initial data fetch
+      const isInitialFetch = !balanceData.has(cacheKey);
+      if (isInitialFetch) {
+        setIsRefreshing(true);
+      }
+
       try {
-        // Batch the most common calls that have the same return type
-        const [tokenBalance, ethBalance] = await Promise.all([
-          requestBatcher.batchContractRead(`token-balance-${cacheKey}`, () =>
+        // For initial fetches, use direct calls for maximum speed
+        if (isInitialFetch) {
+          // Direct calls for maximum speed - bypass batching for critical data
+          const [tokenBalance, ethBalance] = await Promise.all([
             publicClient.readContract({
               address: tokenAddress as `0x${string}`,
               abi: [
@@ -104,28 +111,110 @@ export function TokenDataProvider({ children }: TokenDataProviderProps) {
               ],
               functionName: "balanceOf",
               args: [effectiveAddress as `0x${string}`],
-            })
-          ),
-          requestBatcher.batchContractRead(
-            `eth-balance-${effectiveAddress}`,
-            () =>
-              publicClient.getBalance({
-                address: effectiveAddress as `0x${string}`,
-              })
-          ),
-        ]);
+            }),
+            publicClient.getBalance({
+              address: effectiveAddress as `0x${string}`,
+            }),
+          ]);
 
-        // Handle staked balance separately
-        let stakedBalance = BigInt(0);
-        if (
-          stakingAddress &&
-          stakingAddress !== "0x0000000000000000000000000000000000000000"
-        ) {
-          stakedBalance = (await requestBatcher.batchContractRead(
-            `staked-balance-${stakingAddress}-${effectiveAddress}`,
-            () =>
+          // Update cache immediately with critical balance data
+          setBalanceData(
+            (prev) =>
+              new Map(
+                prev.set(cacheKey, {
+                  tokenBalance: tokenBalance as bigint,
+                  ethBalance: ethBalance as bigint,
+                  stakedBalance: BigInt(0), // Will be updated below if needed
+                  isConnectedToPool: false, // Will be updated below if needed
+                  lastUpdated: Date.now(),
+                })
+              )
+          );
+
+          // Fetch secondary data in parallel without blocking
+          const secondaryPromises = [];
+
+          if (
+            stakingAddress &&
+            stakingAddress !== "0x0000000000000000000000000000000000000000"
+          ) {
+            secondaryPromises.push(
+              publicClient
+                .readContract({
+                  address: stakingAddress as `0x${string}`,
+                  abi: [
+                    {
+                      inputs: [{ name: "account", type: "address" }],
+                      name: "balanceOf",
+                      outputs: [{ name: "", type: "uint256" }],
+                      stateMutability: "view",
+                      type: "function",
+                    },
+                  ],
+                  functionName: "balanceOf",
+                  args: [effectiveAddress as `0x${string}`],
+                })
+                .then((stakedBalance) => {
+                  setBalanceData(
+                    (prev) =>
+                      new Map(
+                        prev.set(cacheKey, {
+                          ...prev.get(cacheKey)!,
+                          stakedBalance: stakedBalance as bigint,
+                        })
+                      )
+                  );
+                })
+                .catch((error) => {
+                  console.error("Error fetching staked balance:", error);
+                })
+            );
+          }
+
+          if (
+            poolAddress &&
+            poolAddress !== "0x0000000000000000000000000000000000000000"
+          ) {
+            secondaryPromises.push(
+              publicClient
+                .readContract({
+                  address: GDA_FORWARDER,
+                  abi: GDA_ABI,
+                  functionName: "isMemberConnected",
+                  args: [
+                    poolAddress as `0x${string}`,
+                    effectiveAddress as `0x${string}`,
+                  ],
+                })
+                .then((isConnectedToPool) => {
+                  setBalanceData(
+                    (prev) =>
+                      new Map(
+                        prev.set(cacheKey, {
+                          ...prev.get(cacheKey)!,
+                          isConnectedToPool: isConnectedToPool as boolean,
+                        })
+                      )
+                  );
+                })
+                .catch((error) => {
+                  console.error("Error fetching pool connection:", error);
+                })
+            );
+          }
+
+          // Fire and forget secondary data
+          if (secondaryPromises.length > 0) {
+            Promise.all(secondaryPromises).catch(() => {
+              // Ignore errors - secondary data failures shouldn't affect primary balance display
+            });
+          }
+        } else {
+          // Use batched calls for subsequent refreshes
+          const [tokenBalance, ethBalance] = await Promise.all([
+            requestBatcher.batchContractRead(`token-balance-${cacheKey}`, () =>
               publicClient.readContract({
-                address: stakingAddress as `0x${string}`,
+                address: tokenAddress as `0x${string}`,
                 abi: [
                   {
                     inputs: [{ name: "account", type: "address" }],
@@ -138,51 +227,90 @@ export function TokenDataProvider({ children }: TokenDataProviderProps) {
                 functionName: "balanceOf",
                 args: [effectiveAddress as `0x${string}`],
               })
-          )) as bigint;
-        }
+            ),
+            requestBatcher.batchContractRead(
+              `eth-balance-${effectiveAddress}`,
+              () =>
+                publicClient.getBalance({
+                  address: effectiveAddress as `0x${string}`,
+                })
+            ),
+          ]);
 
-        // Handle pool connection separately
-        let isConnectedToPool = false;
-        if (
-          poolAddress &&
-          poolAddress !== "0x0000000000000000000000000000000000000000"
-        ) {
-          isConnectedToPool = (await requestBatcher.batchContractRead(
-            `pool-connection-${poolAddress}-${effectiveAddress}`,
-            () =>
-              publicClient.readContract({
-                address: GDA_FORWARDER,
-                abi: GDA_ABI,
-                functionName: "isMemberConnected",
-                args: [
-                  poolAddress as `0x${string}`,
-                  effectiveAddress as `0x${string}`,
-                ],
-              })
-          )) as boolean;
-        }
+          // Handle staked balance separately for batched calls
+          let stakedBalance = BigInt(0);
+          if (
+            stakingAddress &&
+            stakingAddress !== "0x0000000000000000000000000000000000000000"
+          ) {
+            stakedBalance = (await requestBatcher.batchContractRead(
+              `staked-balance-${stakingAddress}-${effectiveAddress}`,
+              () =>
+                publicClient.readContract({
+                  address: stakingAddress as `0x${string}`,
+                  abi: [
+                    {
+                      inputs: [{ name: "account", type: "address" }],
+                      name: "balanceOf",
+                      outputs: [{ name: "", type: "uint256" }],
+                      stateMutability: "view",
+                      type: "function",
+                    },
+                  ],
+                  functionName: "balanceOf",
+                  args: [effectiveAddress as `0x${string}`],
+                })
+            )) as bigint;
+          }
 
-        // Update the cache
-        setBalanceData(
-          (prev) =>
-            new Map(
-              prev.set(cacheKey, {
-                tokenBalance: tokenBalance as bigint,
-                ethBalance: ethBalance as bigint,
-                stakedBalance,
-                isConnectedToPool,
-                lastUpdated: Date.now(),
-              })
-            )
-        );
+          // Handle pool connection separately for batched calls
+          let isConnectedToPool = false;
+          if (
+            poolAddress &&
+            poolAddress !== "0x0000000000000000000000000000000000000000"
+          ) {
+            isConnectedToPool = (await requestBatcher.batchContractRead(
+              `pool-connection-${poolAddress}-${effectiveAddress}`,
+              () =>
+                publicClient.readContract({
+                  address: GDA_FORWARDER,
+                  abi: GDA_ABI,
+                  functionName: "isMemberConnected",
+                  args: [
+                    poolAddress as `0x${string}`,
+                    effectiveAddress as `0x${string}`,
+                  ],
+                })
+            )) as boolean;
+          }
+
+          // Update the cache for batched calls
+          setBalanceData(
+            (prev) =>
+              new Map(
+                prev.set(cacheKey, {
+                  tokenBalance: tokenBalance as bigint,
+                  ethBalance: ethBalance as bigint,
+                  stakedBalance,
+                  isConnectedToPool,
+                  lastUpdated: Date.now(),
+                })
+              )
+          );
+        }
       } catch (error) {
         console.error(
           `Error refreshing token data for ${tokenAddress}:`,
           error
         );
+      } finally {
+        // Clear loading state for initial fetch
+        if (isInitialFetch) {
+          setIsRefreshing(false);
+        }
       }
     },
-    [effectiveAddress, isConnected]
+    [effectiveAddress, isConnected, balanceData]
   );
 
   const refreshAllData = useCallback(async () => {
@@ -297,9 +425,10 @@ export function useTokenBalance(
     }
   }, [tokenAddress, registerActiveToken, unregisterActiveToken]);
 
-  // Auto-fetch if data doesn't exist
+  // Auto-fetch if data doesn't exist - immediate and aggressive for initial load
   useEffect(() => {
     if (effectiveAddress && !data) {
+      // Direct calls will be used automatically for initial fetch
       refreshTokenData(tokenAddress, stakingAddress, poolAddress);
     }
   }, [
