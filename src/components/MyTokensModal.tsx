@@ -522,7 +522,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     }
   };
 
-  // Optimized processing with lazy loading
+  // Optimized processing with immediate loading of critical data
   const processTokensOptimized = async (accountData: {
     poolMemberships?: PoolMembership[];
     accountTokenSnapshots?: AccountTokenSnapshot[];
@@ -620,7 +620,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
         baseAmount: formattedBalance,
         lastUpdateTime: Date.now(),
         userFlowRate,
-        stakedBalance: BigInt(0), // Will be loaded lazily
+        stakedBalance: BigInt(0), // Will be loaded below before setting state
         logo: tokenData?.logo,
         marketData: tokenData?.marketData,
         isConnectedToPool: membership.isConnected, // Use from subgraph initially
@@ -657,70 +657,124 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
       }
     });
 
-    // Step 4: Set initial data immediately for fast UX
-    setStakes(stakesData);
-    setOwnedSuperTokens(superTokensData);
+    // Step 4: Load staking data and update stakes array BEFORE setting state
+    const finalStakesData = await loadStakingDataSync(stakesData);
 
-    // Step 5: Lazy load additional data for stakes with staking addresses
-    lazyLoadStakeData(stakesData);
+    // Step 5: Set state with complete data (no need for secondary update)
+    setStakes(finalStakesData);
+    setOwnedSuperTokens(superTokensData);
   };
 
-  // Lazy loading for non-critical stake data
-  const lazyLoadStakeData = async (stakesData: StakeData[]) => {
+  // Load staking data synchronously and return updated stakes
+  const loadStakingDataSync = async (
+    stakesData: StakeData[]
+  ): Promise<StakeData[]> => {
     const stakesWithStaking = stakesData.filter(
       (stake) => stake.stakingAddress && stake.stakingAddress !== ""
     );
 
-    if (stakesWithStaking.length === 0) return;
-
-    // Prioritize stakes with higher flow rates
-    const prioritizedStakes = stakesWithStaking
-      .sort((a, b) => b.userFlowRate - a.userFlowRate)
-      .slice(0, 10); // Limit to top 10 to avoid overwhelming the system
+    if (stakesWithStaking.length === 0) return stakesData;
 
     try {
-      const requests = prioritizedStakes.flatMap((stake) => [
-        {
-          type: "stakedBalance" as const,
-          stakingAddress: stake.stakingAddress,
-          userAddress: effectiveAddress,
-          tokenAddress: stake.tokenAddress,
-        },
-        // Only check pool connection if not already connected according to subgraph
-        ...(stake.isConnectedToPool
-          ? []
-          : [
+      // Load staked balances for all stakes with staking addresses
+      const stakedBalancePromises = stakesWithStaking.map(async (stake) => {
+        try {
+          const stakedBalance = await publicClient.readContract({
+            address: stake.stakingAddress as `0x${string}`,
+            abi: [
               {
-                type: "poolConnection" as const,
-                poolAddress: stake.stakingPoolAddress,
-                userAddress: effectiveAddress,
-                tokenAddress: stake.tokenAddress,
+                inputs: [{ name: "account", type: "address" }],
+                name: "balanceOf",
+                outputs: [{ name: "", type: "uint256" }],
+                stateMutability: "view",
+                type: "function",
               },
-            ]),
+            ],
+            functionName: "balanceOf",
+            args: [effectiveAddress as `0x${string}`],
+          });
+          return {
+            tokenAddress: stake.tokenAddress,
+            stakedBalance: stakedBalance as bigint,
+          };
+        } catch (error) {
+          console.warn(
+            `Failed to fetch staked balance for ${stake.membership.pool.token.symbol}:`,
+            error
+          );
+          return { tokenAddress: stake.tokenAddress, stakedBalance: BigInt(0) };
+        }
+      });
+
+      // Load pool connection status for all stakes
+      const poolConnectionPromises = stakesWithStaking.map(async (stake) => {
+        try {
+          const isConnected = await publicClient.readContract({
+            address: GDA_FORWARDER,
+            abi: GDA_ABI,
+            functionName: "isMemberConnected",
+            args: [
+              stake.stakingPoolAddress as `0x${string}`,
+              effectiveAddress as `0x${string}`,
+            ],
+          });
+          return {
+            tokenAddress: stake.tokenAddress,
+            isConnected: isConnected as boolean,
+          };
+        } catch (error) {
+          console.warn(
+            `Failed to fetch pool connection for ${stake.membership.pool.token.symbol}:`,
+            error
+          );
+          return {
+            tokenAddress: stake.tokenAddress,
+            isConnected: stake.isConnectedToPool,
+          };
+        }
+      });
+
+      const [stakedBalanceResults, poolConnectionResults] = await Promise.all([
+        Promise.all(stakedBalancePromises),
+        Promise.all(poolConnectionPromises),
       ]);
 
-      const results = await fetchBlockchainDataBatch(requests);
-
-      // Update stakes with the lazy-loaded data
-      setStakes((prevStakes) =>
-        prevStakes.map((stake) => {
-          const stakedBalanceKey = `stakedBalance-${stake.stakingAddress}-${effectiveAddress}`;
-          const poolConnectionKey = `poolConnection-${stake.stakingPoolAddress}-${effectiveAddress}`;
-
-          const stakedBalanceData = results.get(stakedBalanceKey);
-          const poolConnectionData = results.get(poolConnectionKey);
-
-          return {
-            ...stake,
-            stakedBalance:
-              stakedBalanceData?.stakedBalance || stake.stakedBalance,
-            isConnectedToPool:
-              poolConnectionData?.poolConnection ?? stake.isConnectedToPool,
-          };
-        })
+      // Create maps for quick lookup
+      const stakedBalanceMap = new Map(
+        stakedBalanceResults.map((result) => [
+          result.tokenAddress,
+          result.stakedBalance,
+        ])
       );
+      const poolConnectionMap = new Map(
+        poolConnectionResults.map((result) => [
+          result.tokenAddress,
+          result.isConnected,
+        ])
+      );
+
+      // Update stakes with the loaded data and return the updated array
+      const updatedStakes = stakesData.map((stake) => {
+        if (!stake.stakingAddress || stake.stakingAddress === "") {
+          return stake;
+        }
+
+        const stakedBalance =
+          stakedBalanceMap.get(stake.tokenAddress) || BigInt(0);
+        const isConnected =
+          poolConnectionMap.get(stake.tokenAddress) ?? stake.isConnectedToPool;
+
+        return {
+          ...stake,
+          stakedBalance,
+          isConnectedToPool: isConnected,
+        };
+      });
+
+      return updatedStakes;
     } catch (error) {
-      console.error("Error lazy loading stake data:", error);
+      console.error("Error loading staking data:", error);
+      return stakesData; // Return original data on error
     }
   };
 
@@ -1364,6 +1418,10 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                 stake.tokenAddress,
                                 stake.stakingAddress
                               )
+                            }
+                            disabled={
+                              stake.stakedBalance === 0n ||
+                              !stake.stakingAddress
                             }
                             className="btn btn-outline btn-sm w-full"
                             isMiniApp={isMiniAppView}
