@@ -385,11 +385,6 @@ export function TopUpAllStakesButton({
     return null;
   }
 
-  const progressPercentage =
-    currentProgress.total > 0
-      ? Math.round((currentProgress.current / currentProgress.total) * 100)
-      : 0;
-
   return (
     <>
       <button
@@ -400,14 +395,7 @@ export function TopUpAllStakesButton({
         {isLoading ? (
           <>
             <span className="loading loading-spinner loading-sm"></span>
-            {currentProgress.total > 0 ? (
-              <>
-                Processing ({currentProgress.current}/{currentProgress.total}) -{" "}
-                {progressPercentage}%
-              </>
-            ) : (
-              "Processing..."
-            )}
+            {currentProgress.total > 0 ? <>Processing</> : "Processing..."}
           </>
         ) : (
           <>
