@@ -425,6 +425,18 @@ export function TokenActions({
     }
   }, []); // Only run on mount
 
+  // Periodic balance refresh
+  useEffect(() => {
+    if (!walletIsConnected || !currentAddress) return;
+
+    // Refresh balances every 30 seconds
+    const intervalId = setInterval(() => {
+      refreshBalances();
+    }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, [walletIsConnected, currentAddress, refreshBalances]);
+
   // Fetch USD prices
   useEffect(() => {
     const fetchUSDPrices = async () => {
