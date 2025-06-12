@@ -5,7 +5,6 @@ import { useAccount } from "wagmi";
 import { useAppFrameLogic } from "../../hooks/useAppFrameLogic";
 import { formatUnits } from "viem";
 import { StakeButton } from "../../components/StakeButton";
-import { StakeAllButton } from "../../components/StakeAllButton";
 import { UnstakeButton } from "../../components/UnstakeButton";
 import { ConnectPoolButton } from "../../components/ConnectPoolButton";
 import { TopUpAllStakesButton } from "../../components/TopUpAllStakesButton";
@@ -1485,7 +1484,7 @@ export default function TokensPage() {
                         stake.stakingAddress !==
                           "0x0000000000000000000000000000000000000000" ? (
                           <div className="space-y-2">
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="flex">
                               <StakeButton
                                 tokenAddress={stake.tokenAddress}
                                 stakingAddress={stake.stakingAddress}
@@ -1497,23 +1496,7 @@ export default function TokensPage() {
                                     stake.stakingAddress
                                   )
                                 }
-                                className="btn btn-primary btn-sm"
-                                isMiniApp={isMiniAppView}
-                                farcasterAddress={effectiveAddress}
-                                farcasterIsConnected={effectiveIsConnected}
-                              />
-                              <StakeAllButton
-                                tokenAddress={stake.tokenAddress}
-                                stakingAddress={stake.stakingAddress}
-                                stakingPoolAddress={stake.stakingPoolAddress}
-                                symbol={stake.membership.pool.token.symbol}
-                                onSuccess={() =>
-                                  handleStakeSuccess(
-                                    stake.tokenAddress,
-                                    stake.stakingAddress
-                                  )
-                                }
-                                className="btn btn-secondary btn-sm"
+                                className="btn btn-primary btn-sm w-full"
                                 isMiniApp={isMiniAppView}
                                 farcasterAddress={effectiveAddress}
                                 farcasterIsConnected={effectiveIsConnected}
@@ -1633,8 +1616,8 @@ export default function TokensPage() {
                         </div>
 
                         {token.stakingAddress ? (
-                          <div className="pt-3">
-                            <div className="grid grid-cols-2 gap-2">
+                          <div className="">
+                            <div className="flex">
                               <StakeButton
                                 tokenAddress={token.tokenAddress}
                                 stakingAddress={token.stakingAddress}
@@ -1645,22 +1628,7 @@ export default function TokensPage() {
                                     token.tokenAddress
                                   )
                                 }
-                                className="btn btn-primary btn-sm"
-                                isMiniApp={isMiniAppView}
-                                farcasterAddress={effectiveAddress}
-                                farcasterIsConnected={effectiveIsConnected}
-                              />
-                              <StakeAllButton
-                                tokenAddress={token.tokenAddress}
-                                stakingAddress={token.stakingAddress}
-                                stakingPoolAddress=""
-                                symbol={token.symbol}
-                                onSuccess={() =>
-                                  handleSuperTokenStakeSuccess(
-                                    token.tokenAddress
-                                  )
-                                }
-                                className="btn btn-secondary btn-sm"
+                                className="btn btn-primary btn-sm w-full"
                                 isMiniApp={isMiniAppView}
                                 farcasterAddress={effectiveAddress}
                                 farcasterIsConnected={effectiveIsConnected}
