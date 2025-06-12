@@ -70,7 +70,7 @@ export function MiniAppTutorialModal({
           <div className="text-6xl mb-4">🎊</div>
           <p className="text-base opacity-80">
             Play around and explore. Launch, stake, earn rewards streamed to
-            your wallet, top-up your stakes from time to time, and have fun. And
+            your wallet, top up your stakes from time to time, and have fun. And
             don&apos;t forget to and claim your SUP!
           </p>
           <div className="bg-accent/10 p-4 rounded-lg border border-accent/20">

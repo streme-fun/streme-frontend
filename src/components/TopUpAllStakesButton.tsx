@@ -424,7 +424,7 @@ export function TopUpAllStakesButton({
                 d="M13 10V3L4 14h7v7l9-11h-7z"
               />
             </svg>
-            Top-up All Tokens ({totalAvailableTokens})
+            Top up All Tokens ({totalAvailableTokens})
           </>
         )}
       </button>
