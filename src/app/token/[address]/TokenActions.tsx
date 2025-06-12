@@ -228,6 +228,11 @@ export function TokenActions({
       return { isValid: true, error: null };
     }
 
+    // Don't show validation errors while balances are still loading
+    if (isRefreshingBalances) {
+      return { isValid: true, error: null };
+    }
+
     const amount = parseFloat(tradeAmount);
     const PRECISION_TOLERANCE = 1e-8; // Small tolerance for floating point comparison
 
@@ -256,7 +261,14 @@ export function TokenActions({
     }
 
     return { isValid: true, error: null };
-  }, [tradeAmount, tradeDirection, ethBalance, balance, token.symbol]);
+  }, [
+    tradeAmount,
+    tradeDirection,
+    ethBalance,
+    balance,
+    token.symbol,
+    isRefreshingBalances,
+  ]);
 
   const validation = getTradeValidation();
 
