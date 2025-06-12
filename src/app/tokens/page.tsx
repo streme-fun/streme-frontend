@@ -1321,6 +1321,7 @@ export default function TokensPage() {
                   <h2 className="text-2xl font-bold">Staked Tokens</h2>
                   <TopUpAllStakesButton
                     stakes={stakes}
+                    ownedSuperTokens={ownedSuperTokens}
                     onSuccess={() => handleStakeSuccess()}
                     className="btn btn-primary"
                     isMiniApp={isMiniAppView}

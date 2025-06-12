@@ -981,7 +981,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
           </div>
         </div>
 
-        {/* Top-up All Stakes Button - show only when there are stakes or owned tokens */}
+        {/* Top up All Stakes Button - show only when there are stakes or owned tokens */}
         {(stakes.length > 0 || ownedSuperTokens.length > 0) && (
           <div className="mb-4">
             <TopUpAllStakesButton

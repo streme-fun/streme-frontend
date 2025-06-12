@@ -13,6 +13,8 @@ interface StakeOption {
   selected: boolean;
 }
 
+type FilterType = "all" | "topup" | "unstaked";
+
 interface TopUpStakeSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -62,11 +64,54 @@ export function TopUpStakeSelectionModal({
         i === index ? { ...option, selected: !option.selected } : option
       );
 
-      // Update selectAll state based on whether all items are selected
-      const allSelected = updated.every((option) => option.selected);
-      setSelectAll(allSelected);
-
       return updated;
+    });
+  };
+
+  // Calculate counts for each filter
+  const topupCount = stakeOptions.filter(
+    (option) => !!option.stakingPoolAddress
+  ).length;
+  const unstakedCount = stakeOptions.filter(
+    (option) => !option.stakingPoolAddress
+  ).length;
+
+  // Check selection states for each category
+  const allSelected =
+    stakeOptions.length > 0 && stakeOptions.every((option) => option.selected);
+  const topupTokens = stakeOptions.filter(
+    (option) => !!option.stakingPoolAddress
+  );
+  const topupAllSelected =
+    topupTokens.length > 0 && topupTokens.every((option) => option.selected);
+  const unstakedTokens = stakeOptions.filter(
+    (option) => !option.stakingPoolAddress
+  );
+  const unstakedAllSelected =
+    unstakedTokens.length > 0 &&
+    unstakedTokens.every((option) => option.selected);
+
+  const handleBulkSelect = (filter: FilterType) => {
+    setStakeOptions((prev) => {
+      if (filter === "all") {
+        const newSelectAll = !allSelected;
+        return prev.map((option) => ({ ...option, selected: newSelectAll }));
+      } else if (filter === "topup") {
+        const newSelectTopup = !topupAllSelected;
+        return prev.map((option) =>
+          !!option.stakingPoolAddress
+            ? { ...option, selected: newSelectTopup }
+            : option
+        );
+      } else if (filter === "unstaked") {
+        const newSelectUnstaked = !unstakedAllSelected;
+        return prev.map((option) =>
+          !option.stakingPoolAddress
+            ? { ...option, selected: newSelectUnstaked }
+            : option
+        );
+      }
+      return prev;
     });
   };
 
@@ -77,6 +122,11 @@ export function TopUpStakeSelectionModal({
       prev.map((option) => ({ ...option, selected: newSelectAll }))
     );
   };
+
+  // Update selectAll state based on overall selection
+  useEffect(() => {
+    setSelectAll(allSelected);
+  }, [allSelected]);
 
   const handleProceed = () => {
     const selectedStakes = stakeOptions
@@ -118,18 +168,50 @@ export function TopUpStakeSelectionModal({
             </div>
           ) : (
             <>
+              {/* Bulk Selection Buttons */}
               <div className="mb-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectAll}
-                    onChange={handleSelectAll}
-                    className="checkbox checkbox-primary"
-                  />
-                  <span className="font-medium">
-                    Select All ({stakeOptions.length} tokens)
-                  </span>
-                </label>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectAll}
+                      onChange={handleSelectAll}
+                      className="checkbox checkbox-primary"
+                    />
+                    <span className="font-medium">
+                      Select All ({stakeOptions.length})
+                    </span>
+                  </label>
+
+                  <div className="flex gap-1">
+                    <button
+                      className={`btn btn-xs ${
+                        topupAllSelected
+                          ? "btn-secondary"
+                          : "btn-ghost text-gray-500 hover:text-gray-700"
+                      }`}
+                      onClick={() => handleBulkSelect("topup")}
+                      title={`${
+                        topupAllSelected ? "Deselect" : "Select"
+                      } all top up tokens`}
+                    >
+                      {topupAllSelected ? "✓" : ""} Top up ({topupCount})
+                    </button>
+                    <button
+                      className={`btn btn-xs ${
+                        unstakedAllSelected
+                          ? "btn-primary"
+                          : "btn-ghost text-gray-500 hover:text-gray-700"
+                      }`}
+                      onClick={() => handleBulkSelect("unstaked")}
+                      title={`${
+                        unstakedAllSelected ? "Deselect" : "Select"
+                      } all unstaked tokens`}
+                    >
+                      {unstakedAllSelected ? "✓" : ""} New ({unstakedCount})
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-3 max-h-64 overflow-y-auto">
@@ -155,7 +237,7 @@ export function TopUpStakeSelectionModal({
                             <span className="font-medium">{option.symbol}</span>
                             {option.stakingPoolAddress ? (
                               <span className="badge badge-secondary badge-xs">
-                                Top-up
+                                Top up
                               </span>
                             ) : (
                               <span className="badge badge-primary badge-xs">

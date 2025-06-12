@@ -703,7 +703,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
               eligibilityData.eligibility.length > 0 && (
                 <div className="mt-2">
                   <p className="text-xs text-blue-600 mb-1">
-                    Eligible Programs:
+                    Eligible Campaigns:
                   </p>
                   <div className="flex flex-wrap gap-1">
                     {eligibilityData.eligibility
