@@ -6,3 +6,8 @@ Use TailwindCSS to make light adjustments.
 # Authentication / Wallet Connection
 
 Privy handles desktop/mobile authentication, but wagmi is used for Farcaster mini-app.
+
+# Bash Commands
+
+npm run build
+npm run lint

@@ -563,6 +563,31 @@ export default function LaunchedTokensPage() {
                       </div>
                     </div>
 
+                    {/* Claimable Fees Section */}
+                    {token.claimableFees && (token.claimableFees.amount0 > 0 || token.claimableFees.amount1 > 0) && (
+                      <div className="mt-3 p-2 bg-base-200 rounded-lg">
+                        <p className="text-xs opacity-70 mb-1">Claimable Fees</p>
+                        <div className="flex flex-col gap-1">
+                          {token.claimableFees.amount0 > 0 && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs opacity-70">{token.symbol}:</span>
+                              <span className="text-xs font-mono font-semibold">
+                                {formatFeeValue(token.claimableFees.amount0)}
+                              </span>
+                            </div>
+                          )}
+                          {token.claimableFees.amount1 > 0 && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs opacity-70">WETH:</span>
+                              <span className="text-xs font-mono font-semibold">
+                                {formatFeeValue(token.claimableFees.amount1)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="mt-3 flex gap-2">
                       {isWalletConnected ? (
                         <ClaimFeesButton
