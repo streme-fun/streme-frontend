@@ -37,3 +37,58 @@ export type CreatorProfile = Record<
     profileImage: string;
   }
 >;
+
+// New interface for launched tokens from external API
+export interface LaunchedToken {
+  id: number;
+  block_number: number;
+  tx_hash: string;
+  contract_address: string;
+  requestor_fid: number;
+  deployer: string;
+  name: string;
+  symbol: string;
+  img_url: string;
+  cast_hash: string;
+  type: string;
+  pair: string;
+  presale_id?: string;
+  chain_id: number;
+  metadata?: Record<string, unknown> | null;
+  tokenFactory: string;
+  postDeployHook: string;
+  liquidityFactory: string;
+  postLpHook: string;
+  poolConfig: {
+    tick: number;
+    pairedToken: string;
+    devBuyFee: number;
+  };
+  channel?: string;
+  timestamp: {
+    _seconds: number;
+    _nanoseconds: number;
+  };
+  staking_pool: string;
+  staking_address: string;
+  pool_address: string;
+  username: string;
+  pfp_url: string;
+  lastTraded: {
+    _seconds: number;
+    _nanoseconds: number;
+  };
+  marketData: {
+    marketCap: number;
+    price: number;
+    priceChange1h: number;
+    priceChange24h: number;
+    priceChange5m: number;
+    volume24h: number | null;
+    lastUpdated: {
+      _seconds: number;
+      _nanoseconds: number;
+    };
+  };
+  created_at: string;
+}

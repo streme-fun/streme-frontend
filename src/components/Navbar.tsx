@@ -104,12 +104,12 @@ export function Navbar() {
   if (isMiniAppView) {
     return (
       <>
-        <nav className="fixed bottom-0 left-0 right-0 z-50 pb-4 pt-2 bg-background/80 border-t border-black/[.1] bg-white bg-opacity-80">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 pb-4 pt-2 bg-background/80 border-t border-black/[.1] bg-base-100 bg-opacity-80">
           <div className="px-2 sm:px-4 py-2 flex items-center justify-around gap-1 sm:gap-2">
             {/* Explore Button */}
             <Link
               href="/"
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 hover:text-primary flex-1"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 dark:text-gray-300 hover:text-primary flex-1"
             >
               {/* Placeholder for Home Icon */}
               <svg
@@ -131,7 +131,7 @@ export function Navbar() {
             {/* My Stakes Button */}
             <button
               onClick={() => setIsMyStakesOpen(true)}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 hover:text-primary flex-1"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 dark:text-gray-300 hover:text-primary flex-1"
             >
               {/* Special E Icon in Circle */}
               <div className="w-6 h-6 mb-0.5 rounded-full border-2 border-current flex items-center justify-center">
@@ -176,7 +176,7 @@ Symbol: $[your ticker]
                   setIsLaunchTokenOpen(true);
                 }
               }}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm hover:text-primary-focus flex-1"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 dark:text-gray-300 hover:text-primary flex-1"
             >
               {/* Placeholder for Launch Icon */}
               <svg
@@ -201,7 +201,7 @@ Symbol: $[your ticker]
               onClick={() => {
                 setIsLeaderboardModalOpen(true);
               }}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 hover:text-primary flex-1"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 dark:text-gray-300 hover:text-primary flex-1"
             >
               {/* Placeholder for Leaderboard Icon */}
               <svg
@@ -224,7 +224,7 @@ Symbol: $[your ticker]
             {/* Profile Button */}
             <button
               onClick={() => setIsWalletProfileOpen(true)}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 hover:text-primary flex-1"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 dark:text-gray-300 hover:text-primary flex-1"
             >
               {/* Profile Picture or Default Icon */}
               {miniAppProfileImage ? (
@@ -292,7 +292,7 @@ Symbol: $[your ticker]
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 border-b border-black/[.1] dark:border-white/[.1] bg-white bg-opacity-80">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 border-b border-black/[.1] dark:border-white/[.1]  bg-opacity-80">
         <div className="px-4 sm:px-8 lg:px-20 h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center">
             <svg

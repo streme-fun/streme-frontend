@@ -13,7 +13,7 @@ import { Logo } from "../components/Logo";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import { Button } from "../components/ui/button";
 import { base } from "wagmi/chains";
-import { useRouter } from "next/navigation";
+
 import { usePostHog } from "posthog-js/react";
 import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal";
 
@@ -29,7 +29,6 @@ function App() {
   const debugClickTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
-  const router = useRouter();
 
   // Tutorial modal state
   const [showTutorialModal, setShowTutorialModal] = useState(false);
@@ -104,13 +103,6 @@ function App() {
         clearTimeout(debugClickTimeout.current);
       }
 
-      // Navigate to auth test after 5 clicks
-      if (newCount >= 5) {
-        console.log("Debug mode activated! Navigating to auth test...");
-        router.push("/auth-test");
-        return 0; // Reset counter
-      }
-
       // Reset counter after 2 seconds of no clicks
       debugClickTimeout.current = setTimeout(() => {
         setDebugClickCount(0);
@@ -118,7 +110,7 @@ function App() {
 
       return newCount;
     });
-  }, [router]);
+  }, []);
 
   // Cleanup effect for debug timeout
   useEffect(() => {

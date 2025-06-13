@@ -548,7 +548,7 @@ export function TokenActions({
   });
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+    <div className="bg-base-100 rounded-xl border border-gray-200 shadow-sm">
       <div className="p-6 space-y-4">
         {/* Trading Interface */}
         <div className="space-y-4">
@@ -762,7 +762,7 @@ export function TokenActions({
             }}
             disabled={balance === 0n || !stakingAddress}
             symbol={token.symbol}
-            className="btn btn-outline border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 w-full disabled:border-gray-200 disabled:text-gray-400 disabled:bg-gray-50"
+            className="btn btn-outline border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 bg-base-100 hover:bg-gray-50 w-full disabled:border-gray-200 disabled:text-gray-400 disabled:bg-gray-50"
             isMiniApp={isEffectivelyMiniApp}
             farcasterAddress={currentAddress}
             farcasterIsConnected={walletIsConnected}
@@ -779,7 +779,7 @@ export function TokenActions({
           }}
           disabled={stakedBalance === 0n || !stakingAddress}
           symbol={token.symbol}
-          className="btn btn-outline border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 w-full disabled:border-gray-200 disabled:text-gray-400 disabled:bg-gray-50"
+          className="btn btn-outline border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 bg-base-100 hover:bg-gray-50 w-full disabled:border-gray-200 disabled:text-gray-400 disabled:bg-gray-50"
           isMiniApp={isEffectivelyMiniApp}
           farcasterAddress={currentAddress}
           farcasterIsConnected={walletIsConnected}

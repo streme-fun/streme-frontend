@@ -6,6 +6,7 @@ import FarcasterIcon from "@/public/farcaster.svg";
 import { useState, useEffect } from "react";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import DexscreenerIcon from "@/public/dexscreener.webp";
+import InterfaceIcon from "@/public/interface.png";
 import { sdk } from "@farcaster/frame-sdk";
 
 const formatPrice = (price: number | undefined) => {
@@ -111,6 +112,22 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
     }
   };
 
+  const handleInterfaceLink = async () => {
+    const interfaceUrl = `https://app.interface.social/token/8453/${token.contract_address}`;
+
+    if (isMiniAppView) {
+      try {
+        await sdk.actions.openUrl(interfaceUrl);
+      } catch (err) {
+        console.error("Failed to open URL with Mini App SDK:", err);
+        // Fallback to regular window.open if SDK fails
+        window.open(interfaceUrl, "_blank", "noopener,noreferrer");
+      }
+    } else {
+      window.open(interfaceUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
   return (
     <div
       className={`space-y-3 card bg-base-100 border-gray-100 border-2 p-4 relative z-10 ${
@@ -196,6 +213,14 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
               width={16}
               height={16}
             />
+          </button>
+
+          <button
+            onClick={handleInterfaceLink}
+            className="btn btn-outline btn-sm border-primary/10 flex items-center gap-2 hover:bg-primary/10"
+            title="View on Interface"
+          >
+            <Image src={InterfaceIcon} alt="Interface" width={16} height={16} />
           </button>
         </div>
       </div>

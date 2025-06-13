@@ -48,7 +48,6 @@ export function ClaimPointsFlow({
   const { address: wagmiAddress } = useAccount();
   const { isMiniAppView, address: fcAddress } = useAppFrameLogic();
 
-  // Get effective address based on context (same logic as WalletProfileModal and FarcasterAuthDemo)
   const userAddress = isMiniAppView ? fcAddress : wagmiAddress;
   const [currentStep, setCurrentStep] = useState<FlowStep>("idle");
   const [error, setError] = useState<string | null>(null);
