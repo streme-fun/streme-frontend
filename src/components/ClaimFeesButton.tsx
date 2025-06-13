@@ -242,6 +242,11 @@ export function ClaimFeesButton({
     fcIsConnected,
   ]);
 
+  // Don't render anything if wallet is not connected - let TokenActions handle the connect wallet UI
+  if (!walletIsConnected || !currentAddress) {
+    return null;
+  }
+
   return (
     <div className="space-y-1">
       <button
@@ -272,8 +277,6 @@ export function ClaimFeesButton({
             </svg>
             Claimed!
           </>
-        ) : !walletIsConnected ? (
-          "Connect Wallet"
         ) : (
           "Claim Fees" // UI text, actual recipient is determined by contract
         )}

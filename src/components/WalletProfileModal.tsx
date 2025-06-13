@@ -251,6 +251,17 @@ export function WalletProfileModal({
             </div>
           </div>
 
+          {/* Quick Actions */}
+          <div className="">
+            <a
+              href="/launched-tokens"
+              onClick={onClose}
+              className="btn btn-sm btn-outline"
+            >
+              View Launched Tokens
+            </a>
+          </div>
+
           {/* Balances */}
           <div className="space-y-4">
             <h5 className="font-medium text-gray-900">Balances</h5>

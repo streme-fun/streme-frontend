@@ -208,7 +208,8 @@ export function StakedBalance({
     }
   }, []);
 
-  if (!effectiveIsConnected) return null;
+  // Don't render anything if wallet is not connected or address is missing
+  if (!effectiveIsConnected || !effectiveAddress) return null;
 
   const formattedBalance = Number(formatUnits(stakedBalance, 18)).toFixed(4);
   const formattedReceived = (baseAmount + streamedAmount).toFixed(4);

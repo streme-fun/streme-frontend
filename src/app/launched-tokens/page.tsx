@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { LaunchedToken } from "@/src/app/types";
 import { ClaimFeesButton } from "@/src/components/ClaimFeesButton";
+import { usePrivy } from "@privy-io/react-auth";
+import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
+import { Modal } from "@/src/components/Modal";
+import { LaunchTokenModal } from "@/src/components/LaunchTokenModal";
+import sdk from "@farcaster/frame-sdk";
 
 interface TokenStaker {
   account: {
@@ -31,21 +36,38 @@ interface EnrichedLaunchedToken extends LaunchedToken {
     token0: string;
     token1: string;
   };
-  totalFees?: {
-    feeGrowthGlobal0: number;
-    feeGrowthGlobal1: number;
-  };
 }
 
 export default function LaunchedTokensPage() {
-  const deployerAddress = "0x0C65BE17E86BCB6019148be0a4E8F0A4510A70CB"; // Hardcoded for debugging
   const [tokens, setTokens] = useState<EnrichedLaunchedToken[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Wallet connection hooks
+  const { user: privyUser, ready: privyReady } = usePrivy();
+  const {
+    isMiniAppView,
+    address: fcAddress,
+    isConnected: fcIsConnected,
+    isSDKLoaded,
+  } = useAppFrameLogic();
+
+  // Simple wallet detection - just like the original working version
+  const isWalletConnected = isMiniAppView
+    ? fcIsConnected && !!fcAddress
+    : privyReady && !!privyUser?.wallet?.address;
+
+  const deployerAddress = isMiniAppView
+    ? fcAddress
+    : privyUser?.wallet?.address;
   const [selectedTokenStakers, setSelectedTokenStakers] = useState<{
     token: EnrichedLaunchedToken;
     isOpen: boolean;
   } | null>(null);
+  const [stakersWithFarcaster, setStakersWithFarcaster] = useState<
+    TokenStaker[] | null
+  >(null);
+  const [loadingFarcasterData, setLoadingFarcasterData] = useState(false);
   const [stakersSortBy, setStakersSortBy] = useState<
     "units" | "address" | "status" | "joined"
   >("units");
@@ -62,13 +84,63 @@ export default function LaunchedTokensPage() {
   const [filterConnection, setFilterConnection] = useState<
     "all" | "connected" | "not_connected"
   >("all");
+  const [isLaunchTokenOpen, setIsLaunchTokenOpen] = useState(false);
 
-  // Automatically fetch tokens on component mount
-  useEffect(() => {
-    fetchLaunchedTokens();
+  const enrichTokensWithStakingData = useCallback(async (
+    tokenList: LaunchedToken[]
+  ): Promise<EnrichedLaunchedToken[]> => {
+    const enrichmentPromises = tokenList.map(async (token) => {
+      try {
+        const stakers = await fetchTokenStakers(token.staking_pool);
+
+        const totalStaked = stakers.reduce(
+          (sum, staker) => sum + parseInt(staker.units),
+          0
+        );
+
+        let claimableFees = undefined;
+        try {
+          const res = await fetch(
+            `/api/token/${token.contract_address}/claimable-fees`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            claimableFees = {
+              amount0: data.amount0,
+              amount1: data.amount1,
+              token0: data.token0,
+              token1: data.token1,
+            };
+          }
+        } catch {}
+
+        return {
+          ...token,
+          totalStakers: stakers.length,
+          totalStaked,
+          stakers,
+          claimableFees,
+        };
+      } catch (err) {
+        console.warn(`Failed to enrich token ${token.contract_address}:`, err);
+        return {
+          ...token,
+          totalStakers: 0,
+          totalStaked: 0,
+          stakers: [],
+        };
+      }
+    });
+
+    return Promise.all(enrichmentPromises);
   }, []);
 
-  const fetchLaunchedTokens = async () => {
+  const fetchLaunchedTokens = useCallback(async () => {
+    if (!deployerAddress) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -87,7 +159,14 @@ export default function LaunchedTokensPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [deployerAddress, enrichTokensWithStakingData]);
+
+  // Automatically fetch tokens when deployerAddress is available
+  useEffect(() => {
+    if (deployerAddress) {
+      fetchLaunchedTokens();
+    }
+  }, [deployerAddress, fetchLaunchedTokens]);
 
   const fetchTokenStakers = async (
     stakingPoolId: string
@@ -226,91 +305,38 @@ export default function LaunchedTokensPage() {
     }
   };
 
-  const enrichTokensWithStakingData = async (
-    tokenList: LaunchedToken[]
-  ): Promise<EnrichedLaunchedToken[]> => {
-    const enrichmentPromises = tokenList.map(async (token) => {
-      try {
-        const stakers = await fetchTokenStakers(token.staking_pool);
+  // Function to enrich stakers with Farcaster data when modal opens
+  const enrichStakersWithFarcaster = async (stakers: TokenStaker[]) => {
+    setLoadingFarcasterData(true);
+    try {
+      // Fetch Farcaster users for the staker addresses
+      const addresses = stakers.map((staker) => staker.account.id);
+      const farcasterUsers = await fetchFarcasterUsersByAddresses(addresses);
 
-        // Fetch Farcaster users for the staker addresses
-        const addresses = stakers.map((staker) => staker.account.id);
-        const farcasterUsers = await fetchFarcasterUsersByAddresses(addresses);
-
-        // Enrich stakers with Farcaster user data
-        const enrichedStakers = stakers.map((staker) => {
-          const farcasterUser = farcasterUsers[staker.account.id.toLowerCase()];
-          if (farcasterUser) {
-            console.log(
-              `Enriching staker ${staker.account.id} with Farcaster user:`,
-              farcasterUser.username
-            );
-          }
-          return {
-            ...staker,
-            farcasterUser,
-          };
-        });
-
-        const totalStaked = stakers.reduce(
-          (sum, staker) => sum + parseInt(staker.units),
-          0
-        );
-
-        // Fetch claimable fees
-        let claimableFees = undefined;
-        try {
-          const res = await fetch(
-            `/api/token/${token.contract_address}/claimable-fees`
+      // Enrich stakers with Farcaster user data
+      const enrichedStakers = stakers.map((staker) => {
+        const farcasterUser = farcasterUsers[staker.account.id.toLowerCase()];
+        if (farcasterUser) {
+          console.log(
+            `Enriching staker ${staker.account.id} with Farcaster user:`,
+            farcasterUser.username
           );
-          if (res.ok) {
-            const data = await res.json();
-            claimableFees = {
-              amount0: data.amount0,
-              amount1: data.amount1,
-              token0: data.token0,
-              token1: data.token1,
-            };
-          }
-        } catch {}
-        // Fetch total fees (requires pool_address)
-        let totalFees = undefined;
-        if (token.pool_address) {
-          try {
-            const res = await fetch(
-              `/api/token/${token.contract_address}/total-fees?pool=${token.pool_address}`
-            );
-            if (res.ok) {
-              const data = await res.json();
-              totalFees = {
-                feeGrowthGlobal0: data.feeGrowthGlobal0,
-                feeGrowthGlobal1: data.feeGrowthGlobal1,
-              };
-            }
-          } catch {}
         }
-
         return {
-          ...token,
-          totalStakers: stakers.length,
-          totalStaked,
-          stakers: enrichedStakers,
-          claimableFees,
-          totalFees,
+          ...staker,
+          farcasterUser,
         };
-      } catch (err) {
-        console.warn(`Failed to enrich token ${token.contract_address}:`, err);
-        return {
-          ...token,
-          totalStakers: 0,
-          totalStaked: 0,
-          stakers: [],
-        };
-      }
-    });
+      });
 
-    return Promise.all(enrichmentPromises);
+      setStakersWithFarcaster(enrichedStakers);
+    } catch (error) {
+      console.error("Error enriching stakers with Farcaster data:", error);
+      setStakersWithFarcaster(stakers); // Fallback to original stakers
+    } finally {
+      setLoadingFarcasterData(false);
+    }
   };
+
 
   const formatPrice = (price: number | undefined) => {
     if (!price || isNaN(price)) return "-";
@@ -442,15 +468,350 @@ export default function LaunchedTokensPage() {
     return `${num.toFixed(6)}${symbol ? " " + symbol.slice(0, 6) : ""}`;
   };
 
+  // Mini-app view
+  if (isMiniAppView) {
+    return (
+      <div className="font-[family-name:var(--font-geist-sans)] min-h-screen">
+        {/* Fixed header */}
+
+        <h1 className="text-lg font-bold pt-4 px-4 ">Launched Tokens</h1>
+        <div className="px-4">
+          <p className="text-sm opacity-70">
+            {deployerAddress ? (
+              <>
+                Wallet address: {deployerAddress.slice(0, 6).toLowerCase()}...
+                {deployerAddress.slice(-4).toLowerCase()}
+              </>
+            ) : (
+              "Connect wallet to view your launched tokens"
+            )}
+          </p>
+        </div>
+
+        {/* Main content */}
+        <div className="p-4">
+          {!deployerAddress && !loading && (
+            <div className="card bg-base-100 shadow-xl">
+              <div className="card-body text-center">
+                <h3 className="text-xl font-bold mb-4">Connect Your Wallet</h3>
+                <p className="opacity-70 mb-4">
+                  Please connect your wallet to view your launched tokens
+                </p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="alert alert-error">
+              <span>{error}</span>
+            </div>
+          )}
+
+          {loading && (
+            <div className="flex justify-center items-center py-8">
+              <span className="loading loading-spinner loading-lg"></span>
+            </div>
+          )}
+
+          {tokens.length > 0 && (
+            <div className="space-y-4 pb-16">
+              {tokens.map((token) => (
+                <div
+                  key={token.contract_address}
+                  className="card bg-base-100 border border-gray-300"
+                >
+                  <div className="card-body p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      {token.img_url && (
+                        <div className="avatar">
+                          <div className="mask mask-squircle w-12 h-12">
+                            <img src={token.img_url} alt={token.name} />
+                          </div>
+                        </div>
+                      )}
+                      <a
+                        href={`/token/${token.contract_address}`}
+                        className="flex-1"
+                      >
+                        <h3 className="font-bold text-lg">{token.name}</h3>
+                        <p className="text-sm opacity-70">${token.symbol}</p>
+                      </a>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="opacity-70">Price</p>
+                        <p className="font-mono font-semibold">
+                          {formatPrice(token.marketData.price)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="opacity-70">Market Cap</p>
+                        <p className="font-mono font-semibold">
+                          {formatMarketCap(token.marketData.marketCap)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="opacity-70">Stakers</p>
+                        <p className="font-mono font-semibold">
+                          {token.totalStakers ?? 0}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="opacity-70">Created</p>
+                        <p className="text-sm">{formatDate(token.timestamp)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex gap-2">
+                      {isWalletConnected ? (
+                        <ClaimFeesButton
+                          tokenAddress={token.contract_address}
+                          creatorAddress={token.deployer}
+                          className="btn btn-sm btn-outline btn-secondary "
+                        />
+                      ) : (
+                        <button
+                          className="btn btn-sm btn-outline btn-disabled "
+                          disabled
+                        >
+                          Connect Wallet
+                        </button>
+                      )}
+                      <button
+                        className="btn btn-sm btn-outline"
+                        onClick={() => {
+                          setSelectedTokenStakers({
+                            token,
+                            isOpen: true,
+                          });
+                          setStakersWithFarcaster(null);
+                          if (token.stakers && token.stakers.length > 0) {
+                            enrichStakersWithFarcaster(token.stakers);
+                          }
+                        }}
+                        disabled={!token.stakers || token.stakers.length === 0}
+                      >
+                        View Stakers
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {tokens.length === 0 && !loading && !error && deployerAddress && (
+            <div className="card bg-base-100 shadow-xl">
+              <div className="card-body text-center">
+                <div className="mb-4">
+                  <p className="opacity-60 mb-4">
+                    No tokens have been launched from this wallet yet
+                  </p>
+                  <button
+                    onClick={async () => {
+                      if (isSDKLoaded && sdk) {
+                        try {
+                          const castText = `@streme Launch a token for me
+
+Name: [your token name]
+Symbol: $[your ticker]
+
+[Don't forget to attach an image!] 🎨`;
+                          await sdk.actions.composeCast({
+                            text: castText,
+                            embeds: [],
+                          });
+                        } catch (error) {
+                          console.error("Error composing cast:", error);
+                          setIsLaunchTokenOpen(true);
+                        }
+                      } else {
+                        console.warn(
+                          "Farcaster SDK not loaded or sdk not available. Opening LaunchTokenModal as fallback."
+                        );
+                        setIsLaunchTokenOpen(true);
+                      }
+                    }}
+                    className="btn btn-primary"
+                  >
+                    Launch Your First Token
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Stakers Modal for mini-app */}
+        {selectedTokenStakers && (
+          <Modal
+            isOpen={selectedTokenStakers.isOpen}
+            onClose={() => {
+              setSelectedTokenStakers(null);
+              setStakersWithFarcaster(null);
+            }}
+          >
+            <div className="p-6">
+              <h3 className="font-bold text-lg mb-4">
+                {selectedTokenStakers.token.name} Stakers
+              </h3>
+
+              {loadingFarcasterData ? (
+                <div className="text-center py-8">
+                  <span className="loading loading-spinner loading-md"></span>
+                  <p className="mt-2">Loading stakers...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 text-sm opacity-70">
+                    {selectedTokenStakers.token.stakers?.length || 0} total
+                    stakers
+                  </div>
+
+                  <div className="overflow-x-auto max-h-96">
+                    <table className="table table-zebra table-sm">
+                      <thead>
+                        <tr>
+                          <th
+                            className="cursor-pointer"
+                            onClick={() => handleStakersSort("address")}
+                          >
+                            Holder
+                            {stakersSortBy === "address" && (
+                              <span className="ml-1">
+                                {stakersSortDirection === "asc" ? "↑" : "↓"}
+                              </span>
+                            )}
+                          </th>
+                          <th
+                            className="cursor-pointer"
+                            onClick={() => handleStakersSort("units")}
+                          >
+                            Staked
+                            {stakersSortBy === "units" && (
+                              <span className="ml-1">
+                                {stakersSortDirection === "asc" ? "↑" : "↓"}
+                              </span>
+                            )}
+                          </th>
+                          <th
+                            className="cursor-pointer"
+                            onClick={() => handleStakersSort("status")}
+                          >
+                            Status
+                            {stakersSortBy === "status" && (
+                              <span className="ml-1">
+                                {stakersSortDirection === "asc" ? "↑" : "↓"}
+                              </span>
+                            )}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(stakersWithFarcaster
+                          ? getFilteredAndSortedStakers(stakersWithFarcaster)
+                          : selectedTokenStakers.token.stakers
+                          ? getFilteredAndSortedStakers(
+                              selectedTokenStakers.token.stakers
+                            )
+                          : []
+                        ).map((staker, index) => (
+                          <tr key={`${staker.account.id}-${index}`}>
+                            <td>
+                              <div className="flex items-center gap-2">
+                                {staker.farcasterUser?.pfp_url && (
+                                  <img
+                                    src={staker.farcasterUser.pfp_url}
+                                    alt=""
+                                    className="w-6 h-6 rounded-full"
+                                  />
+                                )}
+                                <div>
+                                  <a
+                                    href={`https://basescan.org/address/${staker.account.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="link link-primary font-mono text-xs"
+                                  >
+                                    {staker.account.id.slice(0, 4)}...
+                                    {staker.account.id.slice(-3)}
+                                  </a>
+                                  {staker.farcasterUser?.username && (
+                                    <div className="text-xs opacity-70">
+                                      @{staker.farcasterUser.username}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="font-mono text-xs">
+                              {parseInt(staker.units).toLocaleString()}
+                            </td>
+                            <td>
+                              <div
+                                className={`badge badge-xs ${
+                                  staker.isConnected
+                                    ? "badge-success"
+                                    : "badge-warning"
+                                }`}
+                              >
+                                {staker.isConnected ? "✓" : "○"}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+
+              <div className="modal-action">
+                <button
+                  className="btn btn-sm"
+                  onClick={() => {
+                    setSelectedTokenStakers(null);
+                    setStakersWithFarcaster(null);
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+      </div>
+    );
+  }
+
+  // Standard desktop/mobile view
   return (
     <div className="min-h-screen bg-base-200 py-8 mt-20">
       <div className="max-w-7xl mx-auto px-4">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-4">Launched Tokens</h1>
           <p className="mb-6 opacity-70">
-            Tokens launched by:{" "}
-            <span className="font-mono">{deployerAddress}</span>
+            {deployerAddress ? (
+              <>
+                Tokens launched by:{" "}
+                <span className="font-mono">{deployerAddress}</span>
+              </>
+            ) : (
+              "Connect your wallet to view your launched tokens"
+            )}
           </p>
+
+          {!deployerAddress && !loading && (
+            <div className="card bg-base-100 shadow-xl mb-6">
+              <div className="card-body text-center">
+                <h3 className="text-2xl font-bold mb-4">Connect Your Wallet</h3>
+                <p className="opacity-70 mb-4">
+                  Please connect your wallet to view your launched tokens
+                </p>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="alert alert-error mb-6">
@@ -490,9 +851,7 @@ export default function LaunchedTokensPage() {
                       <th>Volume 24h</th>
                       <th>Stakers</th>
                       <th>Claimable Fees</th>
-                      <th>Total Fees Generated</th>
                       <th>Created</th>
-                      <th>Contract</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -540,12 +899,17 @@ export default function LaunchedTokensPage() {
                         <td className="text-center">
                           <button
                             className="badge badge-outline hover:badge-primary cursor-pointer"
-                            onClick={() =>
+                            onClick={() => {
                               setSelectedTokenStakers({
                                 token,
                                 isOpen: true,
-                              })
-                            }
+                              });
+                              // Reset Farcaster data and fetch when modal opens
+                              setStakersWithFarcaster(null);
+                              if (token.stakers && token.stakers.length > 0) {
+                                enrichStakersWithFarcaster(token.stakers);
+                              }
+                            }}
                             disabled={
                               !token.stakers || token.stakers.length === 0
                             }
@@ -575,52 +939,26 @@ export default function LaunchedTokensPage() {
                             </span>
                           )}
                         </td>
-                        <td className="font-mono">
-                          {token.totalFees ? (
-                            <div className="flex flex-col gap-1">
-                              <span>
-                                {formatFeeValue(
-                                  token.totalFees.feeGrowthGlobal0
-                                )}
-                                <span className="ml-1 text-xs opacity-70">
-                                  {token.symbol}
-                                </span>
-                              </span>
-                              <span>
-                                {formatFeeValue(
-                                  token.totalFees.feeGrowthGlobal1
-                                )}
-                                <span className="ml-1 text-xs opacity-70">
-                                  WETH
-                                </span>
-                              </span>
-                            </div>
-                          ) : token.pool_address ? (
-                            <span title="No total fees data available">-</span>
-                          ) : (
-                            <span title="Missing pool address">-</span>
-                          )}
-                        </td>
+
                         <td className="opacity-50">
                           {formatDate(token.timestamp)}
                         </td>
                         <td>
-                          <a
-                            href={`https://basescan.org/address/${token.contract_address}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="link link-primary"
-                          >
-                            {token.contract_address.slice(0, 6)}...
-                            {token.contract_address.slice(-4)}
-                          </a>
-                        </td>
-                        <td>
-                          <ClaimFeesButton
-                            tokenAddress={token.contract_address}
-                            creatorAddress={token.deployer}
-                            className="btn btn-sm btn-outline btn-secondary"
-                          />
+                          {isWalletConnected ? (
+                            <ClaimFeesButton
+                              tokenAddress={token.contract_address}
+                              creatorAddress={token.deployer}
+                              className="btn btn-sm btn-outline btn-secondary"
+                            />
+                          ) : (
+                            <button
+                              className="btn btn-sm btn-outline btn-disabled"
+                              disabled
+                              title="Connect wallet to claim fees"
+                            >
+                              Connect Wallet
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -631,11 +969,23 @@ export default function LaunchedTokensPage() {
           </div>
         )}
 
-        {tokens.length === 0 && !loading && !error && (
+        {tokens.length === 0 && !loading && !error && deployerAddress && (
           <div className="card bg-base-100 shadow-xl">
             <div className="card-body text-center">
-              <div className="opacity-60">
-                No tokens found for this deployer address
+              <div className="mb-4">
+                <h3 className="text-2xl font-bold mb-2">
+                  Ready to launch your first token?
+                </h3>
+                <p className="opacity-60 mb-6">
+                  No tokens have been launched from this wallet yet. Get started
+                  by launching your first token on Streme!
+                </p>
+                <button
+                  onClick={() => setIsLaunchTokenOpen(true)}
+                  className="btn btn-primary btn-lg"
+                >
+                  Launch Your First Token
+                </button>
               </div>
             </div>
           </div>
@@ -752,13 +1102,24 @@ export default function LaunchedTokensPage() {
 
               {/* Results Counter */}
               <div className="mb-2 text-sm opacity-70">
-                Showing{" "}
-                {selectedTokenStakers.token.stakers
-                  ? getFilteredAndSortedStakers(
-                      selectedTokenStakers.token.stakers
-                    ).length
-                  : 0}{" "}
-                of {selectedTokenStakers.token.stakers?.length || 0} holders
+                {loadingFarcasterData ? (
+                  <span className="flex items-center gap-2">
+                    <span className="loading loading-spinner loading-xs"></span>
+                    Loading stakers...
+                  </span>
+                ) : (
+                  <>
+                    Showing{" "}
+                    {stakersWithFarcaster
+                      ? getFilteredAndSortedStakers(stakersWithFarcaster).length
+                      : selectedTokenStakers.token.stakers
+                      ? getFilteredAndSortedStakers(
+                          selectedTokenStakers.token.stakers
+                        ).length
+                      : 0}{" "}
+                    of {selectedTokenStakers.token.stakers?.length || 0} holders
+                  </>
+                )}
               </div>
 
               <div className="overflow-x-auto">
@@ -820,74 +1181,101 @@ export default function LaunchedTokensPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(selectedTokenStakers.token.stakers
-                      ? getFilteredAndSortedStakers(
-                          selectedTokenStakers.token.stakers
-                        )
-                      : []
-                    ).map((staker, index) => (
-                      <tr key={`${staker.account.id}-${index}`}>
-                        <td>
-                          <div className="flex items-center gap-3">
-                            {staker.farcasterUser &&
-                              staker.farcasterUser.pfp_url && (
-                                <div className="avatar">
-                                  <div className="mask mask-squircle w-8 h-8">
-                                    <img
-                                      src={staker.farcasterUser.pfp_url}
-                                      alt={
-                                        staker.farcasterUser.username || "User"
-                                      }
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            <div>
-                              <a
-                                href={`https://basescan.org/address/${staker.account.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="link link-primary font-mono"
-                              >
-                                {staker.account.id.slice(0, 6)}...
-                                {staker.account.id.slice(-4)}
-                              </a>
+                    {loadingFarcasterData ? (
+                      <tr>
+                        <td colSpan={4} className="text-center py-8">
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="loading loading-spinner loading-md"></span>
+                            <span>Loading Farcaster profiles...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      (stakersWithFarcaster
+                        ? getFilteredAndSortedStakers(stakersWithFarcaster)
+                        : selectedTokenStakers.token.stakers
+                        ? getFilteredAndSortedStakers(
+                            selectedTokenStakers.token.stakers
+                          )
+                        : []
+                      ).map((staker, index) => (
+                        <tr key={`${staker.account.id}-${index}`}>
+                          <td>
+                            <div className="flex items-center gap-3">
                               {staker.farcasterUser &&
-                                staker.farcasterUser.username && (
-                                  <div className="text-sm opacity-70">
-                                    @{staker.farcasterUser.username}
+                                staker.farcasterUser.pfp_url && (
+                                  <div className="avatar">
+                                    <div className="mask mask-squircle w-8 h-8">
+                                      <img
+                                        src={staker.farcasterUser.pfp_url}
+                                        alt={
+                                          staker.farcasterUser.username ||
+                                          "User"
+                                        }
+                                      />
+                                    </div>
                                   </div>
                                 )}
+                              <div>
+                                <a
+                                  href={`https://basescan.org/address/${staker.account.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="link link-primary font-mono"
+                                >
+                                  {staker.account.id.slice(0, 6)}...
+                                  {staker.account.id.slice(-4)}
+                                </a>
+                                {staker.farcasterUser &&
+                                  staker.farcasterUser.username && (
+                                    <div className="text-sm opacity-70">
+                                      @{staker.farcasterUser.username}
+                                    </div>
+                                  )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="font-mono">
-                          {parseInt(staker.units).toLocaleString()} units
-                        </td>
-                        <td>
-                          <div
-                            className={`badge ${
-                              staker.isConnected
-                                ? "badge-success"
-                                : "badge-warning"
-                            }`}
-                          >
-                            {staker.isConnected ? "Connected" : "Not Connected"}
-                          </div>
-                        </td>
-                        <td className="opacity-50">
-                          {new Date(
-                            parseInt(staker.createdAtTimestamp) * 1000
-                          ).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    )) || (
-                      <tr>
-                        <td colSpan={4} className="text-center opacity-50">
-                          No holders found
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="font-mono">
+                            {parseInt(staker.units).toLocaleString()} units
+                          </td>
+                          <td>
+                            <div
+                              className={`badge ${
+                                staker.isConnected
+                                  ? "badge-success"
+                                  : "badge-warning"
+                              }`}
+                            >
+                              {staker.isConnected
+                                ? "Connected"
+                                : "Not Connected"}
+                            </div>
+                          </td>
+                          <td className="opacity-50">
+                            {new Date(
+                              parseInt(staker.createdAtTimestamp) * 1000
+                            ).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))
                     )}
+                    {!loadingFarcasterData &&
+                      (stakersWithFarcaster ||
+                        selectedTokenStakers.token.stakers) &&
+                      (stakersWithFarcaster
+                        ? getFilteredAndSortedStakers(stakersWithFarcaster)
+                        : selectedTokenStakers.token.stakers
+                        ? getFilteredAndSortedStakers(
+                            selectedTokenStakers.token.stakers
+                          )
+                        : []
+                      ).length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="text-center opacity-50">
+                            No holders found
+                          </td>
+                        </tr>
+                      )}
                   </tbody>
                 </table>
               </div>
@@ -897,10 +1285,12 @@ export default function LaunchedTokensPage() {
                   className="btn"
                   onClick={() => {
                     setSelectedTokenStakers(null);
+                    setStakersWithFarcaster(null); // Reset Farcaster data
                     // Reset filters when closing modal
                     setSearchTerm("");
                     setFilterType("all");
                     setFilterFarcaster("all");
+                    setFilterConnection("all");
                   }}
                 >
                   Close
@@ -911,14 +1301,24 @@ export default function LaunchedTokensPage() {
               className="modal-backdrop"
               onClick={() => {
                 setSelectedTokenStakers(null);
+                setStakersWithFarcaster(null); // Reset Farcaster data
                 // Reset filters when closing modal
                 setSearchTerm("");
                 setFilterType("all");
                 setFilterFarcaster("all");
+                setFilterConnection("all");
               }}
-            ></div>
+            >
+              {" "}
+            </div>
           </div>
         )}
+
+        {/* Launch Token Modal */}
+        <LaunchTokenModal
+          isOpen={isLaunchTokenOpen}
+          onClose={() => setIsLaunchTokenOpen(false)}
+        />
       </div>
     </div>
   );

@@ -109,7 +109,7 @@ export function Navbar() {
             {/* Explore Button */}
             <Link
               href="/"
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 dark:text-gray-300 hover:text-primary flex-1"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700  hover:text-primary flex-1 cursor-pointer"
             >
               {/* Placeholder for Home Icon */}
               <svg
@@ -131,7 +131,7 @@ export function Navbar() {
             {/* My Stakes Button */}
             <button
               onClick={() => setIsMyStakesOpen(true)}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 dark:text-gray-300 hover:text-primary flex-1"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700  hover:text-primary flex-1 cursor-pointer"
             >
               {/* Special E Icon in Circle */}
               <div className="w-6 h-6 mb-0.5 rounded-full border-2 border-current flex items-center justify-center">
@@ -176,7 +176,7 @@ Symbol: $[your ticker]
                   setIsLaunchTokenOpen(true);
                 }
               }}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 dark:text-gray-300 hover:text-primary flex-1"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700  hover:text-primary flex-1 cursor-pointer"
             >
               {/* Placeholder for Launch Icon */}
               <svg
@@ -201,7 +201,7 @@ Symbol: $[your ticker]
               onClick={() => {
                 setIsLeaderboardModalOpen(true);
               }}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 dark:text-gray-300 hover:text-primary flex-1"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700  hover:text-primary flex-1 cursor-pointer"
             >
               {/* Placeholder for Leaderboard Icon */}
               <svg
@@ -224,7 +224,7 @@ Symbol: $[your ticker]
             {/* Profile Button */}
             <button
               onClick={() => setIsWalletProfileOpen(true)}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700 dark:text-gray-300 hover:text-primary flex-1"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700  hover:text-primary flex-1 cursor-pointer"
             >
               {/* Profile Picture or Default Icon */}
               {miniAppProfileImage ? (
@@ -292,7 +292,7 @@ Symbol: $[your ticker]
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 border-b border-black/[.1] dark:border-white/[.1]  bg-opacity-80">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 border-b border-black/[.1] dark:border-white/[.1]  bg-opacity-80 bg-base-100 ">
         <div className="px-4 sm:px-8 lg:px-20 h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center">
             <svg
@@ -420,6 +420,13 @@ Symbol: $[your ticker]
                   </button>
                   {isAddressDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-base-100 rounded-lg shadow-lg border border-base-300">
+                      <Link
+                        href="/launched-tokens"
+                        onClick={() => setIsAddressDropdownOpen(false)}
+                        className="block w-full px-4 py-2 text-left hover:bg-base-200 cursor-pointer"
+                      >
+                        Launched Tokens
+                      </Link>
                       <button
                         onClick={() => {
                           privyLogout();
@@ -476,6 +483,16 @@ Symbol: $[your ticker]
             >
               How It Works
             </button>
+
+            {privyAuthenticated && (
+              <Link
+                href="/launched-tokens"
+                className="btn btn-ghost w-full justify-start"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Launched Tokens
+              </Link>
+            )}
 
             {privyAuthenticated ? (
               <button
