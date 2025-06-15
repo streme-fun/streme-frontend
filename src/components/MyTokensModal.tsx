@@ -88,14 +88,20 @@ interface MyTokensModalProps {
 }
 
 // Component for displaying streaming current balance
-const CurrentBalanceDisplay = ({ stake, isMiniApp }: { stake: StakeData; isMiniApp?: boolean }) => {
+const CurrentBalanceDisplay = ({
+  stake,
+  isMiniApp,
+}: {
+  stake: StakeData;
+  isMiniApp?: boolean;
+}) => {
   const currentBalance = useStreamingNumber({
     baseAmount: stake.baseAmount,
     flowRatePerSecond: stake.userFlowRate / 86400, // Convert daily rate to per-second
     lastUpdateTime: stake.lastUpdateTime,
-    updateInterval: isMiniApp ? 1000 : 200, // Slower updates in mini-app
+    updateInterval: isMiniApp ? 60 : 60, // Slower updates in mini-app
     pauseWhenHidden: true,
-    isMobileOptimized: isMiniApp
+    isMobileOptimized: isMiniApp,
   });
 
   return (
@@ -107,9 +113,7 @@ const CurrentBalanceDisplay = ({ stake, isMiniApp }: { stake: StakeData; isMiniA
             minimumFractionDigits: 6,
             maximumFractionDigits: 6,
           })}
-          <span className="ml-1">
-            {stake.membership.pool.token.symbol}
-          </span>
+          <span className="ml-1">{stake.membership.pool.token.symbol}</span>
         </p>
       </div>
     </div>
@@ -1327,7 +1331,10 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
                         {/* Show Current Balance if connected, or Pool Connection Status if not connected */}
                         {stake.isConnectedToPool ? (
-                          <CurrentBalanceDisplay stake={stake} isMiniApp={isMiniAppView} />
+                          <CurrentBalanceDisplay
+                            stake={stake}
+                            isMiniApp={isMiniAppView}
+                          />
                         ) : stake.stakingAddress &&
                           stake.stakingAddress !== "" &&
                           stake.isConnectedToPool === false ? (
