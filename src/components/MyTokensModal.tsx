@@ -90,7 +90,6 @@ interface MyTokensModalProps {
 // Component for displaying streaming current balance
 const CurrentBalanceDisplay = ({
   stake,
-  isMiniApp,
 }: {
   stake: StakeData;
   isMiniApp?: boolean;
@@ -99,16 +98,19 @@ const CurrentBalanceDisplay = ({
     baseAmount: stake.baseAmount,
     flowRatePerSecond: stake.userFlowRate / 86400, // Convert daily rate to per-second
     lastUpdateTime: stake.lastUpdateTime,
-    updateInterval: isMiniApp ? 60 : 60, // Slower updates in mini-app
+    updateInterval: 60, // Use 60ms for smooth requestAnimationFrame updates
     pauseWhenHidden: true,
-    isMobileOptimized: isMiniApp,
+    isMobileOptimized: false, // Disable mobile optimization for smooth animations
   });
 
   return (
     <div>
       <p className="text-gray-500">Current Balance</p>
       <div className="flex items-center">
-        <p className="font-mono text-green-600">
+        <p
+          className="font-mono text-green-600"
+          style={{ willChange: "contents" }}
+        >
           {currentBalance.toLocaleString("en-US", {
             minimumFractionDigits: 6,
             maximumFractionDigits: 6,
