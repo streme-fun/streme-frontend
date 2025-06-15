@@ -8,6 +8,7 @@ import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import DexscreenerIcon from "@/public/dexscreener.webp";
 import InterfaceIcon from "@/public/interface.png";
 import { sdk } from "@farcaster/frame-sdk";
+import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 
 const formatPrice = (price: number | undefined) => {
   if (!price || isNaN(price)) return "-";
@@ -52,10 +53,17 @@ interface TokenInfoProps {
 }
 
 export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
-  const [rewards, setRewards] = useState<number>(0);
+  const [initialRewards, setInitialRewards] = useState<number>(0);
   const [totalStakers, setTotalStakers] = useState<number>(0);
   const [copySuccess, setCopySuccess] = useState<boolean>(false);
   const [shareSuccess, setShareSuccess] = useState<boolean>(false);
+
+  // Use the reward counter hook for animated rewards
+  const currentRewards = useRewardCounter(
+    initialRewards,
+    REWARDS_PER_SECOND,
+    50 // 50ms for smooth animation
+  );
 
   useEffect(() => {
     calculateRewards(
@@ -63,17 +71,11 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
       token.contract_address,
       token.staking_pool
     ).then(({ totalStreamed, totalStakers: stakers }) => {
-      setRewards(totalStreamed);
+      setInitialRewards(totalStreamed);
       setTotalStakers(stakers);
     });
   }, [token.created_at, token.contract_address, token.staking_pool]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRewards((prev) => prev + REWARDS_PER_SECOND / 20);
-    }, 50);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleCopyAddress = async () => {
     try {
@@ -321,7 +323,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
             {totalStakers === 1 ? "staker" : "stakers"})
           </div>
           <div className="font-mono">
-            {rewards.toLocaleString(undefined, {
+            {currentRewards.toLocaleString(undefined, {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}

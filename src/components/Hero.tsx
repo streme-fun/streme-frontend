@@ -4,13 +4,21 @@ import { useState, useEffect } from "react";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import { Token } from "@/src/app/types/token";
 import { HeroAnimation } from "./HeroAnimation";
+import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 
 // Move these from page.tsx to here
 // const initialTotal = 4234567.89; // About $4.2M
 // const ratePerSecond = 52.45; // About $4.5M per day
 
 export function Hero() {
-  const [totalRewards, setTotalRewards] = useState(0);
+  const [initialTotalRewards, setInitialTotalRewards] = useState(0);
+  
+  // Use the reward counter hook for animated total rewards
+  const currentTotalRewards = useRewardCounter(
+    initialTotalRewards,
+    REWARDS_PER_SECOND,
+    50 // 50ms for smooth animation
+  );
 
   useEffect(() => {
     // Fetch tokens and calculate total rewards
@@ -33,7 +41,7 @@ export function Hero() {
 
         // Sum up all rewards
         const total = rewards.reduce((acc, curr) => acc + curr, 0);
-        setTotalRewards(total);
+        setInitialTotalRewards(total);
       } catch (error) {
         console.error("Error fetching total rewards:", error);
       }
@@ -42,13 +50,6 @@ export function Hero() {
     fetchTotalRewards();
   }, []);
 
-  // Keep animating the total
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTotalRewards((prev) => prev + REWARDS_PER_SECOND / 20);
-    }, 50);
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-28 md:mt-20">
@@ -62,7 +63,7 @@ export function Hero() {
 
         <div className="text-2xl font-semibold mb-8">
           <span className="font-mono">
-            {totalRewards.toLocaleString(undefined, {
+            {currentTotalRewards.toLocaleString(undefined, {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}

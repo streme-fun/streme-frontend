@@ -6,11 +6,19 @@ import { useState, useEffect } from "react";
 import { Token } from "@/src/app/types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
+import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 
 export function TopStreamer() {
   const [token, setToken] = useState<Token | null>(null);
-  const [rewards, setRewards] = useState(0);
+  const [initialRewards, setInitialRewards] = useState(0);
   const [totalStakers, setTotalStakers] = useState(0);
+
+  // Use the reward counter hook for animated rewards
+  const currentRewards = useRewardCounter(
+    initialRewards,
+    REWARDS_PER_SECOND,
+    50 // 50ms interval for smooth animation (matches original)
+  );
 
   // Helper function to format market cap
   const formatMarketCap = (marketCap: number | undefined) => {
@@ -111,7 +119,7 @@ export function TopStreamer() {
           totalStakers: stakersCount,
         } as Token & { rewards: number; totalStakers: number });
 
-        setRewards(totalStreamed);
+        setInitialRewards(totalStreamed);
         setTotalStakers(stakersCount);
       } catch (error) {
         console.error("Error fetching random token:", error);
@@ -121,15 +129,6 @@ export function TopStreamer() {
     fetchRandomToken();
   }, []);
 
-  // Animate rewards
-  useEffect(() => {
-    if (!token) return;
-
-    const interval = setInterval(() => {
-      setRewards((prev) => prev + REWARDS_PER_SECOND / 20);
-    }, 50);
-    return () => clearInterval(interval);
-  }, [token]);
 
   if (!token) return null;
 
@@ -211,7 +210,7 @@ export function TopStreamer() {
                     {totalStakers === 1 ? "staker" : "stakers"})
                   </div>
                   <div className="font-mono text-base font-bold group-hover:text-primary transition-colors duration-300">
-                    {rewards.toLocaleString(undefined, {
+                    {currentRewards.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}

@@ -12,6 +12,7 @@ import { ConnectPoolButton } from "./ConnectPoolButton";
 import { TopUpAllStakesButton } from "./TopUpAllStakesButton";
 import { publicClient } from "../lib/viemClient";
 import { GDA_FORWARDER, GDA_ABI } from "../lib/contracts";
+import { useStreamingNumber } from "../hooks/useStreamingNumber";
 
 interface PoolMembership {
   units: string;
@@ -85,6 +86,35 @@ interface MyTokensModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+// Component for displaying streaming current balance
+const CurrentBalanceDisplay = ({ stake, isMiniApp }: { stake: StakeData; isMiniApp?: boolean }) => {
+  const currentBalance = useStreamingNumber({
+    baseAmount: stake.baseAmount,
+    flowRatePerSecond: stake.userFlowRate / 86400, // Convert daily rate to per-second
+    lastUpdateTime: stake.lastUpdateTime,
+    updateInterval: isMiniApp ? 1000 : 200, // Slower updates in mini-app
+    pauseWhenHidden: true,
+    isMobileOptimized: isMiniApp
+  });
+
+  return (
+    <div>
+      <p className="text-gray-500">Current Balance</p>
+      <div className="flex items-center">
+        <p className="font-mono text-green-600">
+          {currentBalance.toLocaleString("en-US", {
+            minimumFractionDigits: 6,
+            maximumFractionDigits: 6,
+          })}
+          <span className="ml-1">
+            {stake.membership.pool.token.symbol}
+          </span>
+        </p>
+      </div>
+    </div>
+  );
+};
 
 // Optimized cache with better TTL management
 const tokenDataCache = new Map<
@@ -1297,20 +1327,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
                         {/* Show Current Balance if connected, or Pool Connection Status if not connected */}
                         {stake.isConnectedToPool ? (
-                          <div>
-                            <p className="text-gray-500">Current Balance</p>
-                            <div className="flex items-center">
-                              <p className="font-mono text-green-600">
-                                {stake.baseAmount.toLocaleString("en-US", {
-                                  minimumFractionDigits: 6,
-                                  maximumFractionDigits: 6,
-                                })}
-                                <span className="ml-1">
-                                  {stake.membership.pool.token.symbol}
-                                </span>
-                              </p>
-                            </div>
-                          </div>
+                          <CurrentBalanceDisplay stake={stake} isMiniApp={isMiniAppView} />
                         ) : stake.stakingAddress &&
                           stake.stakingAddress !== "" &&
                           stake.isConnectedToPool === false ? (

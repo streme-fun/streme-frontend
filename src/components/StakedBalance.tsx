@@ -4,6 +4,7 @@ import { useAccount } from "wagmi";
 import { formatUnits } from "viem";
 import { useState, useEffect } from "react";
 import { publicClient } from "@/src/lib/viemClient"; // Import the centralized client
+import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
 
 interface StakedBalanceProps {
   stakingAddress: string;
@@ -37,7 +38,6 @@ export function StakedBalance({
   const [poolPercentage, setPoolPercentage] = useState<string>("0");
   const [flowRate, setFlowRate] = useState<string>("0");
   const [baseAmount, setBaseAmount] = useState<number>(0);
-  const [streamedAmount, setStreamedAmount] = useState<number>(0);
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -45,6 +45,15 @@ export function StakedBalance({
     ? farcasterIsConnected
     : !!wagmiAddress;
   const effectiveAddress = isMiniApp ? farcasterAddress : wagmiAddress;
+
+  // Use streaming number hook for animated balance
+  const currentBalance = useStreamingNumber({
+    baseAmount,
+    flowRatePerSecond: Number(flowRate) / 86400, // Convert daily rate to per-second
+    lastUpdateTime,
+    updateInterval: 50, // 50ms for smooth animation (matches original)
+    pauseWhenHidden: true
+  });
 
   const refresh = () => setRefreshTrigger((prev) => prev + 1);
 
@@ -184,21 +193,6 @@ export function StakedBalance({
     refreshTrigger,
   ]);
 
-  // Separate animation effect for streaming
-  useEffect(() => {
-    const userFlowRate = Number(flowRate) / 86400;
-
-    if (userFlowRate > 0) {
-      const interval = setInterval(() => {
-        const elapsed = (Date.now() - lastUpdateTime) / 1000;
-        const newStreamed = userFlowRate * elapsed;
-        setStreamedAmount(newStreamed);
-      }, 50);
-      return () => clearInterval(interval);
-    } else {
-      setStreamedAmount(0);
-    }
-  }, [flowRate, lastUpdateTime, baseAmount]);
 
   useEffect(() => {
     const element = document.querySelector("[data-staking-balance]");
@@ -212,7 +206,7 @@ export function StakedBalance({
   if (!effectiveIsConnected || !effectiveAddress) return null;
 
   const formattedBalance = Number(formatUnits(stakedBalance, 18)).toFixed(4);
-  const formattedReceived = (baseAmount + streamedAmount).toFixed(4);
+  const formattedReceived = currentBalance.toFixed(4);
 
   return (
     <div

@@ -86,54 +86,62 @@ export default function LaunchedTokensPage() {
   >("all");
   const [isLaunchTokenOpen, setIsLaunchTokenOpen] = useState(false);
 
-  const enrichTokensWithStakingData = useCallback(async (
-    tokenList: LaunchedToken[]
-  ): Promise<EnrichedLaunchedToken[]> => {
-    const enrichmentPromises = tokenList.map(async (token) => {
-      try {
-        const stakers = await fetchTokenStakers(token.staking_pool);
-
-        const totalStaked = stakers.reduce(
-          (sum, staker) => sum + parseInt(staker.units),
-          0
-        );
-
-        let claimableFees = undefined;
+  const enrichTokensWithStakingData = useCallback(
+    async (tokenList: LaunchedToken[]): Promise<EnrichedLaunchedToken[]> => {
+      const enrichmentPromises = tokenList.map(async (token) => {
         try {
-          const res = await fetch(
-            `/api/token/${token.contract_address}/claimable-fees`
+          // Fetch pool summary data (totalMembers) and stakers list in parallel
+          const [poolSummary, stakers] = await Promise.all([
+            fetchPoolSummary(token.staking_pool),
+            fetchTokenStakers(token.staking_pool),
+          ]);
+
+          const totalStaked = stakers.reduce(
+            (sum, staker) => sum + parseInt(staker.units),
+            0
           );
-          if (res.ok) {
-            const data = await res.json();
-            claimableFees = {
-              amount0: data.amount0,
-              amount1: data.amount1,
-              token0: data.token0,
-              token1: data.token1,
-            };
-          }
-        } catch {}
 
-        return {
-          ...token,
-          totalStakers: stakers.length,
-          totalStaked,
-          stakers,
-          claimableFees,
-        };
-      } catch (err) {
-        console.warn(`Failed to enrich token ${token.contract_address}:`, err);
-        return {
-          ...token,
-          totalStakers: 0,
-          totalStaked: 0,
-          stakers: [],
-        };
-      }
-    });
+          let claimableFees = undefined;
+          try {
+            const res = await fetch(
+              `/api/token/${token.contract_address}/claimable-fees`
+            );
+            if (res.ok) {
+              const data = await res.json();
+              claimableFees = {
+                amount0: data.amount0,
+                amount1: data.amount1,
+                token0: data.token0,
+                token1: data.token1,
+              };
+            }
+          } catch {}
 
-    return Promise.all(enrichmentPromises);
-  }, []);
+          return {
+            ...token,
+            totalStakers: poolSummary.totalMembers, // Use totalMembers from pool data
+            totalStaked,
+            stakers,
+            claimableFees,
+          };
+        } catch (err) {
+          console.warn(
+            `Failed to enrich token ${token.contract_address}:`,
+            err
+          );
+          return {
+            ...token,
+            totalStakers: 0,
+            totalStaked: 0,
+            stakers: [],
+          };
+        }
+      });
+
+      return Promise.all(enrichmentPromises);
+    },
+    []
+  );
 
   const fetchLaunchedTokens = useCallback(async () => {
     if (!deployerAddress) {
@@ -145,7 +153,9 @@ export default function LaunchedTokensPage() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/tokens/deployer/${deployerAddress}`);
+      const response = await fetch(
+        `/api/tokens/deployer/0x1a0A2aBDfE9B18CB81B894d70C08d410ba415c85`
+      );
       const result = await response.json();
 
       if (!response.ok) {
@@ -167,6 +177,57 @@ export default function LaunchedTokensPage() {
       fetchLaunchedTokens();
     }
   }, [deployerAddress, fetchLaunchedTokens]);
+
+  // Fetch pool summary data including totalMembers count
+  const fetchPoolSummary = async (stakingPoolId: string) => {
+    const query = `
+      query GetPoolSummary($poolId: ID!) {
+        pool(id: $poolId) {
+          totalMembers
+          totalUnits
+        }
+      }
+    `;
+
+    const endpoints = [
+      "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",
+      "https://api.thegraph.com/subgraphs/name/superfluid-finance/protocol-v1-base",
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query,
+            variables: { poolId: stakingPoolId },
+          }),
+        });
+
+        if (!response.ok) continue;
+
+        const data = await response.json();
+        if (data.errors) continue;
+
+        const poolData = data.data?.pool;
+        if (poolData) {
+          return {
+            totalMembers: parseInt(poolData.totalMembers) || 0,
+            totalUnits: poolData.totalUnits || "0",
+          };
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch pool summary from ${endpoint}:`, err);
+        continue;
+      }
+    }
+
+    return {
+      totalMembers: 0,
+      totalUnits: "0",
+    };
+  };
 
   const fetchTokenStakers = async (
     stakingPoolId: string
@@ -336,7 +397,6 @@ export default function LaunchedTokensPage() {
       setLoadingFarcasterData(false);
     }
   };
-
 
   const formatPrice = (price: number | undefined) => {
     if (!price || isNaN(price)) return "-";
@@ -564,29 +624,37 @@ export default function LaunchedTokensPage() {
                     </div>
 
                     {/* Claimable Fees Section */}
-                    {token.claimableFees && (token.claimableFees.amount0 > 0 || token.claimableFees.amount1 > 0) && (
-                      <div className="mt-3 p-2 bg-base-200 rounded-lg">
-                        <p className="text-xs opacity-70 mb-1">Claimable Fees</p>
-                        <div className="flex flex-col gap-1">
-                          {token.claimableFees.amount0 > 0 && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs opacity-70">{token.symbol}:</span>
-                              <span className="text-xs font-mono font-semibold">
-                                {formatFeeValue(token.claimableFees.amount0)}
-                              </span>
-                            </div>
-                          )}
-                          {token.claimableFees.amount1 > 0 && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs opacity-70">WETH:</span>
-                              <span className="text-xs font-mono font-semibold">
-                                {formatFeeValue(token.claimableFees.amount1)}
-                              </span>
-                            </div>
-                          )}
+                    {token.claimableFees &&
+                      (token.claimableFees.amount0 > 0 ||
+                        token.claimableFees.amount1 > 0) && (
+                        <div className="mt-3 p-2 bg-base-200 rounded-lg">
+                          <p className="text-xs opacity-70 mb-1">
+                            Claimable Fees
+                          </p>
+                          <div className="flex flex-col gap-1">
+                            {token.claimableFees.amount0 > 0 && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs opacity-70">
+                                  {token.symbol}:
+                                </span>
+                                <span className="text-xs font-mono font-semibold">
+                                  {formatFeeValue(token.claimableFees.amount0)}
+                                </span>
+                              </div>
+                            )}
+                            {token.claimableFees.amount1 > 0 && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs opacity-70">
+                                  WETH:
+                                </span>
+                                <span className="text-xs font-mono font-semibold">
+                                  {formatFeeValue(token.claimableFees.amount1)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
                     <div className="mt-3 flex gap-2">
                       {isWalletConnected ? (
@@ -690,7 +758,7 @@ Symbol: $[your ticker]
               ) : (
                 <>
                   <div className="mb-4 text-sm opacity-70">
-                    {selectedTokenStakers.token.stakers?.length || 0} total
+                    {selectedTokenStakers.token.totalStakers || 0} total
                     stakers
                   </div>
 
@@ -1142,7 +1210,7 @@ Symbol: $[your ticker]
                           selectedTokenStakers.token.stakers
                         ).length
                       : 0}{" "}
-                    of {selectedTokenStakers.token.stakers?.length || 0} holders
+                    of {selectedTokenStakers.token.totalStakers || 0} holders
                   </>
                 )}
               </div>

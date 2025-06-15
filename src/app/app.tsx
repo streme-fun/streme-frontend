@@ -33,6 +33,7 @@ function App() {
   // Tutorial modal state
   const [showTutorialModal, setShowTutorialModal] = useState(false);
   const [hasSkippedTutorial, setHasSkippedTutorial] = useState(false);
+  const [hasShownTutorialThisSession, setHasShownTutorialThisSession] = useState(false);
 
   // Load tutorial skip state from localStorage on mount
   useEffect(() => {
@@ -179,11 +180,12 @@ function App() {
       isSDKLoaded &&
       !hasAddedMiniApp &&
       !hasSkippedTutorial &&
-      !showTutorialModal
+      !hasShownTutorialThisSession
     ) {
       // Small delay to ensure everything is loaded
       const timer = setTimeout(() => {
         setShowTutorialModal(true);
+        setHasShownTutorialThisSession(true);
         // Track tutorial modal shown
         postHog?.capture("mini_app_tutorial_shown", {
           context: "farcaster_mini_app",
@@ -196,7 +198,7 @@ function App() {
     isSDKLoaded,
     hasAddedMiniApp,
     hasSkippedTutorial,
-    showTutorialModal,
+    hasShownTutorialThisSession,
     postHog,
   ]);
 
@@ -315,6 +317,7 @@ function App() {
             tokens={tokens}
             searchQuery={searchQuery}
             sortBy={sortBy}
+            isMiniApp={true}
           />
 
           {!isOnCorrectNetwork && isConnected ? (
@@ -372,6 +375,7 @@ function App() {
                 tokens={tokens}
                 searchQuery={searchQuery}
                 sortBy={sortBy}
+                isMiniApp={false}
               />
             )}
           </div>

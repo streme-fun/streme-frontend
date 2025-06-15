@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# swc
+.swc/
+
 # production
 /build
 

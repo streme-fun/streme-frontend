@@ -284,7 +284,9 @@ export default function TokensPage() {
   useEffect(() => {
     if (stakes.length === 0) return;
 
-    const interval = setInterval(() => {
+    const updateStreaming = () => {
+      if (document.hidden) return; // Pause when tab is hidden
+      
       setStakes((prevStakes) =>
         prevStakes.map((stake) => {
           if (stake.userFlowRate > 0) {
@@ -299,9 +301,23 @@ export default function TokensPage() {
           return stake;
         })
       );
-    }, 50);
+    };
 
-    return () => clearInterval(interval);
+    const interval = setInterval(updateStreaming, 50);
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Just update immediately when tab becomes visible
+        updateStreaming();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [stakes.length > 0]);
 
   // Periodic balance refresh to keep streaming in sync

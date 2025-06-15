@@ -9,11 +9,13 @@ import FarcasterIcon from "@/public/farcaster.svg";
 import { Token } from "../app/types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
+import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 
 interface TokenGridProps {
   tokens: Token[];
   searchQuery: string;
   sortBy: SortOption;
+  isMiniApp?: boolean;
 }
 
 export type SortOption = "stakers" | "newest" | "oldest" | "trending";
@@ -117,11 +119,19 @@ const fetchTrendingTokens = async (): Promise<Token[]> => {
 
 const TokenCardComponent = ({
   token,
+  isMiniApp = false,
 }: {
   token: Token & { rewards: number; totalStakers: number };
+  isMiniApp?: boolean;
 }) => {
-  const [rewards, setRewards] = useState<number>(token.rewards);
   const [totalStakers, setTotalStakers] = useState<number>(token.totalStakers);
+
+  // Use the reward counter hook for animated rewards
+  const currentRewards = useRewardCounter(
+    token.rewards,
+    REWARDS_PER_SECOND,
+    isMiniApp ? 1000 : 60 // Slower updates in mini-app for performance
+  );
 
   useEffect(() => {
     if (!token.creator) {
@@ -142,16 +152,8 @@ const TokenCardComponent = ({
 
   useEffect(() => {
     // Initialize state from props
-    setRewards(token.rewards);
     setTotalStakers(token.totalStakers);
-  }, [token.rewards, token.totalStakers]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRewards((prev) => prev + REWARDS_PER_SECOND / 20);
-    }, 50);
-    return () => clearInterval(interval);
-  }, []);
+  }, [token.totalStakers]);
 
   // Helper function to shorten hash
   const shortenHash = (hash: string | undefined) => {
@@ -322,7 +324,7 @@ const TokenCardComponent = ({
                 {totalStakers === 1 ? "staker" : "stakers"})
               </div>
               <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
-                {rewards.toLocaleString(undefined, {
+                {currentRewards.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}{" "}
@@ -338,7 +340,12 @@ const TokenCardComponent = ({
   );
 };
 
-export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
+export function TokenGrid({
+  tokens,
+  searchQuery,
+  sortBy,
+  isMiniApp = false,
+}: TokenGridProps) {
   const [displayedTokens, setDisplayedTokens] = useState<
     Array<Token & { rewards: number; totalStakers: number }>
   >([]);
@@ -728,7 +735,11 @@ export function TokenGrid({ tokens, searchQuery, sortBy }: TokenGridProps) {
     <div className="mt-2 pb-24">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {displayedTokens.map((token) => (
-          <TokenCardComponent key={token.contract_address} token={token} />
+          <TokenCardComponent
+            key={token.contract_address}
+            token={token}
+            isMiniApp={isMiniApp}
+          />
         ))}
       </div>
       {displayedTokens.length === 0 &&
