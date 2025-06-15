@@ -130,7 +130,7 @@ const TokenCardComponent = ({
   const currentRewards = useRewardCounter(
     token.rewards,
     REWARDS_PER_SECOND,
-    isMiniApp ? 1000 : 60 // Slower updates in mini-app for performance
+    isMiniApp ? 60 : 60 // Slower updates in mini-app for performance
   );
 
   useEffect(() => {
