@@ -34,26 +34,36 @@ export function StakerLeaderboard({
   onClose,
 }: StakerLeaderboardProps) {
   const [stakers, setStakers] = useState<TokenStaker[]>([]);
-  const [stakersWithFarcaster, setStakersWithFarcaster] = useState<TokenStaker[] | null>(null);
+  const [stakersWithFarcaster, setStakersWithFarcaster] = useState<
+    TokenStaker[] | null
+  >(null);
   const [loading, setLoading] = useState(false);
   const [loadingFarcasterData, setLoadingFarcasterData] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Filter and sort states
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "stakers" | "holders">("all");
-  const [filterFarcaster, setFilterFarcaster] = useState<"all" | "with" | "without">("all");
-  const [filterConnection, setFilterConnection] = useState<"all" | "connected" | "not_connected">("all");
-  const [sortBy, setSortBy] = useState<"units" | "address" | "status" | "joined">("units");
+  const [filterType, setFilterType] = useState<"all" | "stakers" | "holders">(
+    "all"
+  );
+  const [filterFarcaster, setFilterFarcaster] = useState<
+    "all" | "with" | "without"
+  >("all");
+  const [filterConnection, setFilterConnection] = useState<
+    "all" | "connected" | "not_connected"
+  >("all");
+  const [sortBy, setSortBy] = useState<
+    "units" | "address" | "status" | "joined"
+  >("units");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Fetch stakers data
   const fetchStakers = async () => {
     if (!stakingPoolAddress) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     const endpoints = [
       "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",
       "https://api.thegraph.com/subgraphs/name/superfluid-finance/protocol-v1-base",
@@ -75,10 +85,10 @@ export function StakerLeaderboard({
         }
       }
     `;
-    
+
     for (const endpoint of endpoints) {
       try {
-        let allStakers: TokenStaker[] = [];
+        const allStakers: TokenStaker[] = [];
         const batchSize = 1000; // Fetch 1000 at a time
         let skip = 0;
         let hasMore = true;
@@ -102,7 +112,7 @@ export function StakerLeaderboard({
           if (!response.ok) break;
 
           const result = await response.json();
-          
+
           if (result.errors) break;
 
           const poolData = result.data?.pool;
@@ -121,9 +131,11 @@ export function StakerLeaderboard({
 
         // If we successfully got data from this endpoint, set it and enrich
         if (allStakers.length > 0) {
-          console.log(`Fetched ${allStakers.length} stakers for pool ${stakingPoolAddress}`);
+          console.log(
+            `Fetched ${allStakers.length} stakers for pool ${stakingPoolAddress}`
+          );
           setStakers(allStakers);
-          
+
           // Start enriching with Farcaster data
           enrichStakersWithFarcaster(allStakers);
         } else {
@@ -135,7 +147,7 @@ export function StakerLeaderboard({
         continue;
       }
     }
-    
+
     // If we get here, all endpoints failed
     setError("Failed to fetch stakers from all available endpoints");
     setLoading(false);
@@ -144,9 +156,9 @@ export function StakerLeaderboard({
   // Enrich stakers with Farcaster data
   const enrichStakersWithFarcaster = async (stakersData: TokenStaker[]) => {
     setLoadingFarcasterData(true);
-    
+
     try {
-      const addresses = stakersData.map(staker => staker.account.id);
+      const addresses = stakersData.map((staker) => staker.account.id);
       const response = await fetch("/api/neynar/bulk-users-by-address", {
         method: "POST",
         headers: {
@@ -161,21 +173,23 @@ export function StakerLeaderboard({
 
       const farcasterData = await response.json();
       const farcasterMap = new Map();
-      
-      // Handle the response format from neynar bulk users API
-      Object.entries(farcasterData).forEach(([address, users]: [string, unknown]) => {
-        if (Array.isArray(users) && users.length > 0) {
-          const user = users[0] as FarcasterUser; // Take the first user if multiple
-          farcasterMap.set(address.toLowerCase(), {
-            fid: user.fid,
-            username: user.username,
-            display_name: user.display_name,
-            pfp_url: user.pfp_url,
-          });
-        }
-      });
 
-      const enrichedStakers = stakersData.map(staker => ({
+      // Handle the response format from neynar bulk users API
+      Object.entries(farcasterData).forEach(
+        ([address, users]: [string, unknown]) => {
+          if (Array.isArray(users) && users.length > 0) {
+            const user = users[0] as FarcasterUser; // Take the first user if multiple
+            farcasterMap.set(address.toLowerCase(), {
+              fid: user.fid,
+              username: user.username,
+              display_name: user.display_name,
+              pfp_url: user.pfp_url,
+            });
+          }
+        }
+      );
+
+      const enrichedStakers = stakersData.map((staker) => ({
         ...staker,
         farcasterUser: farcasterMap.get(staker.account.id.toLowerCase()),
       }));
@@ -207,16 +221,17 @@ export function StakerLeaderboard({
     // Apply search filter
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(staker => 
-        staker.account.id.toLowerCase().includes(searchLower) ||
-        (staker.farcasterUser?.username && 
-         staker.farcasterUser.username.toLowerCase().includes(searchLower))
+      filtered = filtered.filter(
+        (staker) =>
+          staker.account.id.toLowerCase().includes(searchLower) ||
+          (staker.farcasterUser?.username &&
+            staker.farcasterUser.username.toLowerCase().includes(searchLower))
       );
     }
 
     // Apply type filter
     if (filterType !== "all") {
-      filtered = filtered.filter(staker => {
+      filtered = filtered.filter((staker) => {
         const hasUnits = parseInt(staker.units) > 0;
         if (filterType === "stakers") return hasUnits;
         if (filterType === "holders") return !hasUnits;
@@ -226,7 +241,7 @@ export function StakerLeaderboard({
 
     // Apply Farcaster filter
     if (filterFarcaster !== "all") {
-      filtered = filtered.filter(staker => {
+      filtered = filtered.filter((staker) => {
         const hasFarcaster = !!staker.farcasterUser;
         if (filterFarcaster === "with") return hasFarcaster;
         if (filterFarcaster === "without") return !hasFarcaster;
@@ -236,7 +251,7 @@ export function StakerLeaderboard({
 
     // Apply connection filter
     if (filterConnection !== "all") {
-      filtered = filtered.filter(staker => {
+      filtered = filtered.filter((staker) => {
         if (filterConnection === "connected") return staker.isConnected;
         if (filterConnection === "not_connected") return !staker.isConnected;
         return true;
@@ -270,7 +285,7 @@ export function StakerLeaderboard({
       }
 
       if (typeof aValue === "string" && typeof bValue === "string") {
-        return sortDirection === "asc" 
+        return sortDirection === "asc"
           ? aValue.localeCompare(bValue)
           : bValue.localeCompare(aValue);
       } else {
@@ -340,7 +355,9 @@ export function StakerLeaderboard({
               <select
                 className="select select-bordered select-sm"
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value as "all" | "stakers" | "holders")}
+                onChange={(e) =>
+                  setFilterType(e.target.value as "all" | "stakers" | "holders")
+                }
               >
                 <option value="all">All</option>
                 <option value="stakers">Stakers Only</option>
@@ -355,7 +372,11 @@ export function StakerLeaderboard({
               <select
                 className="select select-bordered select-sm"
                 value={filterFarcaster}
-                onChange={(e) => setFilterFarcaster(e.target.value as "all" | "with" | "without")}
+                onChange={(e) =>
+                  setFilterFarcaster(
+                    e.target.value as "all" | "with" | "without"
+                  )
+                }
               >
                 <option value="all">All</option>
                 <option value="with">With Farcaster</option>
@@ -370,7 +391,11 @@ export function StakerLeaderboard({
               <select
                 className="select select-bordered select-sm"
                 value={filterConnection}
-                onChange={(e) => setFilterConnection(e.target.value as "all" | "connected" | "not_connected")}
+                onChange={(e) =>
+                  setFilterConnection(
+                    e.target.value as "all" | "connected" | "not_connected"
+                  )
+                }
               >
                 <option value="all">All</option>
                 <option value="connected">Connected</option>
@@ -406,7 +431,9 @@ export function StakerLeaderboard({
               Loading stakers...
             </span>
           ) : (
-            <>Showing {filteredStakers.length} of {stakers.length} stakers</>
+            <>
+              Showing {filteredStakers.length} of {stakers.length} stakers
+            </>
           )}
         </div>
 
@@ -535,7 +562,10 @@ export function StakerLeaderboard({
                 ))}
                 {filteredStakers.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={4} className="text-center text-base-content/50">
+                    <td
+                      colSpan={4}
+                      className="text-center text-base-content/50"
+                    >
                       No stakers found
                     </td>
                   </tr>
