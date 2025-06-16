@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { LaunchedToken } from "@/src/app/types";
 import { ClaimFeesButton } from "@/src/components/ClaimFeesButton";
 import { usePrivy } from "@privy-io/react-auth";
@@ -41,6 +42,7 @@ interface EnrichedLaunchedToken extends LaunchedToken {
 }
 
 export default function LaunchedTokensPage() {
+  const router = useRouter();
   const [tokens, setTokens] = useState<EnrichedLaunchedToken[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -541,11 +543,39 @@ export default function LaunchedTokensPage() {
   // Mini-app view
   if (isMiniAppView) {
     return (
-      <div className="font-[family-name:var(--font-geist-sans)] min-h-screen">
-        {/* Fixed header */}
+      <div className="font-[family-name:var(--font-geist-sans)] min-h-screen relative">
+        {/* Background Animation */}
+        <div className="fixed inset-0 -z-10">
+          <HeroAnimationMini />
+        </div>
+        
+        {/* Back Button */}
+        <div className="pt-4 px-4 relative z-10">
+          <button
+            onClick={() => router.push("/")}
+            className="flex items-center gap-2 text-sm text-base-content/70 hover:text-base-content transition-colors cursor-pointer mb-4"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            Back
+          </button>
+        </div>
 
-        <h1 className="text-lg font-bold pt-4 px-4 ">Launched Tokens</h1>
-        <div className="px-4">
+        {/* Fixed header */}
+        <h1 className="text-lg font-bold px-4 relative z-10">Launched Tokens</h1>
+        <div className="px-4 relative z-10">
           <p className="text-sm opacity-70">
             {deployerAddress ? (
               <>
@@ -559,7 +589,7 @@ export default function LaunchedTokensPage() {
         </div>
 
         {/* Main content */}
-        <div className="p-4">
+        <div className="p-4 relative z-10">
           {!deployerAddress && !loading && (
             <div className="card bg-base-100 shadow-xl">
               <div className="card-body text-center">

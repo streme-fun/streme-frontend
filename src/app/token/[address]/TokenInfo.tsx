@@ -159,72 +159,6 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
           </div>
         </div>
 
-        {/* Top Right Buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleCopyAddress}
-            className={`btn btn-outline btn-sm transition-all duration-200 ${
-              copySuccess
-                ? "border-success text-success hover:bg-success/10"
-                : "border-primary/10 hover:bg-primary/10"
-            }`}
-            title={copySuccess ? "Address copied!" : "Copy contract address"}
-          >
-            {copySuccess ? (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            ) : (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-            )}
-            {copySuccess ? "Copied!" : "CA"}
-          </button>
-
-          <button
-            onClick={handleDexscreenerLink}
-            className="btn btn-outline btn-sm border-primary/10 flex items-center gap-2 hover:bg-primary/10"
-            title="View on Dexscreener"
-          >
-            <Image
-              src={DexscreenerIcon}
-              alt="Dexscreener"
-              width={16}
-              height={16}
-            />
-          </button>
-
-          <button
-            onClick={handleInterfaceLink}
-            className="btn btn-outline btn-sm border-primary/10 flex items-center gap-2 hover:bg-primary/10"
-            title="View on Interface"
-          >
-            <Image src={InterfaceIcon} alt="Interface" width={16} height={16} />
-          </button>
-        </div>
       </div>
 
       {/* Creator Information */}
@@ -330,7 +264,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
           </div>
         </div>
       </div>
-      {/* Share Button for Desktop and Mini App */}
+      {/* Share Buttons */}
       {onShare && (
         <div className="flex mt-2 -ml-1 gap-2 flex-wrap">
           <button
@@ -397,6 +331,75 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
           </button>
         </div>
       )}
+
+      {/* External Links */}
+      <div className="flex mt-2 -ml-1 gap-2 flex-wrap">
+        <button
+          onClick={handleCopyAddress}
+          className={`btn btn-outline btn-sm transition-all duration-200 ${
+            copySuccess
+              ? "border-success text-success hover:bg-success/10"
+              : "border-primary/10 hover:bg-primary/10"
+          }`}
+          title={copySuccess ? "Address copied!" : "Copy contract address"}
+        >
+          {copySuccess ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+              />
+            </svg>
+          )}
+          {copySuccess ? "Copied!" : "CA"}
+        </button>
+
+        <button
+          onClick={handleDexscreenerLink}
+          className="btn btn-outline btn-sm border-primary/10 flex items-center gap-2 hover:bg-primary/10"
+          title="View on Dexscreener"
+        >
+          <Image
+            src={DexscreenerIcon}
+            alt="Dexscreener"
+            width={16}
+            height={16}
+          />
+          Dexscreener
+        </button>
+
+        <button
+          onClick={handleInterfaceLink}
+          className="btn btn-outline btn-sm border-primary/10 flex items-center gap-2 hover:bg-primary/10"
+          title="View on Interface"
+        >
+          <Image src={InterfaceIcon} alt="Interface" width={16} height={16} />
+          Interface
+        </button>
+      </div>
     </div>
   );
 }

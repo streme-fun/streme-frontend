@@ -12,6 +12,8 @@ import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import sdk from "@farcaster/frame-sdk";
 import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
+import { StakerLeaderboard } from "@/src/components/StakerLeaderboard";
+import { StakerLeaderboardEmbed } from "@/src/components/StakerLeaderboardEmbed";
 
 type Deployment = {
   token: string;
@@ -36,6 +38,7 @@ export function TokenPageContent() {
   const [isCreator, setIsCreator] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stakingUpdateTrigger, setStakingUpdateTrigger] = useState(0);
+  const [isStakerLeaderboardOpen, setIsStakerLeaderboardOpen] = useState(false);
 
   const {
     isSDKLoaded,
@@ -355,6 +358,13 @@ ${shareUrl}`;
             farcasterAddress={address}
             farcasterIsConnected={isConnected}
           />
+
+          {/* Embedded Staker Leaderboard */}
+          <StakerLeaderboardEmbed
+            stakingPoolAddress={token.staking_pool}
+            tokenSymbol={token.symbol}
+            onViewAll={() => setIsStakerLeaderboardOpen(true)}
+          />
         </div>
 
         <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit">
@@ -373,6 +383,14 @@ ${shareUrl}`;
       <div className="fixed inset-0 -z-50">
         <HeroAnimationMini />
       </div>
+
+      {/* Staker Leaderboard Modal */}
+      <StakerLeaderboard
+        stakingPoolAddress={token.staking_pool}
+        tokenSymbol={token.symbol}
+        isOpen={isStakerLeaderboardOpen}
+        onClose={() => setIsStakerLeaderboardOpen(false)}
+      />
     </div>
   );
 }
