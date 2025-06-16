@@ -155,9 +155,7 @@ export default function LaunchedTokensPage() {
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/tokens/deployer/0x1a0A2aBDfE9B18CB81B894d70C08d410ba415c85`
-      );
+      const response = await fetch(`/api/tokens/deployer/${deployerAddress}`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -770,8 +768,7 @@ Symbol: $[your ticker]
               ) : (
                 <>
                   <div className="mb-4 text-sm opacity-70">
-                    {selectedTokenStakers.token.totalStakers || 0} total
-                    stakers
+                    {selectedTokenStakers.token.totalStakers || 0} total stakers
                   </div>
 
                   <div className="overflow-x-auto max-h-96">
@@ -899,208 +896,209 @@ Symbol: $[your ticker]
           <HeroAnimationMini />
         </div>
         <div className="max-w-7xl mx-auto px-4 relative z-10">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-4">Launched Tokens</h1>
-          <p className="mb-6 opacity-70">
-            {deployerAddress ? (
-              <>
-                Tokens launched by:{" "}
-                <span className="font-mono">{deployerAddress}</span>
-              </>
-            ) : (
-              "Connect your wallet to view your launched tokens"
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-4">Launched Tokens</h1>
+            <p className="mb-6 opacity-70">
+              {deployerAddress ? (
+                <>
+                  Tokens launched by:{" "}
+                  <span className="font-mono">{deployerAddress}</span>
+                </>
+              ) : (
+                "Connect your wallet to view your launched tokens"
+              )}
+            </p>
+
+            {!deployerAddress && !loading && (
+              <div className="card bg-base-100 shadow-xl mb-6">
+                <div className="card-body text-center">
+                  <h3 className="text-2xl font-bold mb-4">
+                    Connect Your Wallet
+                  </h3>
+                  <p className="opacity-70 mb-4">
+                    Please connect your wallet to view your launched tokens
+                  </p>
+                </div>
+              </div>
             )}
-          </p>
 
-          {!deployerAddress && !loading && (
-            <div className="card bg-base-100 shadow-xl mb-6">
-              <div className="card-body text-center">
-                <h3 className="text-2xl font-bold mb-4">Connect Your Wallet</h3>
-                <p className="opacity-70 mb-4">
-                  Please connect your wallet to view your launched tokens
-                </p>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="alert alert-error mb-6">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="stroke-current shrink-0 h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span>{error}</span>
-            </div>
-          )}
-        </div>
-
-        {tokens.length > 0 && (
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title text-xl mb-4">
-                {tokens.length} Token{tokens.length !== 1 ? "s" : ""} Found
-              </h2>
-
-              <div className="overflow-x-auto">
-                <table className="table table-zebra">
-                  <thead>
-                    <tr>
-                      <th>Token</th>
-                      <th>Price</th>
-                      <th>Market Cap</th>
-                      <th>24h Change</th>
-                      <th>Volume 24h</th>
-                      <th>Stakers</th>
-                      <th>Claimable Fees</th>
-                      <th>Created</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tokens.map((token) => (
-                      <tr key={token.contract_address} className="hover">
-                        <td>
-                          <div className="flex items-center gap-3">
-                            {token.img_url && (
-                              <div className="avatar">
-                                <div className="mask mask-squircle w-12 h-12">
-                                  <img src={token.img_url} alt={token.name} />
-                                </div>
-                              </div>
-                            )}
-                            <div>
-                              <a
-                                href={`/token/${token.contract_address}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="link link-hover"
-                              >
-                                <div className="font-bold">{token.name}</div>
-                                <div className="text-sm opacity-50">
-                                  ${token.symbol}
-                                </div>
-                              </a>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="font-mono">
-                          {formatPrice(token.marketData.price)}
-                        </td>
-                        <td className="font-mono">
-                          {formatMarketCap(token.marketData.marketCap)}
-                        </td>
-                        <td>
-                          {formatPercentage(token.marketData.priceChange24h)}
-                        </td>
-                        <td className="font-mono">
-                          {token.marketData.volume24h
-                            ? formatMarketCap(token.marketData.volume24h)
-                            : "N/A"}
-                        </td>
-                        <td className="text-center">
-                          <button
-                            className="badge badge-outline hover:badge-primary cursor-pointer"
-                            onClick={() => {
-                              setSelectedTokenStakers({
-                                token,
-                                isOpen: true,
-                              });
-                              // Reset Farcaster data and fetch when modal opens
-                              setStakersWithFarcaster(null);
-                              if (token.stakers && token.stakers.length > 0) {
-                                enrichStakersWithFarcaster(token.stakers);
-                              }
-                            }}
-                            disabled={
-                              !token.stakers || token.stakers.length === 0
-                            }
-                          >
-                            {token.totalStakers ?? 0}
-                          </button>
-                        </td>
-                        <td className="font-mono">
-                          {token.claimableFees ? (
-                            <div className="flex flex-col gap-1">
-                              <span>
-                                {formatFeeValue(token.claimableFees.amount0)}
-                                <span className="ml-1 text-xs opacity-70">
-                                  {token.symbol}
-                                </span>
-                              </span>
-                              <span>
-                                {formatFeeValue(token.claimableFees.amount1)}
-                                <span className="ml-1 text-xs opacity-70">
-                                  WETH
-                                </span>
-                              </span>
-                            </div>
-                          ) : (
-                            <span title="No claimable fees data available">
-                              -
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="opacity-50">
-                          {formatDate(token.timestamp)}
-                        </td>
-                        <td>
-                          {isWalletConnected ? (
-                            <ClaimFeesButton
-                              tokenAddress={token.contract_address}
-                              creatorAddress={token.deployer}
-                              className="btn btn-sm btn-outline btn-secondary"
-                            />
-                          ) : (
-                            <button
-                              className="btn btn-sm btn-outline btn-disabled"
-                              disabled
-                              title="Connect wallet to claim fees"
-                            >
-                              Connect Wallet
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tokens.length === 0 && !loading && !error && deployerAddress && (
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body text-center">
-              <div className="mb-4">
-                <h3 className="text-2xl font-bold mb-2">
-                  Ready to launch your first token?
-                </h3>
-                <p className="opacity-60 mb-6">
-                  No tokens have been launched from this wallet yet. Get started
-                  by launching your first token on Streme!
-                </p>
-                <button
-                  onClick={() => setIsLaunchTokenOpen(true)}
-                  className="btn btn-primary btn-lg"
+            {error && (
+              <div className="alert alert-error mb-6">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="stroke-current shrink-0 h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
                 >
-                  Launch Your First Token
-                </button>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span>{error}</span>
+              </div>
+            )}
+          </div>
+
+          {tokens.length > 0 && (
+            <div className="card bg-base-100 shadow-xl">
+              <div className="card-body">
+                <h2 className="card-title text-xl mb-4">
+                  {tokens.length} Token{tokens.length !== 1 ? "s" : ""} Found
+                </h2>
+
+                <div className="overflow-x-auto">
+                  <table className="table table-zebra">
+                    <thead>
+                      <tr>
+                        <th>Token</th>
+                        <th>Price</th>
+                        <th>Market Cap</th>
+                        <th>24h Change</th>
+                        <th>Volume 24h</th>
+                        <th>Stakers</th>
+                        <th>Claimable Fees</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tokens.map((token) => (
+                        <tr key={token.contract_address} className="hover">
+                          <td>
+                            <div className="flex items-center gap-3">
+                              {token.img_url && (
+                                <div className="avatar">
+                                  <div className="mask mask-squircle w-12 h-12">
+                                    <img src={token.img_url} alt={token.name} />
+                                  </div>
+                                </div>
+                              )}
+                              <div>
+                                <a
+                                  href={`/token/${token.contract_address}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="link link-hover"
+                                >
+                                  <div className="font-bold">{token.name}</div>
+                                  <div className="text-sm opacity-50">
+                                    ${token.symbol}
+                                  </div>
+                                </a>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="font-mono">
+                            {formatPrice(token.marketData.price)}
+                          </td>
+                          <td className="font-mono">
+                            {formatMarketCap(token.marketData.marketCap)}
+                          </td>
+                          <td>
+                            {formatPercentage(token.marketData.priceChange24h)}
+                          </td>
+                          <td className="font-mono">
+                            {token.marketData.volume24h
+                              ? formatMarketCap(token.marketData.volume24h)
+                              : "N/A"}
+                          </td>
+                          <td className="text-center">
+                            <button
+                              className="badge badge-outline hover:badge-primary cursor-pointer"
+                              onClick={() => {
+                                setSelectedTokenStakers({
+                                  token,
+                                  isOpen: true,
+                                });
+                                // Reset Farcaster data and fetch when modal opens
+                                setStakersWithFarcaster(null);
+                                if (token.stakers && token.stakers.length > 0) {
+                                  enrichStakersWithFarcaster(token.stakers);
+                                }
+                              }}
+                              disabled={
+                                !token.stakers || token.stakers.length === 0
+                              }
+                            >
+                              {token.totalStakers ?? 0}
+                            </button>
+                          </td>
+                          <td className="font-mono">
+                            {token.claimableFees ? (
+                              <div className="flex flex-col gap-1">
+                                <span>
+                                  {formatFeeValue(token.claimableFees.amount0)}
+                                  <span className="ml-1 text-xs opacity-70">
+                                    {token.symbol}
+                                  </span>
+                                </span>
+                                <span>
+                                  {formatFeeValue(token.claimableFees.amount1)}
+                                  <span className="ml-1 text-xs opacity-70">
+                                    WETH
+                                  </span>
+                                </span>
+                              </div>
+                            ) : (
+                              <span title="No claimable fees data available">
+                                -
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="opacity-50">
+                            {formatDate(token.timestamp)}
+                          </td>
+                          <td>
+                            {isWalletConnected ? (
+                              <ClaimFeesButton
+                                tokenAddress={token.contract_address}
+                                creatorAddress={token.deployer}
+                                className="btn btn-sm btn-outline btn-secondary"
+                              />
+                            ) : (
+                              <button
+                                className="btn btn-sm btn-outline btn-disabled"
+                                disabled
+                                title="Connect wallet to claim fees"
+                              >
+                                Connect Wallet
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
+          {tokens.length === 0 && !loading && !error && deployerAddress && (
+            <div className="card bg-base-100 shadow-xl">
+              <div className="card-body text-center">
+                <div className="mb-4">
+                  <h3 className="text-2xl font-bold mb-2">
+                    Ready to launch your first token?
+                  </h3>
+                  <p className="opacity-60 mb-6">
+                    No tokens have been launched from this wallet yet. Get
+                    started by launching your first token on Streme!
+                  </p>
+                  <button
+                    onClick={() => setIsLaunchTokenOpen(true)}
+                    className="btn btn-primary btn-lg"
+                  >
+                    Launch Your First Token
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1108,308 +1106,302 @@ Symbol: $[your ticker]
       {selectedTokenStakers && (
         <div className="modal modal-open" style={{ zIndex: 9999 }}>
           <div className="modal-box max-w-4xl">
-              <h3 className="font-bold text-lg mb-4">
-                {selectedTokenStakers.token.name} ($
-                {selectedTokenStakers.token.symbol}) Stakers
-              </h3>
+            <h3 className="font-bold text-lg mb-4">
+              {selectedTokenStakers.token.name} ($
+              {selectedTokenStakers.token.symbol}) Stakers
+            </h3>
 
-              {/* Search and Filters */}
-              <div className="mb-4 space-y-4">
-                {/* Search Input */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">
-                      Search by address or username
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Search address or Farcaster username..."
-                    className="input input-bordered w-full"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-
-                {/* Filters */}
-                <div className="flex flex-wrap gap-4 items-end">
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Type</span>
-                    </label>
-                    <select
-                      className="select select-bordered"
-                      value={filterType}
-                      onChange={(e) =>
-                        setFilterType(
-                          e.target.value as "all" | "stakers" | "holders"
-                        )
-                      }
-                    >
-                      <option value="all">All</option>
-                      <option value="stakers">Stakers Only</option>
-                      <option value="holders">Holders Only</option>
-                    </select>
-                  </div>
-
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Farcaster</span>
-                    </label>
-                    <select
-                      className="select select-bordered"
-                      value={filterFarcaster}
-                      onChange={(e) =>
-                        setFilterFarcaster(
-                          e.target.value as "all" | "with" | "without"
-                        )
-                      }
-                    >
-                      <option value="all">All</option>
-                      <option value="with">With Farcaster</option>
-                      <option value="without">Without Farcaster</option>
-                    </select>
-                  </div>
-
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Connection</span>
-                    </label>
-                    <select
-                      className="select select-bordered"
-                      value={filterConnection}
-                      onChange={(e) =>
-                        setFilterConnection(
-                          e.target.value as
-                            | "all"
-                            | "connected"
-                            | "not_connected"
-                        )
-                      }
-                    >
-                      <option value="all">All</option>
-                      <option value="connected">Connected</option>
-                      <option value="not_connected">Not Connected</option>
-                    </select>
-                  </div>
-
-                  {/* Clear Filters Button */}
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">&nbsp;</span>
-                    </label>
-                    <button
-                      className="btn btn-outline"
-                      onClick={() => {
-                        setSearchTerm("");
-                        setFilterType("all");
-                        setFilterFarcaster("all");
-                        setFilterConnection("all");
-                      }}
-                    >
-                      Clear Filters
-                    </button>
-                  </div>
-                </div>
+            {/* Search and Filters */}
+            <div className="mb-4 space-y-4">
+              {/* Search Input */}
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">
+                    Search by address or username
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Search address or Farcaster username..."
+                  className="input input-bordered w-full"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
 
-              {/* Results Counter */}
-              <div className="mb-2 text-sm opacity-70">
-                {loadingFarcasterData ? (
-                  <span className="flex items-center gap-2">
-                    <span className="loading loading-spinner loading-xs"></span>
-                    Loading stakers...
-                  </span>
-                ) : (
-                  <>
-                    Showing{" "}
-                    {stakersWithFarcaster
-                      ? getFilteredAndSortedStakers(stakersWithFarcaster).length
+              {/* Filters */}
+              <div className="flex flex-wrap gap-4 items-end">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Type</span>
+                  </label>
+                  <select
+                    className="select select-bordered"
+                    value={filterType}
+                    onChange={(e) =>
+                      setFilterType(
+                        e.target.value as "all" | "stakers" | "holders"
+                      )
+                    }
+                  >
+                    <option value="all">All</option>
+                    <option value="stakers">Stakers Only</option>
+                    <option value="holders">Holders Only</option>
+                  </select>
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Farcaster</span>
+                  </label>
+                  <select
+                    className="select select-bordered"
+                    value={filterFarcaster}
+                    onChange={(e) =>
+                      setFilterFarcaster(
+                        e.target.value as "all" | "with" | "without"
+                      )
+                    }
+                  >
+                    <option value="all">All</option>
+                    <option value="with">With Farcaster</option>
+                    <option value="without">Without Farcaster</option>
+                  </select>
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">Connection</span>
+                  </label>
+                  <select
+                    className="select select-bordered"
+                    value={filterConnection}
+                    onChange={(e) =>
+                      setFilterConnection(
+                        e.target.value as "all" | "connected" | "not_connected"
+                      )
+                    }
+                  >
+                    <option value="all">All</option>
+                    <option value="connected">Connected</option>
+                    <option value="not_connected">Not Connected</option>
+                  </select>
+                </div>
+
+                {/* Clear Filters Button */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">&nbsp;</span>
+                  </label>
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setFilterType("all");
+                      setFilterFarcaster("all");
+                      setFilterConnection("all");
+                    }}
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Results Counter */}
+            <div className="mb-2 text-sm opacity-70">
+              {loadingFarcasterData ? (
+                <span className="flex items-center gap-2">
+                  <span className="loading loading-spinner loading-xs"></span>
+                  Loading stakers...
+                </span>
+              ) : (
+                <>
+                  Showing{" "}
+                  {stakersWithFarcaster
+                    ? getFilteredAndSortedStakers(stakersWithFarcaster).length
+                    : selectedTokenStakers.token.stakers
+                    ? getFilteredAndSortedStakers(
+                        selectedTokenStakers.token.stakers
+                      ).length
+                    : 0}{" "}
+                  of {selectedTokenStakers.token.totalStakers || 0} holders
+                </>
+              )}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="table table-zebra">
+                <thead>
+                  <tr>
+                    <th
+                      className="cursor-pointer select-none hover:bg-base-200"
+                      onClick={() => handleStakersSort("address")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Holder / Farcaster
+                        {stakersSortBy === "address" && (
+                          <span className="text-primary">
+                            {stakersSortDirection === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      className="cursor-pointer select-none hover:bg-base-200"
+                      onClick={() => handleStakersSort("units")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Staked Balance
+                        {stakersSortBy === "units" && (
+                          <span className="text-primary">
+                            {stakersSortDirection === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      className="cursor-pointer select-none hover:bg-base-200"
+                      onClick={() => handleStakersSort("status")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Type
+                        {stakersSortBy === "status" && (
+                          <span className="text-primary">
+                            {stakersSortDirection === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      className="cursor-pointer select-none hover:bg-base-200"
+                      onClick={() => handleStakersSort("joined")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Last Updated
+                        {stakersSortBy === "joined" && (
+                          <span className="text-primary">
+                            {stakersSortDirection === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingFarcasterData ? (
+                    <tr>
+                      <td colSpan={4} className="text-center py-8">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="loading loading-spinner loading-md"></span>
+                          <span>Loading Farcaster profiles...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    (stakersWithFarcaster
+                      ? getFilteredAndSortedStakers(stakersWithFarcaster)
                       : selectedTokenStakers.token.stakers
                       ? getFilteredAndSortedStakers(
                           selectedTokenStakers.token.stakers
-                        ).length
-                      : 0}{" "}
-                    of {selectedTokenStakers.token.totalStakers || 0} holders
-                  </>
-                )}
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="table table-zebra">
-                  <thead>
-                    <tr>
-                      <th
-                        className="cursor-pointer select-none hover:bg-base-200"
-                        onClick={() => handleStakersSort("address")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Holder / Farcaster
-                          {stakersSortBy === "address" && (
-                            <span className="text-primary">
-                              {stakersSortDirection === "asc" ? "↑" : "↓"}
-                            </span>
-                          )}
-                        </div>
-                      </th>
-                      <th
-                        className="cursor-pointer select-none hover:bg-base-200"
-                        onClick={() => handleStakersSort("units")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Staked Balance
-                          {stakersSortBy === "units" && (
-                            <span className="text-primary">
-                              {stakersSortDirection === "asc" ? "↑" : "↓"}
-                            </span>
-                          )}
-                        </div>
-                      </th>
-                      <th
-                        className="cursor-pointer select-none hover:bg-base-200"
-                        onClick={() => handleStakersSort("status")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Type
-                          {stakersSortBy === "status" && (
-                            <span className="text-primary">
-                              {stakersSortDirection === "asc" ? "↑" : "↓"}
-                            </span>
-                          )}
-                        </div>
-                      </th>
-                      <th
-                        className="cursor-pointer select-none hover:bg-base-200"
-                        onClick={() => handleStakersSort("joined")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Last Updated
-                          {stakersSortBy === "joined" && (
-                            <span className="text-primary">
-                              {stakersSortDirection === "asc" ? "↑" : "↓"}
-                            </span>
-                          )}
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loadingFarcasterData ? (
-                      <tr>
-                        <td colSpan={4} className="text-center py-8">
-                          <div className="flex items-center justify-center gap-2">
-                            <span className="loading loading-spinner loading-md"></span>
-                            <span>Loading Farcaster profiles...</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      (stakersWithFarcaster
-                        ? getFilteredAndSortedStakers(stakersWithFarcaster)
-                        : selectedTokenStakers.token.stakers
-                        ? getFilteredAndSortedStakers(
-                            selectedTokenStakers.token.stakers
-                          )
-                        : []
-                      ).map((staker, index) => (
-                        <tr key={`${staker.account.id}-${index}`}>
-                          <td>
-                            <div className="flex items-center gap-3">
+                        )
+                      : []
+                    ).map((staker, index) => (
+                      <tr key={`${staker.account.id}-${index}`}>
+                        <td>
+                          <div className="flex items-center gap-3">
+                            {staker.farcasterUser &&
+                              staker.farcasterUser.pfp_url && (
+                                <div className="avatar">
+                                  <div className="mask mask-squircle w-8 h-8">
+                                    <img
+                                      src={staker.farcasterUser.pfp_url}
+                                      alt={
+                                        staker.farcasterUser.username || "User"
+                                      }
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            <div>
+                              <a
+                                href={`https://basescan.org/address/${staker.account.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="link link-primary font-mono"
+                              >
+                                {staker.account.id.slice(0, 6)}...
+                                {staker.account.id.slice(-4)}
+                              </a>
                               {staker.farcasterUser &&
-                                staker.farcasterUser.pfp_url && (
-                                  <div className="avatar">
-                                    <div className="mask mask-squircle w-8 h-8">
-                                      <img
-                                        src={staker.farcasterUser.pfp_url}
-                                        alt={
-                                          staker.farcasterUser.username ||
-                                          "User"
-                                        }
-                                      />
-                                    </div>
+                                staker.farcasterUser.username && (
+                                  <div className="text-sm opacity-70">
+                                    @{staker.farcasterUser.username}
                                   </div>
                                 )}
-                              <div>
-                                <a
-                                  href={`https://basescan.org/address/${staker.account.id}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="link link-primary font-mono"
-                                >
-                                  {staker.account.id.slice(0, 6)}...
-                                  {staker.account.id.slice(-4)}
-                                </a>
-                                {staker.farcasterUser &&
-                                  staker.farcasterUser.username && (
-                                    <div className="text-sm opacity-70">
-                                      @{staker.farcasterUser.username}
-                                    </div>
-                                  )}
-                              </div>
                             </div>
-                          </td>
-                          <td className="font-mono">
-                            {parseInt(staker.units).toLocaleString()} units
-                          </td>
-                          <td>
-                            <div
-                              className={`badge ${
-                                staker.isConnected
-                                  ? "badge-success"
-                                  : "badge-warning"
-                              }`}
-                            >
-                              {staker.isConnected
-                                ? "Connected"
-                                : "Not Connected"}
-                            </div>
-                          </td>
-                          <td className="opacity-50">
-                            {new Date(
-                              parseInt(staker.createdAtTimestamp) * 1000
-                            ).toLocaleDateString()}
-                          </td>
-                        </tr>
-                      ))
+                          </div>
+                        </td>
+                        <td className="font-mono">
+                          {parseInt(staker.units).toLocaleString()} units
+                        </td>
+                        <td>
+                          <div
+                            className={`badge ${
+                              staker.isConnected
+                                ? "badge-success"
+                                : "badge-warning"
+                            }`}
+                          >
+                            {staker.isConnected ? "Connected" : "Not Connected"}
+                          </div>
+                        </td>
+                        <td className="opacity-50">
+                          {new Date(
+                            parseInt(staker.createdAtTimestamp) * 1000
+                          ).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                  {!loadingFarcasterData &&
+                    (stakersWithFarcaster ||
+                      selectedTokenStakers.token.stakers) &&
+                    (stakersWithFarcaster
+                      ? getFilteredAndSortedStakers(stakersWithFarcaster)
+                      : selectedTokenStakers.token.stakers
+                      ? getFilteredAndSortedStakers(
+                          selectedTokenStakers.token.stakers
+                        )
+                      : []
+                    ).length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="text-center opacity-50">
+                          No holders found
+                        </td>
+                      </tr>
                     )}
-                    {!loadingFarcasterData &&
-                      (stakersWithFarcaster ||
-                        selectedTokenStakers.token.stakers) &&
-                      (stakersWithFarcaster
-                        ? getFilteredAndSortedStakers(stakersWithFarcaster)
-                        : selectedTokenStakers.token.stakers
-                        ? getFilteredAndSortedStakers(
-                            selectedTokenStakers.token.stakers
-                          )
-                        : []
-                      ).length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="text-center opacity-50">
-                            No holders found
-                          </td>
-                        </tr>
-                      )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="modal-action">
-                <button
-                  className="btn"
-                  onClick={() => {
-                    setSelectedTokenStakers(null);
-                    setStakersWithFarcaster(null); // Reset Farcaster data
-                    // Reset filters when closing modal
-                    setSearchTerm("");
-                    setFilterType("all");
-                    setFilterFarcaster("all");
-                    setFilterConnection("all");
-                  }}
-                >
-                  Close
-                </button>
-              </div>
+                </tbody>
+              </table>
             </div>
+
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={() => {
+                  setSelectedTokenStakers(null);
+                  setStakersWithFarcaster(null); // Reset Farcaster data
+                  // Reset filters when closing modal
+                  setSearchTerm("");
+                  setFilterType("all");
+                  setFilterFarcaster("all");
+                  setFilterConnection("all");
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
           <div
             className="modal-backdrop"
             onClick={() => {

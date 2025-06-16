@@ -515,17 +515,17 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     // Find current user entry in the re-ranked data
     const currentUserEntry = rerankedData.find((entry) => entry.isCurrentUser);
 
-    // If current user exists and is not in the top 10, show them first followed by top 10
-    if (currentUserEntry && currentUserEntry.rank > 10) {
-      // Get top 10 (excluding current user if they're somehow in top 10)
-      const top10 = rerankedData
-        .filter((entry) => !entry.isCurrentUser)
-        .slice(0, 10);
-      return [currentUserEntry, ...top10];
+    // If current user exists, always show them first
+    if (currentUserEntry) {
+      // Get other entries excluding the current user
+      const otherEntries = rerankedData.filter((entry) => !entry.isCurrentUser);
+      
+      // Return current user first, followed by others (up to 50 total)
+      return [currentUserEntry, ...otherEntries.slice(0, 49)];
     }
 
-    // Otherwise, just show the normal re-ranked list (current user will be in their natural position)
-    return rerankedData;
+    // If no current user, just show the top entries
+    return rerankedData.slice(0, Math.min(rerankedData.length, 50));
   };
 
   const truncateAddress = (address: string) => {
