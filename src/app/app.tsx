@@ -111,13 +111,23 @@ function App() {
         nextPage = data.nextPage;
       }
 
-      // Filter out blacklisted tokens before setting state
+      // Filter out blacklisted tokens and tokens with $ in name/symbol before setting state
       const filteredTokens = allTokens.filter((token) => {
+        // Check blacklist
         if (token.creator?.name) {
           const creatorName = token.creator.name.toLowerCase();
           const isBlacklisted = SPAMMER_BLACKLIST.includes(creatorName);
-          return !isBlacklisted;
+          if (isBlacklisted) return false;
         }
+        
+        // Filter out tokens with $ in name or symbol
+        if (token.name && token.name.includes('$')) {
+          return false;
+        }
+        if (token.symbol && token.symbol.includes('$')) {
+          return false;
+        }
+        
         return true;
       });
 

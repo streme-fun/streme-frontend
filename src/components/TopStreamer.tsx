@@ -89,13 +89,22 @@ export function TopStreamer() {
           },
         }));
 
-        // Filter out blacklisted tokens
+        // Filter out blacklisted tokens and tokens with $ in name/symbol
         const filteredTokens = tokens.filter((token) => {
           if (token.creator?.name) {
             const creatorName = token.creator.name.toLowerCase();
             const isBlacklisted = SPAMMER_BLACKLIST.includes(creatorName);
-            return !isBlacklisted;
+            if (isBlacklisted) return false;
           }
+          
+          // Filter out tokens with $ in name or symbol
+          if (token.name && token.name.includes('$')) {
+            return false;
+          }
+          if (token.symbol && token.symbol.includes('$')) {
+            return false;
+          }
+          
           return true;
         });
 
