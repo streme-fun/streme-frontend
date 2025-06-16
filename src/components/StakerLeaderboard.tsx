@@ -74,7 +74,7 @@ export function StakerLeaderboard({
         pool(id: $poolId) {
           id
           totalMembers
-          poolMembers(first: $first, skip: $skip, orderBy: createdAtTimestamp, orderDirection: desc) {
+          poolMembers(first: $first, skip: $skip, orderBy: units, orderDirection: desc) {
             account {
               id
             }
@@ -135,11 +135,13 @@ export function StakerLeaderboard({
             `Fetched ${allStakers.length} stakers for pool ${stakingPoolAddress}`
           );
           setStakers(allStakers);
+          setLoading(false); // Stop loading immediately after getting stakers
 
-          // Start enriching with Farcaster data
+          // Start enriching with Farcaster data in the background
           enrichStakersWithFarcaster(allStakers);
         } else {
           setStakers([]);
+          setLoading(false);
         }
         return; // Success, exit loop
       } catch (err) {
@@ -158,36 +160,49 @@ export function StakerLeaderboard({
     setLoadingFarcasterData(true);
 
     try {
-      const addresses = stakersData.map((staker) => staker.account.id);
-      const response = await fetch("/api/neynar/bulk-users-by-address", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ addresses }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch Farcaster data");
-      }
-
-      const farcasterData = await response.json();
+      // Process in batches to avoid overwhelming the API
+      const BATCH_SIZE = 50;
       const farcasterMap = new Map();
+      
+      for (let i = 0; i < stakersData.length; i += BATCH_SIZE) {
+        const batch = stakersData.slice(i, i + BATCH_SIZE);
+        const addresses = batch.map((staker) => staker.account.id);
+        
+        try {
+          const response = await fetch("/api/neynar/bulk-users-by-address", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ addresses }),
+          });
 
-      // Handle the response format from neynar bulk users API
-      Object.entries(farcasterData).forEach(
-        ([address, users]: [string, unknown]) => {
-          if (Array.isArray(users) && users.length > 0) {
-            const user = users[0] as FarcasterUser; // Take the first user if multiple
-            farcasterMap.set(address.toLowerCase(), {
-              fid: user.fid,
-              username: user.username,
-              display_name: user.display_name,
-              pfp_url: user.pfp_url,
-            });
+          if (!response.ok) {
+            console.warn(`Failed to fetch Farcaster data for batch ${i / BATCH_SIZE + 1}`);
+            continue;
           }
+
+          const farcasterData = await response.json();
+          
+          // Handle the response format from neynar bulk users API
+          Object.entries(farcasterData).forEach(
+            ([address, users]: [string, unknown]) => {
+              if (Array.isArray(users) && users.length > 0) {
+                const user = users[0] as FarcasterUser; // Take the first user if multiple
+                farcasterMap.set(address.toLowerCase(), {
+                  fid: user.fid,
+                  username: user.username,
+                  display_name: user.display_name,
+                  pfp_url: user.pfp_url,
+                });
+              }
+            }
+          );
+        } catch (batchErr) {
+          console.warn(`Error processing Farcaster batch ${i / BATCH_SIZE + 1}:`, batchErr);
+          // Continue with next batch
         }
-      );
+      }
 
       const enrichedStakers = stakersData.map((staker) => ({
         ...staker,
@@ -325,13 +340,18 @@ export function StakerLeaderboard({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
-      <div className="p-6">
-        <h3 className="text-xl font-bold mb-4">
-          ${tokenSymbol} Staker Leaderboard
-        </h3>
+      <div className="flex flex-col max-h-[90vh] md:max-h-[80vh]">
+        {/* Header */}
+        <div className="p-6 pb-0">
+          <h3 className="text-xl font-bold mb-4">
+            ${tokenSymbol} Staker Leaderboard
+          </h3>
+        </div>
 
-        {/* Search and Filters */}
-        <div className="mb-4 space-y-4">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-6">
+          {/* Search and Filters */}
+          <div className="mb-4 space-y-4">
           {/* Search Input */}
           <div className="form-control">
             <label className="label">
@@ -450,7 +470,7 @@ export function StakerLeaderboard({
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto max-h-96">
+          <div className="overflow-x-auto">
             <table className="table table-zebra table-sm">
               <thead>
                 <tr>
@@ -574,9 +594,11 @@ export function StakerLeaderboard({
             </table>
           </div>
         )}
+        </div>
 
-        <div className="modal-action mt-6">
-          <button className="btn btn-sm" onClick={onClose}>
+        {/* Footer */}
+        <div className="p-6 pt-4 border-t border-base-300">
+          <button className="btn btn-sm btn-outline w-full" onClick={onClose}>
             Close
           </button>
         </div>

@@ -486,7 +486,9 @@ export function TokenActions({
       <div className="card bg-base-100 border border-black/[.1]1]">
         <div className="card-body items-center justify-center min-h-[100px]">
           <span className="loading loading-spinner loading-sm"></span>
-          <p className="text-sm text-base-content/70">Loading Farcaster SDK...</p>
+          <p className="text-sm text-base-content/70">
+            Loading Farcaster SDK...
+          </p>
         </div>
       </div>
     );
@@ -724,8 +726,8 @@ export function TokenActions({
               disabled={!validation.isValid}
               className={`w-full btn ${
                 tradeDirection === "buy"
-                  ? "border-accent bg-accent/20 text-accent-content hover:bg-accent/30 disabled:!opacity-40 disabled:!border-accent disabled:!bg-accent/5 disabled:!text-accent-content disabled:cursor-not-allowed"
-                  : "border-error bg-error/10 text-error-content hover:bg-error/20 disabled:!opacity-40 disabled:!border-error disabled:!bg-error/10 disabled:!text-error-content disabled:cursor-not-allowed"
+                  ? "border-accent bg-accent/20 hover:bg-accent/30 disabled:!opacity-40 disabled:!border-accent disabled:!bg-accent/5 disabled:!text-accent-content disabled:cursor-not-allowed"
+                  : "border-error bg-error/10 hover:bg-error/20 disabled:!opacity-40 disabled:!border-error disabled:!bg-error/10 disabled:!text-error-content disabled:cursor-not-allowed"
               }`}
             />
           </div>

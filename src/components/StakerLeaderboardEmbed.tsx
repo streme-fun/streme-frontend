@@ -88,14 +88,16 @@ export function StakerLeaderboardEmbed({
 
         const stakersData = poolData.poolMembers || [];
         
-        // Enrich with Farcaster data
-        if (stakersData.length > 0) {
-          const enrichedStakers = await enrichStakersWithFarcaster(stakersData);
-          setStakers(enrichedStakers);
-        } else {
-          setStakers([]);
-        }
+        // Set stakers immediately without waiting for Farcaster
+        setStakers(stakersData);
         setLoading(false);
+        
+        // Enrich with Farcaster data in the background
+        if (stakersData.length > 0) {
+          enrichStakersWithFarcaster(stakersData).then(enrichedStakers => {
+            setStakers(enrichedStakers);
+          });
+        }
         return; // Success, exit loop
       } catch (err) {
         console.warn(`Failed to fetch from ${endpoint}:`, err);

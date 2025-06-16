@@ -128,10 +128,10 @@ export async function GET(
               <img
                 src={token.img_url}
                 alt={token.name}
-                width="300"
-                height="300"
+                width="500"
+                height="500"
                 style={{
-                  borderRadius: "30px",
+                  borderRadius: "50%",
                   objectFit: "cover",
                   border: "4px solid rgba(255, 255, 255, 0.9)",
                   boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3)",
