@@ -749,7 +749,7 @@ export function TokenActions({
             />
           )}
         </div>
-        <div className="my-6 h-px bg-gray-100" />
+        <div className="my-6 h-px bg-base-300" />
         {/* Staking Actions */}
         {stakingAddress && (
           <StakeButton
@@ -762,7 +762,7 @@ export function TokenActions({
             }}
             disabled={balance === 0n || !stakingAddress}
             symbol={token.symbol}
-            className="btn btn-outline border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 bg-base-100 hover:bg-gray-50 w-full disabled:border-gray-200 disabled:text-gray-400 disabled:bg-gray-50"
+            className="btn btn-outline border-base-300 hover:border-base-400 text-base-content hover:text-base-content bg-base-100 hover:bg-base-200 w-full disabled:border-base-200 disabled:text-base-content/40 disabled:bg-base-100"
             isMiniApp={isEffectivelyMiniApp}
             farcasterAddress={currentAddress}
             farcasterIsConnected={walletIsConnected}
@@ -779,7 +779,7 @@ export function TokenActions({
           }}
           disabled={stakedBalance === 0n || !stakingAddress}
           symbol={token.symbol}
-          className="btn btn-outline border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900 bg-base-100 hover:bg-gray-50 w-full disabled:border-gray-200 disabled:text-gray-400 disabled:bg-gray-50"
+          className="btn btn-outline border-base-300 hover:border-base-400 text-base-content hover:text-base-content bg-base-100 hover:bg-base-200 w-full disabled:border-base-200 disabled:text-base-content/40 disabled:bg-base-100"
           isMiniApp={isEffectivelyMiniApp}
           farcasterAddress={currentAddress}
           farcasterIsConnected={walletIsConnected}
@@ -787,14 +787,14 @@ export function TokenActions({
 
         {/* Pool Connection Status Indicator */}
         {stakingPoolAddress && (
-          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <div className="bg-base-200 rounded-lg p-3 border border-base-300">
             <div className="flex items-center gap-2 justify-center">
               <div
                 className={`w-2 h-2 rounded-full ${
                   isConnectedToPool ? "bg-green-500" : "bg-amber-500"
                 }`}
               ></div>
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-sm font-medium text-base-content">
                 {isConnectedToPool
                   ? "Connected to reward pool"
                   : "Not connected to reward pool"}
@@ -802,7 +802,7 @@ export function TokenActions({
             </div>
             {!isConnectedToPool && stakedBalance > 0n && (
               <>
-                <p className="text-xs text-gray-500 mb-3">
+                <p className="text-xs text-base-content/60 mb-3">
                   Connect to start receiving rewards on your staked tokens
                 </p>
                 <ConnectPoolButton
