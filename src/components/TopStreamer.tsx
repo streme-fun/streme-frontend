@@ -90,11 +90,17 @@ export function TopStreamer() {
         }));
 
         // Filter out blacklisted tokens
-        const filteredTokens = tokens.filter(
-          (token) =>
-            !token.creator?.name ||
-            !SPAMMER_BLACKLIST.includes(token.creator.name.toLowerCase())
-        );
+        const filteredTokens = tokens.filter((token) => {
+          if (token.creator?.name) {
+            const creatorName = token.creator.name.toLowerCase();
+            const isBlacklisted = SPAMMER_BLACKLIST.includes(creatorName);
+            if (isBlacklisted) {
+              console.log(`TopStreamer: Filtering out blacklisted token from creator: ${creatorName}`);
+            }
+            return !isBlacklisted;
+          }
+          return true;
+        });
 
         // Randomly select a token from the filtered list
         if (filteredTokens.length === 0) {

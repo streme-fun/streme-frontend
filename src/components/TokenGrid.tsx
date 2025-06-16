@@ -602,9 +602,17 @@ export function TokenGrid({
         ).values()
       );
       const baseFilteredTokens = uniqueIncomingTokens.filter(
-        (token) =>
-          !token.creator?.name ||
-          !SPAMMER_BLACKLIST.includes(token.creator.name.toLowerCase())
+        (token) => {
+          if (token.creator?.name) {
+            const creatorName = token.creator.name.toLowerCase();
+            const isBlacklisted = SPAMMER_BLACKLIST.includes(creatorName);
+            if (isBlacklisted) {
+              console.log(`Filtering out blacklisted token from creator: ${creatorName}`);
+            }
+            return !isBlacklisted;
+          }
+          return true;
+        }
       );
 
       // Use searchQuery prop for filtering

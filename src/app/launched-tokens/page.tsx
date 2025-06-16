@@ -8,6 +8,7 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { Modal } from "@/src/components/Modal";
 import { LaunchTokenModal } from "@/src/components/LaunchTokenModal";
 import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
+import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
 import sdk from "@farcaster/frame-sdk";
 
 interface TokenStaker {
@@ -163,7 +164,20 @@ export default function LaunchedTokensPage() {
         throw new Error(result.error || "Failed to fetch tokens");
       }
 
-      const enrichedTokens = await enrichTokensWithStakingData(result.data);
+      // Filter out blacklisted tokens
+      const filteredTokens = result.data.filter((token: LaunchedToken) => {
+        if (token.username) {
+          const username = token.username.toLowerCase();
+          const isBlacklisted = SPAMMER_BLACKLIST.includes(username);
+          if (isBlacklisted) {
+            console.log(`Filtering out blacklisted launched token from creator: ${username}`);
+          }
+          return !isBlacklisted;
+        }
+        return true;
+      });
+
+      const enrichedTokens = await enrichTokensWithStakingData(filteredTokens);
       setTokens(enrichedTokens);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error occurred");
