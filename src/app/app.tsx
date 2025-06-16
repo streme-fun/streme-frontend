@@ -280,7 +280,7 @@ function App() {
             <div className="flex-shrink-0">
               <button
                 onClick={() => setShowTutorialModal(true)}
-                className="btn btn-ghost btn-sm btn-circle bg-white/80 backdrop-blur-sm border border-gray-200 shadow-sm"
+                className="btn btn-ghost btn-sm btn-circle bg-base-100/80 backdrop-blur-sm border border-base-300 shadow-sm"
                 title="Tutorial"
               >
                 <svg

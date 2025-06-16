@@ -218,7 +218,9 @@ export function WalletProfileModal({
             {/* User Info */}
             <div className="flex-1">
               <h4 className="font-semibold text-base-content">{displayName}</h4>
-              {username && <p className="text-sm text-base-content/70">@{username}</p>}
+              {username && (
+                <p className="text-sm text-base-content/70">@{username}</p>
+              )}
               {userFid && (
                 <p className="text-xs text-base-content/50">FID: {userFid}</p>
               )}
@@ -268,7 +270,7 @@ export function WalletProfileModal({
             <label className="block text-sm font-medium text-base-content/80">
               Theme
             </label>
-            <ThemeSwitcher className="w-full justify-start" />
+            <ThemeSwitcher className="justify-start" />
           </div>
 
           {/* Balances */}
