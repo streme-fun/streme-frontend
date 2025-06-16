@@ -179,15 +179,15 @@ export function WalletProfileModal({
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-white rounded-t-2xl shadow-xl animate-in slide-in-from-bottom duration-300">
+      <div className="relative w-full max-w-md bg-base-100 rounded-t-2xl shadow-xl animate-in slide-in-from-bottom duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Profile</h3>
+        <div className="flex items-center justify-between p-4 border-b border-base-300">
+          <h3 className="text-lg font-semibold text-base-content">Profile</h3>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-base-200 rounded-full transition-colors"
           >
-            <X size={20} className="text-gray-500" />
+            <X size={20} className="text-base-content/60" />
           </button>
         </div>
 
@@ -196,7 +196,7 @@ export function WalletProfileModal({
           {/* Profile Section */}
           <div className="flex items-center space-x-4">
             {/* Profile Picture */}
-            <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gray-200">
+            <div className="relative w-16 h-16 rounded-full overflow-hidden bg-base-200">
               {profileImage ? (
                 <Image
                   src={profileImage}
@@ -217,21 +217,21 @@ export function WalletProfileModal({
 
             {/* User Info */}
             <div className="flex-1">
-              <h4 className="font-semibold text-gray-900">{displayName}</h4>
-              {username && <p className="text-sm text-gray-500">@{username}</p>}
+              <h4 className="font-semibold text-base-content">{displayName}</h4>
+              {username && <p className="text-sm text-base-content/70">@{username}</p>}
               {userFid && (
-                <p className="text-xs text-gray-400">FID: {userFid}</p>
+                <p className="text-xs text-base-content/50">FID: {userFid}</p>
               )}
             </div>
           </div>
 
           {/* Wallet Address */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-base-content/80">
               Wallet Address
             </label>
-            <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-              <code className="flex-1 text-sm font-mono text-gray-800">
+            <div className="flex items-center space-x-2 p-3 bg-base-200 rounded-lg">
+              <code className="flex-1 text-sm font-mono text-base-content">
                 {effectiveAddress
                   ? truncateAddress(effectiveAddress)
                   : "Not connected"}
@@ -241,8 +241,8 @@ export function WalletProfileModal({
                   onClick={copyAddress}
                   className={`p-2 rounded-md transition-all duration-200 ${
                     isCopied
-                      ? "bg-green-100 text-green-600"
-                      : "hover:bg-gray-200 text-gray-500"
+                      ? "bg-success/20 text-success"
+                      : "hover:bg-base-300 text-base-content/60"
                   }`}
                   title={isCopied ? "Copied!" : "Copy address"}
                 >
@@ -265,7 +265,7 @@ export function WalletProfileModal({
 
           {/* Theme Switcher */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-base-content/80">
               Theme
             </label>
             <ThemeSwitcher className="w-full justify-start" />
@@ -273,23 +273,23 @@ export function WalletProfileModal({
 
           {/* Balances */}
           <div className="space-y-4">
-            <h5 className="font-medium text-gray-900">Balances</h5>
+            <h5 className="font-medium text-base-content">Balances</h5>
 
             {isLoading ? (
               <div className="space-y-3">
                 <div className="animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-                  <div className="h-6 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-base-300 rounded w-1/2 mb-2"></div>
+                  <div className="h-6 bg-base-300 rounded"></div>
                 </div>
                 <div className="animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-                  <div className="h-6 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-base-300 rounded w-1/2 mb-2"></div>
+                  <div className="h-6 bg-base-300 rounded"></div>
                 </div>
               </div>
             ) : (
               <div className="space-y-3">
                 {/* ETH Balance */}
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <div className="flex justify-between items-center p-3 bg-base-200 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <div className="w-4 h-4 relative">
                       <Image
@@ -299,17 +299,17 @@ export function WalletProfileModal({
                         className="object-contain"
                       />
                     </div>
-                    <span className="font-medium text-gray-900 text-xs">
+                    <span className="font-medium text-base-content text-xs">
                       ETH
                     </span>
                   </div>
-                  <span className="font-mono text-gray-800 text-xs">
+                  <span className="font-mono text-base-content text-xs">
                     {formatBalance(ethBalance, 18, "ETH")}
                   </span>
                 </div>
 
                 {/* STREME Balance */}
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <div className="flex justify-between items-center p-3 bg-base-200 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <div className="w-4 h-4 relative">
                       <Image
@@ -319,11 +319,11 @@ export function WalletProfileModal({
                         className="object-contain"
                       />
                     </div>
-                    <span className="font-medium text-gray-900 text-xs">
+                    <span className="font-medium text-base-content text-xs">
                       $STREME
                     </span>
                   </div>
-                  <span className="font-mono text-gray-800 text-xs">
+                  <span className="font-mono text-base-content text-xs">
                     {formatBalance(stremeBalance, STREME_DECIMALS, "STREME")}
                   </span>
                 </div>

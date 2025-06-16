@@ -110,7 +110,7 @@ export function Navbar() {
             {/* Explore Button */}
             <Link
               href="/"
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700  hover:text-primary flex-1 cursor-pointer"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer"
             >
               {/* Placeholder for Home Icon */}
               <svg
@@ -132,7 +132,7 @@ export function Navbar() {
             {/* My Stakes Button */}
             <button
               onClick={() => setIsMyStakesOpen(true)}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700  hover:text-primary flex-1 cursor-pointer"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer"
             >
               {/* Special E Icon in Circle */}
               <div className="w-6 h-6 mb-0.5 rounded-full border-2 border-current flex items-center justify-center">
@@ -177,7 +177,7 @@ Symbol: $[your ticker]
                   setIsLaunchTokenOpen(true);
                 }
               }}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700  hover:text-primary flex-1 cursor-pointer"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer"
             >
               {/* Placeholder for Launch Icon */}
               <svg
@@ -202,7 +202,7 @@ Symbol: $[your ticker]
               onClick={() => {
                 setIsLeaderboardModalOpen(true);
               }}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700  hover:text-primary flex-1 cursor-pointer"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer"
             >
               {/* Placeholder for Leaderboard Icon */}
               <svg
@@ -225,7 +225,7 @@ Symbol: $[your ticker]
             {/* Profile Button */}
             <button
               onClick={() => setIsWalletProfileOpen(true)}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-gray-700  hover:text-primary flex-1 cursor-pointer"
+              className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer"
             >
               {/* Profile Picture or Default Icon */}
               {miniAppProfileImage ? (
