@@ -105,10 +105,10 @@ const CurrentBalanceDisplay = ({
 
   return (
     <div>
-      <p className="text-gray-500">Current Balance</p>
+      <p className="text-base-content/70">Current Balance</p>
       <div className="flex items-center">
         <p
-          className="font-mono text-green-600"
+          className="font-mono text-success"
           style={{ willChange: "contents" }}
         >
           {currentBalance.toLocaleString("en-US", {
@@ -1091,7 +1091,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
             <div className="text-center py-8">
               <div className="mb-4">
                 <svg
-                  className="w-16 h-16 mx-auto text-gray-300"
+                  className="w-16 h-16 mx-auto text-base-content/30"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1107,7 +1107,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
               <h3 className="text-lg font-semibold mb-2">
                 Wallet Connection Required
               </h3>
-              <p className="text-gray-500 mb-4">
+              <p className="text-base-content/70 mb-4">
                 Please connect your wallet to view your stakes and SuperTokens.
               </p>
               {!isMiniAppView && (
@@ -1122,22 +1122,22 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="card bg-base-100 border border-gray-200 animate-pulse"
+                  className="card bg-base-100 border border-base-300 animate-pulse"
                 >
                   <div className="card-body p-4">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-300"></div>
+                        <div className="w-8 h-8 rounded-full bg-base-300"></div>
                         <div>
-                          <div className="h-5 bg-gray-300 rounded w-20 mb-1"></div>
-                          <div className="h-3 bg-gray-200 rounded w-16"></div>
+                          <div className="h-5 bg-base-300 rounded w-20 mb-1"></div>
+                          <div className="h-3 bg-base-300 rounded w-16"></div>
                         </div>
                       </div>
-                      <div className="h-6 bg-gray-300 rounded w-16"></div>
+                      <div className="h-6 bg-base-300 rounded w-16"></div>
                     </div>
                     <div className="space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-full"></div>
-                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                      <div className="h-4 bg-base-300 rounded w-full"></div>
+                      <div className="h-4 bg-base-300 rounded w-3/4"></div>
                     </div>
                   </div>
                 </div>
@@ -1172,7 +1172,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
             <div className="text-center py-8">
               <div className="mb-4">
                 <svg
-                  className="w-16 h-16 mx-auto text-gray-300"
+                  className="w-16 h-16 mx-auto text-base-content/30"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1190,7 +1190,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                   <h3 className="text-lg font-semibold mb-2">
                     Welcome to Streme!
                   </h3>
-                  <p className="text-gray-500 mb-4">
+                  <p className="text-base-content/70 mb-4">
                     You haven&apos;t interacted with any tokens yet. Start by
                     exploring and staking in your favorite tokens!
                   </p>
@@ -1216,7 +1216,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                   <h3 className="text-lg font-semibold mb-2">
                     No Stakes or SuperTokens Found
                   </h3>
-                  <p className="text-gray-500 mb-4">
+                  <p className="text-base-content/70 mb-4">
                     You don&apos;t have any active stakes or SuperTokens yet.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2 justify-center">
@@ -1252,13 +1252,13 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                 {stakes.map((stake, index) => (
                   <div
                     key={`stake-${index}`}
-                    className="card bg-base-100 border border-gray-200"
+                    className="card bg-base-100 border border-base-300"
                   >
                     <div className="card-body p-4">
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center gap-3">
                           {/* Token Logo */}
-                          <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-full overflow-hidden bg-base-200 flex items-center justify-center">
                             {stake.logo ? (
                               <img
                                 src={stake.logo}
@@ -1284,7 +1284,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                           <div>
                             <a
                               href={`/token/${stake.tokenAddress}`}
-                              className="hover:text-blue-600 transition-colors"
+                              className="hover:text-primary transition-colors"
                             >
                               <h4 className="font-semibold text-lg">
                                 {stake.membership.pool.token.symbol}
@@ -1317,7 +1317,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
                       <div className="flex flex-col gap-4 text-sm mb-4">
                         <div>
-                          <p className="text-gray-500">Staked Amount</p>
+                          <p className="text-base-content/70">Staked Amount</p>
                           <p className="font-mono">
                             {parseFloat(
                               stake.membership.units
@@ -1340,15 +1340,15 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                         ) : stake.stakingAddress &&
                           stake.stakingAddress !== "" &&
                           stake.isConnectedToPool === false ? (
-                          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                          <div className="bg-base-200 rounded-lg p-3 border border-base-300">
                             <div className="flex items-center gap-2 justify-center">
                               <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                              <span className="text-sm font-medium text-gray-700">
+                              <span className="text-sm font-medium text-base-content">
                                 Not connected to reward pool
                               </span>
                             </div>
                             {stake.stakedBalance > 0n && (
-                              <p className="text-xs text-gray-500 mb-3 text-center">
+                              <p className="text-xs text-base-content/70 mb-3 text-center">
                                 Connect to start receiving rewards on your
                                 staked tokens
                               </p>
@@ -1374,9 +1374,9 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                           </div>
                         ) : (
                           <div>
-                            <p className="text-gray-500">Current Balance</p>
+                            <p className="text-base-content/70">Current Balance</p>
                             <div className="flex items-center">
-                              <p className="font-mono text-green-600">
+                              <p className="font-mono text-success">
                                 {stake.baseAmount.toLocaleString("en-US", {
                                   minimumFractionDigits: 6,
                                   maximumFractionDigits: 6,
@@ -1476,13 +1476,13 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                 {ownedSuperTokens.map((token, index) => (
                   <div
                     key={`token-${index}`}
-                    className="card bg-base-100 border border-gray-200"
+                    className="card bg-base-100 border border-base-300"
                   >
                     <div className="card-body p-4">
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center gap-3">
                           {/* Token Logo */}
-                          <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-full overflow-hidden bg-base-200 flex items-center justify-center">
                             {token.logo ? (
                               <img
                                 src={token.logo}
@@ -1542,8 +1542,8 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
                       <div className="flex flex-col gap-4 text-sm mb-4">
                         <div>
-                          <p className="text-gray-500">Balance</p>
-                          <p className="font-mono text-blue-600">
+                          <p className="text-base-content/70">Balance</p>
+                          <p className="font-mono text-primary">
                             {token.balance.toLocaleString("en-US", {
                               minimumFractionDigits: 0,
                               maximumFractionDigits: 2,

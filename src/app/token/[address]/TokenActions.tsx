@@ -486,7 +486,7 @@ export function TokenActions({
       <div className="card bg-base-100 border border-black/[.1]1]">
         <div className="card-body items-center justify-center min-h-[100px]">
           <span className="loading loading-spinner loading-sm"></span>
-          <p className="text-sm text-gray-500">Loading Farcaster SDK...</p>
+          <p className="text-sm text-base-content/70">Loading Farcaster SDK...</p>
         </div>
       </div>
     );
@@ -497,7 +497,7 @@ export function TokenActions({
       <div className="card bg-base-100 border border-black/[.1]1]">
         <div className="card-body items-center justify-center min-h-[100px]">
           <span className="loading loading-spinner loading-sm"></span>
-          <p className="text-sm text-gray-500">Initializing wallet...</p>
+          <p className="text-sm text-base-content/70">Initializing wallet...</p>
         </div>
       </div>
     );
@@ -508,7 +508,7 @@ export function TokenActions({
       <div className="card bg-base-100 border border-black/[.1]1]">
         <div className="card-body items-center">
           <div className="mb-4 text-center">
-            <Wallet size={48} className="mx-auto mb-2 text-gray-400" />
+            <Wallet size={48} className="mx-auto mb-2 text-base-content/40" />
             <p className="font-semibold">
               {isEffectivelyMiniApp ? "Farcaster Wallet" : "Wallet"} Not
               Connected
@@ -548,18 +548,18 @@ export function TokenActions({
   });
 
   return (
-    <div className="bg-base-100 rounded-xl border border-gray-200 shadow-sm">
+    <div className="bg-base-100 rounded-xl border border-base-300 shadow-sm">
       <div className="p-6 space-y-4">
         {/* Trading Interface */}
         <div className="space-y-4">
           {/* Buy/Sell Toggle */}
-          <div className="bg-gray-50 rounded-lg p-1 flex">
+          <div className="bg-base-200 rounded-lg p-1 flex">
             <button
               onClick={() => setTradeDirection("buy")}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                 tradeDirection === "buy"
                   ? "bg-accent text-white"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+                  : "text-base-content/70 hover:text-base-content hover:bg-base-300 cursor-pointer"
               }`}
             >
               Buy
@@ -569,7 +569,7 @@ export function TokenActions({
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                 tradeDirection === "sell"
                   ? "bg-error text-white"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+                  : "text-base-content/70 hover:text-base-content hover:bg-base-300 cursor-pointer"
               }`}
             >
               Sell
@@ -578,13 +578,13 @@ export function TokenActions({
 
           {/* Available to Trade */}
           <div className="flex justify-between">
-            <div className="text-sm text-gray-400">Balance</div>
-            <div className="text-sm text-gray-400 flex items-center gap-2">
+            <div className="text-sm text-base-content/50">Balance</div>
+            <div className="text-sm text-base-content/50 flex items-center gap-2">
               {(isRefreshingBalances || !lastUpdated) && (
-                <div className="animate-spin w-3 h-3 border border-gray-300 border-t-blue-500 rounded-full"></div>
+                <div className="animate-spin w-3 h-3 border border-base-300 border-t-primary rounded-full"></div>
               )}
               {!lastUpdated ? (
-                <span className="text-gray-300">Loading...</span>
+                <span className="text-base-content/30">Loading...</span>
               ) : tradeDirection === "buy" ? (
                 `${(Number(ethBalance) / 1e18).toFixed(4)} ETH`
               ) : (
@@ -602,13 +602,13 @@ export function TokenActions({
                 value={tradeAmount}
                 onChange={(e) => setTradeAmount(e.target.value)}
                 placeholder={tradeDirection === "buy" ? "0.001" : ""}
-                className="w-full p-5 bg-gray-50 border border-gray-200 rounded-lg text-lg font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full p-5 bg-base-200 border border-base-300 rounded-lg text-lg font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 step="0.001"
                 min="0"
               />
               {/* USD equivalent for trade amount */}
               {tradeAmount && (
-                <div className="absolute left-5 top-12 text-xs text-gray-400">
+                <div className="absolute left-5 top-12 text-xs text-base-content/50">
                   {tradeDirection === "buy" && usdPrices.eth
                     ? `≈ ${convertToUSD(tradeAmount, usdPrices.eth)}`
                     : tradeDirection === "sell" && usdPrices.token
@@ -616,7 +616,7 @@ export function TokenActions({
                     : null}
                 </div>
               )}
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/70">
                 {tradeDirection === "buy" ? "ETH" : token.symbol}
               </div>
             </div>
@@ -629,7 +629,7 @@ export function TokenActions({
                     <button
                       key={amount}
                       onClick={() => handleFixedAmountClick(amount)}
-                      className="py-1 px-2 text-xs rounded-md border border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-colors text-gray-500 cursor-pointer"
+                      className="py-1 px-2 text-xs rounded-md border border-base-300 hover:border-base-400 hover:bg-base-200 transition-colors text-base-content/70 cursor-pointer"
                     >
                       {amount} eth
                     </button>
@@ -639,7 +639,7 @@ export function TokenActions({
                     <button
                       key={percentage}
                       onClick={() => handlePercentageClick(percentage)}
-                      className="py-1 px-2 text-xs font-medium rounded-md border border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-colors text-gray-500 cursor-pointer"
+                      className="py-1 px-2 text-xs font-medium rounded-md border border-base-300 hover:border-base-400 hover:bg-base-200 transition-colors text-base-content/70 cursor-pointer"
                     >
                       {percentage}%
                     </button>
@@ -649,12 +649,12 @@ export function TokenActions({
 
           {/* Quote Display */}
           {isPriceLoading ? (
-            <div className="text-center text-gray-500">
-              <div className="animate-spin w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full mx-auto"></div>
+            <div className="text-center text-base-content/70">
+              <div className="animate-spin w-5 h-5 border-2 border-base-300 border-t-primary rounded-full mx-auto"></div>
               {/* <div className="text-sm mt-1">Getting quote...</div> */}
             </div>
           ) : priceQuote && tradeAmount ? (
-            <div className="bg-gray-50 rounded-lg p-3 text-sm">
+            <div className="bg-base-200 rounded-lg p-3 text-sm">
               <div className="flex justify-between">
                 <span>Receive:</span>
                 <div className="text-right">
@@ -687,7 +687,7 @@ export function TokenActions({
                         ? usdPrices.token
                         : usdPrices.eth;
                     return price ? (
-                      <div className="text-xs text-gray-400 mt-1">
+                      <div className="text-xs text-base-content/50 mt-1">
                         ≈ {convertToUSD(amount, price)}
                       </div>
                     ) : null;

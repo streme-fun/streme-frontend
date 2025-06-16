@@ -275,7 +275,7 @@ ${shareUrl}`;
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
-            <p className="text-gray-600">{error || "Token not found"}</p>
+            <p className="text-base-content/70">{error || "Token not found"}</p>
           </div>
         </div>
       </div>
@@ -301,7 +301,7 @@ ${shareUrl}`;
         <div className="mb-4 px-4 sm:px-0">
           <button
             onClick={() => router.push("/")}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+            className="flex items-center gap-2 text-sm text-base-content/70 hover:text-base-content transition-colors cursor-pointer"
           >
             <svg
               className="w-4 h-4"

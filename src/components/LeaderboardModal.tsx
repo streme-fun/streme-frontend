@@ -622,8 +622,8 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     if (authLoading || pointsLoading) {
       return (
         <div className="text-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
-          <p className="text-sm text-gray-600">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-base-content/70">
             {authLoading ? "Authenticating..." : "Loading points data..."}
           </p>
         </div>
@@ -639,7 +639,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
           </p>
           <button
             onClick={authError ? signIn : () => token && fetchUserData(token)}
-            className="text-blue-600 hover:text-blue-700 text-sm underline"
+            className="text-primary hover:text-primary/80 text-sm underline"
           >
             {authError ? "Try Sign In Again" : "Retry Loading"}
           </button>
@@ -651,7 +651,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     if (!isAuthenticated) {
       return (
         <div className="text-center py-4">
-          <p className="text-gray-600 text-sm mb-3">
+          <p className="text-base-content/70 text-sm mb-3">
             Sign in with Farcaster to claim SUP stream
           </p>
           <button
@@ -668,7 +668,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     if (!userData) {
       return (
         <div className="text-center py-4">
-          <p className="text-gray-600 text-sm">Loading your points data...</p>
+          <p className="text-base-content/70 text-sm">Loading your points data...</p>
         </div>
       );
     }
@@ -724,10 +724,10 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
 
         {/* Eligibility Loading State */}
         {isEligibilityLoading && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3">
+          <div className="bg-base-200 border border-base-300 rounded-lg p-3 mb-3">
             <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-              <p className="text-gray-600 text-sm">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+              <p className="text-base-content/70 text-sm">
                 Loading SUP eligibility...
               </p>
             </div>
