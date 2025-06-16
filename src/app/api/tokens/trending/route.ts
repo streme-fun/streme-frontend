@@ -1,3 +1,5 @@
+import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
+
 export async function GET() {
   try {
     const headers = {
@@ -20,7 +22,22 @@ export async function GET() {
 
     const trendingData = await response.json();
 
-    return Response.json(trendingData, { headers });
+    // Filter out blacklisted tokens
+    const filteredData = trendingData.filter((token: any) => {
+      if (token.username) {
+        const username = token.username.toLowerCase();
+        const isBlacklisted = SPAMMER_BLACKLIST.includes(username);
+        if (isBlacklisted) {
+          console.log(`[Trending API] Filtering out blacklisted token from creator: ${username}`);
+        }
+        return !isBlacklisted;
+      }
+      return true;
+    });
+
+    console.log(`[Trending API] Filtered ${trendingData.length - filteredData.length} blacklisted tokens`);
+
+    return Response.json(filteredData, { headers });
   } catch (error) {
     console.error("Error fetching trending tokens:", error);
     return Response.json(

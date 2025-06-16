@@ -8,7 +8,6 @@ import FarcasterIcon from "@/public/farcaster.svg";
 // import { SortMenu } from "./SortMenu";
 import { Token } from "../app/types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
-import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
 import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 
 interface TokenGridProps {
@@ -601,19 +600,8 @@ export function TokenGrid({
           sourceTokens.map((token) => [token.contract_address, token])
         ).values()
       );
-      const baseFilteredTokens = uniqueIncomingTokens.filter(
-        (token) => {
-          if (token.creator?.name) {
-            const creatorName = token.creator.name.toLowerCase();
-            const isBlacklisted = SPAMMER_BLACKLIST.includes(creatorName);
-            if (isBlacklisted) {
-              console.log(`Filtering out blacklisted token from creator: ${creatorName}`);
-            }
-            return !isBlacklisted;
-          }
-          return true;
-        }
-      );
+      // No need to filter here anymore - filtering happens at API level
+      const baseFilteredTokens = uniqueIncomingTokens;
 
       // Use searchQuery prop for filtering
       let searchedTokensResult: Token[];

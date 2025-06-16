@@ -185,7 +185,7 @@ export function WalletProfileModal({
           <h3 className="text-lg font-semibold text-base-content">Profile</h3>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-base-200 rounded-full transition-colors"
+            className="p-2 hover:bg-base-200 rounded-full transition-colors cursor-pointer"
           >
             <X size={20} className="text-base-content/60" />
           </button>

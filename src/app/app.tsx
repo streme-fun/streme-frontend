@@ -9,13 +9,14 @@ import { Token, TokensResponse } from "./types/token";
 import { SortOption } from "../components/TokenGrid";
 import { SearchBar } from "../components/SearchBar";
 import { SortButtons } from "../components/SortButtons";
-import { Logo } from "../components/Logo";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import { Button } from "../components/ui/button";
 import { base } from "wagmi/chains";
-
+import Image from "next/image";
 import { usePostHog } from "posthog-js/react";
 import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal";
+import { SPAMMER_BLACKLIST } from "../lib/blacklist";
+import Link from "next/link";
 
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -24,16 +25,13 @@ function App() {
   const [sortBy, setSortBy] = useState<SortOption>("trending");
   const hasInitiallyFetched = useRef(false);
 
-  // Debug mechanism for auth test page
-  const [debugClickCount, setDebugClickCount] = useState(0);
-  const debugClickTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined
-  );
-
   // Tutorial modal state
   const [showTutorialModal, setShowTutorialModal] = useState(false);
   const [hasSkippedTutorial, setHasSkippedTutorial] = useState(false);
-  const [hasShownTutorialThisSession, setHasShownTutorialThisSession] = useState(false);
+  const [hasShownTutorialThisSession, setHasShownTutorialThisSession] =
+    useState(false);
+  const [blacklistFilterCount, setBlacklistFilterCount] = useState(0);
+  const [debugInfo, setDebugInfo] = useState<{creators: string[], filtered: string[]}>({creators: [], filtered: []});
 
   // Load tutorial skip state from localStorage on mount
   useEffect(() => {
@@ -94,34 +92,6 @@ function App() {
     postHog,
   ]);
 
-  // Debug click handler for logo
-  const handleDebugClick = useCallback(() => {
-    setDebugClickCount((prev) => {
-      const newCount = prev + 1;
-
-      // Clear any existing timeout
-      if (debugClickTimeout.current) {
-        clearTimeout(debugClickTimeout.current);
-      }
-
-      // Reset counter after 2 seconds of no clicks
-      debugClickTimeout.current = setTimeout(() => {
-        setDebugClickCount(0);
-      }, 2000);
-
-      return newCount;
-    });
-  }, []);
-
-  // Cleanup effect for debug timeout
-  useEffect(() => {
-    return () => {
-      if (debugClickTimeout.current) {
-        clearTimeout(debugClickTimeout.current);
-      }
-    };
-  }, []);
-
   // Fixed iterative pagination instead of recursive
   const fetchTokens = useCallback(async () => {
     try {
@@ -143,7 +113,42 @@ function App() {
         nextPage = data.nextPage;
       }
 
-      setTokens(allTokens);
+      // Debug: Show all unique creator names
+      const uniqueCreators = Array.from(new Set(
+        allTokens
+          .filter(t => t.creator?.name)
+          .map(t => t.creator!.name.toLowerCase())
+      ));
+      console.log("=== UNIQUE CREATORS IN FETCHED TOKENS ===");
+      console.log("Total unique creators:", uniqueCreators.length);
+      console.log("Creators:", uniqueCreators.sort());
+      console.log("Blacklist:", SPAMMER_BLACKLIST);
+      
+      // Filter out blacklisted tokens before setting state
+      const filteredNames: string[] = [];
+      const filteredTokens = allTokens.filter((token) => {
+        if (token.creator?.name) {
+          const creatorName = token.creator.name.toLowerCase();
+          const isBlacklisted = SPAMMER_BLACKLIST.includes(creatorName);
+          if (isBlacklisted) {
+            console.log(`[App.tsx] Filtering out blacklisted token "${token.name}" from creator: ${creatorName}`);
+            filteredNames.push(creatorName);
+          }
+          return !isBlacklisted;
+        }
+        return true;
+      });
+      
+      // Update debug info
+      setDebugInfo({
+        creators: uniqueCreators.slice(0, 10), // Show first 10 creators
+        filtered: Array.from(new Set(filteredNames))
+      });
+
+      const filteredCount = allTokens.length - filteredTokens.length;
+      console.log(`[App.tsx] Filtered ${filteredCount} blacklisted tokens`);
+      setBlacklistFilterCount(filteredCount);
+      setTokens(filteredTokens);
     } catch (error) {
       console.error("Error fetching tokens:", error);
     } finally {
@@ -265,12 +270,14 @@ function App() {
       <div className="font-[family-name:var(--font-geist-sans)]">
         <div className="flex flex-col gap-2 row-start-2 items-center w-full p-4 pt-20">
           <div className="fixed top-0 left-0 right-0 flex items-center p-4 z-10 bg-base-100/80 backdrop-blur-sm">
-            <div className="flex-shrink-0">
-              <Logo
-                onClick={handleDebugClick}
-                debugClickCount={debugClickCount}
+            <Link href="/" className="flex-shrink-0">
+              <Image
+                src="/icon-transparent.png"
+                alt="Streme Logo"
+                width={30}
+                height={30}
               />
-            </div>
+            </Link>
             <div className="flex-1 ml-6 mr-4 max-w-xs">
               <SearchBar
                 value={searchQuery}
@@ -280,7 +287,7 @@ function App() {
             <div className="flex-shrink-0">
               <button
                 onClick={() => setShowTutorialModal(true)}
-                className="btn btn-ghost btn-sm btn-circle bg-base-100/80 backdrop-blur-sm border border-base-300 shadow-sm"
+                className="bg-base-50 backdrop-blur-sm cursor-pointer"
                 title="Tutorial"
               >
                 <svg
@@ -310,6 +317,21 @@ function App() {
                   isMiniView={true}
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Debug Panel */}
+          <div className="w-full mb-2 bg-base-200 p-3 rounded-lg border border-base-300">
+            <div className="text-xs space-y-1">
+              <div className="font-bold text-primary">🐛 Blacklist Debug</div>
+              <div>Filtered: {blacklistFilterCount} tokens</div>
+              <div>Blacklist: {SPAMMER_BLACKLIST.slice(0, 5).join(", ")}...</div>
+              {debugInfo.creators.length > 0 && (
+                <div>Sample creators: {debugInfo.creators.slice(0, 5).join(", ")}...</div>
+              )}
+              {debugInfo.filtered.length > 0 && (
+                <div className="text-error">Filtered creators: {debugInfo.filtered.join(", ")}</div>
+              )}
             </div>
           </div>
 
