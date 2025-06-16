@@ -132,7 +132,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
 
   return (
     <div
-      className={`space-y-3 card bg-base-100 border-gray-100 border-2 p-4 relative z-10 ${
+      className={`space-y-3 card bg-base-100 border-base-300 border-2 p-4 relative z-10 ${
         isMiniAppView ? "mt-0" : "mt-12 md:mt-0"
       }`}
     >

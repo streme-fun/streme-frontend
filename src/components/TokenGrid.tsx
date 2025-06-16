@@ -197,8 +197,8 @@ const TokenCardComponent = ({
   return (
     <Link href={`/token/${token.contract_address}`} className="block group">
       <div
-        className="card card-side bg-base-100 rounded-md border-1 border-gray-300 
-        hover:bg-black/[.02]  transition-all duration-300 ease-out
+        className="card card-side bg-base-100 rounded-md border-1 border-base-300 
+        hover:bg-base-200/50  transition-all duration-300 ease-out
         hover:shadow-lg hover:-translate-y-1 group-hover:border-primary/20"
       >
         {token.img_url ? (

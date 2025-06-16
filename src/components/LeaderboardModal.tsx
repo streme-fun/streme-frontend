@@ -668,7 +668,9 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     if (!userData) {
       return (
         <div className="text-center py-4">
-          <p className="text-base-content/70 text-sm">Loading your points data...</p>
+          <p className="text-base-content/70 text-sm">
+            Loading your points data...
+          </p>
         </div>
       );
     }
@@ -954,14 +956,14 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-white rounded-t-2xl shadow-xl animate-in slide-in-from-bottom duration-300 max-h-[85vh] flex flex-col">
+      <div className="relative w-full max-w-md bg-base-100 rounded-t-2xl shadow-xl animate-in slide-in-from-bottom duration-300 max-h-[85vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 border-b border-base-300">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-base-content flex items-center gap-2">
               {!showInfoView && (
                 <svg
-                  className="w-5 h-5 text-gray-700"
+                  className="w-5 h-5 text-base-content/70"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -981,12 +983,12 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowInfoView(!showInfoView)}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-2 hover:bg-base-200 rounded-full transition-colors"
               title={showInfoView ? "Show Leaderboard" : "Show Info"}
             >
               {showInfoView ? (
                 <svg
-                  className="w-5 h-5 text-gray-500"
+                  className="w-5 h-5 text-base-content/60"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1000,7 +1002,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
                 </svg>
               ) : (
                 <svg
-                  className="w-5 h-5 text-gray-500"
+                  className="w-5 h-5 text-base-content/60"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1016,9 +1018,9 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
             </button>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-2 hover:bg-base-200 rounded-full transition-colors"
             >
-              <X size={20} className="text-gray-500" />
+              <X size={20} className="text-base-content/60" />
             </button>
           </div>
         </div>
@@ -1030,11 +1032,11 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
           <div className="flex-1 overflow-y-auto px-4 py-2">
             {loading ? (
               <div className="flex justify-center items-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : error ? (
               <div className="text-center py-12">
-                <p className="text-red-500 mb-4">{error}</p>
+                <p className="text-error mb-4">{error}</p>
                 <button
                   onClick={fetchLeaderboardData}
                   className="btn btn-primary"
@@ -1044,7 +1046,9 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
               </div>
             ) : leaderboardData.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-500">No leaderboard data available</p>
+                <p className="text-base-content/70">
+                  No leaderboard data available
+                </p>
               </div>
             ) : (
               <div className="">
@@ -1062,7 +1066,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
                   return (
                     <div
                       key={`${entry.address}-${displayIndex}`}
-                      className={`flex items-center space-x-3 p-1 py-2 rounded-lg transition-colors border-b border-gray-50 ${
+                      className={`flex items-center space-x-3 p-1 py-2 rounded-lg transition-colors border-b border-base-300 ${
                         isCurrentUser
                           ? "bg-blue-50 border-2 border-blue-200"
                           : isTopThree
@@ -1074,10 +1078,10 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
                       <div
                         className={`flex items-center justify-center w-6 h-6 font-bold text-sm ${
                           isCurrentUser
-                            ? "bg-blue-500 text-white"
+                            ? "bg-blue-500 text-base-100"
                             : isTopThree
-                            ? `${rankColors[entry.rank - 1]} bg-white`
-                            : "text-gray-600 bg-white "
+                            ? `${rankColors[entry.rank - 1]} bg-base-100`
+                            : "text-base-content/70 bg-base-100 "
                         }`}
                       >
                         {entry.rank}
@@ -1093,7 +1097,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
                         onClick={() => isClickable && handleProfileClick(entry)}
                       >
                         {/* Profile Image */}
-                        <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                        <div className="relative w-8 h-8 rounded-full overflow-hidden bg-base-200 flex-shrink-0">
                           {entry.displayInfo.image ? (
                             <Image
                               src={entry.displayInfo.image}
@@ -1116,7 +1120,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
 
                         {/* Name and Address */}
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 truncate flex items-center gap-2">
+                          <div className="font-medium text-base-content truncate flex items-center gap-2">
                             {entry.displayInfo.name}
                             {isCurrentUser && (
                               <span className="bg-blue-500 text-white px-2 py-0.5 rounded text-xs font-medium">
@@ -1124,7 +1128,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-base-content/70">
                             <span className="truncate">
                               {truncateAddress(entry.address)}
                             </span>
@@ -1140,8 +1144,8 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
         )}
 
         {/* Footer - Updated with Auth & Claim Flow */}
-        <div className="px-4 py-2 border-t border-gray-200 space-y-3">
-          <p className="text-xs text-gray-600">
+        <div className="px-4 py-2 border-t border-base-300 space-y-3">
+          <p className="text-xs text-base-content/70">
             Launch, ape, and stake on Streme to qualify for the Superfluid $SUP
             airdrop. The hotter your coins, the more you earn.
           </p>

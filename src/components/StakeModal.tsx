@@ -205,7 +205,7 @@ ${shareUrl}`;
       return (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div className="fixed inset-0 bg-black/50" onClick={handleClose} />
-          <div className="relative bg-white rounded-t-2xl shadow-xl w-full max-w-md animate-in slide-in-from-bottom duration-300">
+          <div className="relative bg-base-100 rounded-t-2xl shadow-xl w-full max-w-md animate-in slide-in-from-bottom duration-300">
             <div className="p-4 space-y-3">
               <h3 className="text-lg font-bold">Stake Successful! 🎉</h3>
               <div className="relative h-24 w-full overflow-hidden rounded-lg">
