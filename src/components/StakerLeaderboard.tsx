@@ -60,11 +60,11 @@ export function StakerLeaderboard({
     ];
 
     const query = `
-      query GetPoolStakers($poolId: ID!) {
+      query GetPoolStakers($poolId: ID!, $first: Int!, $skip: Int!) {
         pool(id: $poolId) {
           id
           totalMembers
-          poolMembers(orderBy: createdAtTimestamp, orderDirection: desc) {
+          poolMembers(first: $first, skip: $skip, orderBy: createdAtTimestamp, orderDirection: desc) {
             account {
               id
             }
@@ -78,34 +78,56 @@ export function StakerLeaderboard({
     
     for (const endpoint of endpoints) {
       try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            query,
-            variables: {
-              poolId: stakingPoolAddress.toLowerCase(),
+        let allStakers: TokenStaker[] = [];
+        const batchSize = 1000; // Fetch 1000 at a time
+        let skip = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
             },
-          }),
-        });
+            body: JSON.stringify({
+              query,
+              variables: {
+                poolId: stakingPoolAddress.toLowerCase(),
+                first: batchSize,
+                skip: skip,
+              },
+            }),
+          });
 
-        if (!response.ok) continue;
+          if (!response.ok) break;
 
-        const result = await response.json();
-        
-        if (result.errors) continue;
+          const result = await response.json();
+          
+          if (result.errors) break;
 
-        const poolData = result.data?.pool;
-        if (!poolData) continue;
+          const poolData = result.data?.pool;
+          if (!poolData) break;
 
-        const stakersData = poolData.poolMembers || [];
-        setStakers(stakersData);
-        
-        // Start enriching with Farcaster data
-        if (stakersData.length > 0) {
-          enrichStakersWithFarcaster(stakersData);
+          const batch = poolData.poolMembers || [];
+          allStakers.push(...batch);
+
+          // If we got less than the batch size, we've reached the end
+          if (batch.length < batchSize) {
+            hasMore = false;
+          } else {
+            skip += batchSize;
+          }
+        }
+
+        // If we successfully got data from this endpoint, set it and enrich
+        if (allStakers.length > 0) {
+          console.log(`Fetched ${allStakers.length} stakers for pool ${stakingPoolAddress}`);
+          setStakers(allStakers);
+          
+          // Start enriching with Farcaster data
+          enrichStakersWithFarcaster(allStakers);
+        } else {
+          setStakers([]);
         }
         return; // Success, exit loop
       } catch (err) {
