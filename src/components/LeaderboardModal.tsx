@@ -554,7 +554,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
 
     for (const identityType of identityOrder) {
       const identity = entry.identities[identityType];
-      if (identity) {
+      if (identity && identity.displayName) {
         return {
           name: identity.displayName,
           image: identity.profileImageUrl || null,

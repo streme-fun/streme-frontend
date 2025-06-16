@@ -12,7 +12,7 @@ import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 
 export function Hero() {
   const [initialTotalRewards, setInitialTotalRewards] = useState(0);
-  
+
   // Use the reward counter hook for animated total rewards
   const currentTotalRewards = useRewardCounter(
     initialTotalRewards,
@@ -49,7 +49,6 @@ export function Hero() {
 
     fetchTotalRewards();
   }, []);
-
 
   return (
     <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-28 md:mt-20">

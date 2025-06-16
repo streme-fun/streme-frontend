@@ -1,6 +1,62 @@
 "use client";
 
+import { useEffect, useState } from 'react';
+
 export function HeroAnimationMini() {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    // Check for dark mode
+    const checkDarkMode = () => {
+      const htmlElement = document.documentElement;
+      const dataTheme = htmlElement.getAttribute("data-theme");
+      const hasClassDark = htmlElement.classList.contains("dark");
+
+      // Only consider it dark if explicitly set to dark theme
+      const isDarkMode = dataTheme === "dark" || hasClassDark;
+      
+      // Only update state if it actually changed
+      setIsDark(prevIsDark => {
+        if (prevIsDark !== isDarkMode) {
+          return isDarkMode;
+        }
+        return prevIsDark;
+      });
+    };
+
+    checkDarkMode();
+
+    // Listen for theme changes
+    const observer = new MutationObserver((mutations) => {
+      // Only check if data-theme or class actually changed
+      const relevantChange = mutations.some(mutation => 
+        mutation.type === 'attributes' && 
+        (mutation.attributeName === 'data-theme' || mutation.attributeName === 'class')
+      );
+      
+      if (relevantChange) {
+        checkDarkMode();
+      }
+    });
+    
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme"],
+    });
+
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    mediaQuery.addEventListener("change", checkDarkMode);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener("change", checkDarkMode);
+    };
+  }, []);
+
+  const backgroundLineColor = isDark ? "hsl(220 13% 22%)" : "hsl(220 13% 97%)";
+  const gradientStopColor = isDark ? "hsl(220 13% 50%)" : "white";
+
   return (
     <div className="wire-wrap relative w-full h-full opacity-70">
       <div className="w-embed absolute inset-0">
@@ -149,42 +205,42 @@ export function HeroAnimationMini() {
           {/* Background gray lines */}
           <path
             d="M-100 80C200 80 400 100 800 200 C1200 300 1300 250 1540 250"
-            stroke="hsl(220 13% 91%)"
+            stroke={backgroundLineColor}
             strokeWidth="4"
           ></path>
           <path
             d="M-100 120C200 120 400 200 800 250 C1200 300 1300 300 1540 300"
-            stroke="hsl(220 13% 91%)"
+            stroke={backgroundLineColor}
             strokeWidth="4"
           ></path>
           <path
             d="M-100 180C200 180 400 300 800 300 C1200 300 1300 350 1540 350"
-            stroke="hsl(220 13% 91%)"
+            stroke={backgroundLineColor}
             strokeWidth="4"
           ></path>
           <path
             d="M-100 220C200 220 400 150 800 280 C1200 410 1300 200 1540 200"
-            stroke="hsl(220 13% 91%)"
+            stroke={backgroundLineColor}
             strokeWidth="4"
           ></path>
           <path
             d="M-100 260C200 260 400 350 800 150 C1200 -50 1300 300 1540 300"
-            stroke="hsl(220 13% 91%)"
+            stroke={backgroundLineColor}
             strokeWidth="4"
           ></path>
           <path
             d="M-100 40C250 40 450 120 800 100 C1150 80 1350 150 1540 150"
-            stroke="hsl(220 13% 91%)"
+            stroke={backgroundLineColor}
             strokeWidth="4"
           ></path>
           <path
             d="M-100 300C150 300 350 200 800 320 C1250 440 1350 250 1540 220"
-            stroke="hsl(220 13% 91%)"
+            stroke={backgroundLineColor}
             strokeWidth="4"
           ></path>
           <path
             d="M-100 340C200 340 400 280 800 380 C1200 480 1300 320 1540 350"
-            stroke="hsl(220 13% 91%)"
+            stroke={backgroundLineColor}
             strokeWidth="4"
           ></path>
 
@@ -267,21 +323,21 @@ export function HeroAnimationMini() {
 
           {/* Animated colored lines */}
           <defs>
-            <linearGradient id="gradient">
-              <stop offset="0" stopColor="white" stopOpacity="0"></stop>
-              <stop offset="0.2" stopColor="white" stopOpacity="0.5"></stop>
-              <stop offset="0.5" stopColor="white" stopOpacity="1"></stop>
-              <stop offset="0.8" stopColor="white" stopOpacity="0.5"></stop>
-              <stop offset="1" stopColor="white" stopOpacity="0"></stop>
+            <linearGradient id="gradient-mini">
+              <stop offset="0" stopColor={gradientStopColor} stopOpacity="0"></stop>
+              <stop offset="0.2" stopColor={gradientStopColor} stopOpacity="0.5"></stop>
+              <stop offset="0.5" stopColor={gradientStopColor} stopOpacity="1"></stop>
+              <stop offset="0.8" stopColor={gradientStopColor} stopOpacity="0.5"></stop>
+              <stop offset="1" stopColor={gradientStopColor} stopOpacity="0"></stop>
             </linearGradient>
-            <mask id="gradient-mask">
+            <mask id="gradient-mask-mini">
               <rect
                 className="mask-rect"
                 x="-100"
                 y="0"
                 width="120%"
                 height="100%"
-                fill="url(#gradient)"
+                fill="url(#gradient-mini)"
               ></rect>
             </mask>
           </defs>
@@ -290,56 +346,56 @@ export function HeroAnimationMini() {
             d="M-100 80C200 80 400 100 800 200 C1200 300 1300 250 1540 250"
             stroke="#2563eb"
             strokeWidth="4"
-            mask="url(#gradient-mask)"
+            mask="url(#gradient-mask-mini)"
           ></path>
           <path
             className="flow-line-2"
             d="M-100 120C200 120 400 200 800 250 C1200 300 1300 300 1540 300"
             stroke="#7c3aed"
             strokeWidth="4"
-            mask="url(#gradient-mask)"
+            mask="url(#gradient-mask-mini)"
           ></path>
           <path
             className="flow-line-3"
             d="M-100 180C200 180 400 300 800 300 C1200 300 1300 350 1540 350"
             stroke="#dc2626"
             strokeWidth="4"
-            mask="url(#gradient-mask)"
+            mask="url(#gradient-mask-mini)"
           ></path>
           <path
             className="flow-line-4"
             d="M-100 220C200 220 400 150 800 280 C1200 410 1300 200 1540 200"
             stroke="#10b981"
             strokeWidth="4"
-            mask="url(#gradient-mask)"
+            mask="url(#gradient-mask-mini)"
           ></path>
           <path
             className="flow-line-5"
             d="M-100 260C200 260 400 350 800 150 C1200 -50 1300 300 1540 300"
             stroke="#f59e0b"
             strokeWidth="4"
-            mask="url(#gradient-mask)"
+            mask="url(#gradient-mask-mini)"
           ></path>
           <path
             className="flow-line-6"
             d="M-100 40C250 40 450 120 800 100 C1150 80 1350 150 1540 150"
             stroke="#ec4899"
             strokeWidth="4"
-            mask="url(#gradient-mask)"
+            mask="url(#gradient-mask-mini)"
           ></path>
           <path
             className="flow-line-7"
             d="M-100 300C150 300 350 200 800 320 C1250 440 1350 250 1540 220"
             stroke="#06b6d4"
             strokeWidth="4"
-            mask="url(#gradient-mask)"
+            mask="url(#gradient-mask-mini)"
           ></path>
           <path
             className="flow-line-8"
             d="M-100 340C200 340 400 280 800 380 C1200 480 1300 320 1540 350"
             stroke="#8b5cf6"
             strokeWidth="4"
-            mask="url(#gradient-mask)"
+            mask="url(#gradient-mask-mini)"
           ></path>
         </svg>
       </div>

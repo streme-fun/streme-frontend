@@ -1,6 +1,62 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 export function HeroAnimation() {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    // Check for dark mode
+    const checkDarkMode = () => {
+      const htmlElement = document.documentElement;
+      const dataTheme = htmlElement.getAttribute("data-theme");
+      const hasClassDark = htmlElement.classList.contains("dark");
+
+      // Only consider it dark if explicitly set to dark theme
+      const isDarkMode = dataTheme === "dark" || hasClassDark;
+      
+      // Only update state if it actually changed
+      setIsDark(prevIsDark => {
+        if (prevIsDark !== isDarkMode) {
+          return isDarkMode;
+        }
+        return prevIsDark;
+      });
+    };
+
+    checkDarkMode();
+
+    // Listen for theme changes
+    const observer = new MutationObserver((mutations) => {
+      // Only check if data-theme or class actually changed
+      const relevantChange = mutations.some(mutation => 
+        mutation.type === 'attributes' && 
+        (mutation.attributeName === 'data-theme' || mutation.attributeName === 'class')
+      );
+      
+      if (relevantChange) {
+        checkDarkMode();
+      }
+    });
+    
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme"],
+    });
+
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    mediaQuery.addEventListener("change", checkDarkMode);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener("change", checkDarkMode);
+    };
+  }, []);
+
+  const backgroundLineColor = isDark ? "hsl(220 13% 22%)" : "hsl(220 13% 97%)";
+  const gradientStopColor = isDark ? "hsl(220 13% 50%)" : "white";
+
   return (
     <div className="wire-wrap relative w-full h-full opacity-70">
       <div className="w-embed absolute inset-0">
@@ -96,17 +152,17 @@ export function HeroAnimation() {
           {/* Background gray lines */}
           <path
             d="M-100 80C200 80 400 100 800 200 C1200 300 1300 250 1540 250"
-            stroke="hsl(220 13% 91%)"
+            stroke={backgroundLineColor}
             strokeWidth="4"
           ></path>
           <path
             d="M-100 120C200 120 400 200 800 250 C1200 300 1300 300 1540 300"
-            stroke="hsl(220 13% 91%)"
+            stroke={backgroundLineColor}
             strokeWidth="4"
           ></path>
           <path
             d="M-100 180C200 180 400 300 800 300 C1200 300 1300 350 1540 350"
-            stroke="hsl(220 13% 91%)"
+            stroke={backgroundLineColor}
             strokeWidth="4"
           ></path>
 
@@ -147,11 +203,31 @@ export function HeroAnimation() {
           {/* Animated colored lines */}
           <defs>
             <linearGradient id="gradient">
-              <stop offset="0" stopColor="white" stopOpacity="0"></stop>
-              <stop offset="0.2" stopColor="white" stopOpacity="0.5"></stop>
-              <stop offset="0.5" stopColor="white" stopOpacity="1"></stop>
-              <stop offset="0.8" stopColor="white" stopOpacity="0.5"></stop>
-              <stop offset="1" stopColor="white" stopOpacity="0"></stop>
+              <stop
+                offset="0"
+                stopColor={gradientStopColor}
+                stopOpacity="0"
+              ></stop>
+              <stop
+                offset="0.2"
+                stopColor={gradientStopColor}
+                stopOpacity="0.5"
+              ></stop>
+              <stop
+                offset="0.5"
+                stopColor={gradientStopColor}
+                stopOpacity="1"
+              ></stop>
+              <stop
+                offset="0.8"
+                stopColor={gradientStopColor}
+                stopOpacity="0.5"
+              ></stop>
+              <stop
+                offset="1"
+                stopColor={gradientStopColor}
+                stopOpacity="0"
+              ></stop>
             </linearGradient>
             <mask id="gradient-mask">
               <rect

@@ -8,6 +8,7 @@ import { StakeButton } from "../../components/StakeButton";
 import { UnstakeButton } from "../../components/UnstakeButton";
 import { ConnectPoolButton } from "../../components/ConnectPoolButton";
 import { TopUpAllStakesButton } from "../../components/TopUpAllStakesButton";
+import { HeroAnimationMini } from "../../components/HeroAnimationMini";
 import { publicClient } from "../../lib/viemClient";
 import { GDA_FORWARDER, GDA_ABI } from "../../lib/contracts";
 import Link from "next/link";
@@ -1120,8 +1121,12 @@ export default function TokensPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pt-24 pb-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background pt-24 pb-8 relative">
+      {/* Background Animation */}
+      <div className="fixed inset-0 -z-10">
+        <HeroAnimationMini />
+      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">My Tokens</h1>
           {/* <p className="text-gray-600">Manage your Streme tokens</p> */}

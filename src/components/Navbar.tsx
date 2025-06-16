@@ -11,6 +11,7 @@ import { LeaderboardModal } from "./LeaderboardModal";
 import { WalletProfileModal } from "./WalletProfileModal";
 import { MyTokensModal } from "./MyTokensModal";
 import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
+import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import sdk from "@farcaster/frame-sdk";
 
@@ -395,6 +396,8 @@ Symbol: $[your ticker]
               How It Works
             </button>
 
+            <ThemeSwitcher />
+
             {privyAuthenticated ? (
               <div className="flex items-center gap-3">
                 <div className="relative">
@@ -483,6 +486,10 @@ Symbol: $[your ticker]
             >
               How It Works
             </button>
+
+            <div className="flex items-center justify-between w-full px-4 py-2">
+              <ThemeSwitcher className="w-full justify-start" />
+            </div>
 
             {privyAuthenticated && (
               <Link

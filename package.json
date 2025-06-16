@@ -47,6 +47,7 @@
     "sonner": "^1.7.4",
     "tailwind-merge": "^3.3.0",
     "tailwindcss": "^4.1.10",
+    "theme-change": "^2.5.0",
     "viem": "^2.31.2",
     "wagmi": "^2.15.6",
     "zod": "^3.25.64"

@@ -147,7 +147,7 @@ export function TopUpStakeSelectionModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
-      <div className="bg-white rounded-lg max-w-md w-full mx-4">
+      <div className="bg-base-100 rounded-lg max-w-md w-full mx-4">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold">Select Tokens to Stake</h2>

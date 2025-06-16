@@ -7,6 +7,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { Modal } from "@/src/components/Modal";
 import { LaunchTokenModal } from "@/src/components/LaunchTokenModal";
+import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
 import sdk from "@farcaster/frame-sdk";
 
 interface TokenStaker {
@@ -880,8 +881,13 @@ Symbol: $[your ticker]
 
   // Standard desktop/mobile view
   return (
-    <div className="min-h-screen bg-base-200 py-8 mt-20">
-      <div className="max-w-7xl mx-auto px-4">
+    <>
+      <div className="min-h-screen py-8 mt-20 relative">
+        {/* Background Animation */}
+        <div className="fixed inset-0 -z-10">
+          <HeroAnimationMini />
+        </div>
+        <div className="max-w-7xl mx-auto px-4 relative z-10">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-4">Launched Tokens</h1>
           <p className="mb-6 opacity-70">
@@ -1084,10 +1090,13 @@ Symbol: $[your ticker]
           </div>
         )}
 
-        {/* Stakers Modal */}
-        {selectedTokenStakers && (
-          <div className="modal modal-open">
-            <div className="modal-box max-w-4xl">
+        </div>
+      </div>
+
+      {/* Stakers Modal - Outside of z-index container */}
+      {selectedTokenStakers && (
+        <div className="modal modal-open" style={{ zIndex: 9999 }}>
+          <div className="modal-box max-w-4xl">
               <h3 className="font-bold text-lg mb-4">
                 {selectedTokenStakers.token.name} ($
                 {selectedTokenStakers.token.symbol}) Stakers
@@ -1390,29 +1399,28 @@ Symbol: $[your ticker]
                 </button>
               </div>
             </div>
-            <div
-              className="modal-backdrop"
-              onClick={() => {
-                setSelectedTokenStakers(null);
-                setStakersWithFarcaster(null); // Reset Farcaster data
-                // Reset filters when closing modal
-                setSearchTerm("");
-                setFilterType("all");
-                setFilterFarcaster("all");
-                setFilterConnection("all");
-              }}
-            >
-              {" "}
-            </div>
+          <div
+            className="modal-backdrop"
+            onClick={() => {
+              setSelectedTokenStakers(null);
+              setStakersWithFarcaster(null); // Reset Farcaster data
+              // Reset filters when closing modal
+              setSearchTerm("");
+              setFilterType("all");
+              setFilterFarcaster("all");
+              setFilterConnection("all");
+            }}
+          >
+            {" "}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Launch Token Modal */}
-        <LaunchTokenModal
-          isOpen={isLaunchTokenOpen}
-          onClose={() => setIsLaunchTokenOpen(false)}
-        />
-      </div>
-    </div>
+      {/* Launch Token Modal */}
+      <LaunchTokenModal
+        isOpen={isLaunchTokenOpen}
+        onClose={() => setIsLaunchTokenOpen(false)}
+      />
+    </>
   );
 }

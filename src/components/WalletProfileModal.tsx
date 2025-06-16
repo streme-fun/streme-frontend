@@ -8,6 +8,7 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import Image from "next/image";
 import { Copy, X, Check } from "lucide-react";
 import { toast } from "sonner";
+import { ThemeSwitcher } from "./ThemeSwitcher";
 
 interface WalletProfileModalProps {
   isOpen: boolean;
@@ -260,6 +261,14 @@ export function WalletProfileModal({
             >
               View Launched Tokens
             </a>
+          </div>
+
+          {/* Theme Switcher */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Theme
+            </label>
+            <ThemeSwitcher className="w-full justify-start" />
           </div>
 
           {/* Balances */}
