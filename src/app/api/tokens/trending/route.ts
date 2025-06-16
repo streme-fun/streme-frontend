@@ -2,6 +2,8 @@ import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
 
 interface TrendingToken {
   username?: string;
+  name?: string;
+  symbol?: string;
   [key: string]: unknown;
 }
 
