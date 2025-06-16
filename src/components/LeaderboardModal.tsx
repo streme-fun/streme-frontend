@@ -47,6 +47,7 @@ interface LeaderboardEntry {
 interface ProcessedLeaderboardEntry extends LeaderboardEntry {
   rank: number;
   isCurrentUser: boolean;
+  displayRank?: string; // For showing ">50" when user is ranked over 50
   displayInfo: {
     name: string;
     image: string | null;
@@ -519,6 +520,16 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     if (currentUserEntry) {
       // Get other entries excluding the current user
       const otherEntries = rerankedData.filter((entry) => !entry.isCurrentUser);
+
+      // If user is ranked over 50, show ">50" as their rank
+      if (currentUserEntry.rank > 50) {
+        const modifiedCurrentUser = {
+          ...currentUserEntry,
+          displayRank: ">50"
+        };
+        // Return current user first, followed by top 49 others
+        return [modifiedCurrentUser, ...otherEntries.slice(0, 49)];
+      }
 
       // Return current user first, followed by others (up to 50 total)
       return [currentUserEntry, ...otherEntries.slice(0, 49)];
@@ -1062,7 +1073,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
                             : "text-base-content/70 bg-base-100 "
                         }`}
                       >
-                        {entry.rank}
+                        {entry.displayRank || entry.rank}
                       </div>
 
                       {/* Clickable Profile Section */}
