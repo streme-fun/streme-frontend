@@ -169,9 +169,6 @@ export default function LaunchedTokensPage() {
         if (token.username) {
           const username = token.username.toLowerCase();
           const isBlacklisted = SPAMMER_BLACKLIST.includes(username);
-          if (isBlacklisted) {
-            console.log(`Filtering out blacklisted launched token from creator: ${username}`);
-          }
           return !isBlacklisted;
         }
         return true;

@@ -30,8 +30,6 @@ function App() {
   const [hasSkippedTutorial, setHasSkippedTutorial] = useState(false);
   const [hasShownTutorialThisSession, setHasShownTutorialThisSession] =
     useState(false);
-  const [blacklistFilterCount, setBlacklistFilterCount] = useState(0);
-  const [debugInfo, setDebugInfo] = useState<{creators: string[], filtered: string[]}>({creators: [], filtered: []});
 
   // Load tutorial skip state from localStorage on mount
   useEffect(() => {
@@ -113,41 +111,16 @@ function App() {
         nextPage = data.nextPage;
       }
 
-      // Debug: Show all unique creator names
-      const uniqueCreators = Array.from(new Set(
-        allTokens
-          .filter(t => t.creator?.name)
-          .map(t => t.creator!.name.toLowerCase())
-      ));
-      console.log("=== UNIQUE CREATORS IN FETCHED TOKENS ===");
-      console.log("Total unique creators:", uniqueCreators.length);
-      console.log("Creators:", uniqueCreators.sort());
-      console.log("Blacklist:", SPAMMER_BLACKLIST);
-      
       // Filter out blacklisted tokens before setting state
-      const filteredNames: string[] = [];
       const filteredTokens = allTokens.filter((token) => {
         if (token.creator?.name) {
           const creatorName = token.creator.name.toLowerCase();
           const isBlacklisted = SPAMMER_BLACKLIST.includes(creatorName);
-          if (isBlacklisted) {
-            console.log(`[App.tsx] Filtering out blacklisted token "${token.name}" from creator: ${creatorName}`);
-            filteredNames.push(creatorName);
-          }
           return !isBlacklisted;
         }
         return true;
       });
-      
-      // Update debug info
-      setDebugInfo({
-        creators: uniqueCreators.slice(0, 10), // Show first 10 creators
-        filtered: Array.from(new Set(filteredNames))
-      });
 
-      const filteredCount = allTokens.length - filteredTokens.length;
-      console.log(`[App.tsx] Filtered ${filteredCount} blacklisted tokens`);
-      setBlacklistFilterCount(filteredCount);
       setTokens(filteredTokens);
     } catch (error) {
       console.error("Error fetching tokens:", error);
@@ -317,21 +290,6 @@ function App() {
                   isMiniView={true}
                 />
               </div>
-            </div>
-          </div>
-
-          {/* Debug Panel */}
-          <div className="w-full mb-2 bg-base-200 p-3 rounded-lg border border-base-300">
-            <div className="text-xs space-y-1">
-              <div className="font-bold text-primary">🐛 Blacklist Debug</div>
-              <div>Filtered: {blacklistFilterCount} tokens</div>
-              <div>Blacklist: {SPAMMER_BLACKLIST.slice(0, 5).join(", ")}...</div>
-              {debugInfo.creators.length > 0 && (
-                <div>Sample creators: {debugInfo.creators.slice(0, 5).join(", ")}...</div>
-              )}
-              {debugInfo.filtered.length > 0 && (
-                <div className="text-error">Filtered creators: {debugInfo.filtered.join(", ")}</div>
-              )}
             </div>
           </div>
 

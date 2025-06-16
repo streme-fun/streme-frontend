@@ -94,9 +94,6 @@ export function TopStreamer() {
           if (token.creator?.name) {
             const creatorName = token.creator.name.toLowerCase();
             const isBlacklisted = SPAMMER_BLACKLIST.includes(creatorName);
-            if (isBlacklisted) {
-              console.log(`TopStreamer: Filtering out blacklisted token from creator: ${creatorName}`);
-            }
             return !isBlacklisted;
           }
           return true;
