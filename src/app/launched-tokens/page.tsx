@@ -29,6 +29,34 @@ interface FarcasterUser {
   pfp_url: string;
 }
 
+interface RawStakerData {
+  // Legacy field names (for backward compatibility)
+  account?: string;
+  address?: string;
+  units?: string;
+  balance?: string;
+  farcasterUser?: FarcasterUser;
+  
+  // Current API field names
+  holder_address?: string;
+  staked_balance?: number;
+  farcaster?: {
+    fid: number;
+    username: string;
+    pfp_url: string;
+  };
+  
+  // Common fields
+  isConnected?: boolean;
+  createdAtTimestamp?: string;
+  timestamp?: string;
+  fid?: number;
+  username?: string;
+  display_name?: string;
+  pfp_url?: string;
+  profileImage?: string;
+}
+
 interface EnrichedLaunchedToken extends LaunchedToken {
   totalStakers?: number;
   totalStaked?: number;
@@ -71,7 +99,6 @@ export default function LaunchedTokensPage() {
   const [stakersWithFarcaster, setStakersWithFarcaster] = useState<
     TokenStaker[] | null
   >(null);
-  const [loadingFarcasterData, setLoadingFarcasterData] = useState(false);
   const [stakersSortBy, setStakersSortBy] = useState<
     "units" | "address" | "status" | "joined"
   >("units");
@@ -201,223 +228,95 @@ export default function LaunchedTokensPage() {
 
   // Fetch pool summary data including totalMembers count
   const fetchPoolSummary = async (stakingPoolId: string) => {
-    const query = `
-      query GetPoolSummary($poolId: ID!) {
-        pool(id: $poolId) {
-          totalMembers
-          totalUnits
-        }
+    try {
+      // Use the internal API route to get stakers and derive the pool summary
+      const response = await fetch(
+        `/api/token/${stakingPoolId}/stakers`
+      );
+
+      if (!response.ok) {
+        console.warn(`Failed to fetch pool summary: ${response.status}`);
+        return {
+          totalMembers: 0,
+          totalUnits: "0",
+        };
       }
-    `;
 
-    const endpoints = [
-      "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",
-      "https://api.thegraph.com/subgraphs/name/superfluid-finance/protocol-v1-base",
-    ];
+      const data = await response.json();
+      
+      // Calculate total members and total units from stakers data
+      const totalMembers = data.length;
+      const totalUnits = data.reduce((sum: bigint, staker: RawStakerData) => {
+        // Handle both new API format (staked_balance as number) and legacy format (units/balance as string)
+        const units = staker.staked_balance 
+          ? BigInt(Math.floor(staker.staked_balance))
+          : BigInt(staker.units || staker.balance || "0");
+        return sum + units;
+      }, BigInt(0));
 
-    for (const endpoint of endpoints) {
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query,
-            variables: { poolId: stakingPoolId },
-          }),
-        });
-
-        if (!response.ok) continue;
-
-        const data = await response.json();
-        if (data.errors) continue;
-
-        const poolData = data.data?.pool;
-        if (poolData) {
-          return {
-            totalMembers: parseInt(poolData.totalMembers) || 0,
-            totalUnits: poolData.totalUnits || "0",
-          };
-        }
-      } catch (err) {
-        console.warn(`Failed to fetch pool summary from ${endpoint}:`, err);
-        continue;
-      }
+      return {
+        totalMembers,
+        totalUnits: totalUnits.toString(),
+      };
+    } catch (err) {
+      console.error("Failed to fetch pool summary:", err);
+      return {
+        totalMembers: 0,
+        totalUnits: "0",
+      };
     }
-
-    return {
-      totalMembers: 0,
-      totalUnits: "0",
-    };
   };
 
   const fetchTokenStakers = async (
     stakingPoolId: string
   ): Promise<TokenStaker[]> => {
-    const query = `
-      query GetPoolStakers($poolId: ID!, $first: Int!, $skip: Int!) {
-        pool(id: $poolId) {
-          poolMembers(first: $first, skip: $skip, orderBy: createdAtTimestamp, orderDirection: desc) {
-            account {
-              id
-            }
-            units
-            isConnected
-            createdAtTimestamp
-          }
-        }
-      }
-    `;
-
-    const endpoints = [
-      "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",
-      "https://api.thegraph.com/subgraphs/name/superfluid-finance/protocol-v1-base",
-    ];
-
-    let allStakers: TokenStaker[] = [];
-    const batchSize = 1000; // Fetch 1000 at a time
-    let skip = 0;
-    let hasMore = true;
-
-    for (const endpoint of endpoints) {
-      try {
-        // Reset for each endpoint attempt
-        allStakers = [];
-        skip = 0;
-        hasMore = true;
-
-        while (hasMore) {
-          const response = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              query,
-              variables: {
-                poolId: stakingPoolId,
-                first: batchSize,
-                skip: skip,
-              },
-            }),
-          });
-
-          if (!response.ok) break;
-
-          const data = await response.json();
-          if (data.errors) break;
-
-          const poolData = data.data?.pool;
-          if (!poolData) break;
-
-          const batch = poolData.poolMembers || [];
-          allStakers.push(...batch);
-
-          // If we got less than the batch size, we've reached the end
-          if (batch.length < batchSize) {
-            hasMore = false;
-          } else {
-            skip += batchSize;
-          }
-        }
-
-        // If we successfully got data from this endpoint, return it
-        if (allStakers.length > 0) {
-          console.log(
-            `Fetched ${allStakers.length} stakers for pool ${stakingPoolId}`
-          );
-          return allStakers;
-        }
-      } catch (err) {
-        console.warn(`Failed to fetch stakers from ${endpoint}:`, err);
-        continue;
-      }
-    }
-
-    return allStakers;
-  };
-
-  const fetchFarcasterUsersByAddresses = async (
-    addresses: string[]
-  ): Promise<Record<string, FarcasterUser>> => {
-    if (addresses.length === 0) return {};
-
-    console.log(`Fetching Farcaster users for ${addresses.length} addresses`);
-
     try {
-      const response = await fetch("/api/neynar/bulk-users-by-address", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ addresses }),
-      });
+      // Use the internal API route
+      const response = await fetch(
+        `/api/token/${stakingPoolId}/stakers`
+      );
 
       if (!response.ok) {
-        console.warn(
-          "Failed to fetch Farcaster users:",
-          response.status,
-          response.statusText
-        );
-        const errorText = await response.text();
-        console.warn("Error response:", errorText);
-        return {};
+        console.warn(`Failed to fetch stakers: ${response.status}`);
+        return [];
       }
 
       const data = await response.json();
-      console.log("Neynar API response:", data);
+      
+      // Transform the data to match our TokenStaker interface
+      const transformedStakers: TokenStaker[] = data.map((staker: RawStakerData) => ({
+        account: {
+          id: staker.holder_address || staker.account || staker.address || "",
+        },
+        units: staker.staked_balance 
+          ? Math.floor(staker.staked_balance).toString()
+          : (staker.units || staker.balance || "0"),
+        isConnected: staker.isConnected ?? true,
+        createdAtTimestamp: staker.createdAtTimestamp || staker.timestamp || "0",
+        farcasterUser: staker.farcaster ? {
+          fid: staker.farcaster.fid,
+          username: staker.farcaster.username,
+          display_name: staker.farcaster.username, // Use username as display_name if not provided
+          pfp_url: staker.farcaster.pfp_url,
+        } : (staker.farcasterUser || (staker.username ? {
+          fid: staker.fid || 0,
+          username: staker.username,
+          display_name: staker.display_name || staker.username,
+          pfp_url: staker.pfp_url || staker.profileImage || "",
+        } : undefined)),
+      }));
 
-      // Create a map of address -> user data
-      const userMap: Record<string, FarcasterUser> = {};
-
-      // The Neynar API returns data directly as an object mapping addresses to user arrays
-      Object.entries(data as Record<string, FarcasterUser[]>).forEach(
-        ([address, userData]) => {
-          if (userData && Array.isArray(userData) && userData.length > 0) {
-            // Take the first user if multiple users have the same address
-            userMap[address.toLowerCase()] = userData[0];
-            console.log(
-              `Found Farcaster user for ${address}:`,
-              userData[0].username
-            );
-          }
-        }
+      console.log(
+        `Fetched ${transformedStakers.length} stakers for token ${stakingPoolId}`
       );
-
-      console.log(`Mapped ${Object.keys(userMap).length} Farcaster users`);
-      return userMap;
-    } catch (error) {
-      console.warn("Error fetching Farcaster users:", error);
-      return {};
+      
+      return transformedStakers;
+    } catch (err) {
+      console.error("Failed to fetch stakers:", err);
+      return [];
     }
   };
 
-  // Function to enrich stakers with Farcaster data when modal opens
-  const enrichStakersWithFarcaster = async (stakers: TokenStaker[]) => {
-    setLoadingFarcasterData(true);
-    try {
-      // Fetch Farcaster users for the staker addresses
-      const addresses = stakers.map((staker) => staker.account.id);
-      const farcasterUsers = await fetchFarcasterUsersByAddresses(addresses);
-
-      // Enrich stakers with Farcaster user data
-      const enrichedStakers = stakers.map((staker) => {
-        const farcasterUser = farcasterUsers[staker.account.id.toLowerCase()];
-        if (farcasterUser) {
-          console.log(
-            `Enriching staker ${staker.account.id} with Farcaster user:`,
-            farcasterUser.username
-          );
-        }
-        return {
-          ...staker,
-          farcasterUser,
-        };
-      });
-
-      setStakersWithFarcaster(enrichedStakers);
-    } catch (error) {
-      console.error("Error enriching stakers with Farcaster data:", error);
-      setStakersWithFarcaster(stakers); // Fallback to original stakers
-    } finally {
-      setLoadingFarcasterData(false);
-    }
-  };
 
   const formatPrice = (price: number | undefined) => {
     if (!price || isNaN(price)) return "-";
@@ -727,10 +626,8 @@ export default function LaunchedTokensPage() {
                             token,
                             isOpen: true,
                           });
-                          setStakersWithFarcaster(null);
-                          if (token.stakers && token.stakers.length > 0) {
-                            enrichStakersWithFarcaster(token.stakers);
-                          }
+                          // Stakers already have Farcaster data from the API
+                          setStakersWithFarcaster(token.stakers || []);
                         }}
                         disabled={!token.stakers || token.stakers.length === 0}
                       >
@@ -799,19 +696,12 @@ Symbol: $[your ticker]
                 {selectedTokenStakers.token.name} Stakers
               </h3>
 
-              {loadingFarcasterData ? (
-                <div className="text-center py-8">
-                  <span className="loading loading-spinner loading-md"></span>
-                  <p className="mt-2">Loading stakers...</p>
-                </div>
-              ) : (
-                <>
-                  <div className="mb-4 text-sm opacity-70">
-                    {selectedTokenStakers.token.totalStakers || 0} total stakers
-                  </div>
+              <div className="mb-4 text-sm opacity-70">
+                {selectedTokenStakers.token.totalStakers || 0} total stakers
+              </div>
 
-                  <div className="overflow-x-auto max-h-96">
-                    <table className="table table-zebra table-sm">
+              <div className="overflow-x-auto max-h-96">
+                <table className="table table-zebra table-sm">
                       <thead>
                         <tr>
                           <th
@@ -875,8 +765,7 @@ Symbol: $[your ticker]
                                     rel="noopener noreferrer"
                                     className="link link-primary font-mono text-xs"
                                   >
-                                    {staker.account.id.slice(0, 4)}...
-                                    {staker.account.id.slice(-3)}
+                                    {staker.account.id ? `${staker.account.id.slice(0, 4)}...${staker.account.id.slice(-3)}` : 'Unknown'}
                                   </a>
                                   {staker.farcasterUser?.username && (
                                     <div className="text-xs opacity-70">
@@ -903,10 +792,8 @@ Symbol: $[your ticker]
                           </tr>
                         ))}
                       </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
+                </table>
+              </div>
 
               <div className="modal-action">
                 <button
@@ -1052,11 +939,8 @@ Symbol: $[your ticker]
                                   token,
                                   isOpen: true,
                                 });
-                                // Reset Farcaster data and fetch when modal opens
-                                setStakersWithFarcaster(null);
-                                if (token.stakers && token.stakers.length > 0) {
-                                  enrichStakersWithFarcaster(token.stakers);
-                                }
+                                // Stakers already have Farcaster data from the API
+                                setStakersWithFarcaster(token.stakers || []);
                               }}
                               disabled={
                                 !token.stakers || token.stakers.length === 0
@@ -1249,24 +1133,15 @@ Symbol: $[your ticker]
 
             {/* Results Counter */}
             <div className="mb-2 text-sm opacity-70">
-              {loadingFarcasterData ? (
-                <span className="flex items-center gap-2">
-                  <span className="loading loading-spinner loading-xs"></span>
-                  Loading stakers...
-                </span>
-              ) : (
-                <>
-                  Showing{" "}
-                  {stakersWithFarcaster
-                    ? getFilteredAndSortedStakers(stakersWithFarcaster).length
-                    : selectedTokenStakers.token.stakers
-                    ? getFilteredAndSortedStakers(
-                        selectedTokenStakers.token.stakers
-                      ).length
-                    : 0}{" "}
-                  of {selectedTokenStakers.token.totalStakers || 0} holders
-                </>
-              )}
+              Showing{" "}
+              {stakersWithFarcaster
+                ? getFilteredAndSortedStakers(stakersWithFarcaster).length
+                : selectedTokenStakers.token.stakers
+                ? getFilteredAndSortedStakers(
+                    selectedTokenStakers.token.stakers
+                  ).length
+                : 0}{" "}
+              of {selectedTokenStakers.token.totalStakers || 0} holders
             </div>
 
             <div className="overflow-x-auto">
@@ -1328,17 +1203,7 @@ Symbol: $[your ticker]
                   </tr>
                 </thead>
                 <tbody>
-                  {loadingFarcasterData ? (
-                    <tr>
-                      <td colSpan={4} className="text-center py-8">
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="loading loading-spinner loading-md"></span>
-                          <span>Loading Farcaster profiles...</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    (stakersWithFarcaster
+                  {(stakersWithFarcaster
                       ? getFilteredAndSortedStakers(stakersWithFarcaster)
                       : selectedTokenStakers.token.stakers
                       ? getFilteredAndSortedStakers(
@@ -1369,8 +1234,7 @@ Symbol: $[your ticker]
                                 rel="noopener noreferrer"
                                 className="link link-primary font-mono"
                               >
-                                {staker.account.id.slice(0, 6)}...
-                                {staker.account.id.slice(-4)}
+                                {staker.account.id ? `${staker.account.id.slice(0, 6)}...${staker.account.id.slice(-4)}` : 'Unknown'}
                               </a>
                               {staker.farcasterUser &&
                                 staker.farcasterUser.username && (
@@ -1382,7 +1246,7 @@ Symbol: $[your ticker]
                           </div>
                         </td>
                         <td className="font-mono">
-                          {parseInt(staker.units).toLocaleString()} units
+                          {parseInt(staker.units).toLocaleString()}
                         </td>
                         <td>
                           <div
@@ -1402,10 +1266,9 @@ Symbol: $[your ticker]
                         </td>
                       </tr>
                     ))
-                  )}
-                  {!loadingFarcasterData &&
-                    (stakersWithFarcaster ||
-                      selectedTokenStakers.token.stakers) &&
+                  }
+                  {(stakersWithFarcaster ||
+                    selectedTokenStakers.token.stakers) &&
                     (stakersWithFarcaster
                       ? getFilteredAndSortedStakers(stakersWithFarcaster)
                       : selectedTokenStakers.token.stakers
