@@ -193,6 +193,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accountExists, setAccountExists] = useState<boolean | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Get effective address based on context
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
@@ -1071,9 +1072,18 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
           </div>
         </div>
 
-        {/* Top up All Stakes Button - show only when there are stakes or owned tokens */}
+        {/* Search Bar */}
         {(stakes.length > 0 || ownedSuperTokens.length > 0) && (
           <div className="mb-4">
+            <div className="form-control mb-4">
+              <input
+                type="text"
+                placeholder="Search tokens by symbol..."
+                className="input input-bordered w-full input-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
             <TopUpAllStakesButton
               stakes={stakes}
               ownedSuperTokens={ownedSuperTokens}
@@ -1249,7 +1259,20 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {/* Staked Tokens */}
-                {stakes.map((stake, index) => (
+                {stakes
+                  .slice()
+                  .filter((stake) => {
+                    if (!searchTerm.trim()) return true;
+                    const searchLower = searchTerm.toLowerCase();
+                    return stake.membership.pool.token.symbol.toLowerCase().includes(searchLower);
+                  })
+                  .sort((a, b) => {
+                    // Sort by staked amount (units) in descending order (highest stake first)
+                    const aUnits = parseFloat(a.membership.units || "0");
+                    const bUnits = parseFloat(b.membership.units || "0");
+                    return bUnits - aUnits;
+                  })
+                  .map((stake, index) => (
                   <div
                     key={`stake-${index}`}
                     className="card bg-base-100 border border-base-300"
@@ -1473,7 +1496,18 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                 )}
 
                 {/* Owned SuperTokens (not staked) */}
-                {ownedSuperTokens.map((token, index) => (
+                {ownedSuperTokens
+                  .slice()
+                  .filter((token) => {
+                    if (!searchTerm.trim()) return true;
+                    const searchLower = searchTerm.toLowerCase();
+                    return token.symbol.toLowerCase().includes(searchLower);
+                  })
+                  .sort((a, b) => {
+                    // Sort by balance in descending order (highest balance first)
+                    return b.balance - a.balance;
+                  })
+                  .map((token, index) => (
                   <div
                     key={`token-${index}`}
                     className="card bg-base-100 border border-base-300"

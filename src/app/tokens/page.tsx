@@ -1350,7 +1350,15 @@ export default function TokensPage() {
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {stakes.map((stake, index) => (
+                  {stakes
+                    .slice()
+                    .sort((a, b) => {
+                      // Sort by staked amount (units) in descending order (highest stake first)
+                      const aUnits = parseFloat(a.membership.units || "0");
+                      const bUnits = parseFloat(b.membership.units || "0");
+                      return bUnits - aUnits;
+                    })
+                    .map((stake, index) => (
                     <div
                       key={`stake-${index}`}
                       className="card bg-base-100 border border-gray-200"
@@ -1559,7 +1567,13 @@ export default function TokensPage() {
               <div>
                 <h2 className="text-2xl font-bold mb-6">Available to Stake</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {ownedSuperTokens.map((token, index) => (
+                  {ownedSuperTokens
+                    .slice()
+                    .sort((a, b) => {
+                      // Sort by balance in descending order (highest balance first)
+                      return b.balance - a.balance;
+                    })
+                    .map((token, index) => (
                     <div
                       key={`token-${index}`}
                       className="card bg-base-100 border border-gray-200"

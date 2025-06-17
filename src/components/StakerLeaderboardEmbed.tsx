@@ -76,10 +76,10 @@ export function StakerLeaderboardEmbed({
 
   const fetchTopStakers = useCallback(async () => {
     if (!stakingPoolAddress) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     const endpoints = [
       "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",
       "https://api.thegraph.com/subgraphs/name/superfluid-finance/protocol-v1-base",
@@ -101,7 +101,7 @@ export function StakerLeaderboardEmbed({
         }
       }
     `;
-    
+
     for (const endpoint of endpoints) {
       try {
         const response = await fetch(endpoint, {
@@ -120,21 +120,21 @@ export function StakerLeaderboardEmbed({
         if (!response.ok) continue;
 
         const result = await response.json();
-        
+
         if (result.errors) continue;
 
         const poolData = result.data?.pool;
         if (!poolData) continue;
 
         const stakersData = poolData.poolMembers || [];
-        
+
         // Set stakers immediately without waiting for Farcaster
         setStakers(stakersData);
         setLoading(false);
-        
+
         // Enrich with Farcaster data in the background
         if (stakersData.length > 0) {
-          enrichStakersWithFarcaster(stakersData).then(enrichedStakers => {
+          enrichStakersWithFarcaster(stakersData).then((enrichedStakers) => {
             setStakers(enrichedStakers);
           });
         }
@@ -144,15 +144,17 @@ export function StakerLeaderboardEmbed({
         continue;
       }
     }
-    
+
     // If we get here, all endpoints failed
     setError("Failed to fetch stakers");
     setLoading(false);
   }, [stakingPoolAddress]);
 
-  const enrichStakersWithFarcaster = async (stakersData: TokenStaker[]): Promise<TokenStaker[]> => {
+  const enrichStakersWithFarcaster = async (
+    stakersData: TokenStaker[]
+  ): Promise<TokenStaker[]> => {
     try {
-      const addresses = stakersData.map(staker => staker.account.id);
+      const addresses = stakersData.map((staker) => staker.account.id);
       const response = await fetch("/api/neynar/bulk-users-by-address", {
         method: "POST",
         headers: {
@@ -167,21 +169,23 @@ export function StakerLeaderboardEmbed({
 
       const farcasterData = await response.json();
       const farcasterMap = new Map();
-      
-      // Handle the response format from neynar bulk users API
-      Object.entries(farcasterData).forEach(([address, users]: [string, unknown]) => {
-        if (Array.isArray(users) && users.length > 0) {
-          const user = users[0] as FarcasterUser; // Take the first user if multiple
-          farcasterMap.set(address.toLowerCase(), {
-            fid: user.fid,
-            username: user.username,
-            display_name: user.display_name,
-            pfp_url: user.pfp_url,
-          });
-        }
-      });
 
-      return stakersData.map(staker => ({
+      // Handle the response format from neynar bulk users API
+      Object.entries(farcasterData).forEach(
+        ([address, users]: [string, unknown]) => {
+          if (Array.isArray(users) && users.length > 0) {
+            const user = users[0] as FarcasterUser; // Take the first user if multiple
+            farcasterMap.set(address.toLowerCase(), {
+              fid: user.fid,
+              username: user.username,
+              display_name: user.display_name,
+              pfp_url: user.pfp_url,
+            });
+          }
+        }
+      );
+
+      return stakersData.map((staker) => ({
         ...staker,
         farcasterUser: farcasterMap.get(staker.account.id.toLowerCase()),
       }));
@@ -412,7 +416,7 @@ export function StakerLeaderboardEmbed({
       setTimeout(() => {
         fetchTopStakers();
         onStakingChange?.();
-      }, 2000);
+      }, 1000);
     } catch (error: unknown) {
       console.error("ZapStake caught error:", error);
       let message = "Zap & Stake failed. Please try again.";
@@ -483,12 +487,22 @@ export function StakerLeaderboardEmbed({
             {isRefreshing ? (
               <span className="loading loading-spinner loading-xs"></span>
             ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
               </svg>
             )}
           </button>
-          
+
           {/* View All button */}
           {stakers.length > 0 && (
             <button onClick={onViewAll} className="btn btn-outline btn-sm">
