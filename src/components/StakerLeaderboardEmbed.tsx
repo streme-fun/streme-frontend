@@ -36,6 +36,7 @@ interface StakerLeaderboardEmbedProps {
   farcasterAddress?: string;
   farcasterIsConnected?: boolean;
   tokenPrice?: number;
+  userStakedBalance?: bigint;
 }
 
 export function StakerLeaderboardEmbed({
@@ -48,6 +49,7 @@ export function StakerLeaderboardEmbed({
   farcasterAddress,
   farcasterIsConnected,
   tokenPrice,
+  userStakedBalance,
 }: StakerLeaderboardEmbedProps) {
   const [stakers, setStakers] = useState<TokenStaker[]>([]);
   const [loading, setLoading] = useState(false);
@@ -185,9 +187,7 @@ export function StakerLeaderboardEmbed({
     }
 
     setIsZapStaking(true);
-    const toastId = toast.loading(
-      "Buying and Staking amount required to become #1..."
-    );
+    const toastId = toast.loading("Buying and Staking amount for #1...");
 
     try {
       const amountIn = getEthAmountForStaking();
@@ -554,13 +554,22 @@ export function StakerLeaderboardEmbed({
   // }
 
   // Helper function to get raw amount for ZapStakeButton
+  // This calculates how many MORE tokens the user needs to buy/stake
   function getAmountToBeatTopStakerRaw(): string {
     if (stakers.length === 0) return "1";
 
     const topStakerUnits = parseFloat(stakers[0]?.units || "0");
-    const amountNeeded = Math.max(1, topStakerUnits + 10000); // Add 10,000 as requested, minimum 1
+    const targetAmount = topStakerUnits + 10000; // Target: top staker + 10,000
 
-    return Math.ceil(amountNeeded).toString();
+    // Get user's current staked balance
+    const userCurrentStaked = userStakedBalance
+      ? Number(userStakedBalance) / 1e18
+      : 0;
+
+    // Calculate how much more they need
+    const additionalNeeded = Math.max(1, targetAmount - userCurrentStaked);
+
+    return Math.ceil(additionalNeeded).toString();
   }
 
   // Helper function to get ETH amount for ZapStakeButton

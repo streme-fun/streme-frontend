@@ -39,6 +39,7 @@ export function TokenPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [stakingUpdateTrigger, setStakingUpdateTrigger] = useState(0);
   const [isStakerLeaderboardOpen, setIsStakerLeaderboardOpen] = useState(false);
+  const [userStakedBalance, setUserStakedBalance] = useState<bigint>(0n);
 
   const {
     isSDKLoaded,
@@ -196,6 +197,10 @@ export function TokenPageContent() {
     setStakingUpdateTrigger((prev) => prev + 1);
   };
 
+  const handleStakedBalanceUpdate = (balance: bigint) => {
+    setUserStakedBalance(balance);
+  };
+
   const handleShare = async () => {
     if (!token) return;
 
@@ -337,6 +342,7 @@ ${shareUrl}`;
             data-trading-section
             token={token}
             onStakingChange={handleStakingChange}
+            onStakedBalanceUpdate={handleStakedBalanceUpdate}
             isMiniAppView={isMiniAppView}
             address={address}
             isConnected={isConnected}
@@ -371,6 +377,7 @@ ${shareUrl}`;
             farcasterAddress={address}
             farcasterIsConnected={isConnected}
             tokenPrice={token.price}
+            userStakedBalance={userStakedBalance}
           />
         </div>
 

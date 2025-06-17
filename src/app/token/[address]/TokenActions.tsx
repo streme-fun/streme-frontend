@@ -21,6 +21,7 @@ import { useTokenBalance } from "@/src/hooks/useTokenData";
 interface TokenActionsProps {
   token: Token;
   onStakingChange: () => void;
+  onStakedBalanceUpdate?: (balance: bigint) => void;
   isMiniAppView?: boolean;
   address?: `0x${string}` | undefined;
   isConnected?: boolean;
@@ -35,6 +36,7 @@ type Deployment = {
 export function TokenActions({
   token: initialToken,
   onStakingChange,
+  onStakedBalanceUpdate,
   isMiniAppView: isMiniAppViewProp,
   address: addressProp,
   isConnected: isConnectedProp,
@@ -379,6 +381,13 @@ export function TokenActions({
   }, [currentAddress, walletIsConnected, contractAddress]);
 
   const hasTokens = walletIsConnected && balance > 0n;
+
+  // Update parent component with staked balance changes
+  useEffect(() => {
+    if (onStakedBalanceUpdate) {
+      onStakedBalanceUpdate(stakedBalance);
+    }
+  }, [stakedBalance, onStakedBalanceUpdate]);
 
   // Trigger an immediate refresh when wallet connects for the first time
   useEffect(() => {
