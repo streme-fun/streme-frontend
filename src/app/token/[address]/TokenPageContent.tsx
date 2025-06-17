@@ -368,6 +368,7 @@ ${shareUrl}`;
 
           {/* Embedded Staker Leaderboard */}
           <StakerLeaderboardEmbed
+            stakingPoolAddress={token.staking_pool}
             tokenAddress={token.contract_address}
             tokenSymbol={token.symbol}
             stakingAddress={token.staking_address}
@@ -400,7 +401,7 @@ ${shareUrl}`;
 
       {/* Staker Leaderboard Modal */}
       <StakerLeaderboard
-        tokenAddress={token.contract_address}
+        stakingPoolAddress={token.staking_pool}
         tokenSymbol={token.symbol}
         isOpen={isStakerLeaderboardOpen}
         onClose={() => setIsStakerLeaderboardOpen(false)}
