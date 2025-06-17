@@ -408,8 +408,11 @@ export function StakerLeaderboardEmbed({
         }
       );
 
-      fetchTopStakers();
-      onStakingChange?.();
+      // Wait 2 seconds before refreshing to allow blockchain state to update
+      setTimeout(() => {
+        fetchTopStakers();
+        onStakingChange?.();
+      }, 2000);
     } catch (error: unknown) {
       console.error("ZapStake caught error:", error);
       let message = "Zap & Stake failed. Please try again.";
