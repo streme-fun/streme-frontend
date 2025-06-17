@@ -2,25 +2,24 @@
 describe('Staker Count Consistency', () => {
   test('fetchPoolSummary should return totalMembers from GraphQL', async () => {
     // Mock fetch
-    global.fetch = jest.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            data: {
-              pool: {
-                totalMembers: "42",
-                totalUnits: "1000000"
-              }
+    global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
+    (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            pool: {
+              totalMembers: "42",
+              totalUnits: "1000000"
             }
-          })
-      })
-    );
+          }
+        })
+    } as Response);
 
     const mockPoolId = "0x123";
     
     // This simulates the fetchPoolSummary function
-    const fetchPoolSummary = async (poolId) => {
+    const fetchPoolSummary = async (poolId: string) => {
       const query = `
         query GetPoolSummary($poolId: ID!) {
           pool(id: $poolId) {

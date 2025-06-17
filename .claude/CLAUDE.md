@@ -59,6 +59,8 @@ src/
 
 - npm run build: Build the project
 - npm run lint: Run the linter
+- npm run typecheck: Check for type errors
+- npm run check:all: Check for all errors (do this when you're done making changes)
 - npm test: Run tests
 - npm run dev: Start development server
 
@@ -69,3 +71,7 @@ src/
 - Check balance call tracking in console during development
 - Use existing patterns when adding features
 - Update types in `/src/app/types/` when modifying data structures
+
+# Notes
+
+- params needs to be awaited in this version of Next.js

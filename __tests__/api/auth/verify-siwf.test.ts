@@ -121,9 +121,12 @@ describe('/api/auth/verify-siwf', () => {
 
   it('uses production domain in production environment', async () => {
     const originalEnv = process.env.NODE_ENV
-    process.env.NODE_ENV = 'production'
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: 'production',
+      configurable: true
+    })
     
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
     
     const validMessage = 'streme.fun wants you to sign in with your Ethereum account:\n0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e\n\nfid:12345\n\nNonce: abc123'
     
@@ -145,11 +148,14 @@ describe('/api/auth/verify-siwf', () => {
     expect(consoleSpy).toHaveBeenCalledWith('SIWF verification using domain:', 'streme.fun')
     
     consoleSpy.mockRestore()
-    process.env.NODE_ENV = originalEnv
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: originalEnv,
+      configurable: true
+    })
   })
 
   it('extracts domain from origin header for tunnel URLs', async () => {
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
     
     const validMessage = 'streme.fun wants you to sign in with your Ethereum account:\n0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e\n\nfid:12345\n\nNonce: abc123'
     

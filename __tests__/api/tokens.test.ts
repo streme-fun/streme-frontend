@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 import { mockTokens } from '../utils/mockData'
 
 // Mock fetch for external APIs
-global.fetch = jest.fn()
+global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>
 
 describe('/api/tokens', () => {
   beforeEach(() => {

@@ -161,7 +161,7 @@ describe('/api/quote', () => {
   })
 
   it('logs quote request details', async () => {
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
     
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -188,7 +188,7 @@ describe('/api/quote', () => {
   })
 
   it('logs error details on API failure', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
     
     mockFetch.mockResolvedValueOnce({
       ok: false,

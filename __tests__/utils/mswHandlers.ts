@@ -50,12 +50,12 @@ export const handlers = [
           address: token.contract_address,
           name: token.name,
           symbol: token.symbol,
-          decimals: token.decimals,
-          price_usd: token.marketData.price.toString(),
-          fdv_usd: token.marketData.marketCap.toString(),
-          market_cap_usd: token.marketData.marketCap.toString(),
+          decimals: 18,
+          price_usd: token.marketData?.price?.toString() || "0",
+          fdv_usd: token.marketData?.marketCap?.toString() || "0",
+          market_cap_usd: token.marketData?.marketCap?.toString() || "0",
           volume_usd: {
-            h24: token.marketData.volume24h.toString(),
+            h24: token.marketData?.volume24h?.toString() || "0",
           },
         },
       })),
@@ -80,7 +80,7 @@ export const handlers = [
 
   // Gasless swap mock
   http.post('/api/gasless-swap/quote', async ({ request }) => {
-    const body = await request.json()
+    const body = await request.json() as any
     
     return HttpResponse.json({
       approval: {
@@ -92,8 +92,8 @@ export const handlers = [
         data: '0xtradedata',
         value: '0',
       },
-      buyAmount: (BigInt(body.sellAmount || '0') * BigInt(2)).toString(),
-      sellAmount: body.sellAmount || '0',
+      buyAmount: (BigInt(body?.sellAmount || '0') * BigInt(2)).toString(),
+      sellAmount: body?.sellAmount || '0',
     })
   }),
 

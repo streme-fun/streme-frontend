@@ -105,7 +105,7 @@ describe('priceUtils', () => {
     })
 
     it('returns null on API error', async () => {
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation()
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
       
       mockFetch.mockResolvedValueOnce({
         ok: false,

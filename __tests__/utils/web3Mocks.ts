@@ -22,48 +22,57 @@ export const MOCK_ADDRESSES = {
 export const MOCK_TX_HASH = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef' as const
 
 // Create mock viem clients
-export const createMockPublicClient = (): PublicClient => {
-  const client = createPublicClient({
+export const createMockPublicClient = (): any => {
+  const getBalanceMock = jest.fn() as any
+  getBalanceMock.mockResolvedValue(BigInt('1000000000000000000'))
+  
+  const estimateGasMock = jest.fn() as any
+  estimateGasMock.mockResolvedValue(BigInt('100000'))
+  
+  const getGasPriceMock = jest.fn() as any
+  getGasPriceMock.mockResolvedValue(BigInt('20000000000'))
+
+  const client = {
     chain: base,
     transport: http(),
-  })
-
-  // Mock common read functions
-  client.readContract = jest.fn().mockImplementation(({ functionName }) => {
-    switch (functionName) {
-      case 'balanceOf':
-        return BigInt('1000000000000000000') // 1 token
-      case 'allowance':
-        return BigInt('0')
-      case 'decimals':
-        return 18
-      case 'symbol':
-        return 'TEST'
-      case 'name':
-        return 'Test Token'
-      default:
-        return BigInt('0')
-    }
-  })
-
-  client.getBalance = jest.fn().mockResolvedValue(BigInt('1000000000000000000')) // 1 ETH
-
-  client.estimateGas = jest.fn().mockResolvedValue(BigInt('100000'))
-
-  client.getGasPrice = jest.fn().mockResolvedValue(BigInt('20000000000')) // 20 gwei
+    readContract: jest.fn().mockImplementation((args: any) => {
+      const { functionName } = args;
+      switch (functionName) {
+        case 'balanceOf':
+          return Promise.resolve(BigInt('1000000000000000000')) // 1 token
+        case 'allowance':
+          return Promise.resolve(BigInt('0'))
+        case 'decimals':
+          return Promise.resolve(18)
+        case 'symbol':
+          return Promise.resolve('TEST')
+        case 'name':
+          return Promise.resolve('Test Token')
+        default:
+          return Promise.resolve(BigInt('0'))
+      }
+    }),
+    getBalance: getBalanceMock,
+    estimateGas: estimateGasMock,
+    getGasPrice: getGasPriceMock,
+  }
 
   return client
 }
 
-export const createMockWalletClient = (): WalletClient => {
-  const client = createWalletClient({
+export const createMockWalletClient = (): any => {
+  const writeContractMock = jest.fn() as any
+  writeContractMock.mockResolvedValue(MOCK_TX_HASH)
+  
+  const sendTransactionMock = jest.fn() as any
+  sendTransactionMock.mockResolvedValue(MOCK_TX_HASH)
+
+  const client = {
     chain: base,
     transport: http(),
-  })
-
-  client.writeContract = jest.fn().mockResolvedValue(MOCK_TX_HASH)
-
-  client.sendTransaction = jest.fn().mockResolvedValue(MOCK_TX_HASH)
+    writeContract: writeContractMock,
+    sendTransaction: sendTransactionMock,
+  }
 
   return client
 }
@@ -72,21 +81,27 @@ export const createMockWalletClient = (): WalletClient => {
 export const mockPrivyWallet = {
   address: MOCK_ADDRESSES.user,
   chainId: base.id,
-  getEthereumProvider: jest.fn().mockResolvedValue({
-    request: jest.fn().mockImplementation(({ method }) => {
-      switch (method) {
-        case 'eth_requestAccounts':
-          return [MOCK_ADDRESSES.user]
-        case 'eth_chainId':
-          return `0x${base.id.toString(16)}`
-        default:
-          return null
-      }
-    }),
-  }),
-  switchChain: jest.fn().mockResolvedValue(undefined),
-  sign: jest.fn().mockResolvedValue('0xmocksignature'),
+  getEthereumProvider: jest.fn() as any,
+  switchChain: jest.fn() as any,
+  sign: jest.fn() as any,
 }
+
+// Setup mock implementations
+mockPrivyWallet.getEthereumProvider.mockResolvedValue({
+  request: jest.fn().mockImplementation((args: any) => {
+    const { method } = args;
+    switch (method) {
+      case 'eth_requestAccounts':
+        return Promise.resolve([MOCK_ADDRESSES.user])
+      case 'eth_chainId':
+        return Promise.resolve(`0x${base.id.toString(16)}`)
+      default:
+        return Promise.resolve(null)
+    }
+  }),
+})
+mockPrivyWallet.switchChain.mockResolvedValue(undefined)
+mockPrivyWallet.sign.mockResolvedValue('0xmocksignature')
 
 // Mock Farcaster context
 export const mockFarcasterContext = {

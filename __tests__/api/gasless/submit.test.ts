@@ -190,7 +190,7 @@ describe('/api/gasless/submit', () => {
   })
 
   it('logs successful submission response', async () => {
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
     
     const mockSubmitResponse = {
       tradeHash: '0x123',
@@ -222,7 +222,7 @@ describe('/api/gasless/submit', () => {
   })
 
   it('logs error details on API failure', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
     
     mockFetch.mockResolvedValueOnce({
       ok: false,

@@ -132,10 +132,10 @@ describe('apiUtils', () => {
     })
 
     it('handles tokens without requestor_fid', async () => {
-      const tokensWithoutFid = mockTokens.map(token => ({
-        ...token,
-        requestor_fid: undefined
-      }))
+      const tokensWithoutFid = mockTokens.map(token => {
+        const { requestor_fid, ...rest } = token;
+        return rest;
+      }) as any[]
       
       const result = await enrichTokensWithData(tokensWithoutFid)
       
