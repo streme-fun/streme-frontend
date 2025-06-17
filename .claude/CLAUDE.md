@@ -55,6 +55,10 @@ src/
 - `NEYNAR_API_KEY` - Farcaster API access
 - `ZEROX_API_KEY` - 0x swaps
 
+# Documentation
+
+- **Farcaster Mini App Docs (always updated)**: https://miniapps.farcaster.xyz/llms-full.txt
+
 # Bash Commands
 
 - npm run build: Build the project
