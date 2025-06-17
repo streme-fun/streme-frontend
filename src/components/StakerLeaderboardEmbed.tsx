@@ -57,6 +57,7 @@ export function StakerLeaderboardEmbed({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isZapStaking, setIsZapStaking] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { wallets } = useWallets();
   const { user } = usePrivy();
   const { primaryAddress } = useWalletAddressChange();
@@ -204,6 +205,19 @@ export function StakerLeaderboardEmbed({
 
     return () => clearInterval(interval);
   }, [fetchTopStakers, stakingPoolAddress]);
+
+  // Manual refresh function
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchTopStakers();
+      toast.success("Staker data refreshed!");
+    } catch {
+      toast.error("Failed to refresh staker data");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Zapstake function
   const handleZapStake = async () => {
@@ -455,11 +469,30 @@ export function StakerLeaderboardEmbed({
     <div className="card bg-base-100 border-base-300 border-2 p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold">Top ${tokenSymbol} Stakers</h3>
-        {stakers.length > 0 && (
-          <button onClick={onViewAll} className="btn btn-outline btn-sm">
-            View All
+        <div className="flex items-center gap-2">
+          {/* Manual refresh button */}
+          <button
+            onClick={handleManualRefresh}
+            disabled={isRefreshing || loading}
+            className="btn btn-ghost btn-sm"
+            title="Refresh staker data"
+          >
+            {isRefreshing ? (
+              <span className="loading loading-spinner loading-xs"></span>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            )}
           </button>
-        )}
+          
+          {/* View All button */}
+          {stakers.length > 0 && (
+            <button onClick={onViewAll} className="btn btn-outline btn-sm">
+              View All
+            </button>
+          )}
+        </div>
       </div>
 
       {stakers.length === 0 ? (
