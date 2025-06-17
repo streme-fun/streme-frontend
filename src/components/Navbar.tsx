@@ -389,6 +389,10 @@ Symbol: $[your ticker]
               </Link>
             )}
 
+            <Link href="/missions" className="btn btn-secondary">
+              🎯 Missions
+            </Link>
+
             <button
               onClick={() => setIsHowItWorksOpen(true)}
               className="btn btn-ghost"
@@ -476,6 +480,14 @@ Symbol: $[your ticker]
                 My Tokens
               </Link>
             )}
+
+            <Link
+              href="/missions"
+              className="btn btn-secondary w-full justify-start"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              🎯 Missions
+            </Link>
 
             <button
               onClick={() => {
