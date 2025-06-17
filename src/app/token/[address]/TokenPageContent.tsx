@@ -334,6 +334,7 @@ ${shareUrl}`;
           />
 
           <TokenActions
+            data-trading-section
             token={token}
             onStakingChange={handleStakingChange}
             isMiniAppView={isMiniAppView}
@@ -363,7 +364,13 @@ ${shareUrl}`;
           <StakerLeaderboardEmbed
             tokenAddress={token.contract_address}
             tokenSymbol={token.symbol}
+            stakingAddress={token.staking_address}
             onViewAll={() => setIsStakerLeaderboardOpen(true)}
+            onStakingChange={handleStakingChange}
+            isMiniApp={isMiniAppView}
+            farcasterAddress={address}
+            farcasterIsConnected={isConnected}
+            tokenPrice={token.price}
           />
         </div>
 

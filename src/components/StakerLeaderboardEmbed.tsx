@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useWallets, usePrivy } from "@privy-io/react-auth";
+import { parseEther, formatEther } from "viem";
+import { toast } from "sonner";
+import { Interface } from "@ethersproject/abi";
+import { publicClient } from "@/src/lib/viemClient";
+import { sdk } from "@farcaster/frame-sdk";
+import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
 interface TokenStaker {
   account: {
@@ -22,41 +29,70 @@ interface FarcasterUser {
 interface StakerLeaderboardEmbedProps {
   tokenAddress: string;
   tokenSymbol: string;
+  stakingAddress?: string;
   onViewAll: () => void;
+  onStakingChange?: () => void;
+  isMiniApp?: boolean;
+  farcasterAddress?: string;
+  farcasterIsConnected?: boolean;
+  tokenPrice?: number;
 }
 
 export function StakerLeaderboardEmbed({
   tokenAddress,
   tokenSymbol,
+  stakingAddress,
   onViewAll,
+  onStakingChange,
+  isMiniApp,
+  farcasterAddress,
+  farcasterIsConnected,
+  tokenPrice,
 }: StakerLeaderboardEmbedProps) {
   const [stakers, setStakers] = useState<TokenStaker[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isZapStaking, setIsZapStaking] = useState(false);
+  const { wallets } = useWallets();
+  const { user } = usePrivy();
+  const { primaryAddress } = useWalletAddressChange();
 
-  const fetchTopStakers = async () => {
+  // Constants for zap contract
+  const WETH = "0x4200000000000000000000000000000000000006";
+  const toHex = (address: string) => address as `0x${string}`;
+
+  // Get effective connection state and address
+  const effectiveIsConnected = isMiniApp
+    ? farcasterIsConnected
+    : !!user?.wallet?.address;
+  const effectiveAddress = isMiniApp
+    ? farcasterAddress
+    : primaryAddress || user?.wallet?.address;
+
+  const fetchTopStakers = useCallback(async () => {
     if (!tokenAddress) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       // Use the internal API route
-      const response = await fetch(
-        `/api/token/${tokenAddress}/stakers`
-      );
+      const response = await fetch(`/api/token/${tokenAddress}/stakers`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch stakers: ${response.status}`);
       }
 
       const data = await response.json();
-      
+
       // Debug: Log the first staker to understand data structure
       if (data && data.length > 0) {
-        console.log('Sample staker data structure:', JSON.stringify(data[0], null, 2));
+        console.log(
+          "Sample staker data structure:",
+          JSON.stringify(data[0], null, 2)
+        );
       }
-      
+
       // Define interface for raw API staker data
       interface RawStakerData {
         // Legacy field names (for backward compatibility)
@@ -65,7 +101,7 @@ export function StakerLeaderboardEmbed({
         units?: string;
         balance?: string;
         farcasterUser?: FarcasterUser;
-        
+
         // Current API field names
         holder_address?: string;
         staked_balance?: number;
@@ -74,7 +110,7 @@ export function StakerLeaderboardEmbed({
           username: string;
           pfp_url: string;
         };
-        
+
         // Common fields
         isConnected?: boolean;
         createdAtTimestamp?: string;
@@ -93,24 +129,30 @@ export function StakerLeaderboardEmbed({
           account: {
             id: staker.holder_address || staker.account || staker.address || "",
           },
-          units: staker.staked_balance 
+          units: staker.staked_balance
             ? Math.floor(staker.staked_balance).toString()
-            : (staker.units || staker.balance || "0"),
+            : staker.units || staker.balance || "0",
           isConnected: staker.isConnected ?? true,
-          createdAtTimestamp: staker.createdAtTimestamp || staker.timestamp || "0",
-          farcasterUser: staker.farcaster ? {
-            fid: staker.farcaster.fid,
-            username: staker.farcaster.username,
-            display_name: staker.farcaster.username, // Use username as display_name if not provided
-            pfp_url: staker.farcaster.pfp_url,
-          } : (staker.farcasterUser || (staker.username ? {
-            fid: staker.fid || 0,
-            username: staker.username,
-            display_name: staker.display_name || staker.username,
-            pfp_url: staker.pfp_url || staker.profileImage || "",
-          } : undefined)),
+          createdAtTimestamp:
+            staker.createdAtTimestamp || staker.timestamp || "0",
+          farcasterUser: staker.farcaster
+            ? {
+                fid: staker.farcaster.fid,
+                username: staker.farcaster.username,
+                display_name: staker.farcaster.username, // Use username as display_name if not provided
+                pfp_url: staker.farcaster.pfp_url,
+              }
+            : staker.farcasterUser ||
+              (staker.username
+                ? {
+                    fid: staker.fid || 0,
+                    username: staker.username,
+                    display_name: staker.display_name || staker.username,
+                    pfp_url: staker.pfp_url || staker.profileImage || "",
+                  }
+                : undefined),
         }));
-        
+
       setStakers(transformedStakers);
       setLoading(false);
     } catch (err) {
@@ -118,14 +160,245 @@ export function StakerLeaderboardEmbed({
       setError("Failed to fetch stakers");
       setLoading(false);
     }
-  };
-
+  }, [tokenAddress]);
 
   useEffect(() => {
     if (tokenAddress) {
       fetchTopStakers();
     }
-  }, [tokenAddress]);
+
+    // Auto-refresh every 2 minutes
+    const interval = setInterval(() => {
+      if (tokenAddress) {
+        fetchTopStakers();
+      }
+    }, 2 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [fetchTopStakers, tokenAddress]);
+
+  // Zapstake function
+  const handleZapStake = async () => {
+    if (!stakingAddress || !effectiveAddress || !effectiveIsConnected) {
+      toast.error("Wallet not connected or staking address missing");
+      return;
+    }
+
+    setIsZapStaking(true);
+    const toastId = toast.loading(
+      "Buying and Staking amount required to become #1..."
+    );
+
+    try {
+      const amountIn = getEthAmountForStaking();
+      const amountInWei = parseEther(amountIn);
+
+      // 1. Get quote
+      const quoterAddress = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
+      const quoterAbi = [
+        {
+          inputs: [
+            {
+              components: [
+                { name: "tokenIn", type: "address" },
+                { name: "tokenOut", type: "address" },
+                { name: "amountIn", type: "uint256" },
+                { name: "fee", type: "uint24" },
+                { name: "sqrtPriceLimitX96", type: "uint160" },
+              ],
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "quoteExactInputSingle",
+          outputs: [
+            { name: "amountOut", type: "uint256" },
+            { name: "sqrtPriceX96After", type: "uint160" },
+            { name: "initializedTicksCrossed", type: "uint32" },
+            { name: "gasEstimate", type: "uint256" },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ];
+      const quoteResult = (await publicClient.readContract({
+        address: quoterAddress as `0x${string}`,
+        abi: quoterAbi,
+        functionName: "quoteExactInputSingle",
+        args: [
+          {
+            tokenIn: WETH,
+            tokenOut: toHex(tokenAddress),
+            amountIn: amountInWei,
+            fee: 10000,
+            sqrtPriceLimitX96: 0n,
+          },
+        ],
+      })) as [bigint, bigint, number, bigint];
+      const amountOut = quoteResult[0];
+      const amountOutMin = amountOut - amountOut / 200n; // 0.5% slippage
+
+      const zapContractAddress = "0xeA25b9CD2D9F8Ba6cff45Ed0f6e1eFa2fC79a57E";
+      const zapAbi = [
+        "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
+      ];
+      const zapIface = new Interface(zapAbi);
+      const zapData = zapIface.encodeFunctionData("zap", [
+        toHex(tokenAddress),
+        amountInWei,
+        amountOutMin,
+        toHex(stakingAddress),
+      ]) as `0x${string}`;
+
+      let txHash: `0x${string}`;
+
+      if (isMiniApp) {
+        const ethProvider = sdk.wallet.ethProvider;
+        if (!ethProvider)
+          throw new Error("Farcaster Ethereum provider not available.");
+        const currentEthBalance = await publicClient.getBalance({
+          address: toHex(effectiveAddress!),
+        });
+        if (currentEthBalance < amountInWei) {
+          throw new Error(
+            `Insufficient ETH. You have ${formatEther(
+              currentEthBalance
+            )} ETH, need ${formatEther(
+              amountInWei
+            )} ETH for zap (excluding gas).`
+          );
+        }
+        txHash = await ethProvider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: toHex(zapContractAddress),
+              from: toHex(effectiveAddress!),
+              data: zapData,
+              value: `0x${amountInWei.toString(16)}`,
+            },
+          ],
+        });
+      } else {
+        if (!user?.wallet?.address)
+          throw new Error("Privy wallet not connected.");
+
+        // Find wallet with fallback logic
+        let wallet = wallets?.find((w) => w.address === user.wallet?.address);
+        if (!wallet && wallets && wallets.length > 0) {
+          wallet = wallets.find(
+            (w) =>
+              w.address?.toLowerCase() === user.wallet?.address?.toLowerCase()
+          );
+        }
+        if (!wallet && wallets && wallets.length === 1) {
+          wallet = wallets[0];
+        }
+        if (!wallet) throw new Error("Privy Wallet not found");
+
+        const walletAddress = wallet.address;
+        if (!walletAddress) throw new Error("Wallet address not available");
+
+        const provider = await wallet.getEthereumProvider();
+        await provider.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x2105" }],
+        });
+        let estimatedGas = 1200000n;
+        try {
+          estimatedGas = await publicClient.estimateGas({
+            account: toHex(walletAddress),
+            to: toHex(zapContractAddress),
+            value: amountInWei,
+            data: zapData,
+          });
+        } catch (e) {
+          console.error("Gas estimation failed (Privy):", e);
+        }
+        const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.2));
+        const currentEthBalance = await publicClient.getBalance({
+          address: toHex(walletAddress),
+        });
+        const gasPrice = await publicClient.getGasPrice();
+        const totalCost = gasLimit * gasPrice + amountInWei;
+        if (currentEthBalance < totalCost) {
+          throw new Error(
+            `Insufficient ETH. Need ~${formatEther(
+              totalCost
+            )} ETH (inc. gas), have ${formatEther(currentEthBalance)} ETH.`
+          );
+        }
+        txHash = await provider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: toHex(zapContractAddress),
+              from: toHex(walletAddress),
+              data: zapData,
+              value: `0x${amountInWei.toString(16)}`,
+              gas: `0x${gasLimit.toString(16)}`,
+            },
+          ],
+        });
+      }
+
+      if (!txHash) {
+        throw new Error(
+          "Transaction hash not received. User might have cancelled."
+        );
+      }
+
+      toast.loading("Waiting for transaction confirmation...", { id: toastId });
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+      });
+
+      if (receipt.status !== "success") {
+        throw new Error(
+          `Transaction failed or reverted. Status: ${receipt.status}`
+        );
+      }
+
+      const ethAmount = parseFloat(amountIn).toFixed(4);
+      toast.success(
+        `🏆 Congrats! You're now the top staker with ${ethAmount} ETH!`,
+        {
+          id: toastId,
+          duration: 5000,
+        }
+      );
+
+      fetchTopStakers();
+      onStakingChange?.();
+    } catch (error: unknown) {
+      console.error("ZapStake caught error:", error);
+      let message = "Zap & Stake failed. Please try again.";
+
+      if (typeof error === "object" && error !== null) {
+        if (
+          "message" in error &&
+          typeof (error as { message: unknown }).message === "string"
+        ) {
+          const errorMessage = (error as { message: string }).message;
+          if (
+            errorMessage.includes("User rejected") ||
+            errorMessage.includes("cancelled")
+          ) {
+            message = "Transaction rejected by user.";
+          } else if (errorMessage.includes("Insufficient ETH")) {
+            message = errorMessage;
+          } else if (errorMessage.includes("Transaction hash not received")) {
+            message = "Transaction cancelled or not initiated.";
+          } else {
+            message = errorMessage.substring(0, 100);
+          }
+        }
+      }
+      toast.error(message, { id: toastId });
+    } finally {
+      setIsZapStaking(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -157,15 +430,12 @@ export function StakerLeaderboardEmbed({
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold">Top ${tokenSymbol} Stakers</h3>
         {stakers.length > 0 && (
-          <button
-            onClick={onViewAll}
-            className="btn btn-outline btn-sm"
-          >
+          <button onClick={onViewAll} className="btn btn-outline btn-sm">
             View All
           </button>
         )}
       </div>
-      
+
       {stakers.length === 0 ? (
         <div className="text-center py-4">
           <p className="text-base-content/50 text-sm">No stakers yet</p>
@@ -207,7 +477,12 @@ export function StakerLeaderboardEmbed({
                         rel="noopener noreferrer"
                         className="hover:underline"
                       >
-                        {staker.account.id ? `${staker.account.id.slice(0, 6)}...${staker.account.id.slice(-4)}` : 'Unknown'}
+                        {staker.account.id
+                          ? `${staker.account.id.slice(
+                              0,
+                              6
+                            )}...${staker.account.id.slice(-4)}`
+                          : "Unknown"}
                       </a>
                     </div>
                   )}
@@ -224,6 +499,106 @@ export function StakerLeaderboardEmbed({
           ))}
         </div>
       )}
+
+      {/* Become Top Staker Button */}
+      {stakingAddress && !isUserTopStaker() && effectiveIsConnected && (
+        <div className="mt-3 pt-3 border-t border-base-300">
+          <div className="text-center">
+            <button
+              onClick={handleZapStake}
+              disabled={isZapStaking}
+              className="btn btn-primary btn-sm w-full"
+            >
+              {isZapStaking ? (
+                <span className="flex items-center gap-2">
+                  <span className="loading loading-spinner loading-xs"></span>
+                  Processing...
+                </span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  {stakers.length > 0
+                    ? "🏆 Become Top Staker"
+                    : "🚀 Be First Staker"}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
+
+  // Helper function to check if current user is already top staker
+  function isUserTopStaker(): boolean {
+    if (!effectiveAddress || stakers.length === 0) return false;
+    return (
+      stakers[0]?.account?.id?.toLowerCase() === effectiveAddress.toLowerCase()
+    );
+  }
+
+  // Helper function to calculate amount needed to beat top staker (formatted for display)
+  // function getAmountToBeatTopStaker(): string {
+  //   if (stakers.length === 0) return "1";
+
+  //   const topStakerUnits = parseFloat(stakers[0]?.units || "0");
+  //   const amountNeeded = Math.max(1, topStakerUnits + 10000); // Add 10,000 as requested, minimum 1
+
+  //   // Format the number appropriately
+  //   if (amountNeeded >= 1000000) {
+  //     return `${(amountNeeded / 1000000).toFixed(1)}M`;
+  //   } else if (amountNeeded >= 1000) {
+  //     return `${(amountNeeded / 1000).toFixed(1)}K`;
+  //   } else {
+  //     return Math.ceil(amountNeeded).toLocaleString();
+  //   }
+  // }
+
+  // Helper function to get raw amount for ZapStakeButton
+  function getAmountToBeatTopStakerRaw(): string {
+    if (stakers.length === 0) return "1";
+
+    const topStakerUnits = parseFloat(stakers[0]?.units || "0");
+    const amountNeeded = Math.max(1, topStakerUnits + 10000); // Add 10,000 as requested, minimum 1
+
+    return Math.ceil(amountNeeded).toString();
+  }
+
+  // Helper function to get ETH amount for ZapStakeButton
+  // Converts the required token amount to ETH using token price
+  function getEthAmountForStaking(): string {
+    if (stakers.length === 0) return "0.001"; // Default small amount for first staker
+
+    const tokensNeeded = parseFloat(getAmountToBeatTopStakerRaw());
+
+    if (tokenPrice && tokenPrice > 0) {
+      // Calculate USD value of tokens needed
+      const usdValue = tokensNeeded * tokenPrice;
+
+      // Convert to ETH (assuming ETH = ~$3000, but could fetch real ETH price)
+      // For now, use a reasonable ETH price estimate
+      const ethPrice = 3000; // Could be fetched dynamically
+      const ethNeeded = usdValue / ethPrice;
+
+      // Add 20% buffer for slippage and price movements
+      const ethWithBuffer = ethNeeded * 1.2;
+
+      // Cap at reasonable amounts for safety
+      const cappedEth = Math.min(ethWithBuffer, 1.0);
+      const finalEth = Math.max(0.001, cappedEth);
+
+      return finalEth.toFixed(4);
+    }
+
+    // Fallback if no token price available - use reasonable defaults
+    const topStakerAmount = parseFloat(stakers[0]?.units || "0");
+    if (topStakerAmount > 1000000) {
+      return "0.1"; // Large amounts
+    } else if (topStakerAmount > 100000) {
+      return "0.05"; // Medium amounts
+    } else if (topStakerAmount > 10000) {
+      return "0.01"; // Small amounts
+    } else {
+      return "0.005"; // Very small amounts
+    }
+  }
 }
