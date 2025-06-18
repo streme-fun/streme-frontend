@@ -59,6 +59,7 @@ export function UnstakedTokensModal({
     isMiniAppView,
     address: fcAddress,
     isConnected: fcIsConnected,
+    isSDKLoaded: isDetectionComplete,
   } = useAppFrameLogic();
   const postHog = usePostHog();
 
@@ -75,14 +76,27 @@ export function UnstakedTokensModal({
   });
 
   useEffect(() => {
-    // Check if we should show the modal
+    // Wait for detection to complete and connection to be stable
+    if (!isDetectionComplete) {
+      console.log("UnstakedTokensModal: Waiting for detection to complete");
+      return;
+    }
+
     if (!effectiveAddress || !effectiveIsConnected) {
+      console.log("UnstakedTokensModal: No address or not connected", { effectiveAddress, effectiveIsConnected });
+      return;
+    }
+
+    // Additional validation for mini app
+    if (isMiniAppView && (!effectiveAddress.startsWith('0x') || effectiveAddress.length !== 42)) {
+      console.log("UnstakedTokensModal: Invalid mini app address format", { effectiveAddress });
       return;
     }
 
     // Check if user has dismissed the modal in this session
     const hasSeenModal = sessionStorage.getItem("unstakedTokensModalDismissed");
     if (hasSeenModal === "true") {
+      console.log("UnstakedTokensModal: Already dismissed this session");
       return;
     }
 
@@ -95,14 +109,22 @@ export function UnstakedTokensModal({
         token.balance > 0
     );
 
+    console.log("UnstakedTokensModal: Check complete", {
+      hasStakableTokens,
+      unstakedTokensCount: unstakedTokens.length,
+      effectiveAddress,
+      isMiniAppView,
+      timestamp: new Date().toISOString()
+    });
+
     if (hasStakableTokens) {
       setShouldShowModal(true);
-      // Delay showing the modal to ensure smooth page load
+      // Shorter delay since we now have stable detection
       setTimeout(() => {
         setIsOpen(true);
-      }, 1500);
+      }, 1000);
     }
-  }, [effectiveAddress, effectiveIsConnected, unstakedTokens]);
+  }, [effectiveAddress, effectiveIsConnected, unstakedTokens, isDetectionComplete, isMiniAppView]);
 
   const handleDismiss = () => {
     sessionStorage.setItem("unstakedTokensModalDismissed", "true");

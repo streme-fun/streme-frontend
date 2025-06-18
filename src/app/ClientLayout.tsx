@@ -128,10 +128,16 @@ function AppContent({ children }: { children: React.ReactNode }) {
     isMiniAppView,
     address: fcAddress,
     isConnected: fcIsConnected,
+    isSDKLoaded: isDetectionComplete,
   } = useAppFrameLogic();
   
   const [unstakedTokens, setUnstakedTokens] = useState<UnstakedToken[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [stableConnectionState, setStableConnectionState] = useState<{
+    isStable: boolean;
+    address: string | undefined;
+    isConnected: boolean;
+  }>({ isStable: false, address: undefined, isConnected: false });
 
   // Get effective address based on context
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
@@ -150,6 +156,50 @@ function AppContent({ children }: { children: React.ReactNode }) {
     });
     setMounted(true);
   }, []);
+
+  // Debounce connection state to prevent rapid changes causing timing issues
+  useEffect(() => {
+    // Only start debouncing after detection is complete and component is mounted
+    if (!isDetectionComplete || !mounted) {
+      return;
+    }
+
+    const debounceTimeout = setTimeout(() => {
+      const currentAddress = effectiveAddress;
+      const currentIsConnected = effectiveIsConnected;
+      
+      // Additional validation for mini app context
+      if (isMiniAppView) {
+        // For mini app, ensure we have a valid Ethereum address format
+        if (!currentAddress || !currentAddress.startsWith('0x') || currentAddress.length !== 42) {
+          console.log("Mini app: Invalid address format, waiting...", { currentAddress });
+          return;
+        }
+      }
+
+      // Only update if the state has actually changed or is being set for the first time
+      if (
+        !stableConnectionState.isStable ||
+        stableConnectionState.address !== currentAddress ||
+        stableConnectionState.isConnected !== currentIsConnected
+      ) {
+        console.log("Updating stable connection state:", {
+          isMiniAppView,
+          currentAddress,
+          currentIsConnected,
+          timestamp: new Date().toISOString()
+        });
+        
+        setStableConnectionState({
+          isStable: true,
+          address: currentAddress,
+          isConnected: currentIsConnected,
+        });
+      }
+    }, 750); // 750ms debounce to allow for state settling
+
+    return () => clearTimeout(debounceTimeout);
+  }, [effectiveAddress, effectiveIsConnected, isDetectionComplete, mounted, isMiniAppView, stableConnectionState]);
 
   // Helper function to safely call toLowerCase on potentially null values
   const safeToLowerCase = React.useCallback((value: string | null | undefined): string => {
@@ -195,19 +245,31 @@ function AppContent({ children }: { children: React.ReactNode }) {
     };
   }, [safeToLowerCase]);
 
-  // Check for unstaked tokens when user connects
+  // Check for unstaked tokens when stable connection is established
   useEffect(() => {
     const checkForUnstakedTokens = async () => {
-      if (!effectiveAddress || !effectiveIsConnected || !mounted) return;
+      // Wait for stable connection state
+      if (!stableConnectionState.isStable || !stableConnectionState.address || !stableConnectionState.isConnected) {
+        console.log("Waiting for stable connection state...", stableConnectionState);
+        return;
+      }
 
       // Check if user has dismissed the modal in this session
       const hasSeenModal = sessionStorage.getItem("unstakedTokensModalDismissed");
       if (hasSeenModal === "true") {
+        console.log("Modal already dismissed this session");
         return;
       }
 
+      console.log("Starting unstaked tokens check with stable state:", {
+        address: stableConnectionState.address,
+        isConnected: stableConnectionState.isConnected,
+        isMiniAppView,
+        timestamp: new Date().toISOString()
+      });
+
       try {
-        const accountId = safeToLowerCase(effectiveAddress);
+        const accountId = safeToLowerCase(stableConnectionState.address);
 
         const query = `
           query GetAccountTokens($accountId: ID!) {
@@ -304,7 +366,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
                         },
                       ],
                       functionName: "balanceOf",
-                      args: [effectiveAddress as `0x${string}`],
+                      args: [stableConnectionState.address as `0x${string}`],
                     });
                     return { tokenAddress, balance };
                   } catch {
@@ -358,10 +420,9 @@ function AppContent({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Small delay to ensure wallet connection is fully established
-    const timeoutId = setTimeout(checkForUnstakedTokens, 500);
-    return () => clearTimeout(timeoutId);
-  }, [effectiveAddress, effectiveIsConnected, mounted, fetchTokenData]);
+    // Run immediately when stable connection is available
+    checkForUnstakedTokens();
+  }, [stableConnectionState, isMiniAppView, safeToLowerCase, fetchTokenData]);
 
   return (
     <>
