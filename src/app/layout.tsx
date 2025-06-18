@@ -25,16 +25,32 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="light">
+    <html lang="en">
       <head>
         <script
           dangerouslySetInnerHTML={{
             __html: `
               // Initialize theme before the page renders
               (function() {
-                const theme = localStorage.getItem('theme') || 
-                            (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-                document.documentElement.setAttribute('data-theme', theme);
+                try {
+                  const savedTheme = localStorage.getItem('theme');
+                  let theme = 'light'; // default
+                  
+                  if (savedTheme) {
+                    theme = savedTheme;
+                  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    theme = 'dark';
+                  }
+                  
+                  document.documentElement.setAttribute('data-theme', theme);
+                  // Also set it in localStorage if not already set
+                  if (!savedTheme) {
+                    localStorage.setItem('theme', theme);
+                  }
+                } catch (e) {
+                  // Fallback if localStorage is not available
+                  document.documentElement.setAttribute('data-theme', 'light');
+                }
               })();
             `,
           }}
