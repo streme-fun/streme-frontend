@@ -80,14 +80,14 @@ export function WalletProfileModal({
   
   // Try multiple possible paths for FID based on SDK documentation
   const userFid = farcasterContext?.user?.fid || 
-                  (farcasterContext as any)?.client?.user?.fid;
+                  (farcasterContext as unknown as { client?: { user?: { fid?: number } } })?.client?.user?.fid;
                   
   console.log("FID extraction attempt:", {
     userFid,
     contextUserFid: farcasterContext?.user?.fid,
-    clientUserFid: (farcasterContext as any)?.client?.user?.fid,
+    clientUserFid: (farcasterContext as unknown as { client?: { user?: { fid?: number } } })?.client?.user?.fid,
     hasUser: !!farcasterContext?.user,
-    hasClient: !!(farcasterContext as any)?.client
+    hasClient: !!(farcasterContext as unknown as { client?: unknown })?.client
   });
 
   // Copy address to clipboard with visual feedback
