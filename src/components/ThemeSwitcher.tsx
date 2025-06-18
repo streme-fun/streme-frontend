@@ -15,28 +15,17 @@ export function ThemeSwitcher({ className = '' }: ThemeSwitcherProps) {
     setMounted(true);
     themeChange(false);
     
-    // Get initial theme and ensure it's applied
+    // Get initial theme
     const theme = localStorage.getItem('theme') || 
                  (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     setIsDark(theme === 'dark');
     
-    // Ensure the theme is applied to the DOM
-    document.documentElement.setAttribute('data-theme', theme);
-    
-    // Also listen for theme changes from other components
-    const handleThemeChange = () => {
-      const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-      setIsDark(currentTheme === 'dark');
-    };
-    
-    // Use MutationObserver to watch for theme changes
-    const observer = new MutationObserver(handleThemeChange);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme']
-    });
-    
-    return () => observer.disconnect();
+    // Ensure theme is applied in case theme-change hasn't initialized properly
+    // This can happen in mini app contexts where timing is different
+    const currentDocumentTheme = document.documentElement.getAttribute('data-theme');
+    if (currentDocumentTheme !== theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
   }, []);
 
   const toggleTheme = () => {
