@@ -108,7 +108,10 @@ export function SwapModal({
         if (prices) {
           setUsdPrices({
             eth: prices.eth,
-            token: prices[contractAddress.toLowerCase()] || token.price || null,
+            token:
+              prices[contractAddress?.toLowerCase() || ""] ||
+              token.price ||
+              null,
           });
         }
       } catch (error) {

@@ -115,19 +115,19 @@ function App() {
       const filteredTokens = allTokens.filter((token) => {
         // Check blacklist
         if (token.creator?.name) {
-          const creatorName = token.creator.name.toLowerCase();
+          const creatorName = token.creator.name?.toLowerCase() || "";
           const isBlacklisted = SPAMMER_BLACKLIST.includes(creatorName);
           if (isBlacklisted) return false;
         }
-        
+
         // Filter out tokens with $ in name or symbol
-        if (token.name && token.name.includes('$')) {
+        if (token.name && token.name.includes("$")) {
           return false;
         }
-        if (token.symbol && token.symbol.includes('$')) {
+        if (token.symbol && token.symbol.includes("$")) {
           return false;
         }
-        
+
         return true;
       });
 

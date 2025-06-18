@@ -187,7 +187,7 @@ export function StakerLeaderboardEmbed({
 
       return stakersData.map((staker) => ({
         ...staker,
-        farcasterUser: farcasterMap.get(staker.account.id.toLowerCase()),
+        farcasterUser: farcasterMap.get(staker.account.id?.toLowerCase() || ""),
       }));
     } catch (err) {
       console.error("Error enriching with Farcaster data:", err);

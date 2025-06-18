@@ -12,6 +12,7 @@ import { HeroAnimationMini } from "../../components/HeroAnimationMini";
 import { publicClient } from "../../lib/viemClient";
 import { GDA_FORWARDER, GDA_ABI } from "../../lib/contracts";
 import Link from "next/link";
+import { UnstakedTokensModal } from "../../components/UnstakedTokensModal";
 
 interface PoolMembership {
   units: string;
@@ -135,6 +136,7 @@ export default function TokensPage() {
   const [error, setError] = useState<string | null>(null);
   const [accountExists, setAccountExists] = useState<boolean | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [showUnstakedModal, setShowUnstakedModal] = useState(true);
 
   // Get effective address based on context
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
@@ -1687,6 +1689,18 @@ export default function TokensPage() {
           </div>
         )}
       </div>
+      
+      {/* Unstaked Tokens Modal */}
+      {showUnstakedModal && mounted && !loading && (
+        <UnstakedTokensModal
+          unstakedTokens={ownedSuperTokens}
+          onDismiss={() => {
+            setShowUnstakedModal(false);
+            // Refresh tokens after staking
+            fetchStakesAndTokens();
+          }}
+        />
+      )}
     </div>
   );
 }

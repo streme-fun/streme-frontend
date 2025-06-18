@@ -158,16 +158,15 @@ export function StakerLeaderboard({
 
   // Enrich stakers with Farcaster data
   const enrichStakersWithFarcaster = async (stakersData: TokenStaker[]) => {
-
     try {
       // Process in batches to avoid overwhelming the API
       const BATCH_SIZE = 50;
       const farcasterMap = new Map();
-      
+
       for (let i = 0; i < stakersData.length; i += BATCH_SIZE) {
         const batch = stakersData.slice(i, i + BATCH_SIZE);
         const addresses = batch.map((staker) => staker.account.id);
-        
+
         try {
           const response = await fetch("/api/neynar/bulk-users-by-address", {
             method: "POST",
@@ -178,12 +177,14 @@ export function StakerLeaderboard({
           });
 
           if (!response.ok) {
-            console.warn(`Failed to fetch Farcaster data for batch ${i / BATCH_SIZE + 1}`);
+            console.warn(
+              `Failed to fetch Farcaster data for batch ${i / BATCH_SIZE + 1}`
+            );
             continue;
           }
 
           const farcasterData = await response.json();
-          
+
           // Handle the response format from neynar bulk users API
           Object.entries(farcasterData).forEach(
             ([address, users]: [string, unknown]) => {
@@ -199,14 +200,17 @@ export function StakerLeaderboard({
             }
           );
         } catch (err) {
-          console.warn(`Error fetching Farcaster data for batch ${i / BATCH_SIZE + 1}:`, err);
+          console.warn(
+            `Error fetching Farcaster data for batch ${i / BATCH_SIZE + 1}:`,
+            err
+          );
         }
       }
 
       // Update stakers with Farcaster data
       const enrichedStakers = stakersData.map((staker) => ({
         ...staker,
-        farcasterUser: farcasterMap.get(staker.account.id.toLowerCase()),
+        farcasterUser: farcasterMap.get(staker.account.id?.toLowerCase() || ""),
       }));
 
       setStakersWithFarcaster(enrichedStakers);
@@ -248,7 +252,7 @@ export function StakerLeaderboard({
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (staker) =>
-          staker.account.id.toLowerCase().includes(searchLower) ||
+          staker.account.id?.toLowerCase().includes(searchLower) ||
           (staker.farcasterUser?.username &&
             staker.farcasterUser.username.toLowerCase().includes(searchLower))
       );
@@ -366,8 +370,18 @@ export function StakerLeaderboard({
               {isRefreshing ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
                 </svg>
               )}
             </button>

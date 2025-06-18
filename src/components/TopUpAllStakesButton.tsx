@@ -318,8 +318,8 @@ export function TopUpAllStakesButton({
           // Avoid duplicates - check if this token is already in stakes
           const isDuplicate = stakesWithBalances.some(
             (stake) =>
-              stake.tokenAddress.toLowerCase() ===
-              superToken.tokenAddress.toLowerCase()
+              stake.tokenAddress?.toLowerCase() ===
+              superToken.tokenAddress?.toLowerCase()
           );
 
           if (!isDuplicate) {
@@ -375,7 +375,8 @@ export function TopUpAllStakesButton({
       // Avoid counting duplicates with stakes
       !stakes.some(
         (stake) =>
-          stake.tokenAddress.toLowerCase() === token.tokenAddress.toLowerCase()
+          stake.tokenAddress?.toLowerCase() ===
+          token.tokenAddress?.toLowerCase()
       )
   ).length;
 
