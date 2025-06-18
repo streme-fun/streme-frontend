@@ -6,7 +6,7 @@ import { useAccount } from "wagmi";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
-import { sdk } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 import { TopUpStakeSelectionModal } from "./TopUpStakeSelectionModal";
 import { usePostHog } from "posthog-js/react";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
@@ -119,7 +119,7 @@ export function TopUpAllStakesButton({
       let userAddress: string;
 
       if (isMiniApp) {
-        provider = sdk.wallet.ethProvider;
+        provider = await sdk.wallet.getEthereumProvider();
         if (!provider) {
           throw new Error("Farcaster Ethereum provider not available");
         }

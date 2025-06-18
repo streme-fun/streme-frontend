@@ -6,7 +6,7 @@ import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
-import { sdk } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
 interface TokenStaker {
@@ -297,7 +297,7 @@ export function StakerLeaderboardEmbed({
       let txHash: `0x${string}`;
 
       if (isMiniApp) {
-        const ethProvider = sdk.wallet.ethProvider;
+        const ethProvider = await sdk.wallet.getEthereumProvider();
         if (!ethProvider)
           throw new Error("Farcaster Ethereum provider not available.");
         const currentEthBalance = await publicClient.getBalance({

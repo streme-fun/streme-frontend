@@ -8,7 +8,7 @@ import { StakeModal } from "./StakeModal";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient"; // Import the centralized client
 import { toast } from "sonner"; // Added for Mini App placeholder
-import { sdk } from "@farcaster/frame-sdk"; // Added Farcaster SDK
+import sdk from "@farcaster/frame-sdk"; // Added Farcaster SDK
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 import { usePostHog } from "posthog-js/react"; // Added PostHog hook
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics"; // Added analytics constants
@@ -138,7 +138,7 @@ export function StakeButton({
       let connectTxHash: `0x${string}` | undefined;
 
       if (isMiniApp) {
-        const ethProvider = sdk.wallet.ethProvider;
+        const ethProvider = await sdk.wallet.getEthereumProvider();
         if (!ethProvider)
           throw new Error("Farcaster Ethereum provider not available.");
 

@@ -8,6 +8,22 @@ import sdk, {
 import { createStore } from "mipd";
 import React from "react";
 
+// Extend Window interface for custom properties
+declare global {
+  interface Window {
+    __FARCASTER_SDK_INITIALIZED__?: boolean;
+    __FARCASTER_SDK_INIT_TIME__?: number;
+  }
+}
+
+// Centralized SDK access
+export function getFrameSDK() {
+  if (typeof window !== "undefined" && !window.__FARCASTER_SDK_INITIALIZED__) {
+    console.warn("SDK not yet initialized");
+  }
+  return sdk;
+}
+
 interface FrameContextType {
   isSDKLoaded: boolean;
   context: Context.FrameContext | undefined;
@@ -97,12 +113,39 @@ export function useFrame() {
       return;
     }
 
+    // Global check to prevent multiple SDK instances, but still load context
+    if (typeof window !== "undefined" && window.__FARCASTER_SDK_INITIALIZED__) {
+      console.warn("SDK already initialized globally, loading context only...");
+      // Still need to load context even if SDK is already initialized
+      const loadContextOnly = async () => {
+        try {
+          const context = await sdk.context;
+          setContext(context);
+          setIsSDKLoaded(true);
+        } catch (error) {
+          console.error("Error loading context on re-initialization:", error);
+          setIsSDKLoaded(true);
+        }
+      };
+      loadContextOnly();
+      return;
+    }
+
     initializationRef.current = true;
     let storeUnsubscribe: (() => void) | null = null;
 
     const load = async () => {
       try {
-        console.log("Starting SDK initialization...");
+        console.log("Starting SDK initialization...", {
+          timestamp: new Date().toISOString(),
+          stack: new Error().stack?.split("\n").slice(2, 5).join("\n"),
+        });
+
+        // Mark SDK as globally initialized
+        if (typeof window !== "undefined") {
+          window.__FARCASTER_SDK_INITIALIZED__ = true;
+          window.__FARCASTER_SDK_INIT_TIME__ = Date.now();
+        }
         const context = await sdk.context;
         setContext(context);
 
@@ -192,8 +235,10 @@ export function useFrame() {
       if (storeUnsubscribe) {
         storeUnsubscribe();
       }
+      // Note: We intentionally don't clear the global flag here
+      // because the SDK should remain initialized for the app lifetime
     };
-  }, []); // Empty dependency array - only run once on mount
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     isSDKLoaded,

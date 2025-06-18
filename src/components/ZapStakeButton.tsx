@@ -8,7 +8,7 @@ import { Interface } from "@ethersproject/abi";
 import { Modal } from "./Modal";
 import { Zap } from "lucide-react";
 import { publicClient } from "@/src/lib/viemClient";
-import { sdk } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
 const WETH = "0x4200000000000000000000000000000000000006";
@@ -145,7 +145,7 @@ export function ZapStakeButton({
       let txHash: `0x${string}`;
 
       if (isMiniApp) {
-        const ethProvider = sdk.wallet.ethProvider;
+        const ethProvider = await sdk.wallet.getEthereumProvider();
         if (!ethProvider)
           throw new Error("Farcaster Ethereum provider not available.");
         const currentEthBalance = await publicClient.getBalance({

@@ -67,7 +67,28 @@ export function WalletProfileModal({
   const effectiveAddress = isMiniAppView
     ? fcAddress
     : privyUser?.wallet?.address;
-  const userFid = farcasterContext?.user?.fid;
+  
+  // Debug Farcaster context structure
+  console.log("WalletProfile Debug:", {
+    isMiniAppView,
+    hasContext: !!farcasterContext,
+    contextKeys: farcasterContext ? Object.keys(farcasterContext) : [],
+    contextUser: farcasterContext?.user,
+    contextLocation: farcasterContext?.location,
+    fullContext: farcasterContext
+  });
+  
+  // Try multiple possible paths for FID based on SDK documentation
+  const userFid = farcasterContext?.user?.fid || 
+                  (farcasterContext as any)?.client?.user?.fid;
+                  
+  console.log("FID extraction attempt:", {
+    userFid,
+    contextUserFid: farcasterContext?.user?.fid,
+    clientUserFid: (farcasterContext as any)?.client?.user?.fid,
+    hasUser: !!farcasterContext?.user,
+    hasClient: !!(farcasterContext as any)?.client
+  });
 
   // Copy address to clipboard with visual feedback
   const copyAddress = async () => {

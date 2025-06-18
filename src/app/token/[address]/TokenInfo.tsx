@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import DexscreenerIcon from "@/public/dexscreener.webp";
 import InterfaceIcon from "@/public/interface.png";
-import { sdk } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 
 const formatPrice = (price: number | undefined) => {

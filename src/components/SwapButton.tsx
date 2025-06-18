@@ -4,7 +4,7 @@ import { useState } from "react";
 import { parseEther } from "viem";
 import { toast } from "sonner";
 import { publicClient } from "@/src/lib/viemClient";
-import { sdk } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 import { useWalletClient } from "wagmi";
 import confetti from "canvas-confetti";
 
@@ -324,7 +324,7 @@ export function SwapButton({
     let txHash: `0x${string}`;
 
     if (isMiniApp) {
-      const ethProvider = sdk.wallet.ethProvider;
+      const ethProvider = await sdk.wallet.getEthereumProvider();
       if (!ethProvider)
         throw new Error("Farcaster Ethereum provider not available.");
 
