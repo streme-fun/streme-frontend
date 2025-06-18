@@ -137,7 +137,17 @@ function AppContent({ children }: { children: React.ReactNode }) {
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
   const effectiveIsConnected = isMiniAppView ? fcIsConnected : !!wagmiAddress;
 
+  // Initialize theme-change early to prevent timing issues
   useEffect(() => {
+    // Import and initialize theme-change as soon as component mounts
+    import('theme-change').then(({ themeChange }) => {
+      themeChange(false);
+      // Ensure theme is properly applied
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      }
+    });
     setMounted(true);
   }, []);
 
@@ -188,18 +198,20 @@ function AppContent({ children }: { children: React.ReactNode }) {
   // Check for unstaked tokens when user connects
   useEffect(() => {
     const checkForUnstakedTokens = async () => {
+      console.log("Checking for unstaked tokens...", {
+        effectiveAddress,
+        effectiveIsConnected,
+        mounted,
+        hasSeenModal: sessionStorage.getItem("unstakedTokensModalDismissed")
+      });
+
       if (!effectiveAddress || !effectiveIsConnected || !mounted) return;
 
-      // Check if user has dismissed the modal recently (within 24 hours)
-      const lastDismissed = localStorage.getItem("unstakedTokensModalLastDismissed");
-      if (lastDismissed) {
-        const dismissedTime = parseInt(lastDismissed);
-        const now = Date.now();
-        const twentyFourHours = 24 * 60 * 60 * 1000;
-        
-        if (now - dismissedTime < twentyFourHours) {
-          return;
-        }
+      // Check if user has dismissed the modal in this session
+      const hasSeenModal = sessionStorage.getItem("unstakedTokensModalDismissed");
+      if (hasSeenModal === "true") {
+        console.log("Modal was already dismissed in this session");
+        return;
       }
 
       try {
@@ -340,7 +352,10 @@ function AppContent({ children }: { children: React.ReactNode }) {
                   }
                 }
 
+                console.log("Found unstaked tokens:", tokens);
                 setUnstakedTokens(tokens);
+              } else {
+                console.log("No valid token snapshots found");
               }
             }
             break;
@@ -355,7 +370,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
     };
 
     // Small delay to ensure wallet connection is fully established
-    const timeoutId = setTimeout(checkForUnstakedTokens, 2000);
+    const timeoutId = setTimeout(checkForUnstakedTokens, 500);
     return () => clearTimeout(timeoutId);
   }, [effectiveAddress, effectiveIsConnected, mounted, fetchTokenData]);
 
@@ -384,8 +399,8 @@ function AppContent({ children }: { children: React.ReactNode }) {
         <UnstakedTokensModal
           unstakedTokens={unstakedTokens}
           onDismiss={() => {
-            // Store dismissal time in localStorage
-            localStorage.setItem("unstakedTokensModalLastDismissed", Date.now().toString());
+            // Store dismissal in sessionStorage to match UnstakedTokensModal
+            sessionStorage.setItem("unstakedTokensModalDismissed", "true");
             setUnstakedTokens([]);
           }}
         />
