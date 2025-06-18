@@ -37,6 +37,7 @@ src/
 # UI
 
 - Use DaisyUI defaults for the UI unless there are specific styles that need to be applied.
+- Make sure that dark mode is accounted for by using daisyui classes like base-100 instead of gray-100 etc
 - Use TailwindCSS to make light adjustments.
 
 # Authentication / Wallet Connection

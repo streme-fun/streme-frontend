@@ -956,7 +956,7 @@ https://streme.fun`;
               <h2 className="text-lg font-bold mb-2">
                 Woah, you&apos;ve got unstaked tokens!
               </h2>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-base-content/70">
                 1-click stake your tokens to start receiving rewards streamed to
                 your wallet every second, no claiming required. Unstake at any
                 time after 24 hours.
@@ -967,10 +967,10 @@ https://streme.fun`;
               {stakableTokens.slice(0, 3).map((token) => (
                 <div
                   key={token.tokenAddress}
-                  className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg"
+                  className="flex items-center justify-between py-2 px-3 bg-base-200 rounded-lg"
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full overflow-hidden bg-base-300 flex items-center justify-center">
                       {token.logo ? (
                         <img
                           src={token.logo}
@@ -993,9 +993,9 @@ https://streme.fun`;
                         {token.symbol.charAt(0)}
                       </div>
                     </div>
-                    <span className="font-medium text-sm">{token.symbol}</span>
+                    <span className="font-medium text-sm text-base-content">{token.symbol}</span>
                   </div>
-                  <span className="text-sm font-mono">
+                  <span className="text-sm font-mono text-base-content">
                     {token.balance.toLocaleString("en-US", {
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 2,
@@ -1004,7 +1004,7 @@ https://streme.fun`;
                 </div>
               ))}
               {stakableTokens.length > 3 && (
-                <div className="text-center text-xs text-gray-500 py-1">
+                <div className="text-center text-xs text-base-content/50 py-1">
                   +{stakableTokens.length - 3} more tokens
                 </div>
               )}

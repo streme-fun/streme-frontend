@@ -198,19 +198,11 @@ function AppContent({ children }: { children: React.ReactNode }) {
   // Check for unstaked tokens when user connects
   useEffect(() => {
     const checkForUnstakedTokens = async () => {
-      console.log("Checking for unstaked tokens...", {
-        effectiveAddress,
-        effectiveIsConnected,
-        mounted,
-        hasSeenModal: sessionStorage.getItem("unstakedTokensModalDismissed")
-      });
-
       if (!effectiveAddress || !effectiveIsConnected || !mounted) return;
 
       // Check if user has dismissed the modal in this session
       const hasSeenModal = sessionStorage.getItem("unstakedTokensModalDismissed");
       if (hasSeenModal === "true") {
-        console.log("Modal was already dismissed in this session");
         return;
       }
 
@@ -352,10 +344,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
                   }
                 }
 
-                console.log("Found unstaked tokens:", tokens);
                 setUnstakedTokens(tokens);
-              } else {
-                console.log("No valid token snapshots found");
               }
             }
             break;
