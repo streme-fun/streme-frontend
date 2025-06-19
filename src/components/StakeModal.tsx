@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { formatUnits, parseUnits } from "viem";
 import { Modal } from "./Modal";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
-import { sdk } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 import Image from "next/image";
 import FarcasterIcon from "@/public/farcaster.svg";
+import { MyTokensModal } from "./MyTokensModal";
 
 interface StakeModalProps {
   isOpen: boolean;
@@ -81,6 +82,7 @@ export function StakeModal({
   const [step, setStep] = useState<"idle" | "staking" | "connecting">("idle");
   const [error, setError] = useState<string | null>(null);
   const [isMaxAmount, setIsMaxAmount] = useState(false);
+  const [showMyTokensModal, setShowMyTokensModal] = useState(false);
 
   const { isSDKLoaded } = useAppFrameLogic();
 
@@ -305,9 +307,21 @@ ${shareUrl}`;
                 Token rewards are now being streamed directly to your wallet.
               </p>
               <div className="flex gap-2">
-                <a href="/tokens" className="btn btn-accent flex-1">
-                  Manage Stakes
-                </a>
+                {isMiniApp ? (
+                  <button
+                    onClick={() => {
+                      handleClose();
+                      setShowMyTokensModal(true);
+                    }}
+                    className="btn btn-accent flex-1"
+                  >
+                    Manage Stakes
+                  </button>
+                ) : (
+                  <a href="/tokens" className="btn btn-accent flex-1">
+                    Manage Stakes
+                  </a>
+                )}
                 <button
                   onClick={handleShare}
                   className="btn btn-outline flex-1"
@@ -409,9 +423,21 @@ ${shareUrl}`;
               Token rewards are now being streamed directly to your wallet.
             </p>
             <div className="flex gap-2">
-              <a href="/tokens" className="btn btn-accent flex-1">
-                Manage Stakes
-              </a>
+              {isMiniApp ? (
+                <button
+                  onClick={() => {
+                    handleClose();
+                    setShowMyTokensModal(true);
+                  }}
+                  className="btn btn-accent flex-1"
+                >
+                  Manage Stakes
+                </button>
+              ) : (
+                <a href="/tokens" className="btn btn-accent flex-1">
+                  Manage Stakes
+                </a>
+              )}
               <button onClick={handleShare} className="btn btn-outline flex-1">
                 <Image
                   src={FarcasterIcon}
@@ -433,6 +459,7 @@ ${shareUrl}`;
   }
 
   return (
+    <>
     <Modal isOpen={isOpen} onClose={handleClose}>
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
@@ -498,5 +525,14 @@ ${shareUrl}`;
         </div>
       </div>
     </Modal>
+    
+    {/* MyTokensModal for mini app */}
+    {showMyTokensModal && (
+      <MyTokensModal
+        isOpen={showMyTokensModal}
+        onClose={() => setShowMyTokensModal(false)}
+      />
+    )}
+  </>
   );
 }

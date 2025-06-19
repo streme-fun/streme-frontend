@@ -8,8 +8,9 @@ import { Interface } from "@ethersproject/abi";
 import { Modal } from "./Modal";
 import { Zap } from "lucide-react";
 import { publicClient } from "@/src/lib/viemClient";
-import { sdk } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
+import { MyTokensModal } from "./MyTokensModal";
 
 const WETH = "0x4200000000000000000000000000000000000006";
 const toHex = (address: string) => address as `0x${string}`;
@@ -41,6 +42,7 @@ export function ZapStakeButton({
 }: ZapStakeButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showMyTokensModal, setShowMyTokensModal] = useState(false);
   const { wallets } = useWallets();
   const { user } = usePrivy();
   const { primaryAddress } = useWalletAddressChange();
@@ -145,7 +147,7 @@ export function ZapStakeButton({
       let txHash: `0x${string}`;
 
       if (isMiniApp) {
-        const ethProvider = sdk.wallet.ethProvider;
+        const ethProvider = await sdk.wallet.getEthereumProvider();
         if (!ethProvider)
           throw new Error("Farcaster Ethereum provider not available.");
         const currentEthBalance = await publicClient.getBalance({
@@ -422,9 +424,21 @@ export function ZapStakeButton({
               Successfully staked {symbol}. Token rewards are now being streamed
               directly to your wallet.
             </p>
-            <a href={`/tokens`} className="btn btn-accent w-full">
-              Manage Stakes
-            </a>
+            {isMiniApp ? (
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setShowMyTokensModal(true);
+                }}
+                className="btn btn-accent w-full"
+              >
+                Manage Stakes
+              </button>
+            ) : (
+              <a href={`/tokens`} className="btn btn-accent w-full">
+                Manage Stakes
+              </a>
+            )}
             <button
               onClick={() => setShowSuccessModal(false)}
               className="btn btn-ghost w-full"
@@ -433,6 +447,14 @@ export function ZapStakeButton({
             </button>
           </div>
         </Modal>
+      )}
+      
+      {/* MyTokensModal for mini app */}
+      {showMyTokensModal && (
+        <MyTokensModal
+          isOpen={showMyTokensModal}
+          onClose={() => setShowMyTokensModal(false)}
+        />
       )}
     </>
   );

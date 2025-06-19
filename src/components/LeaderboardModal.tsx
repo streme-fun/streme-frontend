@@ -484,7 +484,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
       isCurrentUser: Boolean(
         effectiveAddress &&
           entry.address &&
-          entry.address.toLowerCase() === effectiveAddress.toLowerCase()
+          entry.address?.toLowerCase() === effectiveAddress?.toLowerCase()
       ),
       displayInfo: getDisplayInfo(entry),
     }));
@@ -525,7 +525,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
       if (currentUserEntry.rank > 50) {
         const modifiedCurrentUser = {
           ...currentUserEntry,
-          displayRank: ">50"
+          displayRank: ">50",
         };
         // Return current user first, followed by top 49 others
         return [modifiedCurrentUser, ...otherEntries.slice(0, 49)];

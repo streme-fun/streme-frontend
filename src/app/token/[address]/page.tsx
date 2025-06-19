@@ -24,7 +24,7 @@ const metadataCache = new Map<string, CachedTokenData>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function getCachedData(address: string): CachedTokenData["data"] | null {
-  const cached = metadataCache.get(address.toLowerCase());
+  const cached = metadataCache.get(address?.toLowerCase() || "");
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     console.log(`[Metadata] Using cached data for ${address}`);
     return cached.data;
@@ -33,7 +33,7 @@ function getCachedData(address: string): CachedTokenData["data"] | null {
 }
 
 function setCachedData(address: string, data: CachedTokenData["data"]): void {
-  metadataCache.set(address.toLowerCase(), {
+  metadataCache.set(address?.toLowerCase() || "", {
     data,
     timestamp: Date.now(),
   });

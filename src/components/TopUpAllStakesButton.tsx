@@ -6,7 +6,7 @@ import { useAccount } from "wagmi";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
-import { sdk } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 import { TopUpStakeSelectionModal } from "./TopUpStakeSelectionModal";
 import { usePostHog } from "posthog-js/react";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
@@ -119,7 +119,7 @@ export function TopUpAllStakesButton({
       let userAddress: string;
 
       if (isMiniApp) {
-        provider = sdk.wallet.ethProvider;
+        provider = await sdk.wallet.getEthereumProvider();
         if (!provider) {
           throw new Error("Farcaster Ethereum provider not available");
         }
@@ -318,8 +318,8 @@ export function TopUpAllStakesButton({
           // Avoid duplicates - check if this token is already in stakes
           const isDuplicate = stakesWithBalances.some(
             (stake) =>
-              stake.tokenAddress.toLowerCase() ===
-              superToken.tokenAddress.toLowerCase()
+              stake.tokenAddress?.toLowerCase() ===
+              superToken.tokenAddress?.toLowerCase()
           );
 
           if (!isDuplicate) {
@@ -375,7 +375,8 @@ export function TopUpAllStakesButton({
       // Avoid counting duplicates with stakes
       !stakes.some(
         (stake) =>
-          stake.tokenAddress.toLowerCase() === token.tokenAddress.toLowerCase()
+          stake.tokenAddress?.toLowerCase() ===
+          token.tokenAddress?.toLowerCase()
       )
   ).length;
 

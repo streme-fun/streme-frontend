@@ -7,7 +7,7 @@ import { LP_FACTORY_ADDRESS } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
-import { sdk } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 
 interface ClaimFeesButtonProps {
   tokenAddress: string;
@@ -86,7 +86,7 @@ export function ClaimFeesButton({
       let txHash: `0x${string}` | undefined;
 
       if (isEffectivelyMiniApp) {
-        const ethProvider = sdk.wallet.ethProvider;
+        const ethProvider = await sdk.wallet.getEthereumProvider();
         if (!ethProvider) {
           throw new Error("Farcaster Ethereum provider not available.");
         }

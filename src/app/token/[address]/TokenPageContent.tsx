@@ -6,20 +6,11 @@ import { TokenActions } from "./TokenActions";
 import { Token } from "@/src/app/types/token";
 import { TokenInfo } from "./TokenInfo";
 import { StakedBalance } from "@/src/components/StakedBalance";
-import { ClaimFeesButton } from "@/src/components/ClaimFeesButton";
-import { publicClient } from "@/src/lib/viemClient";
-import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import sdk from "@farcaster/frame-sdk";
 import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
 import { StakerLeaderboard } from "@/src/components/StakerLeaderboard";
 import { StakerLeaderboardEmbed } from "@/src/components/StakerLeaderboardEmbed";
-
-type Deployment = {
-  token: string;
-  locker: string;
-  positionId: bigint;
-};
 
 // Interface for GeckoTerminal market data
 interface GeckoTerminalData {
@@ -35,10 +26,10 @@ export function TokenPageContent() {
   const pageAddress = params.address as string;
   const [token, setToken] = useState<Token | null>(null);
   const [tokenLoading, setTokenLoading] = useState(true);
-  const [isCreator, setIsCreator] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stakingUpdateTrigger, setStakingUpdateTrigger] = useState(0);
   const [isStakerLeaderboardOpen, setIsStakerLeaderboardOpen] = useState(false);
+  const [userStakedBalance, setUserStakedBalance] = useState<bigint>(0n);
 
   const {
     isSDKLoaded,
@@ -145,34 +136,6 @@ export function TokenPageContent() {
     fetchToken();
   }, [pageAddress]);
 
-  useEffect(() => {
-    if (!address || !token || !isConnected) {
-      setIsCreator(false);
-      return;
-    }
-
-    const checkIsCreator = async () => {
-      try {
-        const deployments = (await publicClient.readContract({
-          address: LP_FACTORY_ADDRESS,
-          abi: LP_FACTORY_ABI,
-          functionName: "getTokensDeployedByUser",
-          args: [address as `0x${string}`],
-        })) as Deployment[];
-
-        const isCreatorResult = deployments.some(
-          (d) => d.token.toLowerCase() === token.contract_address.toLowerCase()
-        );
-        setIsCreator(isCreatorResult);
-      } catch (error) {
-        console.error("Error checking creator status:", error);
-        setIsCreator(false);
-      }
-    };
-
-    checkIsCreator();
-  }, [address, token, isConnected]);
-
   // Prompt to add mini app when in mini app view
   useEffect(() => {
     if (
@@ -194,6 +157,10 @@ export function TokenPageContent() {
 
   const handleStakingChange = () => {
     setStakingUpdateTrigger((prev) => prev + 1);
+  };
+
+  const handleStakedBalanceUpdate = (balance: bigint) => {
+    setUserStakedBalance(balance);
   };
 
   const handleShare = async () => {
@@ -334,8 +301,10 @@ ${shareUrl}`;
           />
 
           <TokenActions
+            data-trading-section
             token={token}
             onStakingChange={handleStakingChange}
+            onStakedBalanceUpdate={handleStakedBalanceUpdate}
             isMiniAppView={isMiniAppView}
             address={address}
             isConnected={isConnected}
@@ -351,19 +320,20 @@ ${shareUrl}`;
             farcasterIsConnected={isConnected}
             key={stakingUpdateTrigger}
           />
-          <ClaimFeesButton
-            tokenAddress={token.contract_address}
-            creatorAddress={isCreator ? address : undefined}
-            isMiniApp={isMiniAppView}
-            farcasterAddress={address}
-            farcasterIsConnected={isConnected}
-          />
 
           {/* Embedded Staker Leaderboard */}
           <StakerLeaderboardEmbed
+            stakingPoolAddress={token.staking_pool}
             tokenAddress={token.contract_address}
             tokenSymbol={token.symbol}
+            stakingAddress={token.staking_address}
             onViewAll={() => setIsStakerLeaderboardOpen(true)}
+            onStakingChange={handleStakingChange}
+            isMiniApp={isMiniAppView}
+            farcasterAddress={address}
+            farcasterIsConnected={isConnected}
+            tokenPrice={token.price}
+            userStakedBalance={userStakedBalance}
           />
         </div>
 
@@ -386,7 +356,7 @@ ${shareUrl}`;
 
       {/* Staker Leaderboard Modal */}
       <StakerLeaderboard
-        tokenAddress={token.contract_address}
+        stakingPoolAddress={token.staking_pool}
         tokenSymbol={token.symbol}
         isOpen={isStakerLeaderboardOpen}
         onClose={() => setIsStakerLeaderboardOpen(false)}

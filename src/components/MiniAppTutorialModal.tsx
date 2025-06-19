@@ -19,7 +19,7 @@ export function MiniAppTutorialModal({
 
   const steps = [
     {
-      title: "Streme Tokens Are Built Different",
+      title: "Streme 101",
       content: (
         <div className="space-y-4">
           <p className="text-base text-base-content/80">

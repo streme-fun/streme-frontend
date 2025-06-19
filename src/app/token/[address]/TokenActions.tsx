@@ -21,6 +21,7 @@ import { useTokenBalance } from "@/src/hooks/useTokenData";
 interface TokenActionsProps {
   token: Token;
   onStakingChange: () => void;
+  onStakedBalanceUpdate?: (balance: bigint) => void;
   isMiniAppView?: boolean;
   address?: `0x${string}` | undefined;
   isConnected?: boolean;
@@ -35,6 +36,7 @@ type Deployment = {
 export function TokenActions({
   token: initialToken,
   onStakingChange,
+  onStakedBalanceUpdate,
   isMiniAppView: isMiniAppViewProp,
   address: addressProp,
   isConnected: isConnectedProp,
@@ -292,8 +294,8 @@ export function TokenActions({
         if (result.data) {
           if (
             result.data.contract_address &&
-            result.data.contract_address.toLowerCase() ===
-              addressToFetch.toLowerCase()
+            result.data.contract_address?.toLowerCase() ===
+              addressToFetch?.toLowerCase()
           ) {
             // Only update if the data actually changed
             const newToken = result.data;
@@ -366,7 +368,7 @@ export function TokenActions({
           args: [currentAddress as `0x${string}`],
         })) as Deployment[];
         const isCreatorResult = deployments.some(
-          (d) => d.token.toLowerCase() === contractAddress.toLowerCase()
+          (d) => d.token?.toLowerCase() === contractAddress?.toLowerCase()
         );
         if (isCreatorResult) {
           console.log("User is creator of this token");
@@ -379,6 +381,13 @@ export function TokenActions({
   }, [currentAddress, walletIsConnected, contractAddress]);
 
   const hasTokens = walletIsConnected && balance > 0n;
+
+  // Update parent component with staked balance changes
+  useEffect(() => {
+    if (onStakedBalanceUpdate) {
+      onStakedBalanceUpdate(stakedBalance);
+    }
+  }, [stakedBalance, onStakedBalanceUpdate]);
 
   // Trigger an immediate refresh when wallet connects for the first time
   useEffect(() => {
@@ -467,7 +476,10 @@ export function TokenActions({
         if (prices) {
           setUsdPrices({
             eth: prices.eth,
-            token: prices[contractAddress.toLowerCase()] || token.price || null,
+            token:
+              prices[contractAddress?.toLowerCase() || ""] ||
+              token.price ||
+              null,
           });
         }
       } catch (error) {

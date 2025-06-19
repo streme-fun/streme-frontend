@@ -5,7 +5,7 @@ import { useWallets, usePrivy } from "@privy-io/react-auth";
 import { UnstakeModal } from "./UnstakeModal";
 import { publicClient } from "@/src/lib/viemClient";
 import { Interface } from "@ethersproject/abi";
-import { sdk } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 import { toast } from "sonner";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 import { usePostHog } from "posthog-js/react";
@@ -183,7 +183,7 @@ export function UnstakeButton({
       let unstakeTxHash: `0x${string}` | undefined;
 
       if (isMiniApp) {
-        const ethProvider = sdk.wallet.ethProvider;
+        const ethProvider = await sdk.wallet.getEthereumProvider();
         if (!ethProvider) {
           throw new Error("Farcaster Ethereum provider not available.");
         }

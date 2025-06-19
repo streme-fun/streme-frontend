@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { GDA_FORWARDER } from "@/src/lib/contracts";
-import { sdk } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 
 const toHex = (address: string) => address as `0x${string}`;
 
@@ -55,7 +55,7 @@ export function ConnectPoolButton({
       ]);
 
       if (isMiniApp) {
-        const ethProvider = sdk.wallet.ethProvider;
+        const ethProvider = await sdk.wallet.getEthereumProvider();
         if (!ethProvider) {
           throw new Error("Farcaster Ethereum provider not available.");
         }

@@ -6,7 +6,7 @@ import { useAccount } from "wagmi";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
-import { sdk } from "@farcaster/frame-sdk";
+import sdk from "@farcaster/frame-sdk";
 import { usePostHog } from "posthog-js/react";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { formatUnits } from "viem";
@@ -104,7 +104,7 @@ export function StakeAllButton({
       let userAddress: string;
 
       if (isMiniApp) {
-        provider = sdk.wallet.ethProvider;
+        provider = await sdk.wallet.getEthereumProvider();
         if (!provider) {
           throw new Error("Farcaster Ethereum provider not available");
         }

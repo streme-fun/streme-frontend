@@ -37,6 +37,7 @@ src/
 # UI
 
 - Use DaisyUI defaults for the UI unless there are specific styles that need to be applied.
+- Make sure that dark mode is accounted for by using daisyui classes like base-100 instead of gray-100 etc
 - Use TailwindCSS to make light adjustments.
 
 # Authentication / Wallet Connection
@@ -55,18 +56,22 @@ src/
 - `NEYNAR_API_KEY` - Farcaster API access
 - `ZEROX_API_KEY` - 0x swaps
 
+# Documentation
+
+- **Farcaster Mini App Docs (always updated)**: https://miniapps.farcaster.xyz/llms-full.txt
+
 # Bash Commands
 
-- npm run build: Build the project
+- npm run check:all: Check for all errors (do this when you're done making changes)
 - npm run lint: Run the linter
 - npm run typecheck: Check for type errors
-- npm run check:all: Check for all errors (do this when you're done making changes)
+- npm run build: Build the project
 - npm test: Run tests
 - npm run dev: Start development server
 
 # Workflow
 
-- Be sure to typecheck when you're done making a series of code changes
+- Be sure to typecheck and lint when you're done making a series of code changes
 - Prefer running single tests, and not the whole test suite, for performance
 - Check balance call tracking in console during development
 - Use existing patterns when adding features
