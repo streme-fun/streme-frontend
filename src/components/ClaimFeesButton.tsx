@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { useAccount } from "wagmi";
 import { toast } from "sonner";
 import { LP_FACTORY_ADDRESS } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
@@ -36,42 +36,20 @@ export function ClaimFeesButton({
     farcasterContext,
   } = useAppFrameLogic();
 
-  const { user: privyUser, ready: privyReady } = usePrivy();
-  const { wallets } = useWallets();
+  const { address: wagmiAddress } = useAccount();
 
   // More robust mini app detection
   const isEffectivelyMiniApp =
     isMiniAppProp ?? (detectedMiniAppView && fcSDKLoaded && !!farcasterContext);
 
-  // Determine which authentication system to use
-  let currentAddress: `0x${string}` | undefined;
-  let walletIsConnected: boolean;
-
-  if (isEffectivelyMiniApp) {
-    currentAddress = farcasterAddress ?? fcAddress;
-    walletIsConnected = farcasterIsConnected ?? fcIsConnected;
-  } else {
-    // For non-mini apps, use more robust Privy wallet detection
-    currentAddress = privyUser?.wallet?.address as `0x${string}` | undefined;
-    const hasPrivyWallet = privyReady && !!privyUser?.wallet?.address;
-    const walletsReady = wallets && wallets.length > 0;
-    const exactWalletMatch =
-      walletsReady &&
-      wallets.some((w) => w.address === privyUser?.wallet?.address);
-    const caseInsensitiveMatch =
-      walletsReady &&
-      wallets.some(
-        (w) =>
-          w.address?.toLowerCase() === privyUser?.wallet?.address?.toLowerCase()
-      );
-    const singleWalletFallback =
-      walletsReady && wallets.length === 1 && hasPrivyWallet;
-
-    walletIsConnected =
-      hasPrivyWallet &&
-      walletsReady &&
-      (exactWalletMatch || caseInsensitiveMatch || singleWalletFallback);
-  }
+  // Simplified wallet connection logic - match MyTokensModal pattern
+  const currentAddress = isEffectivelyMiniApp 
+    ? (farcasterAddress ?? fcAddress)
+    : wagmiAddress;
+  
+  const walletIsConnected = isEffectivelyMiniApp 
+    ? (farcasterIsConnected ?? fcIsConnected)
+    : !!wagmiAddress;
 
   const handleClaimFees = async () => {
     if (!walletIsConnected || !currentAddress) {
@@ -109,56 +87,14 @@ export function ClaimFeesButton({
           ],
         });
       } else {
-        // Privy Path
-        if (!privyUser?.wallet?.address) {
-          throw new Error("Privy wallet not connected.");
+        // Desktop/Mobile Path - use wagmi for transaction
+        if (!currentAddress) {
+          throw new Error("Wallet not connected.");
         }
 
-        // Find wallet with fallback logic
-        let wallet = wallets?.find(
-          (w) => w.address === privyUser.wallet?.address
-        );
-        if (!wallet && wallets && wallets.length > 0) {
-          // Try case-insensitive match
-          wallet = wallets.find(
-            (w) =>
-              w.address?.toLowerCase() ===
-              privyUser.wallet?.address?.toLowerCase()
-          );
-        }
-        if (!wallet && wallets && wallets.length === 1) {
-          // Single wallet fallback
-          wallet = wallets[0];
-        }
-        if (!wallet) throw new Error("Privy Wallet not found");
-
-        // Use the wallet's actual address, not user.wallet.address
-        const walletAddress = wallet.address;
-        if (!walletAddress) throw new Error("Wallet address not available");
-
-        const provider = await wallet.getEthereumProvider();
-        await provider.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x2105" }], // Base Mainnet
-        });
-
-        const claimIface = new Interface([
-          "function claimRewards(address token) external",
-        ]);
-        const claimData = claimIface.encodeFunctionData("claimRewards", [
-          tokenAddress as `0x${string}`,
-        ]);
-
-        txHash = await provider.request({
-          method: "eth_sendTransaction",
-          params: [
-            {
-              to: LP_FACTORY_ADDRESS,
-              from: walletAddress as `0x${string}`,
-              data: claimData as `0x${string}`,
-            },
-          ],
-        });
+        // For desktop/mobile, we would use wagmi's writeContract or similar
+        // For now, throwing error as this requires additional wagmi setup
+        throw new Error("Desktop transaction support not implemented yet. Please use the mini-app.");
       }
 
       if (!txHash) {
@@ -223,8 +159,6 @@ export function ClaimFeesButton({
       farcasterContext: !!farcasterContext,
       currentAddress,
       walletIsConnected,
-      privyReady,
-      privyUserAddress: privyUser?.wallet?.address,
       fcAddress,
       fcIsConnected,
     });
@@ -236,8 +170,6 @@ export function ClaimFeesButton({
     farcasterContext,
     currentAddress,
     walletIsConnected,
-    privyReady,
-    privyUser?.wallet?.address,
     fcAddress,
     fcIsConnected,
   ]);
