@@ -9,6 +9,7 @@ import { UnstakeButton } from "@/src/components/UnstakeButton";
 import { ConnectPoolButton } from "@/src/components/ConnectPoolButton";
 import { ZapStakeButton } from "@/src/components/ZapStakeButton";
 import { SwapButton } from "@/src/components/SwapButton";
+import { LiquidityWarning } from "@/src/components/LiquidityWarning";
 import { Wallet } from "lucide-react";
 import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
@@ -716,6 +717,19 @@ export function TokenActions({
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
               {validation.error}
             </div>
+          )}
+
+          {/* Liquidity Warning - only show for buy direction */}
+          {tradeDirection === "buy" && (
+            <LiquidityWarning
+              tokenAddress={contractAddress}
+              tokenLaunchTime={token.timestamp ? 
+                new Date(token.timestamp._seconds * 1000 + token.timestamp._nanoseconds / 1000000) : 
+                token.created_at
+              }
+              tokenSymbol={token.symbol}
+              className="mb-4"
+            />
           )}
 
           {/* Action Buttons */}
