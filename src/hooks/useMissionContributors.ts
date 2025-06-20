@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useReadContract } from "wagmi";
+import { useReadContract, usePublicClient } from "wagmi";
 import { STREME_STAKING_REWARDS_FUNDER_ADDRESS, STREME_STAKING_REWARDS_FUNDER_ABI } from "@/src/lib/contracts/StremeStakingRewardsFunder";
-import { formatUnits } from "viem";
+import { formatUnits, getAddress } from "viem";
 
 interface FarcasterUser {
   fid: number;
@@ -24,6 +24,9 @@ export const useMissionContributors = () => {
   const [contributors, setContributors] = useState<ContributorData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [contributorAddresses, setContributorAddresses] = useState<string[]>([]);
+
+  const publicClient = usePublicClient();
 
   // Get total balance to calculate percentages
   const { data: totalBalance } = useReadContract({
@@ -32,36 +35,76 @@ export const useMissionContributors = () => {
     functionName: "totalBalance",
   });
 
-  // In production, fetch these from contract Deposit events
-  // For demo, using a few addresses to check if they have real balances
-  const mockContributorAddresses: string[] = [
-    "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e",
-    "0x1234567890123456789012345678901234567890"
-  ];
+  // Fetch contributor addresses from Deposit events
+  const fetchContributorAddresses = async () => {
+    if (!publicClient) {
+      console.log('❌ No public client available');
+      return [];
+    }
 
-  // Read balances for each contributor from the contract
-  const balance1 = useReadContract({
-    address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
-    abi: STREME_STAKING_REWARDS_FUNDER_ABI,
-    functionName: "balanceOf",
-    args: [mockContributorAddresses[0] as `0x${string}`],
-  });
-  
-  const balance2 = useReadContract({
-    address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
-    abi: STREME_STAKING_REWARDS_FUNDER_ABI,
-    functionName: "balanceOf",
-    args: [mockContributorAddresses[1] as `0x${string}`],
-  });
-  
-  // const balance3 = useReadContract({
-  //   address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
-  //   abi: STREME_STAKING_REWARDS_FUNDER_ABI,
-  //   functionName: "balanceOf",
-  //   args: [mockContributorAddresses[2] as `0x${string}`],
-  // });
-  
-  // const balanceQueries = [balance1, balance2, balance3, balance4, balance5];
+    try {
+      console.log('🔗 Fetching from contract:', STREME_STAKING_REWARDS_FUNDER_ADDRESS);
+      
+      // Get current block number to limit search range for better performance
+      // Use a much larger range to catch older deposits - search last 100k blocks
+      const currentBlock = await publicClient.getBlockNumber();
+      const fromBlock = currentBlock > 100000n ? currentBlock - 100000n : 0n;
+      
+      console.log(`📦 Searching blocks ${fromBlock} to latest (current: ${currentBlock})`);
+
+      // Get Deposit events from the contract
+      const logs = await publicClient.getLogs({
+        address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+        event: {
+          type: 'event',
+          name: 'Deposit',
+          inputs: [
+            { name: 'user', type: 'address', indexed: true },
+            { name: 'amount', type: 'uint256', indexed: false }
+          ]
+        },
+        fromBlock,
+        toBlock: 'latest'
+      });
+
+      console.log(`📋 Found ${logs.length} deposit events`);
+
+      // Extract unique addresses from the logs
+      const addresses = [...new Set(logs.map(log => {
+        if (log.args && 'user' in log.args) {
+          return getAddress(log.args.user as string);
+        }
+        return null;
+      }).filter(Boolean))] as string[];
+
+      console.log(`👥 Found ${addresses.length} unique contributors:`, addresses);
+      
+      if (addresses.length === 0) {
+        console.log('⚠️ No contributors found in events, using fallback addresses');
+        return [
+          "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e",
+          "0x1234567890123456789012345678901234567890"
+        ];
+      }
+      
+      // Always include the known contributor in case events miss them
+      const knownContributor = "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e";
+      if (!addresses.includes(knownContributor)) {
+        console.log('🔧 Adding known contributor to address list');
+        addresses.push(knownContributor);
+      }
+      
+      return addresses;
+    } catch (err) {
+      console.error('❌ Failed to fetch deposit events:', err);
+      // Fallback to mock addresses if event fetching fails
+      console.log('🔄 Using fallback addresses');
+      return [
+        "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e",
+        "0x1234567890123456789012345678901234567890"
+      ];
+    }
+  };
 
   // Fetch Farcaster data for addresses
   const fetchFarcasterData = async (address: string): Promise<FarcasterUser | undefined> => {
@@ -84,12 +127,6 @@ export const useMissionContributors = () => {
           username: "defi_builder", 
           display_name: "DeFi Builder",
           pfp_url: "/api/placeholder/40/40"
-        },
-        "0x4567890123456789012345678901234567890123": {
-          fid: 45678,
-          username: "community_lead",
-          display_name: "Community Leader", 
-          pfp_url: "/api/placeholder/40/40"
         }
       };
       
@@ -100,40 +137,95 @@ export const useMissionContributors = () => {
     }
   };
 
+  // Fetch addresses on mount
+  useEffect(() => {
+    const loadAddresses = async () => {
+      console.log('🔍 Loading contributor addresses...');
+      console.log('Public client available:', !!publicClient);
+      const addresses = await fetchContributorAddresses();
+      console.log('📊 Loaded addresses:', addresses);
+      setContributorAddresses(addresses);
+    };
+    
+    loadAddresses();
+  }, [publicClient]);
+
   useEffect(() => {
     const processContributors = async () => {
       try {
         setLoading(true);
         
-        // Wait for all balance queries to complete
-        const balances = [balance1.data, balance2.data];
+        console.log('💰 Processing contributors...');
+        console.log('Total balance:', totalBalance?.toString());
+        console.log('Contributor addresses:', contributorAddresses);
+        console.log('Public client:', !!publicClient);
         
-        if (!totalBalance || balances.some(b => b === undefined)) {
+        if (!totalBalance || contributorAddresses.length === 0 || !publicClient) {
+          console.log('⏳ Still loading - missing:', {
+            totalBalance: !!totalBalance,
+            addresses: contributorAddresses.length,
+            publicClient: !!publicClient
+          });
           return; // Still loading
         }
 
-        // Create contributor data with balances and Farcaster profiles
-        const contributorPromises = mockContributorAddresses.map(async (address, index) => {
-          const balance = balances[index] as bigint;
-          
-          // Use actual balance from contract, no mock data
-          const finalBalance = balance || 0n;
-          const farcasterUser = await fetchFarcasterData(address);
-          
-          const percentage = totalBalance && totalBalance > 0n ? 
-            (Number(finalBalance) / Number(totalBalance)) * 100 : 
-            0;
+        // Fetch balances for all contributor addresses
+        const contributorPromises = contributorAddresses.map(async (address) => {
+          try {
+            console.log(`💳 Checking balance for address: ${address}`);
+            
+            // Try both balanceOf and deposits functions to see which one has data
+            const balance = await publicClient.readContract({
+              address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+              abi: STREME_STAKING_REWARDS_FUNDER_ABI,
+              functionName: "balanceOf",
+              args: [address as `0x${string}`],
+            }) as bigint;
 
-          return {
-            address,
-            balance: finalBalance,
-            farcasterUser,
-            rank: 0, // Will be set after sorting
-            percentage
-          };
+            const deposits = await publicClient.readContract({
+              address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+              abi: STREME_STAKING_REWARDS_FUNDER_ABI,
+              functionName: "deposits",
+              args: [address as `0x${string}`],
+            }) as bigint;
+
+            console.log(`💰 Address ${address}: balanceOf=${balance.toString()}, deposits=${deposits.toString()}`);
+
+            const farcasterUser = await fetchFarcasterData(address);
+            
+            // Use whichever balance is greater (balanceOf should be the current balance)
+            const actualBalance = balance > deposits ? balance : deposits;
+            
+            const percentage = totalBalance && totalBalance > 0n ? 
+              (Number(actualBalance) / Number(totalBalance)) * 100 : 
+              0;
+
+            return {
+              address,
+              balance: actualBalance,
+              farcasterUser,
+              rank: 0, // Will be set after sorting
+              percentage
+            };
+          } catch (err) {
+            console.warn(`❌ Failed to fetch balance for ${address}:`, err);
+            return {
+              address,
+              balance: 0n,
+              farcasterUser: undefined,
+              rank: 0,
+              percentage: 0
+            };
+          }
         });
 
         const contributorData = await Promise.all(contributorPromises);
+        
+        console.log('📋 Raw contributor data:', contributorData.map(c => ({
+          address: c.address,
+          balance: c.balance.toString(),
+          hasBalance: c.balance > 0n
+        })));
         
         // Filter out zero balances and sort by balance
         const filteredAndSorted = contributorData
@@ -144,7 +236,58 @@ export const useMissionContributors = () => {
             rank: index + 1
           }));
 
-        setContributors(filteredAndSorted);
+        console.log('✅ Final contributors:', filteredAndSorted.length, 'with balances');
+        console.log('📊 Summary:', {
+          totalAddressesChecked: contributorData.length,
+          addressesWithBalances: filteredAndSorted.length,
+          totalBalance: totalBalance?.toString(),
+          contributors: filteredAndSorted.map(c => ({
+            address: c.address,
+            balance: c.balance.toString(),
+            percentage: c.percentage.toFixed(2) + '%'
+          }))
+        });
+        
+        // If no real contributors found, show mock data for development
+        if (filteredAndSorted.length === 0 && totalBalance && totalBalance > 0n) {
+          console.log('🎭 No real contributors found, showing mock data for development');
+          const mockContributors: ContributorData[] = [
+            {
+              address: "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e",
+              balance: totalBalance / 3n, // 1/3 of total
+              farcasterUser: {
+                fid: 12345,
+                username: "streamer1",
+                display_name: "Top Streamer",
+                pfp_url: "/api/placeholder/40/40"
+              },
+              rank: 1,
+              percentage: 33.33
+            },
+            {
+              address: "0x1234567890123456789012345678901234567890",
+              balance: totalBalance / 4n, // 1/4 of total
+              farcasterUser: {
+                fid: 23456,
+                username: "defi_builder", 
+                display_name: "DeFi Builder",
+                pfp_url: "/api/placeholder/40/40"
+              },
+              rank: 2,
+              percentage: 25.0
+            },
+            {
+              address: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+              balance: totalBalance / 6n, // 1/6 of total
+              farcasterUser: undefined,
+              rank: 3,
+              percentage: 16.67
+            }
+          ];
+          setContributors(mockContributors);
+        } else {
+          setContributors(filteredAndSorted);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -153,7 +296,7 @@ export const useMissionContributors = () => {
     };
 
     processContributors();
-  }, [totalBalance, balance1.data, balance2.data]);
+  }, [totalBalance, contributorAddresses, publicClient]);
 
   const formatContribution = (balance: bigint): string => {
     const formatted = formatUnits(balance, 18);

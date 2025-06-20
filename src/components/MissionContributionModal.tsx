@@ -8,6 +8,7 @@ import {
   useStakingContractActions, 
   formatStakeAmount 
 } from "@/src/hooks/useStremeStakingContract";
+import { useStremePrice } from "@/src/hooks/useStremePrice";
 
 interface MissionContributionModalProps {
   mission: Mission;
@@ -22,17 +23,16 @@ export const MissionContributionModal = ({
 }: MissionContributionModalProps) => {
   const { isConnected } = useAccount();
   const [amount, setAmount] = useState("");
+  const [percentage, setPercentage] = useState(0);
   const [step, setStep] = useState<'input' | 'approve' | 'deposit' | 'success'>('input');
   const [error, setError] = useState("");
-  // const [shouldAutoDeposit, setShouldAutoDeposit] = useState(false);
+  const { price } = useStremePrice();
 
   const {
     userStakedTokenBalance,
     userAllowance,
     userDepositBalance,
     isPaused,
-    stakedStremeCoinAddress,
-    contractAddress,
     refetchAllowance,
     refetchUserBalance
   } = useStremeStakingContract();
@@ -98,11 +98,42 @@ export const MissionContributionModal = ({
   const handleAmountChange = (value: string) => {
     setAmount(value);
     setError("");
+    
+    // Update percentage based on amount
+    if (userStakedTokenBalance && value) {
+      const numericAmount = parseFloat(value);
+      const maxAmount = Number(userStakedTokenBalance) / 1e18;
+      const newPercentage = Math.min(100, (numericAmount / maxAmount) * 100);
+      setPercentage(newPercentage);
+    } else {
+      setPercentage(0);
+    }
+  };
+
+  const handlePercentageChange = (newPercentage: number) => {
+    setPercentage(newPercentage);
+    setError("");
+    
+    if (userStakedTokenBalance) {
+      const maxAmount = Number(userStakedTokenBalance) / 1e18;
+      let newAmount = (maxAmount * newPercentage) / 100;
+      
+      // For 100%, round down to avoid precision issues
+      if (newPercentage === 100) {
+        newAmount = Math.floor(maxAmount * 1e6) / 1e6;
+      }
+      
+      setAmount(newAmount.toString());
+    }
   };
 
   const handleMaxClick = () => {
     if (userStakedTokenBalance) {
-      setAmount(userStakedBalance);
+      const maxAmount = Number(userStakedTokenBalance) / 1e18;
+      // Round down to avoid precision issues and ensure we don't exceed the balance
+      const roundedMaxAmount = Math.floor(maxAmount * 1e6) / 1e6; // Round down to 6 decimal places
+      setAmount(roundedMaxAmount.toString());
+      setPercentage(100);
     }
   };
 
@@ -217,14 +248,11 @@ export const MissionContributionModal = ({
             You&apos;ve successfully contributed <strong>{amount} staked STREME</strong> to 
             <strong> {mission.title}</strong>!
           </p>
-          <div className="bg-base-200 rounded-lg p-4 mb-4 text-left">
-            <h4 className="font-semibold text-sm mb-2">📝 What happens next?</h4>
-            <ul className="text-sm text-base-content/70 space-y-1">
-              <li>• Your funds are now helping Streme bid on the daily QR auction</li>
-              <li>• You can track your contribution on the leaderboard</li>
-              <li>• You can withdraw your $STREME tokens at any time</li>
-              <li>• If we win, the QR code will point to Streme for 24 hours!</li>
-            </ul>
+          <div className="bg-primary/10 rounded-lg p-4 mb-4">
+            <p className="text-sm">
+              Your contribution is now part of the QR auction fund. When we win, 
+              thousands will discover Streme through the QR placement!
+            </p>
           </div>
           {hash && (
             <p className="text-sm text-base-content/70 mb-4">
@@ -235,16 +263,14 @@ export const MissionContributionModal = ({
             <button className="btn btn-ghost" onClick={onClose}>
               Close
             </button>
-            <button 
+            <a 
               className="btn btn-primary"
-              onClick={() => {
-                onClose();
-                // TODO: Navigate to contributions dashboard
-                // window.location.href = '/dashboard/contributions';
-              }}
+              href="https://qrcoin.fun"
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              View My Contributions
-            </button>
+              View QR Auction
+            </a>
           </div>
         </div>
       </div>
@@ -258,21 +284,20 @@ export const MissionContributionModal = ({
           Contribute to {mission.title}
         </h3>
 
-        {/* Mission Info */}
+        {/* Mission Progress */}
         <div className="bg-base-200 rounded-lg p-4 mb-6">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium">Mission Progress</span>
+          <div className="flex justify-between items-center mb-3">
+            <span className="font-medium">Goal Progress</span>
             <span className="text-sm text-base-content/70">
-              {(mission.currentAmount / 1000000).toFixed(1)}M / {(mission.goal / 1000000).toFixed(1)}M STREME
+              ${(mission.currentAmount * (price || 0)).toFixed(0)} / ${mission.goal}
             </span>
           </div>
-          <div className="w-full bg-base-300 rounded-full h-3 mb-2">
+          <div className="w-full bg-base-300 rounded-full h-3">
             <div 
               className="h-3 rounded-full bg-primary transition-all duration-500"
               style={{ width: `${Math.min(progressPercentage, 100)}%` }}
             ></div>
           </div>
-          <p className="text-sm text-base-content/70">{mission.description}</p>
         </div>
 
         {/* User Balances */}
@@ -302,11 +327,6 @@ export const MissionContributionModal = ({
             <span className="label-text">Amount to Contribute</span>
             <span className="label-text-alt">
               Available: {userStakedBalance} staked STREME
-              {userStakedTokenBalance && (
-                <span className="block text-xs text-base-content/50">
-                  (Raw: {userStakedTokenBalance.toString()})
-                </span>
-              )}
             </span>
           </label>
           <div className="input-group">
@@ -325,6 +345,45 @@ export const MissionContributionModal = ({
             >
               MAX
             </button>
+          </div>
+          
+          {/* Percentage Slider */}
+          <div className="mt-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="label-text text-sm">Percentage of Balance</span>
+              <span className="label-text-alt text-sm">{percentage.toFixed(0)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={percentage}
+              onChange={(e) => handlePercentageChange(Number(e.target.value))}
+              className="range range-primary"
+              step="1"
+              disabled={step !== 'input'}
+            />
+            <div className="w-full flex justify-between text-xs text-base-content/60 mt-1">
+              <span>0%</span>
+              <span>25%</span>
+              <span>50%</span>
+              <span>75%</span>
+              <span>100%</span>
+            </div>
+          </div>
+          
+          {/* Quick Percentage Buttons */}
+          <div className="flex gap-2 mt-3">
+            {[25, 50, 75, 100].map((pct) => (
+              <button
+                key={pct}
+                className={`btn btn-sm flex-1 ${percentage === pct ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => handlePercentageChange(pct)}
+                disabled={step !== 'input'}
+              >
+                {pct}%
+              </button>
+            ))}
           </div>
         </div>
 
@@ -355,24 +414,6 @@ export const MissionContributionModal = ({
             <span>⚠️ Contract is currently paused</span>
           </div>
         )}
-        
-        {/* Debug Info */}
-        <div className="collapse collapse-arrow bg-base-200 mb-4">
-          <input type="checkbox" /> 
-          <div className="collapse-title text-sm font-medium">
-            Debug Info (Click to expand)
-          </div>
-          <div className="collapse-content text-xs space-y-2">
-            <div>Staked Token Address: {stakedStremeCoinAddress || 'Not loaded'}</div>
-            <div>User Balance (raw): {userStakedTokenBalance?.toString() || 'Not loaded'}</div>
-            <div>User Balance (formatted): {userStakedBalance}</div>
-            <div>User Allowance: {userAllowance?.toString() || 'Not loaded'}</div>
-            <div>Amount to contribute (wei): {amount && !isNaN(parseFloat(amount)) ? BigInt(parseFloat(amount) * 1e18).toString() : 'N/A'}</div>
-            <div>Contract Address: {contractAddress}</div>
-            <div>Is Paused: {isPaused?.toString()}</div>
-            <div>Current Step: {step}</div>
-          </div>
-        </div>
 
         {/* Transaction Steps */}
         {step !== 'input' && (

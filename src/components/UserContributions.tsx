@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useAccount } from "wagmi";
-import { 
-  useStremeStakingContract, 
+import {
+  useStremeStakingContract,
   useStakingContractActions,
-  formatStakeAmount 
+  formatStakeAmount,
 } from "@/src/hooks/useStremeStakingContract";
 import { useStremePrice } from "@/src/hooks/useStremePrice";
 
@@ -14,31 +14,27 @@ export const UserContributions = () => {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
-  
-  const {
-    userDepositBalance,
-    totalBalance,
-    isPaused,
-    refetchUserBalance
-  } = useStremeStakingContract();
-  
+
+  const { userDepositBalance, totalBalance, isPaused, refetchUserBalance } =
+    useStremeStakingContract();
+
   const {
     withdrawTokens,
     withdrawAllTokens,
     isWithdrawing,
     isConfirming,
-    // isConfirmed,
     error,
-    hash
+    hash,
   } = useStakingContractActions();
-  
+
   const { formatUsd } = useStremePrice();
-  
+
   const userContribution = formatStakeAmount(userDepositBalance);
-  const userPercentage = userDepositBalance && totalBalance && totalBalance > 0n
-    ? ((Number(userDepositBalance) / Number(totalBalance)) * 100).toFixed(2)
-    : "0";
-  
+  const userPercentage =
+    userDepositBalance && totalBalance && totalBalance > 0n
+      ? ((Number(userDepositBalance) / Number(totalBalance)) * 100).toFixed(1)
+      : "0";
+
   const handleWithdraw = async (withdrawAll: boolean = false) => {
     try {
       setWithdrawing(true);
@@ -59,131 +55,145 @@ export const UserContributions = () => {
 
   if (!isConnected) {
     return (
-      <div className="card bg-base-100 shadow-xl">
-        <div className="card-body">
-          <h2 className="card-title">My Contributions</h2>
-          <p className="text-base-content/70">Connect your wallet to view your mission contributions.</p>
-        </div>
+      <div className="alert">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          className="stroke-info shrink-0 w-6 h-6"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          ></path>
+        </svg>
+        <span>Connect your wallet to view and manage your contributions</span>
       </div>
     );
   }
 
   return (
     <>
-      <div className="card bg-base-100 shadow-xl">
-        <div className="card-body">
-          <h2 className="card-title flex justify-between items-center">
-            <span>My QR Auction Contributions</span>
-            {userDepositBalance && userDepositBalance > 0n && (
-              <button
-                className="btn btn-sm btn-outline"
-                onClick={() => setShowWithdrawModal(true)}
-                disabled={isPaused}
-              >
-                Manage
-              </button>
-            )}
-          </h2>
-          
-          {userDepositBalance && userDepositBalance > 0n ? (
-            <div className="space-y-4">
-              <div className="stats shadow">
-                <div className="stat">
-                  <div className="stat-title">Your Contribution</div>
-                  <div className="stat-value text-primary">{userContribution}</div>
-                  <div className="stat-desc">{formatUsd(parseFloat(userContribution))}</div>
-                </div>
-                
-                <div className="stat">
-                  <div className="stat-title">Your Share</div>
-                  <div className="stat-value text-secondary">{userPercentage}%</div>
-                  <div className="stat-desc">of total contributions</div>
-                </div>
-              </div>
-              
-              <div className="bg-base-200 rounded-lg p-4">
-                <h4 className="font-semibold text-sm mb-2">🎯 Mission Status</h4>
-                <p className="text-sm text-base-content/70">
-                  Your $STREME is actively funding bids for the daily QR auction at qrcoin.fun.
-                  When we win, thousands will see Streme through the QR code!
-                  <br /><br />
-                  <strong className="text-primary">Remember: You can withdraw your funds anytime using the button above!</strong>
-                </p>
-              </div>
-              
-              <div className="text-sm text-base-content/60">
-                💡 You can withdraw your contribution at any time
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-4">🚀</div>
-              <p className="text-base-content/70 mb-4">
-                You haven&apos;t contributed to the QR auction mission yet.
+      {userDepositBalance && userDepositBalance > 0n ? (
+        <div className="alert alert-info flex flex-col">
+          <div className="flex flex-row">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              className="stroke-current shrink-0 w-6 h-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+            <div className="flex-1">
+              <h3 className="font-bold">Your Mission Contribution</h3>
+              <p className="text-sm">
+                You&apos;re contributing{" "}
+                <span className="font-bold">{userContribution} STREME</span> (
+                {formatUsd(parseFloat(userContribution))}) to the QR auction
+                fund - that&apos;s {userPercentage}% of the total pool!
               </p>
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-4">
-                <p className="text-sm font-semibold text-primary mb-1">
-                  💰 Flexible Contributions
-                </p>
-                <p className="text-xs text-base-content/70">
-                  Your tokens remain yours • Withdraw anytime • No lock-up period
-                </p>
-              </div>
             </div>
-          )}
+          </div>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => setShowWithdrawModal(true)}
+            disabled={isPaused}
+          >
+            Withdraw Funds
+          </button>
         </div>
-      </div>
+      ) : (
+        <div className="text-center py-6 px-4 bg-base-200 rounded-lg">
+          <p className="text-base-content/70 mb-2">
+            Join the mission to help Streme win daily QR auctions!
+          </p>
+          <p className="text-sm text-base-content/60">
+            Your tokens remain yours • Withdraw anytime • No lock-up
+          </p>
+        </div>
+      )}
 
-      {/* Withdraw Modal */}
+      {/* Simplified Withdraw Modal */}
       {showWithdrawModal && (
         <div className="modal modal-open">
           <div className="modal-box">
-            <h3 className="font-bold text-lg mb-4">Withdraw Contribution</h3>
-            
+            <h3 className="font-bold text-lg mb-4">Withdraw Your Funds</h3>
+
             {error && (
               <div className="alert alert-error mb-4">
                 <span>{error.message || "Withdrawal failed"}</span>
               </div>
             )}
-            
-            <div className="bg-base-200 rounded-lg p-4 mb-4">
-              <div className="text-sm text-base-content/70 mb-2">Available to withdraw</div>
-              <div className="text-2xl font-bold">{userContribution} STREME</div>
-              <div className="text-sm text-accent">{formatUsd(parseFloat(userContribution))}</div>
-            </div>
-            
-            <div className="form-control mb-4">
-              <label className="label">
-                <span className="label-text">Withdraw Amount</span>
-              </label>
-              <div className="input-group">
-                <input
-                  type="number"
-                  placeholder="0.0"
-                  className="input input-bordered flex-1"
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                  disabled={withdrawing || isWithdrawing || isConfirming}
-                />
-                <button 
-                  className="btn btn-outline"
-                  onClick={() => setWithdrawAmount(userContribution)}
-                  disabled={withdrawing || isWithdrawing || isConfirming}
-                >
-                  MAX
-                </button>
+
+            <div className="bg-primary/10 rounded-lg p-6 mb-6 text-center">
+              <div className="text-3xl font-bold text-primary mb-1">
+                {userContribution} STREME
+              </div>
+              <div className="text-lg">
+                {formatUsd(parseFloat(userContribution))}
+              </div>
+              <div className="text-sm text-base-content/70 mt-2">
+                Available to withdraw
               </div>
             </div>
-            
-            {isPaused && (
-              <div className="alert alert-warning mb-4">
-                <span>⚠️ Contract is currently paused</span>
+
+            <div className="space-y-3">
+              <button
+                className="btn btn-primary btn-block btn-lg"
+                onClick={() => handleWithdraw(true)}
+                disabled={
+                  withdrawing || isWithdrawing || isConfirming || isPaused
+                }
+              >
+                {isWithdrawing || isConfirming ? (
+                  <>
+                    <span className="loading loading-spinner loading-sm"></span>
+                    Processing...
+                  </>
+                ) : (
+                  "Withdraw All Funds"
+                )}
+              </button>
+
+              <div className="divider text-sm">OR WITHDRAW CUSTOM AMOUNT</div>
+
+              <div className="form-control">
+                <div className="input-group">
+                  <input
+                    type="number"
+                    placeholder="0.0"
+                    className="input input-bordered flex-1"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    disabled={withdrawing || isWithdrawing || isConfirming}
+                  />
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => handleWithdraw(false)}
+                    disabled={
+                      !withdrawAmount ||
+                      parseFloat(withdrawAmount) <= 0 ||
+                      withdrawing ||
+                      isWithdrawing ||
+                      isConfirming ||
+                      isPaused
+                    }
+                  >
+                    Withdraw
+                  </button>
+                </div>
               </div>
-            )}
-            
-            <div className="modal-action">
-              <button 
-                className="btn btn-ghost"
+
+              <button
+                className="btn btn-ghost btn-block"
                 onClick={() => {
                   setShowWithdrawModal(false);
                   setWithdrawAmount("");
@@ -192,47 +202,15 @@ export const UserContributions = () => {
               >
                 Cancel
               </button>
-              <button
-                className="btn btn-primary"
-                onClick={() => handleWithdraw(false)}
-                disabled={
-                  !withdrawAmount || 
-                  parseFloat(withdrawAmount) <= 0 ||
-                  withdrawing || 
-                  isWithdrawing || 
-                  isConfirming ||
-                  isPaused
-                }
-              >
-                {isWithdrawing || isConfirming ? (
-                  <>
-                    <span className="loading loading-spinner loading-sm"></span>
-                    Withdrawing...
-                  </>
-                ) : (
-                  'Withdraw'
-                )}
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={() => handleWithdraw(true)}
-                disabled={withdrawing || isWithdrawing || isConfirming || isPaused}
-              >
-                {isWithdrawing || isConfirming ? (
-                  <>
-                    <span className="loading loading-spinner loading-sm"></span>
-                    Withdrawing All...
-                  </>
-                ) : (
-                  'Withdraw All'
-                )}
-              </button>
             </div>
-            
+
             {hash && (
               <div className="text-center mt-4">
                 <p className="text-sm text-base-content/70">
-                  Transaction: <span className="font-mono">{hash.slice(0, 10)}...{hash.slice(-8)}</span>
+                  Transaction:{" "}
+                  <span className="font-mono">
+                    {hash.slice(0, 10)}...{hash.slice(-8)}
+                  </span>
                 </p>
               </div>
             )}

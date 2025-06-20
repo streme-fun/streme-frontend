@@ -1,186 +1,297 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Mission, MissionCategory, MissionStats } from "@/src/app/types/mission";
+import { Mission, MissionCategory } from "@/src/app/types/mission";
 import { MissionCard } from "@/src/components/MissionCard";
-import { MissionStreamAnimation } from "@/src/components/MissionStreamAnimation";
-import { MissionLeaderboard } from "@/src/components/MissionLeaderboard";
+// import { MissionLeaderboard } from "@/src/components/MissionLeaderboard";
 import { UserContributions } from "@/src/components/UserContributions";
 import { useStremePrice } from "@/src/hooks/useStremePrice";
-import { useMissionContributors } from "@/src/hooks/useMissionContributors";
+// import { useMissionContributors } from "@/src/hooks/useMissionContributors";
+import { useReadContract } from "wagmi";
+import { ERC20_ABI } from "@/src/lib/contracts/StremeStakingRewardsFunder";
+import { useState, useEffect, useRef } from "react";
+import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
+import { StreamAnimation } from "@/src/components/StreamAnimation";
 
 export default function MissionsPage() {
-  const [missionStats, setMissionStats] = useState<MissionStats | null>(null);
-  const [loading, setLoading] = useState(true);
   const { price } = useStremePrice();
-  const { contributors, totalBalance } = useMissionContributors();
+  // const { contributors, loading } = useMissionContributors();
 
-  // Featured mission: Fund QR Auction Win
-  const featuredMission: Mission = {
+  // STREME token contract address
+  const STREME_TOKEN_ADDRESS = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
+  // Deposit contract address
+  const DEPOSIT_CONTRACT_ADDRESS = "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
+
+  // Read STREME token balance in the deposit contract
+  const { data: stremeBalance, refetch: refetchStremeBalance } =
+    useReadContract({
+      address: STREME_TOKEN_ADDRESS as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [DEPOSIT_CONTRACT_ADDRESS as `0x${string}`],
+    });
+
+  // State for animated balance
+  const [baseStremeAmount, setBaseStremeAmount] = useState<number>(0);
+  const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
+  const [stremeGrowthRate, setStremeGrowthRate] = useState<number>(0); // STREME per second
+  const previousBalanceRef = useRef<number>(0);
+  const lastBalanceUpdateRef = useRef<number>(Date.now());
+
+  // Animated STREME balance
+  const animatedStremeBalance = useStreamingNumber({
+    baseAmount: baseStremeAmount,
+    flowRatePerSecond: stremeGrowthRate,
+    lastUpdateTime,
+    updateInterval: 16, // ~60fps for ultra-smooth animation (16ms ≈ 60fps)
+    pauseWhenHidden: true,
+  });
+
+  // Effect to track STREME balance changes and calculate growth rate
+  useEffect(() => {
+    if (!stremeBalance) return;
+
+    const currentBalance = Number(stremeBalance) / 1e18;
+    const now = Date.now();
+
+    if (previousBalanceRef.current > 0) {
+      const timeDiff = (now - lastBalanceUpdateRef.current) / 1000; // seconds
+      const balanceDiff = currentBalance - previousBalanceRef.current;
+
+      if (timeDiff > 0 && balanceDiff > 0) {
+        const newGrowthRate = balanceDiff / timeDiff;
+        setStremeGrowthRate(newGrowthRate);
+      }
+    }
+
+    setBaseStremeAmount(currentBalance);
+    setLastUpdateTime(now);
+    previousBalanceRef.current = currentBalance;
+    lastBalanceUpdateRef.current = now;
+  }, [stremeBalance]);
+
+  // Refetch STREME balance periodically to update growth rate
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetchStremeBalance();
+    }, 30000); // Refetch every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [refetchStremeBalance]);
+
+  // QR Auction Mission - Our single focused mission
+  const qrMission: Mission = {
     id: "qr-auction-fund",
     title: "Fund QR Auction Win",
-    description: "Help Streme win the daily QR auction at qrcoin.fun! Winners decide where the QR code points for that day, bringing massive attention to their website through daily announcements on X, Farcaster notifications, and growing physical/digital QR distribution. Your staked $STREME funds our bid to showcase Streme to thousands of viewers.",
+    description:
+      "Pool funds to win daily auctions at qrcoin.fun. Winners control where a QR code points for 24 hours, getting massive exposure through X announcements and Farcaster notifications.",
     imageUrl: "/api/placeholder/600/300",
     goal: 1000, // $1000 USD goal
     currentAmount: 0, // Will be calculated from actual contributions
     startDate: "2024-12-01T00:00:00Z",
-    endDate: undefined, // No end date - ongoing
+    endDate: undefined,
     isActive: true,
     category: MissionCategory.DEVELOPMENT,
-    totalContributors: 47,
+    totalContributors: 0,
     createdBy: "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e",
-    rewards: []
+    rewards: [],
   };
-  
-  // Calculate USD value of contributions
-  const totalStremeAmount = totalBalance ? Number(totalBalance) / 1e18 : 0;
+
+  // Calculate values using animated balance
+  const totalStremeAmount = animatedStremeBalance;
   const totalUsdValue = price ? totalStremeAmount * price : 0;
-  const progressPercentage = (totalUsdValue / featuredMission.goal) * 100;
-  
-  // Calculate estimated completion time
-  // Assuming $50/day average contribution rate based on current progress
-  const dailyRate = contributors.length > 0 ? totalUsdValue / Math.max(1, contributors.length) : 50;
-  const remainingUsd = featuredMission.goal - totalUsdValue;
-  const estimatedDays = Math.ceil(remainingUsd / dailyRate);
+  const remainingUsd = Math.max(0, qrMission.goal - totalUsdValue);
 
-  useEffect(() => {
-    // Simulate API call
-    const mockStats: MissionStats = {
-      totalMissions: 1,
-      activeMissions: 1,
-      totalValueLocked: 12500000,
-      totalContributors: 47,
-      completedMissions: 0
-    };
-    
-    setTimeout(() => {
-      setMissionStats(mockStats);
-      setLoading(false);
-    }, 1000);
-  }, []);
+  // Calculate growth rates for display
+  const stremePerHour = stremeGrowthRate * 3600;
+  const stremePerDay = stremeGrowthRate * 86400;
+  const usdPerDay = price ? stremePerDay * price : 0;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-base-100 flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg"></span>
-      </div>
-    );
-  }
+  // Dynamic decimal precision based on growth rate
+  const getDecimalPrecision = (growthRate: number): number => {
+    // Always show at least 2 decimals for visible movement
+    if (growthRate <= 0) return 2;
+
+    // For very slow growth (< 0.001 STREME/second), show 6 decimals
+    if (growthRate < 0.001) return 6;
+    // For slow growth (< 0.01 STREME/second), show 4 decimals
+    if (growthRate < 0.01) return 4;
+    // For moderate growth (< 0.1 STREME/second), show 3 decimals
+    if (growthRate < 0.1) return 3;
+    // For faster growth (< 1 STREME/second), show 2 decimals
+    if (growthRate < 1) return 2;
+    // For very fast growth, minimum 2 decimals
+    if (growthRate < 10) return 2;
+    // For extremely fast growth, minimum 2 decimals
+    return 2;
+  };
+
+  const decimalPrecision = getDecimalPrecision(stremeGrowthRate);
 
   return (
-    <div className="min-h-screen bg-base-100">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 to-secondary/10">
-        <div className="absolute inset-0">
-          <MissionStreamAnimation />
-        </div>
-        <div className="relative container mx-auto px-4 py-16">
-          <div className="text-center space-y-6">
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Fund QR Auction Win
-            </h1>
-            <p className="text-xl text-base-content/70 max-w-3xl mx-auto">
-              Help Streme win the daily auction at <a href="https://qrcoin.fun" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">qrcoin.fun</a>! 
-              Winners get massive exposure through daily announcements reaching thousands of viewers. 
-              Your staked $STREME funds our winning bids.
+    <div className="min-h-screen mt-20">
+      {/* Hero Section - Simplified and focused */}
+      <div className="">
+        <div className="container mx-auto px-4 py-12">
+          <div className="text-center">
+            <h1 className="text-lg uppercase text-base-600 mb-2">Mission</h1>
+            <h2 className="text-3xl font-bold">Fund Streme $QR Auction Win</h2>
+            <p className="text-lg text-base-content/70 max-w-2xl mx-auto mt-4">
+              Redirect your staked STREME rewards to help Streme win a{" "}
+              <a
+                href="https://qrcoin.fun"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                qrcoin.fun
+              </a>{" "}
+              auction
             </p>
-            
-            {/* Mission Progress Stats */}
-            {missionStats && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-8 max-w-2xl mx-auto">
-                <div className="bg-base-200/50 backdrop-blur-sm rounded-lg p-4">
-                  <div className="text-2xl font-bold text-primary">
-                    ${totalUsdValue.toFixed(0)}
-                  </div>
-                  <div className="text-sm text-base-content/70">USD Raised</div>
-                  <div className="text-xs text-base-content/50">
-                    {totalStremeAmount > 1000000 ? `${(totalStremeAmount / 1000000).toFixed(1)}M` : totalStremeAmount.toFixed(0)} $STREME
-                  </div>
+
+            {/* STREME Balance Display */}
+            <div className="mt-6 p-4 rounded-lg max-w-4xl mx-auto">
+              <div className="text-center">
+                {/* Stream Animation */}
+                <div className="mb-4">
+                  <StreamAnimation
+                    contributorCount={20} // Fixed count for animation
+                    growthRate={Math.max(stremeGrowthRate, 0.1)} // Ensure some growth rate for testing
+                  />
                 </div>
-                <div className="bg-base-200/50 backdrop-blur-sm rounded-lg p-4">
-                  <div className="text-2xl font-bold text-secondary">{contributors.length}</div>
-                  <div className="text-sm text-base-content/70">Contributors</div>
+
+                <div className="text-2xl font-bold font-mono">
+                  {totalStremeAmount.toLocaleString("en-US", {
+                    minimumFractionDigits: decimalPrecision,
+                    maximumFractionDigits: decimalPrecision,
+                  })}{" "}
+                  STREME
                 </div>
-                <div className="bg-base-200/50 backdrop-blur-sm rounded-lg p-4">
-                  <div className="text-2xl font-bold text-accent">
-                    {progressPercentage.toFixed(1)}%
-                  </div>
-                  <div className="text-sm text-base-content/70">Complete</div>
-                  <div className="text-xs text-base-content/50">
-                    ~{estimatedDays} days to goal
-                  </div>
+                <div className="text-lg font-semibold font-mono text-primary">
+                  $
+                  {totalUsdValue.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </div>
+
+                {/* Growth Rate Display */}
+                {stremeGrowthRate > 0 && (
+                  <div className="mt-3 pt-3 border-t border-primary/20">
+                    <div className="text-xs font-semibold text-primary/80 mb-1">
+                      Growth Rate
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-base-100/50 rounded p-2">
+                        <div className="font-semibold font-mono">
+                          +
+                          {stremePerHour.toLocaleString("en-US", {
+                            minimumFractionDigits: Math.max(
+                              2,
+                              Math.min(decimalPrecision - 1, 4)
+                            ),
+                            maximumFractionDigits: Math.max(
+                              2,
+                              Math.min(decimalPrecision - 1, 4)
+                            ),
+                          })}
+                        </div>
+                        <div className="text-base-content/60">STREME/hour</div>
+                      </div>
+                      <div className="bg-base-100/50 rounded p-2">
+                        <div className="font-semibold font-mono">
+                          +$
+                          {usdPerDay.toLocaleString("en-US", {
+                            minimumFractionDigits:
+                              stremeGrowthRate < 0.01 ? 4 : 2,
+                            maximumFractionDigits:
+                              stremeGrowthRate < 0.01 ? 4 : 2,
+                          })}
+                        </div>
+                        <div className="text-base-content/60">USD/day</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
-        {/* User Contributions Section - Make withdrawal obvious */}
-        <div className="max-w-4xl mx-auto mb-8">
+      <div className="container mx-auto px-4 py-6 sm:py-8 max-w-6xl">
+        {/* User Contributions - Prominent placement */}
+        <div className="mb-6 sm:mb-8">
           <UserContributions />
         </div>
 
-        {/* Featured Mission Display */}
-        <div className="max-w-4xl mx-auto mb-12 mission-card">
+        {/* Mission Card - Central focus */}
+        <div className="mb-8 sm:mb-12">
           <MissionCard
             mission={{
-              ...featuredMission,
-              currentAmount: totalStremeAmount, // Pass STREME amount, MissionCard will convert to USD
-              totalContributors: contributors.length
+              ...qrMission,
+              currentAmount: totalStremeAmount,
+              totalContributors: 0,
             }}
           />
         </div>
 
         {/* How It Works */}
-        <div className="bg-base-200 rounded-xl p-6 mb-8">
-          <h2 className="text-2xl font-bold mb-6">💡 How It Works</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-base-100 rounded-lg p-4">
-              <div className="text-3xl mb-3">1️⃣</div>
-              <h3 className="font-semibold mb-2">You Contribute $STREME</h3>
-              <p className="text-sm text-base-content/70">
-                Stake your $STREME tokens to the mission fund. Your tokens remain yours and can be withdrawn anytime.
-              </p>
+        <div className="bg-base-200 rounded-xl p-4 sm:p-6 max-w-4xl mx-auto">
+          <h2 className="text-xl font-bold mb-4">How It Works</h2>
+          <div className="space-y-4">
+            <div className="flex gap-3">
+              <div className="text-2xl">1️⃣</div>
+              <div>
+                <h3 className="font-semibold">Contribute Staked STREME</h3>
+                <p className="text-sm text-base-content/70">
+                  Your tokens remain yours and earn rewards. Withdraw anytime.
+                </p>
+              </div>
             </div>
-            <div className="bg-base-100 rounded-lg p-4">
-              <div className="text-3xl mb-3">2️⃣</div>
-              <h3 className="font-semibold mb-2">We Bid Daily</h3>
-              <p className="text-sm text-base-content/70">
-                The pooled funds are used to bid on qrcoin.fun&apos;s daily QR auction. Winners control where the QR points for 24 hours.
-              </p>
+            <div className="flex gap-3">
+              <div className="text-2xl">2️⃣</div>
+              <div>
+                <h3 className="font-semibold">Win Daily Auctions</h3>
+                <p className="text-sm text-base-content/70">
+                  Pooled funds bid on qrcoin.fun. Winners control QR placement.
+                </p>
+              </div>
             </div>
-            <div className="bg-base-100 rounded-lg p-4">
-              <div className="text-3xl mb-3">3️⃣</div>
-              <h3 className="font-semibold mb-2">Massive Exposure</h3>
-              <p className="text-sm text-base-content/70">
-                When we win, thousands see Streme through X announcements, Farcaster notifications, and the growing QR network.
-              </p>
+            <div className="flex gap-3">
+              <div className="text-2xl">3️⃣</div>
+              <div>
+                <h3 className="font-semibold">Drive Traffic to Streme</h3>
+                <p className="text-sm text-base-content/70">
+                  QR codes bring thousands of daily visitors to our platform.
+                </p>
+              </div>
             </div>
           </div>
+
+          {/* Current Goal */}
           <div className="mt-6 p-4 bg-primary/10 rounded-lg">
-            <p className="text-sm">
-              <strong>Goal:</strong> Raise $1,000 USD to secure multiple auction wins
-              <br />
-              <strong>Current Progress:</strong> ${totalUsdValue.toFixed(2)} ({progressPercentage.toFixed(1)}%)
-              <br />
-              <strong>Estimated Completion:</strong> {estimatedDays} days at current rate
-            </p>
+            <div className="text-sm font-semibold mb-2">Current Goal</div>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>Target:</span>
+                <span className="font-semibold">${qrMission.goal}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Remaining:</span>
+                <span>${remainingUsd.toFixed(0)}</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Mission Leaderboard */}
-        <div className="bg-base-200 rounded-xl p-6">
-          <h2 className="text-2xl font-bold mb-6 flex items-center">
-            🏆 QR Auction Contributors
-          </h2>
-          <div className="mb-4 text-sm text-base-content/70">
-            Supporting Streme&apos;s bids on <a href="https://qrcoin.fun" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">qrcoin.fun</a> daily auctions
-          </div>
-          <MissionLeaderboard missionId={featuredMission.id} />
+        {/* Leaderboard - Commented out for future use */}
+        {/* 
+        <div className="bg-base-200 rounded-xl p-6 max-w-4xl mx-auto mt-8">
+          <h2 className="text-xl font-bold mb-4">Top Contributors</h2>
+          <MissionLeaderboard missionId={qrMission.id} />
         </div>
+        */}
       </div>
     </div>
   );

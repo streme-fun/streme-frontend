@@ -14,24 +14,20 @@ export const useStremePrice = () => {
   useEffect(() => {
     const fetchPrice = async () => {
       try {
-        // Using CoinGecko API to get STREME price
-        // Contract address: 0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58
-        const response = await fetch(
-          'https://api.coingecko.com/api/v3/simple/token_price/base?contract_addresses=0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58&vs_currencies=usd'
-        );
+        // Use internal API route to avoid CSP issues
+        const response = await fetch('/api/streme-price');
         
         if (!response.ok) {
-          throw new Error('Failed to fetch price');
+          throw new Error('Failed to fetch price from API');
         }
         
         const data = await response.json();
-        const priceData = data['0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58'];
         
-        if (priceData && priceData.usd) {
-          setPrice(priceData.usd);
+        if (data.success && data.price) {
+          setPrice(data.price);
+          setError(null); // Clear any previous errors
         } else {
-          // Fallback to mock price if API doesn't have data yet
-          setPrice(0.000012); // Mock price for development
+          throw new Error(data.error || 'Invalid price data');
         }
       } catch (err) {
         console.warn('Failed to fetch STREME price, using fallback:', err);

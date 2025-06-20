@@ -15,6 +15,9 @@ export const MissionLeaderboard = ({ missionId, limit = 10 }: MissionLeaderboard
   const { contributors, loading, formatContribution } = useMissionContributors();
   const { formatUsd } = useStremePrice();
 
+  console.log('🏆 MissionLeaderboard - Contributors:', contributors.length, contributors);
+  console.log('🏆 MissionLeaderboard - Loading:', loading);
+
   const entries = contributors.slice(0, limit);
 
   const getUsdValue = (balance: bigint): string => {
