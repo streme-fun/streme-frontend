@@ -309,6 +309,9 @@ export function SwapButton({
 
     // For Permit2, we need to sign the EIP-712 message and append it
     if (quoteData.permit2?.eip712) {
+      if (!walletClient) {
+        throw new Error("Wallet client required for Permit2 signing");
+      }
       const signature = await walletClient.signTypedData(
         quoteData.permit2.eip712
       );
@@ -361,7 +364,10 @@ export function SwapButton({
         ],
       });
     } else {
-      // Don't specify account, let walletClient use its connected account
+      // Desktop/mobile transaction using walletClient
+      if (!walletClient) {
+        throw new Error("Wallet client not available for desktop transaction");
+      }
       txHash = await walletClient.sendTransaction({
         to: quoteData.transaction.to as `0x${string}`,
         data: transactionData,
