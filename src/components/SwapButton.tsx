@@ -8,6 +8,7 @@ import sdk from "@farcaster/frame-sdk";
 import { useAccount, useWalletClient } from "wagmi";
 import confetti from "canvas-confetti";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
+import { Interface } from "@ethersproject/abi";
 
 interface SwapButtonProps {
   tokenAddress: string;
@@ -125,14 +126,8 @@ export function SwapButton({
       throw new Error("Wallet not available");
     }
 
-    // For mini-app, we can't check allowance or set approval since we need walletClient
-    if (isEffectivelyMiniApp) {
-      // Skip allowance check for mini-app - the transaction will handle this
-      return;
-    }
-
-    if (!walletClient) {
-      throw new Error("Wallet client not available for allowance operations");
+    if (!walletClient && !isEffectivelyMiniApp) {
+      throw new Error("Wallet client not available");
     }
 
     // Check current allowance
@@ -165,23 +160,51 @@ export function SwapButton({
     }
 
     // Set approval for the required amount
-    const approvalTxHash = await walletClient.writeContract({
-      address: tokenAddress as `0x${string}`,
-      abi: [
-        {
-          inputs: [
-            { name: "spender", type: "address" },
-            { name: "amount", type: "uint256" },
-          ],
-          name: "approve",
-          outputs: [{ name: "", type: "bool" }],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-      ],
-      functionName: "approve",
-      args: [spenderAddress as `0x${string}`, requiredAmountBigInt],
-    });
+    let approvalTxHash: `0x${string}`;
+    
+    if (isEffectivelyMiniApp) {
+      const ethProvider = await sdk.wallet.getEthereumProvider();
+      if (!ethProvider) {
+        throw new Error("Farcaster Ethereum provider not available.");
+      }
+      
+      const approveIface = new Interface([
+        "function approve(address spender, uint256 amount) external returns (bool)",
+      ]);
+      const approveData = approveIface.encodeFunctionData("approve", [
+        spenderAddress,
+        requiredAmountBigInt,
+      ]);
+      
+      approvalTxHash = await ethProvider.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            to: tokenAddress as `0x${string}`,
+            from: currentAddress as `0x${string}`,
+            data: approveData as `0x${string}`,
+          },
+        ],
+      });
+    } else {
+      approvalTxHash = await walletClient!.writeContract({
+        address: tokenAddress as `0x${string}`,
+        abi: [
+          {
+            inputs: [
+              { name: "spender", type: "address" },
+              { name: "amount", type: "uint256" },
+            ],
+            name: "approve",
+            outputs: [{ name: "", type: "bool" }],
+            stateMutability: "nonpayable",
+            type: "function",
+          },
+        ],
+        functionName: "approve",
+        args: [spenderAddress as `0x${string}`, requiredAmountBigInt],
+      });
+    }
 
     // Wait for approval transaction to be confirmed
     await publicClient.waitForTransactionReceipt({ hash: approvalTxHash });

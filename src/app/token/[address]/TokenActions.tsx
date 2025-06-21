@@ -594,7 +594,7 @@ export function TokenActions({
                 value={tradeAmount}
                 onChange={(e) => setTradeAmount(e.target.value)}
                 placeholder={tradeDirection === "buy" ? "0.001" : ""}
-                className="w-full p-5 bg-base-200 border border-base-300 rounded-lg text-lg font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full p-5 bg-base-200 border border-base-300 rounded-lg text-base font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 step="0.001"
                 min="0"
               />

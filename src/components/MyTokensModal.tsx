@@ -1079,7 +1079,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
               <input
                 type="text"
                 placeholder="Search tokens by symbol..."
-                className="input input-bordered w-full input-sm"
+                className="input input-bordered w-full text-base"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />

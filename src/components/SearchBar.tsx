@@ -14,7 +14,7 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
           placeholder="search by token/username"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="input input-bordered w-full pr-10 
+          className="input input-bordered w-full pr-10 text-base
             focus:input-primary transition-all duration-200
             placeholder:text-base-content/50"
         />

@@ -108,7 +108,7 @@ export function LaunchForm() {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="input input-ghost bg-black/[.02] dark:bg-white/[.02] w-full"
+                className="input input-ghost bg-black/[.02] dark:bg-white/[.02] w-full text-base"
                 required
               />
             </div>
@@ -124,7 +124,7 @@ export function LaunchForm() {
                 onChange={(e) =>
                   setFormData({ ...formData, symbol: e.target.value })
                 }
-                className="input input-ghost bg-black/[.02] dark:bg-white/[.02] w-full"
+                className="input input-ghost bg-black/[.02] dark:bg-white/[.02] w-full text-base"
                 required
               />
             </div>

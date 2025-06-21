@@ -488,7 +488,7 @@ ${shareUrl}`;
                 onChange={handleAmountChange}
                 placeholder="0.0000"
                 step="0.0001"
-                className="input input-bordered w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="input input-bordered w-full text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <button
                 className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs font-semibold bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600 hover:text-gray-800 transition-all active:scale-95 hover:cursor-pointer"
@@ -496,6 +496,25 @@ ${shareUrl}`;
               >
                 Max
               </button>
+            </div>
+            
+            {/* Percentage Buttons */}
+            <div className="grid grid-cols-3 gap-2 mt-2">
+              {[25, 50, 75].map((percentage) => (
+                <button
+                  key={percentage}
+                  type="button"
+                  onClick={() => {
+                    const maxAmount = Number(formatUnits(balance, 18));
+                    const calculatedAmount = (maxAmount * percentage) / 100;
+                    setAmount(calculatedAmount.toFixed(6));
+                    setIsMaxAmount(false); // Reset max flag when using percentage
+                  }}
+                  className="py-1 px-2 text-xs font-medium rounded-md border border-base-300 hover:border-base-400 hover:bg-base-200 transition-colors text-base-content/70 cursor-pointer"
+                >
+                  {percentage}%
+                </button>
+              ))}
             </div>
             <div className="text-sm opacity-60 bg-base-200 p-3 rounded-lg">
               Note: Staked tokens are locked for 24 hours before they can be
