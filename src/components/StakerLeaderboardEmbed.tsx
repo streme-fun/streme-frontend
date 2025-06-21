@@ -327,18 +327,9 @@ export function StakerLeaderboardEmbed({
         if (!user?.wallet?.address)
           throw new Error("Privy wallet not connected.");
 
-        // Find wallet with fallback logic
-        let wallet = wallets?.find((w) => w.address === user.wallet?.address);
-        if (!wallet && wallets && wallets.length > 0) {
-          wallet = wallets.find(
-            (w) =>
-              w.address?.toLowerCase() === user.wallet?.address?.toLowerCase()
-          );
-        }
-        if (!wallet && wallets && wallets.length === 1) {
-          wallet = wallets[0];
-        }
-        if (!wallet) throw new Error("Privy Wallet not found");
+        // Simplified wallet access
+        const wallet = wallets?.[0];
+        if (!wallet) throw new Error("No wallet available");
 
         const walletAddress = wallet.address;
         if (!walletAddress) throw new Error("Wallet address not available");

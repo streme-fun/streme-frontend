@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useWallets, usePrivy } from "@privy-io/react-auth";
+import { useAccount, useWalletClient } from "wagmi";
 import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
@@ -9,8 +9,9 @@ import { Modal } from "./Modal";
 import { Zap } from "lucide-react";
 import { publicClient } from "@/src/lib/viemClient";
 import sdk from "@farcaster/frame-sdk";
-import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 import { MyTokensModal } from "./MyTokensModal";
+import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
+import { useWallets } from "@privy-io/react-auth";
 
 const WETH = "0x4200000000000000000000000000000000000006";
 const toHex = (address: string) => address as `0x${string}`;
@@ -43,26 +44,32 @@ export function ZapStakeButton({
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showMyTokensModal, setShowMyTokensModal] = useState(false);
+
+  const { address: wagmiAddress } = useAccount();
+  const { data: walletClient } = useWalletClient();
   const { wallets } = useWallets();
-  const { user } = usePrivy();
-  const { primaryAddress } = useWalletAddressChange();
+  const { address: fcAddress, isConnected: fcIsConnected } = useAppFrameLogic();
 
   // Use external amount if provided, otherwise default to "0.001"
   const amountIn = externalAmount || "0.001";
 
-  const effectiveIsConnected = isMiniApp
-    ? farcasterIsConnected
-    : !!user?.wallet?.address;
-  const effectiveAddress = isMiniApp
-    ? farcasterAddress
-    : primaryAddress || user?.wallet?.address;
+  // Use explicit mini-app check with fallback to passed prop
+  const isEffectivelyMiniApp = isMiniApp || false;
+
+  const currentAddress = isEffectivelyMiniApp
+    ? farcasterAddress ?? fcAddress
+    : wagmiAddress;
+
+  const walletIsConnected = isEffectivelyMiniApp
+    ? farcasterIsConnected ?? fcIsConnected
+    : !!wagmiAddress;
 
   // Validate amount and check if transaction would be possible
   const { isValid } = useMemo(() => {
-    if (!effectiveIsConnected) {
+    if (!walletIsConnected) {
       return { isValid: false };
     }
-    if (!effectiveAddress) {
+    if (!currentAddress) {
       return { isValid: false };
     }
 
@@ -74,15 +81,15 @@ export function ZapStakeButton({
     // For validation purposes, we'll assume it's valid since we don't have balance here
     // The actual validation will happen in the transaction
     return { isValid: true };
-  }, [amountIn, effectiveIsConnected, effectiveAddress]);
+  }, [amountIn, walletIsConnected, currentAddress]);
 
   const handleZapStake = async () => {
-    if (!isValid || !effectiveAddress || !effectiveIsConnected) {
+    if (!isValid || !currentAddress || !walletIsConnected) {
       toast.error("Wallet not connected or address missing");
       return;
     }
     setIsLoading(true);
-    const toastId = toast.loading("Processing Zap & Stake...");
+    const toastId = toast.loading("Processing Buy & Stake...");
 
     try {
       const amountInWei = parseEther(amountIn);
@@ -146,12 +153,12 @@ export function ZapStakeButton({
 
       let txHash: `0x${string}`;
 
-      if (isMiniApp) {
+      if (isEffectivelyMiniApp) {
         const ethProvider = await sdk.wallet.getEthereumProvider();
         if (!ethProvider)
           throw new Error("Farcaster Ethereum provider not available.");
         const currentEthBalance = await publicClient.getBalance({
-          address: toHex(effectiveAddress!),
+          address: toHex(currentAddress!),
         });
         if (currentEthBalance < amountInWei) {
           throw new Error(
@@ -167,76 +174,84 @@ export function ZapStakeButton({
           params: [
             {
               to: toHex(zapContractAddress),
-              from: toHex(effectiveAddress!),
+              from: toHex(currentAddress!),
               data: zapData,
               value: `0x${amountInWei.toString(16)}`,
             },
           ],
         });
       } else {
-        if (!user?.wallet?.address)
-          throw new Error("Privy wallet not connected.");
-
-        // Find wallet with fallback logic similar to StakeButton
-        let wallet = wallets?.find((w) => w.address === user.wallet?.address);
-        if (!wallet && wallets && wallets.length > 0) {
-          // Try case-insensitive match
-          wallet = wallets.find(
-            (w) =>
-              w.address?.toLowerCase() === user.wallet?.address?.toLowerCase()
-          );
+        // Desktop/Mobile Path - use wagmi/privy for transaction
+        if (!currentAddress) {
+          throw new Error("Wallet not connected.");
         }
-        if (!wallet && wallets && wallets.length === 1) {
-          // Single wallet fallback
-          wallet = wallets[0];
-        }
-        if (!wallet) throw new Error("Privy Wallet not found");
 
-        // Use the wallet's actual address, not user.wallet.address
-        const walletAddress = wallet.address;
-        if (!walletAddress) throw new Error("Wallet address not available");
-
-        const provider = await wallet.getEthereumProvider();
-        await provider.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x2105" }],
-        });
-        let estimatedGas = 1200000n;
-        try {
-          estimatedGas = await publicClient.estimateGas({
-            account: toHex(walletAddress),
-            to: toHex(zapContractAddress),
-            value: amountInWei,
-            data: zapData,
-          });
-        } catch (e) {
-          console.error("Gas estimation failed (Privy):", e);
-        }
-        const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.2));
+        // Check ETH balance first
         const currentEthBalance = await publicClient.getBalance({
-          address: toHex(walletAddress),
+          address: toHex(currentAddress!),
         });
-        const gasPrice = await publicClient.getGasPrice();
-        const totalCost = gasLimit * gasPrice + amountInWei;
-        if (currentEthBalance < totalCost) {
+        if (currentEthBalance < amountInWei) {
           throw new Error(
-            `Insufficient ETH. Need ~${formatEther(
-              totalCost
-            )} ETH (inc. gas), have ${formatEther(currentEthBalance)} ETH.`
+            `Insufficient ETH. You have ${formatEther(
+              currentEthBalance
+            )} ETH, need ${formatEther(
+              amountInWei
+            )} ETH for zap (excluding gas).`
           );
         }
-        txHash = await provider.request({
-          method: "eth_sendTransaction",
-          params: [
-            {
-              to: toHex(zapContractAddress),
-              from: toHex(walletAddress),
-              data: zapData,
-              value: `0x${amountInWei.toString(16)}`,
-              gas: `0x${gasLimit.toString(16)}`,
-            },
-          ],
-        });
+
+        // Get provider from Privy wallets or wagmi
+        if (walletClient) {
+          // Use wagmi wallet client for zap & stake
+          txHash = await walletClient.writeContract({
+            address: toHex(zapContractAddress),
+            abi: [
+              {
+                inputs: [
+                  { name: "tokenOut", type: "address" },
+                  { name: "amountIn", type: "uint256" },
+                  { name: "amountOutMin", type: "uint256" },
+                  { name: "stakingContract", type: "address" },
+                ],
+                name: "zap",
+                outputs: [{ name: "", type: "uint256" }],
+                stateMutability: "payable",
+                type: "function",
+              },
+            ],
+            functionName: "zap",
+            args: [
+              toHex(tokenAddress),
+              amountInWei,
+              amountOutMin,
+              toHex(stakingAddress),
+            ],
+            value: amountInWei,
+          });
+        } else {
+          // Fallback to Privy wallet
+          const wallet = wallets.find((w) => w.address === wagmiAddress);
+          if (!wallet) {
+            throw new Error("Wallet not found");
+          }
+          const provider = await wallet.getEthereumProvider();
+          await provider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x2105" }],
+          });
+
+          txHash = await provider.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                to: toHex(zapContractAddress),
+                from: toHex(currentAddress!),
+                data: zapData,
+                value: `0x${amountInWei.toString(16)}`,
+              },
+            ],
+          });
+        }
       }
 
       if (!txHash) {
@@ -424,7 +439,7 @@ export function ZapStakeButton({
               Successfully staked {symbol}. Token rewards are now being streamed
               directly to your wallet.
             </p>
-            {isMiniApp ? (
+            {isEffectivelyMiniApp ? (
               <button
                 onClick={() => {
                   setShowSuccessModal(false);
@@ -448,7 +463,7 @@ export function ZapStakeButton({
           </div>
         </Modal>
       )}
-      
+
       {/* MyTokensModal for mini app */}
       {showMyTokensModal && (
         <MyTokensModal

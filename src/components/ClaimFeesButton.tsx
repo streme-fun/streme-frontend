@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useWalletClient } from "wagmi";
 import { toast } from "sonner";
 import { LP_FACTORY_ADDRESS } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import sdk from "@farcaster/frame-sdk";
+import { useWallets } from "@privy-io/react-auth";
 
 interface ClaimFeesButtonProps {
   tokenAddress: string;
@@ -37,6 +38,8 @@ export function ClaimFeesButton({
   } = useAppFrameLogic();
 
   const { address: wagmiAddress } = useAccount();
+  const { data: walletClient } = useWalletClient();
+  const { wallets } = useWallets();
 
   // More robust mini app detection
   const isEffectivelyMiniApp =
@@ -87,14 +90,56 @@ export function ClaimFeesButton({
           ],
         });
       } else {
-        // Desktop/Mobile Path - use wagmi for transaction
+        // Desktop/Mobile Path - use wagmi/privy for transaction
         if (!currentAddress) {
           throw new Error("Wallet not connected.");
         }
 
-        // For desktop/mobile, we would use wagmi's writeContract or similar
-        // For now, throwing error as this requires additional wagmi setup
-        throw new Error("Desktop transaction support not implemented yet. Please use the mini-app.");
+        // Get provider from Privy wallets or wagmi
+        if (walletClient) {
+          // Use wagmi wallet client for claiming fees
+          txHash = await walletClient.writeContract({
+            address: LP_FACTORY_ADDRESS,
+            abi: [{
+              inputs: [{ name: "token", type: "address" }],
+              name: "claimRewards",
+              outputs: [],
+              stateMutability: "nonpayable",
+              type: "function",
+            }],
+            functionName: "claimRewards",
+            args: [tokenAddress as `0x${string}`],
+          });
+        } else {
+          // Fallback to Privy wallet
+          const wallet = wallets.find((w) => w.address === wagmiAddress);
+          if (!wallet) {
+            throw new Error("Wallet not found");
+          }
+          const provider = await wallet.getEthereumProvider();
+          await provider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x2105" }],
+          });
+          
+          const claimIface = new Interface([
+            "function claimRewards(address token) external",
+          ]);
+          const claimData = claimIface.encodeFunctionData("claimRewards", [
+            tokenAddress as `0x${string}`,
+          ]);
+
+          txHash = await provider.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                to: LP_FACTORY_ADDRESS,
+                from: currentAddress,
+                data: claimData as `0x${string}`,
+              },
+            ],
+          });
+        }
       }
 
       if (!txHash) {

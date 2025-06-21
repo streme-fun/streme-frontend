@@ -5,8 +5,10 @@ import { parseEther } from "viem";
 import { toast } from "sonner";
 import { publicClient } from "@/src/lib/viemClient";
 import sdk from "@farcaster/frame-sdk";
-import { useWalletClient } from "wagmi";
+import { useAccount, useWalletClient } from "wagmi";
 import confetti from "canvas-confetti";
+import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
+import { useWallets } from "@privy-io/react-auth";
 
 interface SwapButtonProps {
   tokenAddress: string;
@@ -41,15 +43,23 @@ export function SwapButton({
 }: SwapButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { data: walletClient } = useWalletClient();
+  const { address: wagmiAddress } = useAccount();
+  const { wallets } = useWallets();
+  const {
+    address: fcAddress,
+    isConnected: fcIsConnected,
+  } = useAppFrameLogic();
 
-  const effectiveIsConnected = isMiniApp
-    ? farcasterIsConnected
-    : !!walletClient?.account?.address;
-
-  // Use the actual connected wallet account address, not user.wallet.address
-  const effectiveAddress = isMiniApp
-    ? farcasterAddress
-    : walletClient?.account?.address;
+  // Use explicit mini-app check with fallback to passed prop
+  const isEffectivelyMiniApp = isMiniApp || false;
+  
+  const currentAddress = isEffectivelyMiniApp 
+    ? (farcasterAddress ?? fcAddress)
+    : wagmiAddress;
+  
+  const walletIsConnected = isEffectivelyMiniApp 
+    ? (farcasterIsConnected ?? fcIsConnected)
+    : !!wagmiAddress;
 
   // Confetti function for celebrations
   const triggerConfetti = () => {
@@ -62,7 +72,7 @@ export function SwapButton({
   };
 
   const performSwap = async () => {
-    if (!effectiveAddress || !effectiveIsConnected || !amount || !quote) {
+    if (!currentAddress || !walletIsConnected || !amount || !quote) {
       toast.error("Missing required data for swap");
       return;
     }
@@ -113,8 +123,18 @@ export function SwapButton({
     spenderAddress: string,
     requiredAmount: string
   ) => {
-    if (!walletClient || !effectiveAddress) {
+    if (!currentAddress) {
       throw new Error("Wallet not available");
+    }
+
+    // For mini-app, we can't check allowance or set approval since we need walletClient
+    if (isEffectivelyMiniApp) {
+      // Skip allowance check for mini-app - the transaction will handle this
+      return;
+    }
+
+    if (!walletClient) {
+      throw new Error("Wallet client not available for allowance operations");
     }
 
     // Check current allowance
@@ -134,7 +154,7 @@ export function SwapButton({
       ],
       functionName: "allowance",
       args: [
-        effectiveAddress as `0x${string}`,
+        currentAddress as `0x${string}`,
         spenderAddress as `0x${string}`,
       ],
     });
@@ -170,7 +190,7 @@ export function SwapButton({
   };
 
   const performRegularSwap = async (toastId: string | number) => {
-    if (!walletClient || !effectiveAddress) {
+    if (!currentAddress) {
       throw new Error("Wallet not available");
     }
 
@@ -204,7 +224,7 @@ export function SwapButton({
           },
         ],
         functionName: "balanceOf",
-        args: [effectiveAddress as `0x${string}`],
+        args: [currentAddress as `0x${string}`],
       });
 
       const parsedAmount = parseEther(amount);
@@ -230,7 +250,7 @@ export function SwapButton({
       sellToken,
       buyToken,
       sellAmount,
-      taker: effectiveAddress,
+      taker: currentAddress,
     });
 
     const quoteResponse = await fetch(`/api/quote?${quoteParams.toString()}`);
@@ -323,7 +343,7 @@ export function SwapButton({
 
     let txHash: `0x${string}`;
 
-    if (isMiniApp) {
+    if (isEffectivelyMiniApp) {
       const ethProvider = await sdk.wallet.getEthereumProvider();
       if (!ethProvider)
         throw new Error("Farcaster Ethereum provider not available.");
@@ -333,7 +353,7 @@ export function SwapButton({
         params: [
           {
             to: quoteData.transaction.to,
-            from: effectiveAddress as `0x${string}`,
+            from: currentAddress as `0x${string}`,
             data: transactionData,
             value: `0x${BigInt(quoteData.transaction.value || "0").toString(
               16
@@ -395,17 +415,18 @@ export function SwapButton({
     onSuccess?.();
   };
 
+
   const isDisabled =
     disabled ||
     isLoading ||
     !amount ||
     parseFloat(amount) <= 0 ||
     !quote?.liquidityAvailable ||
-    !effectiveIsConnected;
+    !walletIsConnected;
 
   return (
     <button onClick={performSwap} disabled={isDisabled} className={className}>
-      {isLoading ? "Processing..." : "Place Trade"}
+      {isLoading ? "Processing..." : !walletIsConnected ? "Wallet not available" : "Place Trade"}
     </button>
   );
 }
