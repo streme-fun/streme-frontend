@@ -8,7 +8,6 @@ import sdk from "@farcaster/frame-sdk";
 import { useAccount, useWalletClient } from "wagmi";
 import confetti from "canvas-confetti";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import { useWallets } from "@privy-io/react-auth";
 
 interface SwapButtonProps {
   tokenAddress: string;
@@ -44,7 +43,6 @@ export function SwapButton({
   const [isLoading, setIsLoading] = useState(false);
   const { data: walletClient } = useWalletClient();
   const { address: wagmiAddress } = useAccount();
-  const { wallets } = useWallets();
   const {
     address: fcAddress,
     isConnected: fcIsConnected,
