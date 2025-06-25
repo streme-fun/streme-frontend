@@ -9,6 +9,7 @@ import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import sdk from "@farcaster/frame-sdk";
 import { useWallets } from "@privy-io/react-auth";
+import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 
 interface ClaimFeesButtonProps {
   tokenAddress: string;
@@ -78,6 +79,11 @@ export function ClaimFeesButton({
         const claimData = claimIface.encodeFunctionData("claimRewards", [
           tokenAddress as `0x${string}`,
         ]);
+        
+        const claimDataWithReferral = await appendReferralTag(
+          claimData as `0x${string}`,
+          currentAddress as `0x${string}`
+        );
 
         txHash = await ethProvider.request({
           method: "eth_sendTransaction",
@@ -85,7 +91,7 @@ export function ClaimFeesButton({
             {
               to: LP_FACTORY_ADDRESS,
               from: currentAddress,
-              data: claimData as `0x${string}`,
+              data: claimDataWithReferral,
             },
           ],
         });
@@ -98,17 +104,31 @@ export function ClaimFeesButton({
         // Get provider from Privy wallets or wagmi
         if (walletClient) {
           // Use wagmi wallet client for claiming fees
-          txHash = await walletClient.writeContract({
-            address: LP_FACTORY_ADDRESS,
-            abi: [{
-              inputs: [{ name: "token", type: "address" }],
-              name: "claimRewards",
-              outputs: [],
-              stateMutability: "nonpayable",
-              type: "function",
-            }],
+          const { encodeFunctionData } = await import("viem");
+          const abi = [{
+            inputs: [{ name: "token", type: "address" }],
+            name: "claimRewards",
+            outputs: [],
+            stateMutability: "nonpayable",
+            type: "function",
+          }] as const;
+          
+          const claimData = encodeFunctionData({
+            abi,
             functionName: "claimRewards",
             args: [tokenAddress as `0x${string}`],
+          });
+          
+          const claimDataWithReferral = await appendReferralTag(
+            claimData,
+            currentAddress as `0x${string}`
+          );
+          
+          txHash = await walletClient.sendTransaction({
+            to: LP_FACTORY_ADDRESS,
+            data: claimDataWithReferral,
+            account: currentAddress as `0x${string}`,
+            chain: undefined,
           });
         } else {
           // Fallback to Privy wallet
@@ -128,6 +148,11 @@ export function ClaimFeesButton({
           const claimData = claimIface.encodeFunctionData("claimRewards", [
             tokenAddress as `0x${string}`,
           ]);
+          
+          const claimDataWithReferral = await appendReferralTag(
+            claimData as `0x${string}`,
+            currentAddress as `0x${string}`
+          );
 
           txHash = await provider.request({
             method: "eth_sendTransaction",
@@ -135,7 +160,7 @@ export function ClaimFeesButton({
               {
                 to: LP_FACTORY_ADDRESS,
                 from: currentAddress,
-                data: claimData as `0x${string}`,
+                data: claimDataWithReferral,
               },
             ],
           });
@@ -157,6 +182,9 @@ export function ClaimFeesButton({
       if (receipt.status !== "success") {
         throw new Error("Transaction failed or reverted.");
       }
+      
+      // Submit referral to Divvi
+      await submitDivviReferral(txHash, 8453); // Base L2 chain ID
 
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);

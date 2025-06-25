@@ -9,6 +9,7 @@ import { useAccount, useWalletClient } from "wagmi";
 import confetti from "canvas-confetti";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { Interface } from "@ethersproject/abi";
+import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 
 interface SwapButtonProps {
   tokenAddress: string;
@@ -176,38 +177,60 @@ export function SwapButton({
         requiredAmountBigInt,
       ]);
       
+      const approveDataWithReferral = await appendReferralTag(
+        approveData as `0x${string}`,
+        currentAddress as `0x${string}`
+      );
+      
       approvalTxHash = await ethProvider.request({
         method: "eth_sendTransaction",
         params: [
           {
             to: tokenAddress as `0x${string}`,
             from: currentAddress as `0x${string}`,
-            data: approveData as `0x${string}`,
+            data: approveDataWithReferral,
           },
         ],
       });
     } else {
-      approvalTxHash = await walletClient!.writeContract({
-        address: tokenAddress as `0x${string}`,
-        abi: [
-          {
-            inputs: [
-              { name: "spender", type: "address" },
-              { name: "amount", type: "uint256" },
-            ],
-            name: "approve",
-            outputs: [{ name: "", type: "bool" }],
-            stateMutability: "nonpayable",
-            type: "function",
-          },
-        ],
+      const { encodeFunctionData } = await import("viem");
+      const abi = [
+        {
+          inputs: [
+            { name: "spender", type: "address" },
+            { name: "amount", type: "uint256" },
+          ],
+          name: "approve",
+          outputs: [{ name: "", type: "bool" }],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ] as const;
+      
+      const approveData = encodeFunctionData({
+        abi,
         functionName: "approve",
         args: [spenderAddress as `0x${string}`, requiredAmountBigInt],
+      });
+      
+      const approveDataWithReferral = await appendReferralTag(
+        approveData,
+        currentAddress as `0x${string}`
+      );
+      
+      approvalTxHash = await walletClient!.sendTransaction({
+        to: tokenAddress as `0x${string}`,
+        data: approveDataWithReferral,
+        account: currentAddress as `0x${string}`,
+        chain: undefined,
       });
     }
 
     // Wait for approval transaction to be confirmed
     await publicClient.waitForTransactionReceipt({ hash: approvalTxHash });
+    
+    // Submit referral to Divvi
+    await submitDivviReferral(approvalTxHash, 8453); // Base L2 chain ID
   };
 
   const performRegularSwap = async (toastId: string | number) => {
@@ -350,6 +373,12 @@ export function SwapButton({
         signature,
       ]);
     }
+    
+    // Append Divvi referral tag to transaction data
+    transactionData = await appendReferralTag(
+      transactionData as `0x${string}`,
+      currentAddress as `0x${string}`
+    );
 
     toast.loading(
       direction === "buy"
@@ -408,6 +437,9 @@ export function SwapButton({
       },
     });
     await publicClient.waitForTransactionReceipt({ hash: txHash });
+    
+    // Submit referral to Divvi
+    await submitDivviReferral(txHash, 8453); // Base L2 chain ID
 
     // Dismiss the loading toast first to prevent conflicts
     toast.dismiss(toastId);

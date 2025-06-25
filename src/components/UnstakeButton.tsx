@@ -12,6 +12,7 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { formatUnits } from "viem";
 import { useWallets } from "@privy-io/react-auth";
+import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 
 const stakingAbiEthers = [
   "function unstake(address to, uint256 amount)",
@@ -203,6 +204,11 @@ export function UnstakeButton({
           toHex(currentAddress!),
           amount,
         ]);
+        
+        const unstakeDataWithReferral = await appendReferralTag(
+          toHex(unstakeData),
+          toHex(currentAddress!)
+        );
 
         unstakeTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
@@ -210,7 +216,7 @@ export function UnstakeButton({
             {
               to: toHex(stakingAddress),
               from: toHex(currentAddress!),
-              data: toHex(unstakeData),
+              data: unstakeDataWithReferral,
             },
           ],
         });
@@ -227,6 +233,10 @@ export function UnstakeButton({
         if (unstakeReceipt.status !== "success") {
           throw new Error("Unstake transaction failed.");
         }
+        
+        // Submit referral to Divvi
+        await submitDivviReferral(unstakeTxHash, 8453); // Base L2 chain ID
+        
         toast.success("Unstaking successful!", { id: toastId });
       } else {
         // Desktop/Mobile Path - use wagmi/privy for transaction
@@ -256,11 +266,23 @@ export function UnstakeButton({
         
         if (walletClient) {
           // Use wagmi wallet client for unstaking
-          unstakeTxHash = await walletClient.writeContract({
-            address: toHex(stakingAddress),
+          const { encodeFunctionData } = await import("viem");
+          const unstakeData = encodeFunctionData({
             abi: stakingAbiViem,
             functionName: "unstake",
             args: [toHex(currentAddress!), amount],
+          });
+          
+          const unstakeDataWithReferral = await appendReferralTag(
+            unstakeData,
+            toHex(currentAddress!)
+          );
+          
+          unstakeTxHash = await walletClient.sendTransaction({
+            to: toHex(stakingAddress),
+            data: unstakeDataWithReferral,
+            account: toHex(currentAddress!),
+            chain: undefined,
           });
         } else {
           // Use Privy provider
@@ -269,13 +291,19 @@ export function UnstakeButton({
             toHex(currentAddress!),
             amount,
           ]);
+          
+          const unstakeDataWithReferral = await appendReferralTag(
+            toHex(unstakeData),
+            toHex(currentAddress!)
+          );
+          
           unstakeTxHash = await provider.request({
             method: "eth_sendTransaction",
             params: [
               {
                 to: toHex(stakingAddress),
                 from: toHex(currentAddress!),
-                data: toHex(unstakeData),
+                data: unstakeDataWithReferral,
               },
             ],
           });
@@ -293,6 +321,10 @@ export function UnstakeButton({
         if (unstakeReceipt.status !== "success") {
           throw new Error("Unstake transaction failed.");
         }
+        
+        // Submit referral to Divvi
+        await submitDivviReferral(unstakeTxHash, 8453); // Base L2 chain ID
+        
         toast.success("Unstaking successful!", { id: toastId });
       }
 

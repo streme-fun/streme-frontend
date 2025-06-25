@@ -13,6 +13,7 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics"; // Added analytics constants
 import { formatUnits } from "viem"; // Added for amount formatting
 import { useWallets } from "@privy-io/react-auth";
+import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 
@@ -164,13 +165,17 @@ export function StakeButton({
             toHex(stakingAddress),
             MAX_UINT256, // Use unlimited allowance instead of just the amount
           ]);
+          const approveDataWithReferral = await appendReferralTag(
+            toHex(approveData),
+            toHex(currentAddress!)
+          );
           approveTxHash = await ethProvider.request({
             method: "eth_sendTransaction",
             params: [
               {
                 to: toHex(tokenAddress),
                 from: toHex(currentAddress!),
-                data: toHex(approveData),
+                data: approveDataWithReferral,
               },
             ],
           });
@@ -186,6 +191,10 @@ export function StakeButton({
           });
           if (approveReceipt.status !== "success")
             throw new Error("Approval transaction failed");
+          
+          // Submit referral to Divvi
+          await submitDivviReferral(approveTxHash, 8453); // Base L2 chain ID
+          
           toast.success(
             "Approval successful! You won't need to approve again.",
             { id: toastId }
@@ -204,13 +213,17 @@ export function StakeButton({
           toHex(currentAddress!),
           amount,
         ]);
+        const stakeDataWithReferral = await appendReferralTag(
+          toHex(stakeData),
+          toHex(currentAddress!)
+        );
         stakeTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
           params: [
             {
               to: toHex(stakingAddress),
               from: toHex(currentAddress!),
-              data: toHex(stakeData),
+              data: stakeDataWithReferral,
             },
           ],
         });
@@ -224,6 +237,10 @@ export function StakeButton({
         });
         if (stakeReceipt.status !== "success")
           throw new Error("Stake transaction failed");
+        
+        // Submit referral to Divvi
+        await submitDivviReferral(stakeTxHash, 8453); // Base L2 chain ID
+        
         toast.success("Staking successful!", { id: toastId });
 
         if (
@@ -245,13 +262,17 @@ export function StakeButton({
               toHex(stakingPoolAddress),
               "0x",
             ]);
+            const connectDataWithReferral = await appendReferralTag(
+              toHex(connectData),
+              toHex(currentAddress!)
+            );
             connectTxHash = await ethProvider.request({
               method: "eth_sendTransaction",
               params: [
                 {
                   to: toHex(GDA_FORWARDER),
                   from: toHex(currentAddress!),
-                  data: toHex(connectData),
+                  data: connectDataWithReferral,
                 },
               ],
             });
@@ -260,6 +281,10 @@ export function StakeButton({
             await publicClient.waitForTransactionReceipt({
               hash: connectTxHash,
             });
+            
+            // Submit referral to Divvi
+            await submitDivviReferral(connectTxHash, 8453); // Base L2 chain ID
+            
             toast.success("Connected to reward pool!", { id: toastId });
             onPoolConnect?.();
           }
@@ -297,20 +322,34 @@ export function StakeButton({
           
           if (walletClient) {
             // Use wagmi wallet client for approval
-            approveTxHash = await walletClient.writeContract({
-              address: toHex(tokenAddress),
-              abi: [{
-                inputs: [
-                  { name: "spender", type: "address" },
-                  { name: "amount", type: "uint256" },
-                ],
-                name: "approve",
-                outputs: [{ name: "", type: "bool" }],
-                stateMutability: "nonpayable",
-                type: "function",
-              }],
+            const { encodeFunctionData } = await import("viem");
+            const abi = [{
+              inputs: [
+                { name: "spender", type: "address" },
+                { name: "amount", type: "uint256" },
+              ],
+              name: "approve",
+              outputs: [{ name: "", type: "bool" }],
+              stateMutability: "nonpayable",
+              type: "function",
+            }] as const;
+            
+            const approveData = encodeFunctionData({
+              abi,
               functionName: "approve",
               args: [toHex(stakingAddress), MAX_UINT256],
+            });
+            
+            const approveDataWithReferral = await appendReferralTag(
+              approveData,
+              toHex(currentAddress!)
+            );
+            
+            approveTxHash = await walletClient.sendTransaction({
+              to: toHex(tokenAddress),
+              data: approveDataWithReferral,
+              account: toHex(currentAddress!),
+              chain: undefined,
             });
           } else {
             // Use Privy provider
@@ -321,13 +360,17 @@ export function StakeButton({
               toHex(stakingAddress),
               MAX_UINT256,
             ]);
+            const approveDataWithReferral = await appendReferralTag(
+              toHex(approveData),
+              toHex(currentAddress!)
+            );
             approveTxHash = await provider.request({
               method: "eth_sendTransaction",
               params: [
                 {
                   to: toHex(tokenAddress),
                   from: toHex(currentAddress!),
-                  data: toHex(approveData),
+                  data: approveDataWithReferral,
                 },
               ],
             });
@@ -345,6 +388,10 @@ export function StakeButton({
           });
           if (approveReceipt.status !== "success")
             throw new Error("Approval transaction failed");
+          
+          // Submit referral to Divvi
+          await submitDivviReferral(approveTxHash, 8453); // Base L2 chain ID
+          
           toast.success(
             "Approval successful! You won't need to approve again.",
             { id: toastId }
@@ -359,20 +406,34 @@ export function StakeButton({
         
         if (walletClient) {
           // Use wagmi wallet client for staking
-          stakeTxHash = await walletClient.writeContract({
-            address: toHex(stakingAddress),
-            abi: [{
-              inputs: [
-                { name: "to", type: "address" },
-                { name: "amount", type: "uint256" },
-              ],
-              name: "stake",
-              outputs: [],
-              stateMutability: "nonpayable",
-              type: "function",
-            }],
+          const { encodeFunctionData } = await import("viem");
+          const abi = [{
+            inputs: [
+              { name: "to", type: "address" },
+              { name: "amount", type: "uint256" },
+            ],
+            name: "stake",
+            outputs: [],
+            stateMutability: "nonpayable",
+            type: "function",
+          }] as const;
+          
+          const stakeData = encodeFunctionData({
+            abi,
             functionName: "stake",
             args: [toHex(currentAddress!), amount],
+          });
+          
+          const stakeDataWithReferral = await appendReferralTag(
+            stakeData,
+            toHex(currentAddress!)
+          );
+          
+          stakeTxHash = await walletClient.sendTransaction({
+            to: toHex(stakingAddress),
+            data: stakeDataWithReferral,
+            account: toHex(currentAddress!),
+            chain: undefined,
           });
         } else {
           // Use Privy provider
@@ -383,13 +444,17 @@ export function StakeButton({
             toHex(currentAddress!),
             amount,
           ]);
+          const stakeDataWithReferral = await appendReferralTag(
+            toHex(stakeData),
+            toHex(currentAddress!)
+          );
           stakeTxHash = await provider.request({
             method: "eth_sendTransaction",
             params: [
               {
                 to: toHex(stakingAddress),
                 from: toHex(currentAddress!),
-                data: toHex(stakeData),
+                data: stakeDataWithReferral,
               },
             ],
           });
@@ -405,6 +470,10 @@ export function StakeButton({
         });
         if (stakeReceipt.status !== "success")
           throw new Error("Stake transaction failed");
+        
+        // Submit referral to Divvi
+        await submitDivviReferral(stakeTxHash, 8453); // Base L2 chain ID
+        
         toast.success("Staking successful!", { id: toastId });
 
         if (
@@ -422,20 +491,34 @@ export function StakeButton({
             
             if (walletClient) {
               // Use wagmi wallet client for pool connection
-              connectTxHash = await walletClient.writeContract({
-                address: toHex(GDA_FORWARDER),
-                abi: [{
-                  inputs: [
-                    { name: "pool", type: "address" },
-                    { name: "userData", type: "bytes" },
-                  ],
-                  name: "connectPool",
-                  outputs: [{ name: "", type: "bool" }],
-                  stateMutability: "nonpayable",
-                  type: "function",
-                }],
+              const { encodeFunctionData } = await import("viem");
+              const abi = [{
+                inputs: [
+                  { name: "pool", type: "address" },
+                  { name: "userData", type: "bytes" },
+                ],
+                name: "connectPool",
+                outputs: [{ name: "", type: "bool" }],
+                stateMutability: "nonpayable",
+                type: "function",
+              }] as const;
+              
+              const connectData = encodeFunctionData({
+                abi,
                 functionName: "connectPool",
                 args: [toHex(stakingPoolAddress), "0x"],
+              });
+              
+              const connectDataWithReferral = await appendReferralTag(
+                connectData,
+                toHex(currentAddress!)
+              );
+              
+              connectTxHash = await walletClient.sendTransaction({
+                to: toHex(GDA_FORWARDER),
+                data: connectDataWithReferral,
+                account: toHex(currentAddress!),
+                chain: undefined,
               });
             } else {
               // Use Privy provider
@@ -446,13 +529,17 @@ export function StakeButton({
                 toHex(stakingPoolAddress),
                 "0x",
               ]);
+              const connectDataWithReferral = await appendReferralTag(
+                toHex(connectData),
+                toHex(currentAddress!)
+              );
               connectTxHash = await provider.request({
                 method: "eth_sendTransaction",
                 params: [
                   {
                     to: toHex(GDA_FORWARDER),
                     from: toHex(currentAddress!),
-                    data: toHex(connectData),
+                    data: connectDataWithReferral,
                   },
                 ],
               });
@@ -463,6 +550,10 @@ export function StakeButton({
             await publicClient.waitForTransactionReceipt({
               hash: connectTxHash,
             });
+            
+            // Submit referral to Divvi
+            await submitDivviReferral(connectTxHash, 8453); // Base L2 chain ID
+            
             toast.success("Connected to reward pool!", { id: toastId });
             onPoolConnect?.();
           }

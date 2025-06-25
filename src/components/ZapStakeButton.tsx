@@ -12,6 +12,7 @@ import sdk from "@farcaster/frame-sdk";
 import { MyTokensModal } from "./MyTokensModal";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useWallets } from "@privy-io/react-auth";
+import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 
 const WETH = "0x4200000000000000000000000000000000000006";
 const toHex = (address: string) => address as `0x${string}`;
@@ -169,13 +170,18 @@ export function ZapStakeButton({
             )} ETH for zap (excluding gas).`
           );
         }
+        const zapDataWithReferral = await appendReferralTag(
+          zapData,
+          toHex(currentAddress!)
+        );
+        
         txHash = await ethProvider.request({
           method: "eth_sendTransaction",
           params: [
             {
               to: toHex(zapContractAddress),
               from: toHex(currentAddress!),
-              data: zapData,
+              data: zapDataWithReferral,
               value: `0x${amountInWei.toString(16)}`,
             },
           ],
@@ -203,22 +209,24 @@ export function ZapStakeButton({
         // Get provider from Privy wallets or wagmi
         if (walletClient) {
           // Use wagmi wallet client for zap & stake
-          txHash = await walletClient.writeContract({
-            address: toHex(zapContractAddress),
-            abi: [
-              {
-                inputs: [
-                  { name: "tokenOut", type: "address" },
-                  { name: "amountIn", type: "uint256" },
-                  { name: "amountOutMin", type: "uint256" },
-                  { name: "stakingContract", type: "address" },
-                ],
-                name: "zap",
-                outputs: [{ name: "", type: "uint256" }],
-                stateMutability: "payable",
-                type: "function",
-              },
-            ],
+          const { encodeFunctionData } = await import("viem");
+          const abi = [
+            {
+              inputs: [
+                { name: "tokenOut", type: "address" },
+                { name: "amountIn", type: "uint256" },
+                { name: "amountOutMin", type: "uint256" },
+                { name: "stakingContract", type: "address" },
+              ],
+              name: "zap",
+              outputs: [{ name: "", type: "uint256" }],
+              stateMutability: "payable",
+              type: "function",
+            },
+          ] as const;
+          
+          const zapDataEncoded = encodeFunctionData({
+            abi,
             functionName: "zap",
             args: [
               toHex(tokenAddress),
@@ -226,7 +234,19 @@ export function ZapStakeButton({
               amountOutMin,
               toHex(stakingAddress),
             ],
+          });
+          
+          const zapDataWithReferral = await appendReferralTag(
+            zapDataEncoded,
+            toHex(currentAddress!)
+          );
+          
+          txHash = await walletClient.sendTransaction({
+            to: toHex(zapContractAddress),
+            data: zapDataWithReferral,
             value: amountInWei,
+            account: toHex(currentAddress!),
+            chain: undefined,
           });
         } else {
           // Fallback to Privy wallet
@@ -240,13 +260,18 @@ export function ZapStakeButton({
             params: [{ chainId: "0x2105" }],
           });
 
+          const zapDataWithReferral = await appendReferralTag(
+            zapData,
+            toHex(currentAddress!)
+          );
+          
           txHash = await provider.request({
             method: "eth_sendTransaction",
             params: [
               {
                 to: toHex(zapContractAddress),
                 from: toHex(currentAddress!),
-                data: zapData,
+                data: zapDataWithReferral,
                 value: `0x${amountInWei.toString(16)}`,
               },
             ],
@@ -271,6 +296,9 @@ export function ZapStakeButton({
           `Transaction failed or reverted. Status: ${receipt.status}`
         );
       }
+      
+      // Submit referral to Divvi
+      await submitDivviReferral(txHash, 8453); // Base L2 chain ID
 
       // Enhanced success message with amount details
       const ethAmount = parseFloat(amountIn).toFixed(4);
