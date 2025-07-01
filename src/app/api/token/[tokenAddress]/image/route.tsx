@@ -70,6 +70,7 @@ export async function GET(
     }
 
     const tokenData = await tokenResponse.json();
+    console.log(tokenData);
     console.log(`[Image Gen] Token data received:`, {
       hasData: !!tokenData.data,
       name: tokenData.data?.name,
@@ -128,8 +129,8 @@ export async function GET(
               <img
                 src={token.img_url}
                 alt={token.name}
-                width="500"
-                height="500"
+                width="700"
+                height="700"
                 style={{
                   borderRadius: "50%",
                   objectFit: "cover",
