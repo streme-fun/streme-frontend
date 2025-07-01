@@ -7,4 +7,5 @@ export const SPAMMER_BLACKLIST = [
   "ismancuan",
   "colderine",
   "ilhamjr1987",
+  "slerfbase",
 ];
