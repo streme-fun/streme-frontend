@@ -9,9 +9,10 @@ import sdk from "@farcaster/frame-sdk";
 
 export function useAppFrameLogic() {
   // Quick sync detection as initial fallback
-  const quickDetection = typeof window !== 'undefined' && 
+  const quickDetection =
+    typeof window !== "undefined" &&
     (window.parent !== window || window.location !== window.parent.location);
-    
+
   const [isMiniAppView, setIsMiniAppView] = useState(quickDetection);
   const [isDetectionComplete, setIsDetectionComplete] = useState(false);
   const [hasPromptedToAdd, setHasPromptedToAdd] = useState(false);
@@ -35,14 +36,14 @@ export function useAppFrameLogic() {
   // Enhanced mini app detection with proper timeout and fallback
   useEffect(() => {
     let detectionTimeoutId: NodeJS.Timeout;
-    
+
     const detectMiniApp = async () => {
       try {
         console.log("Starting mini app detection...", {
           isSDKLoaded,
           isDetectionComplete,
           hasContext: !!farcasterContext,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
 
         // Try detection even if SDK isn't "fully loaded" - it might still work
@@ -53,18 +54,23 @@ export function useAppFrameLogic() {
           hasContext: !!farcasterContext,
           isSDKLoaded,
           timestamp: new Date().toISOString(),
-          globalFlag: typeof window !== 'undefined' ? window.__FARCASTER_SDK_INITIALIZED__ : null
+          globalFlag:
+            typeof window !== "undefined"
+              ? window.__FARCASTER_SDK_INITIALIZED__
+              : null,
         });
 
         setIsMiniAppView(isMiniApp);
         setIsDetectionComplete(true);
       } catch (error) {
         console.error("Error checking if in mini app:", error);
-        
+
         // Try to detect based on window properties as fallback
-        const fallbackDetection = typeof window !== 'undefined' && 
-          (window.parent !== window || window.location !== window.parent.location);
-        
+        const fallbackDetection =
+          typeof window !== "undefined" &&
+          (window.parent !== window ||
+            window.location !== window.parent.location);
+
         console.log("Using fallback detection:", fallbackDetection);
         setIsMiniAppView(fallbackDetection);
         setIsDetectionComplete(true);
@@ -82,8 +88,10 @@ export function useAppFrameLogic() {
       detectionTimeoutId = setTimeout(() => {
         if (!isDetectionComplete) {
           console.log("Mini app detection timeout - using fallback");
-          const fallbackDetection = typeof window !== 'undefined' && 
-            (window.parent !== window || window.location !== window.parent.location);
+          const fallbackDetection =
+            typeof window !== "undefined" &&
+            (window.parent !== window ||
+              window.location !== window.parent.location);
           setIsMiniAppView(fallbackDetection);
           setIsDetectionComplete(true);
         }
@@ -178,7 +186,7 @@ export function useAppFrameLogic() {
     if (!isMiniAppView || !isSDKLoaded) {
       throw new Error("Not in Mini App context");
     }
-    
+
     try {
       const provider = await sdk.wallet.getEthereumProvider();
       if (!provider) {
@@ -190,15 +198,6 @@ export function useAppFrameLogic() {
       throw new Error("Wallet connection not available");
     }
   };
-
-  // Debug the return values (can be removed later)
-  console.log("useAppFrameLogic return values:", {
-    isSDKLoaded,
-    isDetectionComplete,
-    isMiniAppView,
-    quickDetection: typeof window !== 'undefined' && 
-      (window.parent !== window || window.location !== window.parent.location)
-  });
 
   return {
     isSDKLoaded: isDetectionComplete, // Only require detection to complete, not SDK loading
