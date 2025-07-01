@@ -13,6 +13,7 @@ import { TopUpAllStakesButton } from "./TopUpAllStakesButton";
 import { publicClient } from "../lib/viemClient";
 import { GDA_FORWARDER, GDA_ABI } from "../lib/contracts";
 import { useStreamingNumber } from "../hooks/useStreamingNumber";
+import { useTokenData } from "../hooks/useTokenData";
 
 interface PoolMembership {
   units: string;
@@ -198,6 +199,9 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
   // Get effective address based on context
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
   const effectiveIsConnected = isMiniAppView ? fcIsConnected : !!wagmiAddress;
+
+  // Use centralized token data hook
+  const { balanceData, refreshTokenData, refreshAllData, registerActiveToken, unregisterActiveToken } = useTokenData();
 
   // Helper function to safely call toLowerCase on potentially null values
   const safeToLowerCase = (value: string | null | undefined): string => {
@@ -414,60 +418,49 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     }
   }, [isOpen, effectiveAddress]);
 
-  // Simplified periodic refresh for critical streaming data only
+  // Create stable token list for dependencies
+  const tokenAddresses = stakes.map(s => s.tokenAddress).concat(ownedSuperTokens.map(t => t.tokenAddress)).sort().join(',');
+  
+  // Register active tokens when modal is open
   useEffect(() => {
-    if (!effectiveAddress || stakes.length === 0) return;
+    if (isOpen) {
+      const allTokens = [...stakes.map(s => s.tokenAddress), ...ownedSuperTokens.map(t => t.tokenAddress)];
+      allTokens.forEach(token => {
+        registerActiveToken(token);
+      });
+      
+      return () => {
+        allTokens.forEach(token => {
+          unregisterActiveToken(token);
+        });
+      };
+    }
+  }, [isOpen, tokenAddresses, registerActiveToken, unregisterActiveToken]);
 
-    const refreshCriticalData = async () => {
-      try {
-        // Only refresh balances for actively streaming stakes
-        const streamingStakes = stakes.filter(
-          (stake) => stake.userFlowRate > 0.1 && stake.isConnectedToPool
-        );
+  // Update stakes when balance data changes (but only when not loading/refreshing)
+  useEffect(() => {
+    if (!effectiveAddress || stakes.length === 0 || loading || refreshing) return;
 
-        if (streamingStakes.length === 0) return;
+    setStakes((prevStakes) =>
+      prevStakes.map((stake) => {
+        const cacheKey = `${stake.tokenAddress}-${effectiveAddress}`;
+        const cachedData = balanceData.get(cacheKey);
 
-        // Limit to top 3 most active streams to minimize load
-        const topStreams = streamingStakes
-          .sort((a, b) => b.userFlowRate - a.userFlowRate)
-          .slice(0, 3);
-
-        const balanceRequests = topStreams.map((stake) => ({
-          type: "balance" as const,
-          tokenAddress: stake.tokenAddress,
-          userAddress: effectiveAddress,
-        }));
-
-        const results = await fetchBlockchainDataBatch(balanceRequests);
-
-        setStakes((prevStakes) =>
-          prevStakes.map((stake) => {
-            const cacheKey = `balance-${stake.tokenAddress}-${effectiveAddress}`;
-            const result = results.get(cacheKey);
-
-            if (result?.balance) {
-              const formattedBalance = Number(formatUnits(result.balance, 18));
-              if (Math.abs(formattedBalance - stake.baseAmount) > 0.01) {
-                return {
-                  ...stake,
-                  receivedBalance: formattedBalance,
-                  baseAmount: formattedBalance,
-                  lastUpdateTime: Date.now(),
-                };
-              }
-            }
-            return stake;
-          })
-        );
-      } catch (error) {
-        console.error("Error refreshing critical data:", error);
-      }
-    };
-
-    // Refresh every 30 minutes instead of 20
-    const interval = setInterval(refreshCriticalData, 1800000);
-    return () => clearInterval(interval);
-  }, [effectiveAddress, stakes.length]);
+        if (cachedData && stake.stakingAddress) { // Only update if we have stakingAddress (stake is fully loaded)
+          const formattedBalance = Number(formatUnits(cachedData.tokenBalance, 18));
+          if (Math.abs(formattedBalance - stake.baseAmount) > 0.01) {
+            return {
+              ...stake,
+              receivedBalance: formattedBalance,
+              baseAmount: formattedBalance,
+              lastUpdateTime: cachedData.lastUpdated,
+            };
+          }
+        }
+        return stake;
+      })
+    );
+  }, [balanceData, effectiveAddress, loading, refreshing]);
 
   const fetchStakesAndTokens = async () => {
     if (!effectiveAddress) return;
@@ -609,16 +602,46 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     }
 
     // Step 2: Fetch essential data in parallel
-    const [tokenDataMap, balanceResults] = await Promise.all([
-      fetchTokenDataBatch(uniqueTokens),
-      fetchBlockchainDataBatch(
-        uniqueTokens.map((token) => ({
+    const tokenDataMap = await fetchTokenDataBatch(uniqueTokens);
+    
+    // Use centralized balance data or fetch if not available
+    const balanceResults = new Map();
+    for (const token of uniqueTokens) {
+      const cacheKey = `${token}-${effectiveAddress}`;
+      const cachedData = balanceData.get(cacheKey);
+      
+      if (cachedData) {
+        balanceResults.set(`balance-${token}-${effectiveAddress}`, {
+          balance: cachedData.tokenBalance,
+          timestamp: cachedData.lastUpdated
+        });
+      } else {
+        // Trigger refresh for this token
+        const tokenData = tokenDataMap.get(token);
+        // Find pool address if this is a staked token
+        const membership = validMemberships.find(m => m.pool.token.id === token);
+        const poolAddress = membership?.pool.id;
+        await refreshTokenData(token, tokenData?.staking_address, poolAddress);
+      }
+    }
+    
+    // Fetch any missing balances
+    const missingTokens = uniqueTokens.filter(
+      token => !balanceResults.has(`balance-${token}-${effectiveAddress}`)
+    );
+    
+    if (missingTokens.length > 0) {
+      const additionalResults = await fetchBlockchainDataBatch(
+        missingTokens.map((token) => ({
           type: "balance" as const,
           tokenAddress: token,
           userAddress: effectiveAddress,
         }))
-      ),
-    ]);
+      );
+      additionalResults.forEach((value, key) => {
+        balanceResults.set(key, value);
+      });
+    }
 
     // Step 3: Build initial data structures
     const stakesData: StakeData[] = [];
@@ -700,6 +723,14 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     // Step 5: Set state with complete data (no need for secondary update)
     setStakes(finalStakesData);
     setOwnedSuperTokens(superTokensData);
+    
+    // Register active tokens for automatic refresh
+    finalStakesData.forEach(stake => {
+      registerActiveToken(stake.tokenAddress);
+    });
+    superTokensData.forEach(token => {
+      registerActiveToken(token.tokenAddress);
+    });
   };
 
   // Load staking data synchronously and return updated stakes
@@ -846,52 +877,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     );
   };
 
-  // Targeted update functions to avoid full refresh
-  const updateStakeBalances = async (tokenAddresses?: string[]) => {
-    if (!effectiveAddress) return;
-
-    try {
-      const addressesToUpdate =
-        tokenAddresses || stakes.map((stake) => stake.tokenAddress);
-      const balanceResults = await fetchBlockchainDataBatch(
-        addressesToUpdate.map((address) => ({
-          type: "balance" as const,
-          tokenAddress: address,
-          userAddress: effectiveAddress,
-        }))
-      );
-
-      // Create balance map from cache results
-      const balanceMap = new Map<string, bigint>();
-      addressesToUpdate.forEach((address) => {
-        const cacheKey = `balance-${address}-${effectiveAddress}`;
-        const result = balanceResults.get(cacheKey);
-        if (result?.balance) {
-          balanceMap.set(address, result.balance as bigint);
-        }
-      });
-
-      setStakes((prevStakes) =>
-        prevStakes.map((stake) => {
-          if (!tokenAddresses || tokenAddresses.includes(stake.tokenAddress)) {
-            const currentBalance =
-              (balanceMap.get(stake.tokenAddress) as bigint) || BigInt(0);
-            const formattedBalance = Number(formatUnits(currentBalance, 18));
-
-            return {
-              ...stake,
-              receivedBalance: formattedBalance,
-              baseAmount: formattedBalance,
-              lastUpdateTime: Date.now(),
-            };
-          }
-          return stake;
-        })
-      );
-    } catch (error) {
-      console.error("Error updating stake balances:", error);
-    }
-  };
+  // Targeted update functions
 
   const updateStakedBalance = async (
     stakingAddress: string,
@@ -965,41 +951,42 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     }
   };
 
-  const handleStakeSuccess = (
+  const handleStakeSuccess = async (
     tokenAddress?: string,
     stakingAddress?: string
   ) => {
-    // Instead of full refresh, do targeted updates
     if (tokenAddress) {
-      // Update the specific token's balance
-      updateStakeBalances([tokenAddress]);
-
-      // If staking address is provided, update staked balance too
+      // Use centralized refresh for the specific token
+      await refreshTokenData(tokenAddress, stakingAddress);
+      
+      // Also update staked balance if staking address is provided
       if (stakingAddress) {
         updateStakedBalance(stakingAddress, tokenAddress);
       }
     } else {
-      // Fallback to updating all balances if no specific token provided
-      updateStakeBalances();
+      // For bulk operations (like top-up all), just trigger a small delay then refresh
+      // This prevents race conditions with ongoing state updates
+      setTimeout(async () => {
+        await refreshAllData();
+      }, 500);
     }
   };
 
-  const handleConnectPoolSuccess = (
+  const handleConnectPoolSuccess = async (
     poolAddress: string,
     tokenAddress: string
   ) => {
-    // Update pool connection status and balances for the specific token
+    // Refresh token data and update pool connection status
+    await refreshTokenData(tokenAddress);
     updatePoolConnectionStatus(poolAddress, tokenAddress);
-    updateStakeBalances([tokenAddress]);
   };
 
-  const handleSuperTokenStakeSuccess = (tokenAddress: string) => {
-    // When a SuperToken gets staked, we need to refresh the data to move it to the staked section
-    // This is one case where we might need a more comprehensive refresh
-    // For now, let's do a targeted update and let the periodic refresh handle the reorganization
-    updateStakeBalances([tokenAddress]);
-
-    // Optionally trigger a full refresh after a short delay to reorganize the sections
+  const handleSuperTokenStakeSuccess = async (tokenAddress: string) => {
+    // Refresh token data which will update balances
+    await refreshTokenData(tokenAddress);
+    
+    // Also refresh stake data to see if new stake was created
+    // Use a short delay to ensure the blockchain state is updated
     setTimeout(() => {
       fetchStakesAndTokens();
     }, 2000);
@@ -1011,7 +998,9 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
     setRefreshing(true);
     try {
-      // Simply re-fetch all data - fast and comprehensive
+      // Refresh all centralized data first
+      await refreshAllData();
+      // Then re-fetch stakes and tokens to update UI
       await fetchStakesAndTokens();
     } catch (error) {
       console.error("Manual refresh failed:", error);

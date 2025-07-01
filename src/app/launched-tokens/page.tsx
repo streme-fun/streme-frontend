@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { LaunchedToken } from "@/src/app/types";
 import { ClaimFeesButton } from "@/src/components/ClaimFeesButton";
 import { usePrivy } from "@privy-io/react-auth";
@@ -36,7 +37,7 @@ interface RawStakerData {
   units?: string;
   balance?: string;
   farcasterUser?: FarcasterUser;
-  
+
   // Current API field names
   holder_address?: string;
   staked_balance?: number;
@@ -45,7 +46,7 @@ interface RawStakerData {
     username: string;
     pfp_url: string;
   };
-  
+
   // Common fields
   isConnected?: boolean;
   createdAtTimestamp?: string;
@@ -198,15 +199,15 @@ export default function LaunchedTokensPage() {
           const isBlacklisted = SPAMMER_BLACKLIST.includes(username);
           if (isBlacklisted) return false;
         }
-        
+
         // Filter out tokens with $ in name or symbol
-        if (token.name && token.name.includes('$')) {
+        if (token.name && token.name.includes("$")) {
           return false;
         }
-        if (token.symbol && token.symbol.includes('$')) {
+        if (token.symbol && token.symbol.includes("$")) {
           return false;
         }
-        
+
         return true;
       });
 
@@ -230,9 +231,7 @@ export default function LaunchedTokensPage() {
   const fetchPoolSummary = async (stakingPoolId: string) => {
     try {
       // Use the internal API route to get stakers and derive the pool summary
-      const response = await fetch(
-        `/api/token/${stakingPoolId}/stakers`
-      );
+      const response = await fetch(`/api/token/${stakingPoolId}/stakers`);
 
       if (!response.ok) {
         console.warn(`Failed to fetch pool summary: ${response.status}`);
@@ -243,12 +242,12 @@ export default function LaunchedTokensPage() {
       }
 
       const data = await response.json();
-      
+
       // Calculate total members and total units from stakers data
       const totalMembers = data.length;
       const totalUnits = data.reduce((sum: bigint, staker: RawStakerData) => {
         // Handle both new API format (staked_balance as number) and legacy format (units/balance as string)
-        const units = staker.staked_balance 
+        const units = staker.staked_balance
           ? BigInt(Math.floor(staker.staked_balance))
           : BigInt(staker.units || staker.balance || "0");
         return sum + units;
@@ -272,9 +271,7 @@ export default function LaunchedTokensPage() {
   ): Promise<TokenStaker[]> => {
     try {
       // Use the internal API route
-      const response = await fetch(
-        `/api/token/${stakingPoolId}/stakers`
-      );
+      const response = await fetch(`/api/token/${stakingPoolId}/stakers`);
 
       if (!response.ok) {
         console.warn(`Failed to fetch stakers: ${response.status}`);
@@ -282,41 +279,48 @@ export default function LaunchedTokensPage() {
       }
 
       const data = await response.json();
-      
+
       // Transform the data to match our TokenStaker interface
-      const transformedStakers: TokenStaker[] = data.map((staker: RawStakerData) => ({
-        account: {
-          id: staker.holder_address || staker.account || staker.address || "",
-        },
-        units: staker.staked_balance 
-          ? Math.floor(staker.staked_balance).toString()
-          : (staker.units || staker.balance || "0"),
-        isConnected: staker.isConnected ?? true,
-        createdAtTimestamp: staker.createdAtTimestamp || staker.timestamp || "0",
-        farcasterUser: staker.farcaster ? {
-          fid: staker.farcaster.fid,
-          username: staker.farcaster.username,
-          display_name: staker.farcaster.username, // Use username as display_name if not provided
-          pfp_url: staker.farcaster.pfp_url,
-        } : (staker.farcasterUser || (staker.username ? {
-          fid: staker.fid || 0,
-          username: staker.username,
-          display_name: staker.display_name || staker.username,
-          pfp_url: staker.pfp_url || staker.profileImage || "",
-        } : undefined)),
-      }));
+      const transformedStakers: TokenStaker[] = data.map(
+        (staker: RawStakerData) => ({
+          account: {
+            id: staker.holder_address || staker.account || staker.address || "",
+          },
+          units: staker.staked_balance
+            ? Math.floor(staker.staked_balance).toString()
+            : staker.units || staker.balance || "0",
+          isConnected: staker.isConnected ?? true,
+          createdAtTimestamp:
+            staker.createdAtTimestamp || staker.timestamp || "0",
+          farcasterUser: staker.farcaster
+            ? {
+                fid: staker.farcaster.fid,
+                username: staker.farcaster.username,
+                display_name: staker.farcaster.username, // Use username as display_name if not provided
+                pfp_url: staker.farcaster.pfp_url,
+              }
+            : staker.farcasterUser ||
+              (staker.username
+                ? {
+                    fid: staker.fid || 0,
+                    username: staker.username,
+                    display_name: staker.display_name || staker.username,
+                    pfp_url: staker.pfp_url || staker.profileImage || "",
+                  }
+                : undefined),
+        })
+      );
 
       console.log(
         `Fetched ${transformedStakers.length} stakers for token ${stakingPoolId}`
       );
-      
+
       return transformedStakers;
     } catch (err) {
       console.error("Failed to fetch stakers:", err);
       return [];
     }
   };
-
 
   const formatPrice = (price: number | undefined) => {
     if (!price || isNaN(price)) return "-";
@@ -456,7 +460,7 @@ export default function LaunchedTokensPage() {
         <div className="fixed inset-0 -z-10">
           <HeroAnimationMini />
         </div>
-        
+
         {/* Back Button */}
         <div className="pt-4 px-4 relative z-10">
           <button
@@ -482,7 +486,9 @@ export default function LaunchedTokensPage() {
         </div>
 
         {/* Fixed header */}
-        <h1 className="text-lg font-bold px-4 relative z-10">Launched Tokens</h1>
+        <h1 className="text-lg font-bold px-4 relative z-10">
+          Launched Tokens
+        </h1>
         <div className="px-4 relative z-10">
           <p className="text-sm opacity-70">
             {deployerAddress ? (
@@ -533,7 +539,13 @@ export default function LaunchedTokensPage() {
                       {token.img_url && (
                         <div className="avatar">
                           <div className="mask mask-squircle w-12 h-12">
-                            <img src={token.img_url} alt={token.name} />
+                            <Image
+                              src={token.img_url}
+                              alt={token.name}
+                              width={48}
+                              height={48}
+                              unoptimized
+                            />
                           </div>
                         </div>
                       )}
@@ -702,96 +714,104 @@ Symbol: $[your ticker]
 
               <div className="overflow-x-auto max-h-96">
                 <table className="table table-zebra table-sm">
-                      <thead>
-                        <tr>
-                          <th
-                            className="cursor-pointer"
-                            onClick={() => handleStakersSort("address")}
-                          >
-                            Holder
-                            {stakersSortBy === "address" && (
-                              <span className="ml-1">
-                                {stakersSortDirection === "asc" ? "↑" : "↓"}
-                              </span>
+                  <thead>
+                    <tr>
+                      <th
+                        className="cursor-pointer"
+                        onClick={() => handleStakersSort("address")}
+                      >
+                        Holder
+                        {stakersSortBy === "address" && (
+                          <span className="ml-1">
+                            {stakersSortDirection === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </th>
+                      <th
+                        className="cursor-pointer"
+                        onClick={() => handleStakersSort("units")}
+                      >
+                        Staked
+                        {stakersSortBy === "units" && (
+                          <span className="ml-1">
+                            {stakersSortDirection === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </th>
+                      <th
+                        className="cursor-pointer"
+                        onClick={() => handleStakersSort("status")}
+                      >
+                        Status
+                        {stakersSortBy === "status" && (
+                          <span className="ml-1">
+                            {stakersSortDirection === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(stakersWithFarcaster
+                      ? getFilteredAndSortedStakers(stakersWithFarcaster)
+                      : selectedTokenStakers.token.stakers
+                      ? getFilteredAndSortedStakers(
+                          selectedTokenStakers.token.stakers
+                        )
+                      : []
+                    ).map((staker, index) => (
+                      <tr key={`${staker.account.id}-${index}`}>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            {staker.farcasterUser?.pfp_url && (
+                              <Image
+                                src={staker.farcasterUser.pfp_url}
+                                alt=""
+                                width={24}
+                                height={24}
+                                className="w-6 h-6 rounded-full"
+                                unoptimized
+                              />
                             )}
-                          </th>
-                          <th
-                            className="cursor-pointer"
-                            onClick={() => handleStakersSort("units")}
-                          >
-                            Staked
-                            {stakersSortBy === "units" && (
-                              <span className="ml-1">
-                                {stakersSortDirection === "asc" ? "↑" : "↓"}
-                              </span>
-                            )}
-                          </th>
-                          <th
-                            className="cursor-pointer"
-                            onClick={() => handleStakersSort("status")}
-                          >
-                            Status
-                            {stakersSortBy === "status" && (
-                              <span className="ml-1">
-                                {stakersSortDirection === "asc" ? "↑" : "↓"}
-                              </span>
-                            )}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(stakersWithFarcaster
-                          ? getFilteredAndSortedStakers(stakersWithFarcaster)
-                          : selectedTokenStakers.token.stakers
-                          ? getFilteredAndSortedStakers(
-                              selectedTokenStakers.token.stakers
-                            )
-                          : []
-                        ).map((staker, index) => (
-                          <tr key={`${staker.account.id}-${index}`}>
-                            <td>
-                              <div className="flex items-center gap-2">
-                                {staker.farcasterUser?.pfp_url && (
-                                  <img
-                                    src={staker.farcasterUser.pfp_url}
-                                    alt=""
-                                    className="w-6 h-6 rounded-full"
-                                  />
-                                )}
-                                <div>
-                                  <a
-                                    href={`https://basescan.org/address/${staker.account.id}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="link link-primary font-mono text-xs"
-                                  >
-                                    {staker.account.id ? `${staker.account.id.slice(0, 4)}...${staker.account.id.slice(-3)}` : 'Unknown'}
-                                  </a>
-                                  {staker.farcasterUser?.username && (
-                                    <div className="text-xs opacity-70">
-                                      @{staker.farcasterUser.username}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="font-mono text-xs">
-                              {parseInt(staker.units).toLocaleString()}
-                            </td>
-                            <td>
-                              <div
-                                className={`badge badge-xs ${
-                                  staker.isConnected
-                                    ? "badge-success"
-                                    : "badge-warning"
-                                }`}
+                            <div>
+                              <a
+                                href={`https://basescan.org/address/${staker.account.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="link link-primary font-mono text-xs"
                               >
-                                {staker.isConnected ? "✓" : "○"}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
+                                {staker.account.id
+                                  ? `${staker.account.id.slice(
+                                      0,
+                                      4
+                                    )}...${staker.account.id.slice(-3)}`
+                                  : "Unknown"}
+                              </a>
+                              {staker.farcasterUser?.username && (
+                                <div className="text-xs opacity-70">
+                                  @{staker.farcasterUser.username}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="font-mono text-xs">
+                          {parseInt(staker.units).toLocaleString()}
+                        </td>
+                        <td>
+                          <div
+                            className={`badge badge-xs ${
+                              staker.isConnected
+                                ? "badge-success"
+                                : "badge-warning"
+                            }`}
+                          >
+                            {staker.isConnected ? "✓" : "○"}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </table>
               </div>
 
@@ -898,7 +918,13 @@ Symbol: $[your ticker]
                               {token.img_url && (
                                 <div className="avatar">
                                   <div className="mask mask-squircle w-12 h-12">
-                                    <img src={token.img_url} alt={token.name} />
+                                    <Image
+                                      src={token.img_url}
+                                      alt={token.name}
+                                      width={48}
+                                      height={48}
+                                      unoptimized
+                                    />
                                   </div>
                                 </div>
                               )}
@@ -1204,69 +1230,76 @@ Symbol: $[your ticker]
                 </thead>
                 <tbody>
                   {(stakersWithFarcaster
-                      ? getFilteredAndSortedStakers(stakersWithFarcaster)
-                      : selectedTokenStakers.token.stakers
-                      ? getFilteredAndSortedStakers(
-                          selectedTokenStakers.token.stakers
-                        )
-                      : []
-                    ).map((staker, index) => (
-                      <tr key={`${staker.account.id}-${index}`}>
-                        <td>
-                          <div className="flex items-center gap-3">
+                    ? getFilteredAndSortedStakers(stakersWithFarcaster)
+                    : selectedTokenStakers.token.stakers
+                    ? getFilteredAndSortedStakers(
+                        selectedTokenStakers.token.stakers
+                      )
+                    : []
+                  ).map((staker, index) => (
+                    <tr key={`${staker.account.id}-${index}`}>
+                      <td>
+                        <div className="flex items-center gap-3">
+                          {staker.farcasterUser &&
+                            staker.farcasterUser.pfp_url && (
+                              <div className="avatar">
+                                <div className="mask mask-squircle w-8 h-8">
+                                  <Image
+                                    src={staker.farcasterUser.pfp_url}
+                                    alt={
+                                      staker.farcasterUser.username || "User"
+                                    }
+                                    width={32}
+                                    height={32}
+                                    unoptimized
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          <div>
+                            <a
+                              href={`https://basescan.org/address/${staker.account.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="link link-primary font-mono"
+                            >
+                              {staker.account.id
+                                ? `${staker.account.id.slice(
+                                    0,
+                                    6
+                                  )}...${staker.account.id.slice(-4)}`
+                                : "Unknown"}
+                            </a>
                             {staker.farcasterUser &&
-                              staker.farcasterUser.pfp_url && (
-                                <div className="avatar">
-                                  <div className="mask mask-squircle w-8 h-8">
-                                    <img
-                                      src={staker.farcasterUser.pfp_url}
-                                      alt={
-                                        staker.farcasterUser.username || "User"
-                                      }
-                                    />
-                                  </div>
+                              staker.farcasterUser.username && (
+                                <div className="text-sm opacity-70">
+                                  @{staker.farcasterUser.username}
                                 </div>
                               )}
-                            <div>
-                              <a
-                                href={`https://basescan.org/address/${staker.account.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="link link-primary font-mono"
-                              >
-                                {staker.account.id ? `${staker.account.id.slice(0, 6)}...${staker.account.id.slice(-4)}` : 'Unknown'}
-                              </a>
-                              {staker.farcasterUser &&
-                                staker.farcasterUser.username && (
-                                  <div className="text-sm opacity-70">
-                                    @{staker.farcasterUser.username}
-                                  </div>
-                                )}
-                            </div>
                           </div>
-                        </td>
-                        <td className="font-mono">
-                          {parseInt(staker.units).toLocaleString()}
-                        </td>
-                        <td>
-                          <div
-                            className={`badge ${
-                              staker.isConnected
-                                ? "badge-success"
-                                : "badge-warning"
-                            }`}
-                          >
-                            {staker.isConnected ? "Connected" : "Not Connected"}
-                          </div>
-                        </td>
-                        <td className="opacity-50">
-                          {new Date(
-                            parseInt(staker.createdAtTimestamp) * 1000
-                          ).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))
-                  }
+                        </div>
+                      </td>
+                      <td className="font-mono">
+                        {parseInt(staker.units).toLocaleString()}
+                      </td>
+                      <td>
+                        <div
+                          className={`badge ${
+                            staker.isConnected
+                              ? "badge-success"
+                              : "badge-warning"
+                          }`}
+                        >
+                          {staker.isConnected ? "Connected" : "Not Connected"}
+                        </div>
+                      </td>
+                      <td className="opacity-50">
+                        {new Date(
+                          parseInt(staker.createdAtTimestamp) * 1000
+                        ).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
                   {(stakersWithFarcaster ||
                     selectedTokenStakers.token.stakers) &&
                     (stakersWithFarcaster

@@ -21,7 +21,11 @@ export async function GET(
     console.log(`[Image Gen] Base URL: ${baseUrl}`);
 
     // Fetch background image and convert to data URL
-    const bgImageUrl = `${baseUrl}/og-bg.png`;
+    // half of the time use og-light.png, half of the time use og-dark.png
+    const bgImageUrl =
+      Math.random() < 0.5
+        ? `${baseUrl}/og-light.png`
+        : `${baseUrl}/og-dark.png`;
     console.log(`[Image Gen] Background image URL: ${bgImageUrl}`);
 
     let backgroundDataUrl = null;

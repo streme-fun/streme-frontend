@@ -460,98 +460,101 @@ ${shareUrl}`;
 
   return (
     <>
-    <Modal isOpen={isOpen} onClose={handleClose}>
-      <div className="p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">Stake Tokens</h3>
-          {totalStakers && (
-            <span className="text-sm opacity-60">
-              {totalStakers} {Number(totalStakers) === 1 ? "staker" : "stakers"}
-            </span>
-          )}
-        </div>
-
-        {error && <div className="alert alert-error text-sm">{error}</div>}
-
-        <div>
-          <div className="flex justify-between text-sm mb-2">
-            <span className="opacity-60">Amount</span>
-            <span className="opacity-60">
-              Balance: {formatBalance(balance)} {symbol}
-            </span>
+      <Modal isOpen={isOpen} onClose={handleClose}>
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold">Stake Tokens</h3>
+            {totalStakers && (
+              <span className="text-sm opacity-60">
+                {totalStakers}{" "}
+                {Number(totalStakers) === 1 ? "staker" : "stakers"}
+              </span>
+            )}
           </div>
-          <div className="space-y-4">
-            <div className="relative">
-              <input
-                type="number"
-                value={amount}
-                onChange={handleAmountChange}
-                placeholder="0.0000"
-                step="0.0001"
-                className="input input-bordered w-full text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
+
+          {error && <div className="alert alert-error text-sm">{error}</div>}
+
+          <div>
+            <div className="flex justify-between text-sm mb-2">
+              <span className="opacity-60">Amount</span>
+              <span className="opacity-60">
+                Balance:{" "}
+                <span className="font-mono">{formatBalance(balance)}</span>{" "}
+                {symbol}
+              </span>
+            </div>
+            <div className="space-y-4">
+              <div className="relative">
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={handleAmountChange}
+                  placeholder="0.0000"
+                  step="0.0001"
+                  className="input input-bordered w-full text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <button
+                  className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs font-semibold bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600 hover:text-gray-800 transition-all active:scale-95 hover:cursor-pointer"
+                  onClick={handleMaxClick}
+                >
+                  Max
+                </button>
+              </div>
+
+              {/* Percentage Buttons */}
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {[25, 50, 75].map((percentage) => (
+                  <button
+                    key={percentage}
+                    type="button"
+                    onClick={() => {
+                      const maxAmount = Number(formatUnits(balance, 18));
+                      const calculatedAmount = (maxAmount * percentage) / 100;
+                      setAmount(calculatedAmount.toFixed(6));
+                      setIsMaxAmount(false); // Reset max flag when using percentage
+                    }}
+                    className="py-1 px-2 text-xs font-medium rounded-md border border-base-300 hover:border-base-400 hover:bg-base-200 transition-colors text-base-content/70 cursor-pointer"
+                  >
+                    {percentage}%
+                  </button>
+                ))}
+              </div>
+              <div className="text-sm opacity-60 bg-base-200 p-3 rounded-lg">
+                Note: Staked tokens are locked for 24 hours before they can be
+                unstaked. Rewards will start streaming immediately.
+              </div>
               <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs font-semibold bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600 hover:text-gray-800 transition-all active:scale-95 hover:cursor-pointer"
-                onClick={handleMaxClick}
+                className="btn btn-primary w-full"
+                onClick={handleStake}
+                disabled={
+                  isStaking ||
+                  !amount ||
+                  (isMaxAmount
+                    ? balance <= 0n
+                    : parseUnits(amount || "0", 18) > balance) ||
+                  (isMaxAmount ? false : parseUnits(amount || "0", 18) <= 0n)
+                }
               >
-                Max
+                {step === "staking" ? (
+                  <LoadingText text="Staking" />
+                ) : step === "connecting" ? (
+                  <LoadingText text="Connecting to Pool" />
+                ) : (
+                  "Stake"
+                )}
               </button>
             </div>
-            
-            {/* Percentage Buttons */}
-            <div className="grid grid-cols-3 gap-2 mt-2">
-              {[25, 50, 75].map((percentage) => (
-                <button
-                  key={percentage}
-                  type="button"
-                  onClick={() => {
-                    const maxAmount = Number(formatUnits(balance, 18));
-                    const calculatedAmount = (maxAmount * percentage) / 100;
-                    setAmount(calculatedAmount.toFixed(6));
-                    setIsMaxAmount(false); // Reset max flag when using percentage
-                  }}
-                  className="py-1 px-2 text-xs font-medium rounded-md border border-base-300 hover:border-base-400 hover:bg-base-200 transition-colors text-base-content/70 cursor-pointer"
-                >
-                  {percentage}%
-                </button>
-              ))}
-            </div>
-            <div className="text-sm opacity-60 bg-base-200 p-3 rounded-lg">
-              Note: Staked tokens are locked for 24 hours before they can be
-              unstaked. Rewards will start streaming immediately.
-            </div>
-            <button
-              className="btn btn-primary w-full"
-              onClick={handleStake}
-              disabled={
-                isStaking ||
-                !amount ||
-                (isMaxAmount
-                  ? balance <= 0n
-                  : parseUnits(amount || "0", 18) > balance) ||
-                (isMaxAmount ? false : parseUnits(amount || "0", 18) <= 0n)
-              }
-            >
-              {step === "staking" ? (
-                <LoadingText text="Staking" />
-              ) : step === "connecting" ? (
-                <LoadingText text="Connecting to Pool" />
-              ) : (
-                "Stake"
-              )}
-            </button>
           </div>
         </div>
-      </div>
-    </Modal>
-    
-    {/* MyTokensModal for mini app */}
-    {showMyTokensModal && (
-      <MyTokensModal
-        isOpen={showMyTokensModal}
-        onClose={() => setShowMyTokensModal(false)}
-      />
-    )}
-  </>
+      </Modal>
+
+      {/* MyTokensModal for mini app */}
+      {showMyTokensModal && (
+        <MyTokensModal
+          isOpen={showMyTokensModal}
+          onClose={() => setShowMyTokensModal(false)}
+        />
+      )}
+    </>
   );
 }
