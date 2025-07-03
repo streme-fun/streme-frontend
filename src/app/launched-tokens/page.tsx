@@ -7,6 +7,7 @@ import { LaunchedToken } from "@/src/app/types";
 import { ClaimFeesButton } from "@/src/components/ClaimFeesButton";
 import { usePrivy } from "@privy-io/react-auth";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
+import { useAccount } from "wagmi";
 import { Modal } from "@/src/components/Modal";
 import { LaunchTokenModal } from "@/src/components/LaunchTokenModal";
 import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
@@ -77,7 +78,8 @@ export default function LaunchedTokensPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Wallet connection hooks
-  const { user: privyUser, ready: privyReady } = usePrivy();
+  const { user: privyUser, ready: privyReady, authenticated } = usePrivy();
+  const { address: wagmiAddress } = useAccount();
   const {
     isMiniAppView,
     address: fcAddress,
@@ -85,14 +87,17 @@ export default function LaunchedTokensPage() {
     isSDKLoaded,
   } = useAppFrameLogic();
 
+  // Get the correct wallet address - prioritize wagmi address, then privy wallet
+  const userAddress = wagmiAddress || privyUser?.wallet?.address;
+
   // Simple wallet detection - just like the original working version
   const isWalletConnected = isMiniAppView
     ? fcIsConnected && !!fcAddress
-    : privyReady && !!privyUser?.wallet?.address;
+    : authenticated && !!userAddress;
 
   const deployerAddress = isMiniAppView
     ? fcAddress
-    : privyUser?.wallet?.address;
+    : userAddress;
   const [selectedTokenStakers, setSelectedTokenStakers] = useState<{
     token: EnrichedLaunchedToken;
     isOpen: boolean;
