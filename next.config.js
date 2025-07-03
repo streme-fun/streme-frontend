@@ -149,7 +149,7 @@ const nextConfig = {
                 https://*.wrpcd.net
                 blob:
                 https://cdn.blockaid.io;
-              img-src 'self' data: https: http:;
+              img-src 'self' data: https: http: blob:;
             `
               .replace(/\s{2,}/g, " ")
               .trim(),
