@@ -361,12 +361,10 @@ Symbol: $[your ticker]
           </button>
 
           <div className="hidden lg:flex items-center gap-6">
-            <button
-              onClick={() => setIsCreateTokenOpen(true)}
-              className="btn btn-primary"
-            >
+            {/* link to create page */}
+            <Link href="/create" className="btn btn-primary">
               Create a Token
-            </button>
+            </Link>
 
             <button
               onClick={() => setIsHowItWorksOpen(true)}
@@ -444,15 +442,12 @@ Symbol: $[your ticker]
           } border-t border-black/[.1] dark:border-white/[.1] bg-background/95 backdrop-blur-sm`}
         >
           <div className="px-4 py-4 space-y-3">
-            <button
-              onClick={() => {
-                setIsCreateTokenOpen(true);
-                setIsMenuOpen(false);
-              }}
+            <Link
+              href="/create"
               className="btn btn-primary w-full justify-start"
             >
               Create a Token
-            </button>
+            </Link>
 
             {privyAuthenticated && (
               <Link
