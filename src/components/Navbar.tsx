@@ -51,7 +51,7 @@ export function Navbar() {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
-  const [isLaunchTokenOpen, setIsLaunchTokenOpen] = useState(false);
+  const [isCreateTokenOpen, setIsCreateTokenOpen] = useState(false);
   const [isAddressDropdownOpen, setIsAddressDropdownOpen] = useState(false);
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [isWalletProfileOpen, setIsWalletProfileOpen] = useState(false);
@@ -156,7 +156,7 @@ export function Navbar() {
               onClick={async () => {
                 if (isSDKLoaded && sdk) {
                   try {
-                    const castText = `@streme Launch a token for me
+                    const castText = `@streme Create a token for me
 
 Name: [your token name]
 Symbol: $[your ticker]
@@ -168,13 +168,13 @@ Symbol: $[your ticker]
                     });
                   } catch (error) {
                     console.error("Error composing cast:", error);
-                    setIsLaunchTokenOpen(true);
+                    setIsCreateTokenOpen(true);
                   }
                 } else {
                   console.warn(
-                    "Farcaster SDK not loaded or sdk not available. Opening LaunchTokenModal as fallback."
+                    "Farcaster SDK not loaded or sdk not available. Opening CreateTokenModal as fallback."
                   );
-                  setIsLaunchTokenOpen(true);
+                  setIsCreateTokenOpen(true);
                 }
               }}
               className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer"
@@ -194,7 +194,7 @@ Symbol: $[your ticker]
                   d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
                 ></path>
               </svg>
-              Launch
+              Create
             </button>
 
             {/* Leaderboard Button */}
@@ -267,8 +267,8 @@ Symbol: $[your ticker]
           onClose={() => setIsHowItWorksOpen(false)}
         />
         <LaunchTokenModal
-          isOpen={isLaunchTokenOpen}
-          onClose={() => setIsLaunchTokenOpen(false)}
+          isOpen={isCreateTokenOpen}
+          onClose={() => setIsCreateTokenOpen(false)}
         />
         <LeaderboardModal
           isOpen={isLeaderboardModalOpen}
@@ -362,17 +362,11 @@ Symbol: $[your ticker]
 
           <div className="hidden lg:flex items-center gap-6">
             <button
-              onClick={() => setIsLaunchTokenOpen(true)}
+              onClick={() => setIsCreateTokenOpen(true)}
               className="btn btn-primary"
             >
-              Launch a Token
+              Create a Token
             </button>
-
-            {privyAuthenticated && (
-              <Link href="/tokens" className="btn btn-accent">
-                My Tokens
-              </Link>
-            )}
 
             <button
               onClick={() => setIsHowItWorksOpen(true)}
@@ -409,11 +403,19 @@ Symbol: $[your ticker]
                   {isAddressDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-base-100 rounded-lg shadow-lg border border-base-300">
                       <Link
-                        href="/launched-tokens"
+                        href="/tokens"
                         onClick={() => setIsAddressDropdownOpen(false)}
                         className="block w-full px-4 py-2 text-left hover:bg-base-200 cursor-pointer"
                       >
-                        Launched Tokens
+                        Streme Wallet
+                      </Link>
+
+                      <Link
+                        href="/created-tokens"
+                        onClick={() => setIsAddressDropdownOpen(false)}
+                        className="block w-full px-4 py-2 text-left hover:bg-base-200 cursor-pointer"
+                      >
+                        Created Tokens
                       </Link>
                       <button
                         onClick={() => {
@@ -444,12 +446,12 @@ Symbol: $[your ticker]
           <div className="px-4 py-4 space-y-3">
             <button
               onClick={() => {
-                setIsLaunchTokenOpen(true);
+                setIsCreateTokenOpen(true);
                 setIsMenuOpen(false);
               }}
               className="btn btn-primary w-full justify-start"
             >
-              Launch a Token
+              Create a Token
             </button>
 
             {privyAuthenticated && (
@@ -478,11 +480,11 @@ Symbol: $[your ticker]
 
             {privyAuthenticated && (
               <Link
-                href="/launched-tokens"
+                href="/created-tokens"
                 className="btn btn-ghost w-full justify-start"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Launched Tokens
+                Created Tokens
               </Link>
             )}
 
@@ -516,8 +518,8 @@ Symbol: $[your ticker]
         onClose={() => setIsHowItWorksOpen(false)}
       />
       <LaunchTokenModal
-        isOpen={isLaunchTokenOpen}
-        onClose={() => setIsLaunchTokenOpen(false)}
+        isOpen={isCreateTokenOpen}
+        onClose={() => setIsCreateTokenOpen(false)}
       />
     </>
   );

@@ -26,48 +26,53 @@ export function HowItWorksModal({
           ✕
         </button>
 
-        <h2 className="text-2xl font-bold mb-6">How to Streme</h2>
+        <h2 className="text-2xl font-bold mb-6">Streme 101</h2>
 
         <div className="space-y-6">
           <div>
             <h3 className="text-lg font-semibold mb-2 text-primary">
-              Streaming Rewards
+              Create Tokens with Built-in Staking
             </h3>
             <p className="opacity-80">
-              Streme is a token launcher, where every token launched
-              automatically streams rewards directly to stakers&apos; wallets -
-              no claiming needed.
+              Create tokens with automatic staking rewards. 20% of supply
+              streams to stakers over 365 days.
             </p>
           </div>
-
           <div>
             <h3 className="text-lg font-semibold mb-2 text-secondary">
-              Allocation
+              Stake for Streaming Rewards
             </h3>
             <p className="opacity-80">
-              20% of each token&apos;s total supply is allocated to the rewards
-              pool, distributed over 365 days proportionally to stakers.
+              Stake to earn streaming rewards proportional to your share of the
+              pool, streamed to your wallet every second. No claiming needed.
             </p>
           </div>
-
           <div>
-            <h3 className="text-lg font-semibold mb-2 text-accent">Stake</h3>
+            <h3 className="text-lg font-semibold mb-2 text-accent">
+              Streme to Earn $SUP
+            </h3>
             <p className="opacity-80">
-              When you stake tokens, they&apos;re locked for 24 hours. After the
-              lock period, you can unstake anytime. Your rewards continue
-              streaming whether they&apos;re locked or not.
+              Every action you can do on Streme earns Superfluid $SUP. Launch,
+              trade, stake, and hold to maximize your claim.
             </p>
           </div>
-
+          {/* Add launch a token button */}
+          <div>
+            <div className="text-center pt-4">
+              <a href="/create" className="btn btn-primary btn-lg w-full">
+                Create Your Streme Token
+              </a>
+            </div>
+          </div>
           {/* Add docs link */}
-          <div className="text-center pt-4">
+          <div className="text-center">
             <a
               href="https://docs.streme.fun"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline"
+              className="text-sm text-base-content/60 hover:text-base-content/80"
             >
-              Read the full documentation →
+              Read the Docs →
             </a>
           </div>
         </div>
