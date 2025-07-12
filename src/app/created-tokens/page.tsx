@@ -71,14 +71,14 @@ interface EnrichedLaunchedToken extends LaunchedToken {
   };
 }
 
-export default function LaunchedTokensPage() {
+export default function CreatedTokensPage() {
   const router = useRouter();
   const [tokens, setTokens] = useState<EnrichedLaunchedToken[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Wallet connection hooks
-  const { user: privyUser, ready: privyReady, authenticated } = usePrivy();
+  const { user: privyUser, authenticated } = usePrivy();
   const { address: wagmiAddress } = useAccount();
   const {
     isMiniAppView,
@@ -95,9 +95,7 @@ export default function LaunchedTokensPage() {
     ? fcIsConnected && !!fcAddress
     : authenticated && !!userAddress;
 
-  const deployerAddress = isMiniAppView
-    ? fcAddress
-    : userAddress;
+  const deployerAddress = isMiniAppView ? fcAddress : userAddress;
   const [selectedTokenStakers, setSelectedTokenStakers] = useState<{
     token: EnrichedLaunchedToken;
     isOpen: boolean;
@@ -567,13 +565,17 @@ export default function LaunchedTokensPage() {
                       <div>
                         <p className="opacity-70">Price</p>
                         <p className="font-mono font-semibold">
-                          {formatPrice(token.marketData.price)}
+                          {token.marketData?.price
+                            ? formatPrice(token.marketData.price)
+                            : "--"}
                         </p>
                       </div>
                       <div>
                         <p className="opacity-70">Market Cap</p>
                         <p className="font-mono font-semibold">
-                          {formatMarketCap(token.marketData.marketCap)}
+                          {token.marketData?.marketCap
+                            ? formatMarketCap(token.marketData.marketCap)
+                            : "--"}
                         </p>
                       </div>
                       <div>
@@ -949,16 +951,24 @@ Symbol: $[your ticker]
                             </div>
                           </td>
                           <td className="font-mono">
-                            {formatPrice(token.marketData.price)}
+                            {token.marketData?.price
+                              ? formatPrice(token.marketData.price)
+                              : "--"}
                           </td>
                           <td className="font-mono">
-                            {formatMarketCap(token.marketData.marketCap)}
+                            {token.marketData?.marketCap
+                              ? formatMarketCap(token.marketData.marketCap)
+                              : "--"}
                           </td>
                           <td>
-                            {formatPercentage(token.marketData.priceChange24h)}
+                            {token.marketData?.priceChange24h
+                              ? formatPercentage(
+                                  token.marketData.priceChange24h
+                                )
+                              : "--"}
                           </td>
                           <td className="font-mono">
-                            {token.marketData.volume24h
+                            {token.marketData?.volume24h
                               ? formatMarketCap(token.marketData.volume24h)
                               : "N/A"}
                           </td>

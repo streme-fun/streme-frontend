@@ -16,7 +16,7 @@ Symbol: $[your ticker]
 
 [Don't forget to attach an image!] 🎨`;
 
-  const warpcastUrl = `https://farcaster.xyz/~/compose?text=${encodeURIComponent(
+  const farcasterUrl = `https://farcaster.xyz/~/compose?text=${encodeURIComponent(
     launchText
   )}`;
 
@@ -77,12 +77,12 @@ Symbol: $[your ticker]
             <div className="relative group">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-secondary to-accent rounded-lg blur opacity-30 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-glow"></div>
               <a
-                href={warpcastUrl}
+                href={farcasterUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="relative btn btn-primary w-full"
               >
-                Launch Token on Warpcast
+                Launch Token on Farcaster
               </a>
             </div>
           </div>

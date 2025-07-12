@@ -278,11 +278,11 @@ export function WalletProfileModal({
           {/* Quick Actions */}
           <div className="">
             <a
-              href="/launched-tokens"
+              href="/created-tokens"
               onClick={onClose}
               className="btn btn-sm btn-outline"
             >
-              View Launched Tokens
+              View Created Tokens
             </a>
           </div>
 

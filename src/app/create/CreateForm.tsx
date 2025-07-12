@@ -3,25 +3,31 @@
 import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import {
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from "wagmi";
 import { readContract } from "wagmi/actions";
 import { config } from "@/src/components/providers/WagmiProvider";
 import { parseEther } from "viem";
 import { toast } from "sonner";
-import { 
-  STREME_DEPLOY_ADDRESS, 
-  STREME_DEPLOY_ABI, 
+import {
+  STREME_DEPLOY_ADDRESS,
+  STREME_DEPLOY_ABI,
   LP_FACTORY_ADDRESS,
   TOKEN_FACTORY_ADDRESS,
   POST_DEPLOY_HOOK_ADDRESS,
-  MAIN_STREME_ADDRESS
+  MAIN_STREME_ADDRESS,
 } from "@/src/lib/contracts";
 
-export function LaunchForm() {
+export function CreateForm() {
   const { login, authenticated, user } = usePrivy();
   const { isMiniAppView, isConnected, farcasterContext } = useAppFrameLogic();
   const { address } = useAccount();
+  const router = useRouter();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -32,6 +38,7 @@ export function LaunchForm() {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [isDeploying, setIsDeploying] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [deployedTokenAddress, setDeployedTokenAddress] = useState<string>("");
 
   // Get user's FID and primary address
   const userFid = farcasterContext?.user?.fid || 0;
@@ -47,28 +54,38 @@ export function LaunchForm() {
   // We'll generate salt only when submitting, not on every keystroke
 
   // Deploy contract
-  const { writeContract, data: deployHash, isPending: isWritePending } = useWriteContract();
+  const {
+    writeContract,
+    data: deployHash,
+    isPending: isWritePending,
+  } = useWriteContract();
 
   // Wait for deployment transaction
-  const { isLoading: isTxLoading, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({
-    hash: deployHash,
-  });
+  const { isLoading: isTxLoading, isSuccess: isTxSuccess } =
+    useWaitForTransactionReceipt({
+      hash: deployHash,
+    });
 
   // Handle transaction success
   useEffect(() => {
-    if (isTxSuccess) {
-      toast.success("🎉 Token deployed successfully!");
+    if (isTxSuccess && deployedTokenAddress) {
+      toast.success(
+        "🎉 Token deployed successfully! Redirecting in 3 seconds..."
+      );
       setIsDeploying(false);
-      // Reset form
-      setFormData({
-        name: "",
-        symbol: "",
-        description: "",
-        imageUrl: "",
-      });
-      setPreviewUrl("");
+
+      console.log(
+        "Deployment successful, token address:",
+        deployedTokenAddress
+      );
+      console.log("Transaction hash:", deployHash);
+
+      // Add a delay to allow backend indexing before redirect
+      setTimeout(() => {
+        router.push(`/created-tokens`);
+      }, 3000); // 3 second delay
     }
-  }, [isTxSuccess]);
+  }, [isTxSuccess, deployedTokenAddress, router, deployHash]);
 
   // Update loading state
   useEffect(() => {
@@ -80,14 +97,16 @@ export function LaunchForm() {
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      e.target.value = ""; // Reset the input
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be smaller than 5MB');
+    // Validate file size (max 1MB)
+    if (file.size > 1024 * 1024) {
+      toast.error("Image must be smaller than 1MB");
+      e.target.value = ""; // Reset the input
       return;
     }
 
@@ -99,27 +118,27 @@ export function LaunchForm() {
     try {
       // Upload to Vercel Blob
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
+      const response = await fetch("/api/upload", {
+        method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('Upload failed');
+        throw new Error("Upload failed");
       }
 
       const { url } = await response.json();
-      
+
       // Update form data with the uploaded URL
-      setFormData(prev => ({ ...prev, imageUrl: url }));
-      toast.success('Image uploaded successfully!');
+      setFormData((prev) => ({ ...prev, imageUrl: url }));
+      toast.success("Image uploaded successfully!");
     } catch (error) {
-      console.error('Image upload error:', error);
-      toast.error('Failed to upload image');
+      console.error("Image upload error:", error);
+      toast.error("Failed to upload image");
       // Clear preview on error
-      setPreviewUrl('');
+      setPreviewUrl("");
     } finally {
       setIsUploadingImage(false);
     }
@@ -149,16 +168,21 @@ export function LaunchForm() {
     setIsDeploying(true);
 
     try {
-      console.log("Preparing token deployment for:", formData.symbol, userAddress);
+      console.log(
+        "Preparing token deployment for:",
+        formData.symbol,
+        userAddress
+      );
 
       // Generate salt using the main Streme contract (matching successful transaction pattern)
-      let salt = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
-      
+      let salt =
+        "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
+
       try {
         console.log("Generating salt with main contract:", MAIN_STREME_ADDRESS);
         console.log("Should NOT be using wrapper:", STREME_DEPLOY_ADDRESS);
         console.log("Using TOKEN_FACTORY_ADDRESS:", TOKEN_FACTORY_ADDRESS);
-        
+
         const saltResult = await readContract(config, {
           address: MAIN_STREME_ADDRESS,
           abi: [
@@ -186,10 +210,19 @@ export function LaunchForm() {
             WETH_ADDRESS,
           ],
         });
-        
-        const [generatedSalt, predictedToken] = saltResult as [`0x${string}`, `0x${string}`];
+
+        const [generatedSalt, predictedToken] = saltResult as [
+          `0x${string}`,
+          `0x${string}`
+        ];
         salt = generatedSalt;
-        console.log("Generated salt:", salt, "Predicted token:", predictedToken);
+        setDeployedTokenAddress(predictedToken);
+        console.log(
+          "Generated salt:",
+          salt,
+          "Predicted token:",
+          predictedToken
+        );
       } catch (saltError) {
         console.warn("Salt generation failed, using default:", saltError);
         // Keep the default 0x0 salt
@@ -224,7 +257,7 @@ export function LaunchForm() {
         liquidityFactory: LP_FACTORY_ADDRESS,
         postLPHook: "0x0000000000000000000000000000000000000000",
         tokenConfig,
-        note: "No ETH value - just gas fees"
+        note: "No ETH value - just gas fees",
       });
 
       // Use the wrapper contract (as originally requested) with correct addresses
@@ -245,7 +278,8 @@ export function LaunchForm() {
       toast.success("Token deployment initiated!");
     } catch (error) {
       console.error("Token deployment error:", error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       toast.error(`Failed to deploy token: ${errorMessage}`);
       setIsDeploying(false);
     }
@@ -255,114 +289,127 @@ export function LaunchForm() {
   const buttonText = !isWalletConnected
     ? isMiniAppView
       ? "WALLET CONNECTING..."
-      : "CONNECT WALLET TO LAUNCH"
+      : "CONNECT WALLET TO CREATE"
     : isDeploying
-    ? "DEPLOYING TOKEN..."
-    : "LAUNCH TOKEN";
+    ? "CREATING TOKEN..."
+    : "CREATE TOKEN";
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="card bg-base-100 border border-black/[.1] dark:border-white/[.1]">
-        <div className="card-body">
-          {/* Token Details */}
-          <div className="space-y-6">
-            {/* Image Upload */}
-            <div>
-              <label className="text-base opacity-60 mb-2 block">
-                Token Image
-              </label>
-              <div className="flex items-center gap-4">
-                {/* Image Preview */}
-                <div className="relative w-24 h-24 bg-black/[.02] dark:bg-white/[.02] rounded-full overflow-hidden flex items-center justify-center">
-                  {previewUrl ? (
-                    <Image
-                      src={previewUrl}
-                      alt="Token preview"
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <span className="text-4xl opacity-20">🖼️</span>
-                  )}
-                </div>
-                {/* Upload Button */}
-                <div className="flex-1">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                    id="image-upload"
-                  />
-                  <label
-                    htmlFor="image-upload"
-                    className={`btn btn-ghost bg-black/[.02] dark:bg-white/[.02] w-full justify-start normal-case ${
-                      isUploadingImage ? "loading" : ""
-                    }`}
-                  >
-                    {isUploadingImage 
-                      ? "Uploading..." 
-                      : previewUrl 
-                      ? "Change Image" 
-                      : "Upload Image"
-                    }
-                  </label>
-                  <div className="text-xs opacity-40 mt-2">
-                    Recommended: 400x400px or larger
-                  </div>
-                </div>
-              </div>
-            </div>
+    <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto">
+      {/* Name Field */}
+      <div>
+        <label className="block mb-2">
+          <span className="text-sm font-medium">Name</span>
+          <span className="text-error ml-1">*</span>
+        </label>
+        <input
+          type="text"
+          placeholder="Enter token name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          className="input input-bordered w-full bg-base-200"
+          required
+        />
+      </div>
 
-            <div>
-              <label className="text-base opacity-60 mb-2 block">
-                Token Name
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Based Fwog"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                className="input input-ghost bg-black/[.02] dark:bg-white/[.02] w-full text-base"
-                required
+      {/* Symbol Field */}
+      <div>
+        <label className="block mb-2">
+          <span className="text-sm font-medium">Symbol</span>
+          <span className="text-error ml-1">*</span>
+        </label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50">
+            $
+          </span>
+          <input
+            type="text"
+            placeholder="Enter token symbol"
+            value={formData.symbol}
+            onChange={(e) =>
+              setFormData({ ...formData, symbol: e.target.value })
+            }
+            className="input input-bordered w-full bg-base-200"
+            required
+          />
+        </div>
+      </div>
+
+      {/* Image Upload */}
+      <div>
+        <label className="block mb-2">
+          <span className="text-sm font-medium">Image</span>
+        </label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
+          className="hidden"
+          id="image-upload"
+        />
+        <label
+          htmlFor="image-upload"
+          className="btn btn-outline border-base-content/20 w-full justify-center normal-case"
+        >
+          {isUploadingImage ? (
+            <>
+              <span className="loading loading-spinner loading-sm mr-2"></span>
+              UPLOADING...
+            </>
+          ) : (
+            <>
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+              SELECT FILE (JPEG / PNG, 1MB MAX)
+            </>
+          )}
+        </label>
+
+        {/* Image Preview */}
+        {previewUrl && (
+          <div className="mt-4 flex justify-center">
+            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-base-300">
+              <Image
+                src={previewUrl}
+                alt="Token preview"
+                fill
+                className="object-cover"
               />
             </div>
+          </div>
+        )}
+      </div>
 
-            <div>
-              <label className="text-base opacity-60 mb-2 block">
-                Token Symbol
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. FWOG"
-                value={formData.symbol}
-                onChange={(e) =>
-                  setFormData({ ...formData, symbol: e.target.value })
-                }
-                className="input input-ghost bg-black/[.02] dark:bg-white/[.02] w-full text-base"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-base opacity-60 mb-2 block">
-                Description
-              </label>
-              <textarea
-                placeholder="Tell us about your token..."
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                className="textarea textarea-ghost bg-black/[.02] dark:bg-white/[.02] w-full h-32"
-                required
-              />
-              <div className="text-xs opacity-40 mt-2">
-                200,000 tokens (20% of supply) will be distributed to stakers
-              </div>
-            </div>
+      {/* Token Metadata Collapsible */}
+      <div className="collapse collapse-arrow bg-base-200">
+        <input type="checkbox" />
+        <div className="collapse-title text-sm font-medium flex items-center">
+          <span>Token Metadata (optional)</span>
+        </div>
+        <div className="collapse-content">
+          <div className="pt-4">
+            <label className="block mb-2">
+              <span className="text-sm font-medium">Description</span>
+            </label>
+            <textarea
+              placeholder="Describe your token..."
+              value={formData.description}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
+              className="textarea textarea-bordered w-full h-24 bg-base-100"
+            />
           </div>
         </div>
       </div>
@@ -370,7 +417,7 @@ export function LaunchForm() {
       {/* Launch Button */}
       <button
         type="submit"
-        className="btn btn-primary btn-lg w-full font-bold text-lg"
+        className="btn btn-primary w-full"
         disabled={(isMiniAppView && !isConnected) || isDeploying}
       >
         {buttonText}
