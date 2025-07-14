@@ -10,7 +10,7 @@ import { Toaster } from "sonner";
 import React, { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
-import { UnstakedTokensModal } from "../components/UnstakedTokensModal";
+// import { UnstakedTokensModal } from "../components/UnstakedTokensModal";
 import { formatUnits } from "viem";
 import { publicClient } from "../lib/viemClient";
 
@@ -130,8 +130,8 @@ function AppContent({ children }: { children: React.ReactNode }) {
     isConnected: fcIsConnected,
     isSDKLoaded: isDetectionComplete,
   } = useAppFrameLogic();
-  
-  const [unstakedTokens, setUnstakedTokens] = useState<UnstakedToken[]>([]);
+
+  // const [unstakedTokens, setUnstakedTokens] = useState<UnstakedToken[]>([]);
   const [mounted, setMounted] = useState(false);
   const [stableConnectionState, setStableConnectionState] = useState<{
     isStable: boolean;
@@ -146,12 +146,12 @@ function AppContent({ children }: { children: React.ReactNode }) {
   // Initialize theme-change early to prevent timing issues
   useEffect(() => {
     // Import and initialize theme-change as soon as component mounts
-    import('theme-change').then(({ themeChange }) => {
+    import("theme-change").then(({ themeChange }) => {
       themeChange(false);
       // Ensure theme is properly applied
-      const savedTheme = localStorage.getItem('theme');
+      const savedTheme = localStorage.getItem("theme");
       if (savedTheme) {
-        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.documentElement.setAttribute("data-theme", savedTheme);
       }
     });
     setMounted(true);
@@ -167,12 +167,18 @@ function AppContent({ children }: { children: React.ReactNode }) {
     const debounceTimeout = setTimeout(() => {
       const currentAddress = effectiveAddress;
       const currentIsConnected = effectiveIsConnected;
-      
+
       // Additional validation for mini app context
       if (isMiniAppView) {
         // For mini app, ensure we have a valid Ethereum address format
-        if (!currentAddress || !currentAddress.startsWith('0x') || currentAddress.length !== 42) {
-          console.log("Mini app: Invalid address format, waiting...", { currentAddress });
+        if (
+          !currentAddress ||
+          !currentAddress.startsWith("0x") ||
+          currentAddress.length !== 42
+        ) {
+          console.log("Mini app: Invalid address format, waiting...", {
+            currentAddress,
+          });
           return;
         }
       }
@@ -187,9 +193,9 @@ function AppContent({ children }: { children: React.ReactNode }) {
           isMiniAppView,
           currentAddress,
           currentIsConnected,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
-        
+
         setStableConnectionState({
           isStable: true,
           address: currentAddress,
@@ -199,63 +205,86 @@ function AppContent({ children }: { children: React.ReactNode }) {
     }, 750); // 750ms debounce to allow for state settling
 
     return () => clearTimeout(debounceTimeout);
-  }, [effectiveAddress, effectiveIsConnected, isDetectionComplete, mounted, isMiniAppView, stableConnectionState]);
+  }, [
+    effectiveAddress,
+    effectiveIsConnected,
+    isDetectionComplete,
+    mounted,
+    isMiniAppView,
+    stableConnectionState,
+  ]);
 
   // Helper function to safely call toLowerCase on potentially null values
-  const safeToLowerCase = React.useCallback((value: string | null | undefined): string => {
-    if (!value || typeof value !== "string") {
-      return "";
-    }
-    return value.toLowerCase();
-  }, []);
+  const safeToLowerCase = React.useCallback(
+    (value: string | null | undefined): string => {
+      if (!value || typeof value !== "string") {
+        return "";
+      }
+      return value.toLowerCase();
+    },
+    []
+  );
 
   // Helper function to fetch token data
-  const fetchTokenData = React.useCallback(async (tokenAddress: string) => {
-    if (
-      !tokenAddress ||
-      BLACKLISTED_TOKENS.includes(safeToLowerCase(tokenAddress))
-    ) {
+  const fetchTokenData = React.useCallback(
+    async (tokenAddress: string) => {
+      if (
+        !tokenAddress ||
+        BLACKLISTED_TOKENS.includes(safeToLowerCase(tokenAddress))
+      ) {
+        return {
+          staking_address: undefined,
+          logo: undefined,
+          marketData: undefined,
+        };
+      }
+
+      try {
+        const response = await fetch(
+          `/api/tokens/single?address=${tokenAddress}`
+        );
+        if (response.ok) {
+          const result = await response.json();
+          return {
+            staking_address: result.data?.staking_address,
+            logo:
+              result.data?.img_url || result.data?.logo || result.data?.image,
+            marketData: result.data?.marketData,
+          };
+        }
+      } catch (error) {
+        console.warn("Could not fetch token data for:", tokenAddress, error);
+      }
+
       return {
         staking_address: undefined,
         logo: undefined,
         marketData: undefined,
       };
-    }
-
-    try {
-      const response = await fetch(
-        `/api/tokens/single?address=${tokenAddress}`
-      );
-      if (response.ok) {
-        const result = await response.json();
-        return {
-          staking_address: result.data?.staking_address,
-          logo: result.data?.img_url || result.data?.logo || result.data?.image,
-          marketData: result.data?.marketData,
-        };
-      }
-    } catch (error) {
-      console.warn("Could not fetch token data for:", tokenAddress, error);
-    }
-
-    return {
-      staking_address: undefined,
-      logo: undefined,
-      marketData: undefined,
-    };
-  }, [safeToLowerCase]);
+    },
+    [safeToLowerCase]
+  );
 
   // Check for unstaked tokens when stable connection is established
   useEffect(() => {
     const checkForUnstakedTokens = async () => {
       // Wait for stable connection state
-      if (!stableConnectionState.isStable || !stableConnectionState.address || !stableConnectionState.isConnected) {
-        console.log("Waiting for stable connection state...", stableConnectionState);
+      if (
+        !stableConnectionState.isStable ||
+        !stableConnectionState.address ||
+        !stableConnectionState.isConnected
+      ) {
+        console.log(
+          "Waiting for stable connection state...",
+          stableConnectionState
+        );
         return;
       }
 
       // Check if user has dismissed the modal in this session
-      const hasSeenModal = sessionStorage.getItem("unstakedTokensModalDismissed");
+      const hasSeenModal = sessionStorage.getItem(
+        "unstakedTokensModalDismissed"
+      );
       if (hasSeenModal === "true") {
         console.log("Modal already dismissed this session");
         return;
@@ -265,7 +294,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
         address: stableConnectionState.address,
         isConnected: stableConnectionState.isConnected,
         isMiniAppView,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
       try {
@@ -322,76 +351,94 @@ function AppContent({ children }: { children: React.ReactNode }) {
               // Get tokens that have been staked (have pool memberships with units > 0)
               const stakedTokens = new Set(
                 (accountData.poolMemberships || [])
-                  .filter((membership: { units?: string; pool?: { token?: { id?: string } } }) => 
-                    membership.units && 
-                    parseFloat(membership.units) > 0 &&
-                    membership.pool?.token?.id
+                  .filter(
+                    (membership: {
+                      units?: string;
+                      pool?: { token?: { id?: string } };
+                    }) =>
+                      membership.units &&
+                      parseFloat(membership.units) > 0 &&
+                      membership.pool?.token?.id
                   )
-                  .map((membership: { pool: { token: { id: string } } }) => safeToLowerCase(membership.pool.token.id))
+                  .map((membership: { pool: { token: { id: string } } }) =>
+                    safeToLowerCase(membership.pool.token.id)
+                  )
               );
 
               // Filter to only tokens that have NEVER been staked
               const validSnapshots = accountData.accountTokenSnapshots.filter(
-                (snapshot: { 
-                  balanceUntilUpdatedAt?: string; 
-                  token: { 
-                    isNativeAssetSuperToken?: boolean; 
-                    id?: string; 
+                (snapshot: {
+                  balanceUntilUpdatedAt?: string;
+                  token: {
+                    isNativeAssetSuperToken?: boolean;
+                    id?: string;
                     symbol?: string;
-                  } 
+                  };
                 }) =>
                   snapshot.balanceUntilUpdatedAt &&
                   parseFloat(snapshot.balanceUntilUpdatedAt) > 0 &&
                   !snapshot.token.isNativeAssetSuperToken &&
                   snapshot.token.id &&
-                  !BLACKLISTED_TOKENS.includes(safeToLowerCase(snapshot.token.id)) &&
+                  !BLACKLISTED_TOKENS.includes(
+                    safeToLowerCase(snapshot.token.id)
+                  ) &&
                   !stakedTokens.has(safeToLowerCase(snapshot.token.id)) // Only never-staked tokens
               );
 
               if (validSnapshots.length > 0) {
                 // Fetch current balances and token data
-                const tokenAddresses = validSnapshots.map((snapshot: { token: { id: string } }) => snapshot.token.id);
-                
-                const balancePromises = tokenAddresses.map(async (tokenAddress: string) => {
-                  try {
-                    const balance = await publicClient.readContract({
-                      address: tokenAddress as `0x${string}`,
-                      abi: [
-                        {
-                          inputs: [{ name: "account", type: "address" }],
-                          name: "balanceOf",
-                          outputs: [{ name: "", type: "uint256" }],
-                          stateMutability: "view",
-                          type: "function",
-                        },
-                      ],
-                      functionName: "balanceOf",
-                      args: [stableConnectionState.address as `0x${string}`],
-                    });
-                    return { tokenAddress, balance };
-                  } catch {
-                    return { tokenAddress, balance: BigInt(0) };
+                const tokenAddresses = validSnapshots.map(
+                  (snapshot: { token: { id: string } }) => snapshot.token.id
+                );
+
+                const balancePromises = tokenAddresses.map(
+                  async (tokenAddress: string) => {
+                    try {
+                      const balance = await publicClient.readContract({
+                        address: tokenAddress as `0x${string}`,
+                        abi: [
+                          {
+                            inputs: [{ name: "account", type: "address" }],
+                            name: "balanceOf",
+                            outputs: [{ name: "", type: "uint256" }],
+                            stateMutability: "view",
+                            type: "function",
+                          },
+                        ],
+                        functionName: "balanceOf",
+                        args: [stableConnectionState.address as `0x${string}`],
+                      });
+                      return { tokenAddress, balance };
+                    } catch {
+                      return { tokenAddress, balance: BigInt(0) };
+                    }
                   }
-                });
+                );
 
                 const balanceResults = await Promise.all(balancePromises);
                 const balanceMap = new Map(
-                  balanceResults.map((result) => [result.tokenAddress, result.balance])
+                  balanceResults.map((result) => [
+                    result.tokenAddress,
+                    result.balance,
+                  ])
                 );
 
                 // Fetch token data in parallel
-                const tokenDataPromises = tokenAddresses.slice(0, 5).map((tokenAddress: string) =>
-                  fetchTokenData(tokenAddress)
-                );
+                const tokenDataPromises = tokenAddresses
+                  .slice(0, 5)
+                  .map((tokenAddress: string) => fetchTokenData(tokenAddress));
                 const tokenDataResults = await Promise.all(tokenDataPromises);
 
                 const tokens: UnstakedToken[] = [];
-                
+
                 for (let i = 0; i < Math.min(validSnapshots.length, 5); i++) {
                   const snapshot = validSnapshots[i];
                   const tokenAddress = snapshot.token.id;
-                  const currentBalance = balanceMap.get(tokenAddress) || BigInt(0);
-                  const formattedBalance = Number(formatUnits(currentBalance, 18));
+                  const currentBalance =
+                    balanceMap.get(tokenAddress) || BigInt(0);
+                  const formattedBalance = Number(
+                    formatUnits(currentBalance, 18)
+                  );
                   const tokenData = tokenDataResults[i];
 
                   if (formattedBalance > 0 && tokenData.staking_address) {
@@ -406,7 +453,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
                   }
                 }
 
-                setUnstakedTokens(tokens);
+                // setUnstakedTokens(tokens);
               }
             }
             break;
@@ -443,9 +490,9 @@ function AppContent({ children }: { children: React.ReactNode }) {
           },
         }}
       />
-      
+
       {/* Global Unstaked Tokens Modal */}
-      {mounted && unstakedTokens.length > 0 && (
+      {/* {mounted && unstakedTokens.length > 0 && (
         <UnstakedTokensModal
           unstakedTokens={unstakedTokens}
           onDismiss={() => {
@@ -454,7 +501,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
             setUnstakedTokens([]);
           }}
         />
-      )}
+      )} */}
     </>
   );
 }

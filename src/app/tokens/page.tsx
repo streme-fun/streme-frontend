@@ -12,7 +12,7 @@ import { HeroAnimationMini } from "../../components/HeroAnimationMini";
 import { publicClient } from "../../lib/viemClient";
 import { GDA_FORWARDER, GDA_ABI } from "../../lib/contracts";
 import Link from "next/link";
-import { UnstakedTokensModal } from "../../components/UnstakedTokensModal";
+// import { UnstakedTokensModal } from "../../components/UnstakedTokensModal";
 import { useTokenData } from "../../hooks/useTokenData";
 
 interface PoolMembership {
@@ -137,14 +137,20 @@ export default function TokensPage() {
   const [error, setError] = useState<string | null>(null);
   const [accountExists, setAccountExists] = useState<boolean | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [showUnstakedModal, setShowUnstakedModal] = useState(true);
+  // const [showUnstakedModal, setShowUnstakedModal] = useState(true);
 
   // Get effective address based on context
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
   const effectiveIsConnected = isMiniAppView ? fcIsConnected : !!wagmiAddress;
-  
+
   // Use centralized token data hook
-  const { balanceData, refreshTokenData, refreshAllData, registerActiveToken, unregisterActiveToken } = useTokenData();
+  const {
+    balanceData,
+    refreshTokenData,
+    refreshAllData,
+    registerActiveToken,
+    unregisterActiveToken,
+  } = useTokenData();
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -238,52 +244,54 @@ export default function TokensPage() {
   const fetchBalances = async (tokenAddresses: string[]) => {
     const results = [];
     const tokensNeedingDirectFetch = [];
-    
+
     // First, try to get cached data
     for (const tokenAddress of tokenAddresses) {
       const cacheKey = `${tokenAddress}-${effectiveAddress}`;
       const cachedData = balanceData.get(cacheKey);
-      
+
       if (cachedData) {
         results.push({ tokenAddress, balance: cachedData.tokenBalance });
       } else {
         tokensNeedingDirectFetch.push(tokenAddress);
       }
     }
-    
+
     // For tokens not in cache, fetch directly from blockchain
     if (tokensNeedingDirectFetch.length > 0) {
-      const directFetchPromises = tokensNeedingDirectFetch.map(async (tokenAddress) => {
-        try {
-          const balance = await publicClient.readContract({
-            address: tokenAddress as `0x${string}`,
-            abi: [
-              {
-                inputs: [{ name: "account", type: "address" }],
-                name: "balanceOf",
-                outputs: [{ name: "", type: "uint256" }],
-                stateMutability: "view",
-                type: "function",
-              },
-            ],
-            functionName: "balanceOf",
-            args: [effectiveAddress as `0x${string}`],
-          });
-          
-          // Also trigger background refresh for future use
-          refreshTokenData(tokenAddress).catch(console.warn);
-          
-          return { tokenAddress, balance };
-        } catch (error) {
-          console.warn("Failed to fetch balance for:", tokenAddress, error);
-          return { tokenAddress, balance: BigInt(0) };
+      const directFetchPromises = tokensNeedingDirectFetch.map(
+        async (tokenAddress) => {
+          try {
+            const balance = await publicClient.readContract({
+              address: tokenAddress as `0x${string}`,
+              abi: [
+                {
+                  inputs: [{ name: "account", type: "address" }],
+                  name: "balanceOf",
+                  outputs: [{ name: "", type: "uint256" }],
+                  stateMutability: "view",
+                  type: "function",
+                },
+              ],
+              functionName: "balanceOf",
+              args: [effectiveAddress as `0x${string}`],
+            });
+
+            // Also trigger background refresh for future use
+            refreshTokenData(tokenAddress).catch(console.warn);
+
+            return { tokenAddress, balance };
+          } catch (error) {
+            console.warn("Failed to fetch balance for:", tokenAddress, error);
+            return { tokenAddress, balance: BigInt(0) };
+          }
         }
-      });
-      
+      );
+
       const directResults = await Promise.all(directFetchPromises);
       results.push(...directResults);
     }
-    
+
     return results;
   };
 
@@ -311,42 +319,56 @@ export default function TokensPage() {
       fetchStakesAndTokens();
     }
   }, [effectiveAddress]);
-  
+
   // Create stable token lists for dependencies
-  const stakeTokenAddresses = stakes.map(s => s.tokenAddress).sort().join(',');
-  const superTokenAddresses = ownedSuperTokens.map(t => t.tokenAddress).sort().join(',');
-  
+  const stakeTokenAddresses = stakes
+    .map((s) => s.tokenAddress)
+    .sort()
+    .join(",");
+  const superTokenAddresses = ownedSuperTokens
+    .map((t) => t.tokenAddress)
+    .sort()
+    .join(",");
+
   // Register active tokens for automatic refresh
   useEffect(() => {
     const allTokens = [
-      ...stakes.map(s => s.tokenAddress),
-      ...ownedSuperTokens.map(t => t.tokenAddress)
+      ...stakes.map((s) => s.tokenAddress),
+      ...ownedSuperTokens.map((t) => t.tokenAddress),
     ];
-    
-    allTokens.forEach(token => {
+
+    allTokens.forEach((token) => {
       registerActiveToken(token);
     });
-    
+
     return () => {
-      allTokens.forEach(token => {
+      allTokens.forEach((token) => {
         unregisterActiveToken(token);
       });
     };
-  }, [stakeTokenAddresses, superTokenAddresses, registerActiveToken, unregisterActiveToken]);
-  
+  }, [
+    stakeTokenAddresses,
+    superTokenAddresses,
+    registerActiveToken,
+    unregisterActiveToken,
+  ]);
+
   // Update balances when centralized data changes
   useEffect(() => {
     if (!effectiveAddress || loading) return;
-    
+
     // Update stakes if we have any
     if (stakes.length > 0) {
       setStakes((prevStakes) => {
         const updatedStakes = prevStakes.map((stake) => {
           const cacheKey = `${stake.tokenAddress}-${effectiveAddress}`;
           const cachedData = balanceData.get(cacheKey);
-          
-          if (cachedData && stake.stakingAddress) { // Only update if stake is fully loaded
-            const formattedBalance = Number(formatUnits(cachedData.tokenBalance, 18));
+
+          if (cachedData && stake.stakingAddress) {
+            // Only update if stake is fully loaded
+            const formattedBalance = Number(
+              formatUnits(cachedData.tokenBalance, 18)
+            );
             if (Math.abs(formattedBalance - stake.baseAmount) > 0.0001) {
               return {
                 ...stake,
@@ -361,16 +383,18 @@ export default function TokensPage() {
         return updatedStakes;
       });
     }
-    
+
     // Update super tokens if we have any
     if (ownedSuperTokens.length > 0) {
       setOwnedSuperTokens((prevTokens) => {
         const updatedTokens = prevTokens.map((token) => {
           const cacheKey = `${token.tokenAddress}-${effectiveAddress}`;
           const cachedData = balanceData.get(cacheKey);
-          
+
           if (cachedData) {
-            const formattedBalance = Number(formatUnits(cachedData.tokenBalance, 18));
+            const formattedBalance = Number(
+              formatUnits(cachedData.tokenBalance, 18)
+            );
             if (Math.abs(formattedBalance - token.balance) > 0.0001) {
               return {
                 ...token,
@@ -391,7 +415,7 @@ export default function TokensPage() {
 
     const updateStreaming = () => {
       if (document.hidden) return; // Pause when tab is hidden
-      
+
       setStakes((prevStakes) =>
         prevStakes.map((stake) => {
           if (stake.userFlowRate > 0) {
@@ -417,11 +441,11 @@ export default function TokensPage() {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [stakes.length > 0]);
 
@@ -705,9 +729,9 @@ export default function TokensPage() {
     });
 
     setStakes(enhancedStakes);
-    
+
     // Register enhanced tokens as active for auto-refresh
-    enhancedStakes.forEach(stake => {
+    enhancedStakes.forEach((stake) => {
       registerActiveToken(stake.tokenAddress);
     });
 
@@ -945,9 +969,9 @@ export default function TokensPage() {
     });
 
     setOwnedSuperTokens(enhancedSuperTokens);
-    
+
     // Register enhanced SuperTokens as active for auto-refresh
-    enhancedSuperTokens.forEach(token => {
+    enhancedSuperTokens.forEach((token) => {
       registerActiveToken(token.tokenAddress);
     });
 
@@ -1103,14 +1127,18 @@ export default function TokensPage() {
   ) => {
     if (tokenAddress) {
       // Use centralized refresh for the specific token
-      const stakeData = stakes.find(s => s.tokenAddress === tokenAddress);
-      await refreshTokenData(tokenAddress, stakingAddress, stakeData?.stakingPoolAddress);
-      
+      const stakeData = stakes.find((s) => s.tokenAddress === tokenAddress);
+      await refreshTokenData(
+        tokenAddress,
+        stakingAddress,
+        stakeData?.stakingPoolAddress
+      );
+
       // Also update staked balance if staking address is provided
       if (stakingAddress) {
         updateStakedBalance(stakingAddress, tokenAddress);
       }
-      
+
       // For stakes, also trigger a full refresh to get updated flow rates
       // This is needed because stakes have complex data that needs GraphQL updates
       setTimeout(() => {
@@ -1137,7 +1165,7 @@ export default function TokensPage() {
   const handleSuperTokenStakeSuccess = async (tokenAddress: string) => {
     // Refresh token data which will update balances
     await refreshTokenData(tokenAddress);
-    
+
     // Also refresh stake data to see if new stake was created
     setTimeout(() => {
       fetchStakesAndTokens();
@@ -1412,206 +1440,215 @@ export default function TokensPage() {
                       return bUnits - aUnits;
                     })
                     .map((stake, index) => (
-                    <div
-                      key={`stake-${index}`}
-                      className="card bg-base-100 border border-gray-200"
-                    >
-                      <div className="card-body p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-                              {stake.logo ? (
-                                <img
-                                  src={stake.logo}
-                                  alt={stake.membership.pool.token.symbol}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = "none";
-                                    target.nextElementSibling!.classList.remove(
-                                      "hidden"
-                                    );
-                                  }}
-                                />
-                              ) : null}
-                              <div
-                                className={`${
-                                  stake.logo ? "hidden" : ""
-                                } w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold`}
-                              >
-                                {stake.membership.pool.token.symbol.charAt(0)}
-                              </div>
-                            </div>
-                            <div>
-                              <Link
-                                href={`/token/${stake.tokenAddress}`}
-                                className="hover:text-blue-600 transition-colors"
-                              >
-                                <h4 className="font-semibold text-lg">
-                                  {stake.membership.pool.token.symbol}
-                                  {stake.membership.pool.token
-                                    .isNativeAssetSuperToken && (
-                                    <span className="badge badge-secondary badge-sm ml-2">
-                                      Native
-                                    </span>
-                                  )}
-                                </h4>
-                              </Link>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end text-right">
-                            <div className="text-xs uppercase tracking-wider opacity-50">
-                              MKT CAP
-                            </div>
-                            <div className="flex gap-2 items-baseline">
-                              <div className="font-mono text-sm font-bold">
-                                {formatMarketCap(stake.marketData?.marketCap)}
-                              </div>
-                              <div className="text-xs">
-                                {format24hChange(
-                                  stake.marketData?.priceChange24h
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-4 text-sm mb-4">
-                          <div>
-                            <p className="text-gray-500">Staked Amount</p>
-                            <p className="font-mono">
-                              {parseFloat(
-                                stake.membership.units
-                              ).toLocaleString()}{" "}
-                              st{stake.membership.pool.token.symbol} (
-                              {calculateSharePercentage(
-                                stake.membership.units,
-                                stake.membership.pool.totalUnits
-                              )}
-                              %)
-                            </p>
-                          </div>
-
-                          {stake.isConnectedToPool ? (
-                            <div>
-                              <p className="text-gray-500">Current Balance</p>
-                              <div className="flex items-center">
-                                <p className="font-mono text-green-600">
-                                  {(
-                                    stake.baseAmount + stake.streamedAmount
-                                  ).toLocaleString("en-US", {
-                                    minimumFractionDigits: 6,
-                                    maximumFractionDigits: 6,
-                                  })}
-                                  <span className="ml-1">
-                                    {stake.membership.pool.token.symbol}
-                                  </span>
-                                </p>
-                              </div>
-                            </div>
-                          ) : stake.stakingAddress &&
-                            stake.stakingAddress !== "" &&
-                            stake.isConnectedToPool === false ? (
-                            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                              <div className="flex items-center gap-2 justify-center">
-                                <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                                <span className="text-sm font-medium text-gray-700">
-                                  Not connected to reward pool
-                                </span>
-                              </div>
-                              {stake.stakedBalance > 0n && (
-                                <p className="text-xs text-gray-500 mb-3 text-center">
-                                  Connect to start receiving rewards
-                                </p>
-                              )}
-                              {stake.stakedBalance > 0n &&
-                                stake.stakingPoolAddress && (
-                                  <ConnectPoolButton
-                                    stakingPoolAddress={
-                                      stake.stakingPoolAddress as `0x${string}`
-                                    }
-                                    onSuccess={() =>
-                                      handleConnectPoolSuccess(
-                                        stake.stakingPoolAddress,
-                                        stake.tokenAddress
-                                      )
-                                    }
-                                    isMiniApp={isMiniAppView}
-                                    farcasterAddress={effectiveAddress}
-                                    farcasterIsConnected={effectiveIsConnected}
+                      <div
+                        key={`stake-${index}`}
+                        className="card bg-base-100 border border-gray-200"
+                      >
+                        <div className="card-body p-6">
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                                {stake.logo ? (
+                                  <img
+                                    src={stake.logo}
+                                    alt={stake.membership.pool.token.symbol}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const target =
+                                        e.target as HTMLImageElement;
+                                      target.style.display = "none";
+                                      target.nextElementSibling!.classList.remove(
+                                        "hidden"
+                                      );
+                                    }}
                                   />
-                                )}
-                            </div>
-                          ) : (
-                            <div>
-                              <p className="text-gray-500">Current Balance</p>
-                              <div className="flex items-center">
-                                <p className="font-mono text-green-600">
-                                  {(
-                                    stake.baseAmount + stake.streamedAmount
-                                  ).toLocaleString("en-US", {
-                                    minimumFractionDigits: 6,
-                                    maximumFractionDigits: 6,
-                                  })}
-                                  <span className="ml-1">
+                                ) : null}
+                                <div
+                                  className={`${
+                                    stake.logo ? "hidden" : ""
+                                  } w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold`}
+                                >
+                                  {stake.membership.pool.token.symbol.charAt(0)}
+                                </div>
+                              </div>
+                              <div>
+                                <Link
+                                  href={`/token/${stake.tokenAddress}`}
+                                  className="hover:text-blue-600 transition-colors"
+                                >
+                                  <h4 className="font-semibold text-lg">
                                     {stake.membership.pool.token.symbol}
-                                  </span>
-                                </p>
+                                    {stake.membership.pool.token
+                                      .isNativeAssetSuperToken && (
+                                      <span className="badge badge-secondary badge-sm ml-2">
+                                        Native
+                                      </span>
+                                    )}
+                                  </h4>
+                                </Link>
                               </div>
                             </div>
-                          )}
-                        </div>
+                            <div className="flex flex-col items-end text-right">
+                              <div className="text-xs uppercase tracking-wider opacity-50">
+                                MKT CAP
+                              </div>
+                              <div className="flex gap-2 items-baseline">
+                                <div className="font-mono text-sm font-bold">
+                                  {formatMarketCap(stake.marketData?.marketCap)}
+                                </div>
+                                <div className="text-xs">
+                                  {format24hChange(
+                                    stake.marketData?.priceChange24h
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
 
-                        {stake.stakingAddress &&
-                        stake.stakingAddress !==
-                          "0x0000000000000000000000000000000000000000" ? (
-                          <div className="space-y-2">
-                            <div className="flex">
-                              <StakeButton
-                                tokenAddress={stake.tokenAddress}
+                          <div className="flex flex-col gap-4 text-sm mb-4">
+                            <div>
+                              <p className="text-gray-500">Staked Amount</p>
+                              <p className="font-mono">
+                                {parseFloat(
+                                  stake.membership.units
+                                ).toLocaleString()}{" "}
+                                st{stake.membership.pool.token.symbol} (
+                                {calculateSharePercentage(
+                                  stake.membership.units,
+                                  stake.membership.pool.totalUnits
+                                )}
+                                %)
+                              </p>
+                            </div>
+
+                            {stake.isConnectedToPool ? (
+                              <div>
+                                <p className="text-gray-500">Current Balance</p>
+                                <div className="flex items-center">
+                                  <p className="font-mono text-green-600">
+                                    {(
+                                      stake.baseAmount + stake.streamedAmount
+                                    ).toLocaleString("en-US", {
+                                      minimumFractionDigits: 6,
+                                      maximumFractionDigits: 6,
+                                    })}
+                                    <span className="ml-1">
+                                      {stake.membership.pool.token.symbol}
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                            ) : stake.stakingAddress &&
+                              stake.stakingAddress !== "" &&
+                              stake.isConnectedToPool === false ? (
+                              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                                <div className="flex items-center gap-2 justify-center">
+                                  <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                                  <span className="text-sm font-medium text-gray-700">
+                                    Not connected to reward pool
+                                  </span>
+                                </div>
+                                {stake.stakedBalance > 0n && (
+                                  <p className="text-xs text-gray-500 mb-3 text-center">
+                                    Connect to start receiving rewards
+                                  </p>
+                                )}
+                                {stake.stakedBalance > 0n &&
+                                  stake.stakingPoolAddress && (
+                                    <ConnectPoolButton
+                                      stakingPoolAddress={
+                                        stake.stakingPoolAddress as `0x${string}`
+                                      }
+                                      onSuccess={() =>
+                                        handleConnectPoolSuccess(
+                                          stake.stakingPoolAddress,
+                                          stake.tokenAddress
+                                        )
+                                      }
+                                      isMiniApp={isMiniAppView}
+                                      farcasterAddress={effectiveAddress}
+                                      farcasterIsConnected={
+                                        effectiveIsConnected
+                                      }
+                                    />
+                                  )}
+                              </div>
+                            ) : (
+                              <div>
+                                <p className="text-gray-500">Current Balance</p>
+                                <div className="flex items-center">
+                                  <p className="font-mono text-green-600">
+                                    {(
+                                      stake.baseAmount + stake.streamedAmount
+                                    ).toLocaleString("en-US", {
+                                      minimumFractionDigits: 6,
+                                      maximumFractionDigits: 6,
+                                    })}
+                                    <span className="ml-1">
+                                      {stake.membership.pool.token.symbol}
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {stake.stakingAddress &&
+                          stake.stakingAddress !==
+                            "0x0000000000000000000000000000000000000000" ? (
+                            <div className="space-y-2">
+                              <div className="flex">
+                                <StakeButton
+                                  tokenAddress={stake.tokenAddress}
+                                  stakingAddress={stake.stakingAddress}
+                                  stakingPoolAddress={stake.stakingPoolAddress}
+                                  symbol={stake.membership.pool.token.symbol}
+                                  tokenBalance={BigInt(
+                                    Math.floor(
+                                      (stake.baseAmount +
+                                        stake.streamedAmount) *
+                                        1e18
+                                    )
+                                  )}
+                                  onSuccess={() =>
+                                    handleStakeSuccess(
+                                      stake.tokenAddress,
+                                      stake.stakingAddress
+                                    )
+                                  }
+                                  className="btn btn-primary btn-sm w-full"
+                                  isMiniApp={isMiniAppView}
+                                  farcasterAddress={effectiveAddress}
+                                  farcasterIsConnected={effectiveIsConnected}
+                                />
+                              </div>
+                              <UnstakeButton
                                 stakingAddress={stake.stakingAddress}
-                                stakingPoolAddress={stake.stakingPoolAddress}
+                                userStakedBalance={stake.stakedBalance}
                                 symbol={stake.membership.pool.token.symbol}
-                                tokenBalance={BigInt(Math.floor((stake.baseAmount + stake.streamedAmount) * 1e18))}
                                 onSuccess={() =>
                                   handleStakeSuccess(
                                     stake.tokenAddress,
                                     stake.stakingAddress
                                   )
                                 }
-                                className="btn btn-primary btn-sm w-full"
+                                className="btn btn-outline btn-sm w-full"
                                 isMiniApp={isMiniAppView}
                                 farcasterAddress={effectiveAddress}
                                 farcasterIsConnected={effectiveIsConnected}
                               />
                             </div>
-                            <UnstakeButton
-                              stakingAddress={stake.stakingAddress}
-                              userStakedBalance={stake.stakedBalance}
-                              symbol={stake.membership.pool.token.symbol}
-                              onSuccess={() =>
-                                handleStakeSuccess(
-                                  stake.tokenAddress,
-                                  stake.stakingAddress
-                                )
-                              }
-                              className="btn btn-outline btn-sm w-full"
-                              isMiniApp={isMiniAppView}
-                              farcasterAddress={effectiveAddress}
-                              farcasterIsConnected={effectiveIsConnected}
-                            />
-                          </div>
-                        ) : stake.stakingAddress === "" ? (
-                          <div className="pt-3">
-                            <div className="btn btn-disabled btn-sm w-full">
-                              <span className="loading loading-spinner loading-xs"></span>
-                              Loading staking info...
+                          ) : stake.stakingAddress === "" ? (
+                            <div className="pt-3">
+                              <div className="btn btn-disabled btn-sm w-full">
+                                <span className="loading loading-spinner loading-xs"></span>
+                                Loading staking info...
+                              </div>
                             </div>
-                          </div>
-                        ) : null}
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </div>
             )}
@@ -1628,123 +1665,126 @@ export default function TokensPage() {
                       return b.balance - a.balance;
                     })
                     .map((token, index) => (
-                    <div
-                      key={`token-${index}`}
-                      className="card bg-base-100 border border-gray-200"
-                    >
-                      <div className="card-body p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-                              {token.logo ? (
-                                <img
-                                  src={token.logo}
-                                  alt={token.symbol}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = "none";
-                                    target.nextElementSibling!.classList.remove(
-                                      "hidden"
-                                    );
-                                  }}
-                                />
-                              ) : null}
-                              <div
-                                className={`${
-                                  token.logo ? "hidden" : ""
-                                } w-full h-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white text-sm font-bold`}
-                              >
-                                {token.symbol.charAt(0)}
+                      <div
+                        key={`token-${index}`}
+                        className="card bg-base-100 border border-gray-200"
+                      >
+                        <div className="card-body p-6">
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                                {token.logo ? (
+                                  <img
+                                    src={token.logo}
+                                    alt={token.symbol}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const target =
+                                        e.target as HTMLImageElement;
+                                      target.style.display = "none";
+                                      target.nextElementSibling!.classList.remove(
+                                        "hidden"
+                                      );
+                                    }}
+                                  />
+                                ) : null}
+                                <div
+                                  className={`${
+                                    token.logo ? "hidden" : ""
+                                  } w-full h-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white text-sm font-bold`}
+                                >
+                                  {token.symbol.charAt(0)}
+                                </div>
+                              </div>
+                              <div>
+                                <Link
+                                  href={`/token/${token.tokenAddress}`}
+                                  className="hover:text-blue-600 transition-colors"
+                                >
+                                  <h4 className="font-semibold text-lg">
+                                    {token.symbol}
+                                    {token.isNativeAssetSuperToken && (
+                                      <span className="badge badge-secondary badge-sm ml-2">
+                                        Native
+                                      </span>
+                                    )}
+                                  </h4>
+                                </Link>
                               </div>
                             </div>
-                            <div>
-                              <Link
-                                href={`/token/${token.tokenAddress}`}
-                                className="hover:text-blue-600 transition-colors"
-                              >
-                                <h4 className="font-semibold text-lg">
-                                  {token.symbol}
-                                  {token.isNativeAssetSuperToken && (
-                                    <span className="badge badge-secondary badge-sm ml-2">
-                                      Native
-                                    </span>
+                            <div className="flex flex-col items-end text-right">
+                              <div className="text-xs uppercase tracking-wider opacity-50">
+                                MKT CAP
+                              </div>
+                              <div className="flex gap-2 items-baseline">
+                                <div className="font-mono text-sm font-bold">
+                                  {formatMarketCap(token.marketData?.marketCap)}
+                                </div>
+                                <div className="text-xs">
+                                  {format24hChange(
+                                    token.marketData?.priceChange24h
                                   )}
-                                </h4>
-                              </Link>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end text-right">
-                            <div className="text-xs uppercase tracking-wider opacity-50">
-                              MKT CAP
-                            </div>
-                            <div className="flex gap-2 items-baseline">
-                              <div className="font-mono text-sm font-bold">
-                                {formatMarketCap(token.marketData?.marketCap)}
-                              </div>
-                              <div className="text-xs">
-                                {format24hChange(
-                                  token.marketData?.priceChange24h
-                                )}
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="flex flex-col gap-4 text-sm mb-4">
-                          <div>
-                            <p className="text-gray-500">Balance</p>
-                            <p className="font-mono text-blue-600">
-                              {token.balance.toLocaleString("en-US", {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 2,
-                              })}
-                              <span className="ml-1">{token.symbol}</span>
-                            </p>
-                          </div>
-                        </div>
-
-                        {token.stakingAddress ? (
-                          <div className="">
-                            <div className="flex">
-                              <StakeButton
-                                tokenAddress={token.tokenAddress}
-                                stakingAddress={token.stakingAddress}
-                                stakingPoolAddress=""
-                                symbol={token.symbol}
-                                tokenBalance={BigInt(Math.floor(token.balance * 1e18))}
-                                onSuccess={() =>
-                                  handleSuperTokenStakeSuccess(
-                                    token.tokenAddress
-                                  )
-                                }
-                                className="btn btn-primary btn-sm w-full"
-                                isMiniApp={isMiniAppView}
-                                farcasterAddress={effectiveAddress}
-                                farcasterIsConnected={effectiveIsConnected}
-                              />
+                          <div className="flex flex-col gap-4 text-sm mb-4">
+                            <div>
+                              <p className="text-gray-500">Balance</p>
+                              <p className="font-mono text-blue-600">
+                                {token.balance.toLocaleString("en-US", {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 2,
+                                })}
+                                <span className="ml-1">{token.symbol}</span>
+                              </p>
                             </div>
                           </div>
-                        ) : token.stakingAddress === undefined ? (
-                          <div className="pt-3">
-                            <div className="btn btn-disabled btn-sm w-full">
-                              <span className="loading loading-spinner loading-xs"></span>
-                              Loading staking info...
+
+                          {token.stakingAddress ? (
+                            <div className="">
+                              <div className="flex">
+                                <StakeButton
+                                  tokenAddress={token.tokenAddress}
+                                  stakingAddress={token.stakingAddress}
+                                  stakingPoolAddress=""
+                                  symbol={token.symbol}
+                                  tokenBalance={BigInt(
+                                    Math.floor(token.balance * 1e18)
+                                  )}
+                                  onSuccess={() =>
+                                    handleSuperTokenStakeSuccess(
+                                      token.tokenAddress
+                                    )
+                                  }
+                                  className="btn btn-primary btn-sm w-full"
+                                  isMiniApp={isMiniAppView}
+                                  farcasterAddress={effectiveAddress}
+                                  farcasterIsConnected={effectiveIsConnected}
+                                />
+                              </div>
                             </div>
-                          </div>
-                        ) : null}
+                          ) : token.stakingAddress === undefined ? (
+                            <div className="pt-3">
+                              <div className="btn btn-disabled btn-sm w-full">
+                                <span className="loading loading-spinner loading-xs"></span>
+                                Loading staking info...
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </div>
             )}
           </div>
         )}
       </div>
-      
+
       {/* Unstaked Tokens Modal */}
-      {showUnstakedModal && mounted && !loading && (
+      {/* {showUnstakedModal && mounted && !loading && (
         <UnstakedTokensModal
           unstakedTokens={ownedSuperTokens}
           onDismiss={async () => {
@@ -1755,7 +1795,7 @@ export default function TokensPage() {
             await fetchStakesAndTokens();
           }}
         />
-      )}
+      )} */}
     </div>
   );
 }

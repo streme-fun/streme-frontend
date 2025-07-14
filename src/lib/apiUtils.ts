@@ -119,10 +119,7 @@ export async function fetchTokenFromStreme(
     // console.log("Raw token response:", tokenJson);
 
     if (tokenJson.message === "No such document!" || tokenJson.errors) {
-      console.error("Token fetch failed:", {
-        status: response.status,
-        data: tokenJson,
-      });
+      // Token doesn't exist in the external API - this is expected for some tokens
       return null;
     }
 

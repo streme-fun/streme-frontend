@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import { Modal } from "./Modal";
@@ -14,6 +14,10 @@ import { publicClient } from "../lib/viemClient";
 import { GDA_FORWARDER, GDA_ABI } from "../lib/contracts";
 import { useStreamingNumber } from "../hooks/useStreamingNumber";
 import { useTokenData } from "../hooks/useTokenData";
+import {
+  formatMarketCap,
+  format24hChange,
+} from "../lib/formatUtils";
 
 interface PoolMembership {
   units: string;
@@ -195,6 +199,12 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [accountExists, setAccountExists] = useState<boolean | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Progressive loading states
+  const [loadingPhase, setLoadingPhase] = useState<'initial' | 'balances' | 'metadata' | 'complete'>('initial');
+  
+  // Liquidity data cache for sorting
+  const [liquidityCache, setLiquidityCache] = useState<Map<string, boolean>>(new Map());
 
   // Get effective address based on context
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
@@ -418,6 +428,85 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     }
   }, [isOpen, effectiveAddress]);
 
+  // Effect to trigger Phase 2 when loading phase changes to 'balances'
+  useEffect(() => {
+    if (loadingPhase === 'balances') {
+      processPhase2();
+    }
+  }, [loadingPhase]);
+
+  // Effect to trigger Phase 3 when loading phase changes to 'metadata'
+  useEffect(() => {
+    if (loadingPhase === 'metadata') {
+      processPhase3();
+    }
+  }, [loadingPhase]);
+
+  // Refresh staked balances for timer functionality
+  const refreshStakedBalances = useCallback(async () => {
+    if (!effectiveAddress || stakes.length === 0) return;
+
+    const stakesWithStaking = stakes.filter(
+      stake => stake.stakingAddress && stake.stakingAddress !== ""
+    );
+
+    if (stakesWithStaking.length === 0) return;
+
+    try {
+      const stakedBalanceResults = await Promise.allSettled(
+        stakesWithStaking.map(async (stake) => {
+          const stakedBalance = await publicClient.readContract({
+            address: stake.stakingAddress as `0x${string}`,
+            abi: [
+              {
+                inputs: [{ name: "account", type: "address" }],
+                name: "balanceOf",
+                outputs: [{ name: "", type: "uint256" }],
+                stateMutability: "view",
+                type: "function",
+              },
+            ],
+            functionName: "balanceOf",
+            args: [effectiveAddress as `0x${string}`],
+          });
+          return {
+            tokenAddress: stake.tokenAddress,
+            stakedBalance: stakedBalance as bigint,
+          };
+        })
+      );
+
+      // Update stakes with new staked balances
+      setStakes(prevStakes =>
+        prevStakes.map(stake => {
+          const resultIndex = stakesWithStaking.findIndex(
+            s => s.tokenAddress === stake.tokenAddress
+          );
+          if (resultIndex >= 0) {
+            const result = stakedBalanceResults[resultIndex];
+            if (result.status === 'fulfilled') {
+              return {
+                ...stake,
+                stakedBalance: result.value.stakedBalance,
+              };
+            }
+          }
+          return stake;
+        })
+      );
+    } catch (error) {
+      console.warn('Failed to refresh staked balances:', error);
+    }
+  }, [effectiveAddress, stakes]);
+
+  // Refresh staked balances when modal opens (for unstake timer)
+  useEffect(() => {
+    if (isOpen && effectiveAddress && stakes.length > 0) {
+      // Refresh once when modal opens to get current staked balances for timers
+      refreshStakedBalances();
+    }
+  }, [isOpen, refreshStakedBalances]);
+
   // Create stable token list for dependencies
   const tokenAddresses = stakes.map(s => s.tokenAddress).concat(ownedSuperTokens.map(t => t.tokenAddress)).sort().join(',');
   
@@ -537,7 +626,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
       if (accountData) {
         setAccountExists(true);
-        await processTokensOptimized(accountData);
+        await processPhase1(accountData);
       } else {
         setAccountExists(false);
         setStakes([]);
@@ -552,11 +641,14 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     }
   };
 
-  // Optimized processing with immediate loading of critical data
-  const processTokensOptimized = async (accountData: {
+  // Optimized processing with progressive loading phases
+  // Phase 1: Initial data processing and display
+  const processPhase1 = async (accountData: {
     poolMemberships?: PoolMembership[];
     accountTokenSnapshots?: AccountTokenSnapshot[];
   }) => {
+    // Reset progressive loading states
+    setLoadingPhase('initial');
     // Step 1: Quick filtering and data collection
     const allTokens = new Set<string>();
     const validMemberships: PoolMembership[] = [];
@@ -601,11 +693,87 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
       return;
     }
 
-    // Step 2: Fetch essential data in parallel
-    const tokenDataMap = await fetchTokenDataBatch(uniqueTokens);
+    // PHASE 1: Show basic token list immediately (from subgraph data)
+    const stakesData: StakeData[] = [];
+    const superTokensData: SuperTokenData[] = [];
+
+    // Build initial data structures with just subgraph data
+    validMemberships.forEach((membership) => {
+      const tokenAddress = membership.pool.token.id;
+      
+      // Calculate user flow rate
+      const totalUnits = BigInt(membership.pool.totalUnits || "0");
+      const memberUnits = BigInt(membership.units || "0");
+      let userFlowRate = 0;
+
+      if (totalUnits > 0n) {
+        const percentage = (Number(memberUnits) * 100) / Number(totalUnits);
+        const totalFlowRate = Number(
+          formatUnits(BigInt(membership.pool.flowRate), 18)
+        );
+        userFlowRate = totalFlowRate * (percentage / 100) * 86400;
+      }
+
+      stakesData.push({
+        membership,
+        tokenAddress,
+        stakingAddress: "", // Will be loaded later
+        stakingPoolAddress: membership.pool.id,
+        receivedBalance: 0,
+        baseAmount: 0,
+        lastUpdateTime: Date.now(),
+        userFlowRate,
+        stakedBalance: BigInt(0),
+        logo: undefined,
+        marketData: undefined,
+        isConnectedToPool: membership.isConnected,
+      });
+    });
+
+    // Process snapshots for super tokens
+    validSnapshots.forEach((snapshot) => {
+      const tokenAddress = snapshot.token.id;
+      const isAlreadyStaked = stakesData.some(
+        (stake) =>
+          safeToLowerCase(stake.tokenAddress) === safeToLowerCase(tokenAddress)
+      );
+
+      if (!isAlreadyStaked) {
+        superTokensData.push({
+          tokenAddress,
+          symbol: snapshot.token.symbol,
+          balance: 0, // Will be loaded later
+          stakingAddress: undefined,
+          isNativeAssetSuperToken: snapshot.token.isNativeAssetSuperToken,
+          logo: undefined,
+          marketData: undefined,
+          isConnectedToPool: false,
+        });
+      }
+    });
+
+    // Set initial states immediately for fast UI
+    setStakes(stakesData);
+    setOwnedSuperTokens(superTokensData);
     
-    // Use centralized balance data or fetch if not available
+    // Trigger Phase 2 after a brief delay to allow React to render
+    setTimeout(() => {
+      setLoadingPhase('balances');
+    }, 100);
+  };
+
+  // Phase 2: Load blockchain balances (critical data)
+  const processPhase2 = async () => {
+    if (!effectiveAddress || stakes.length === 0 && ownedSuperTokens.length === 0) return;
+    
+    const uniqueTokens = Array.from(new Set([
+      ...stakes.map(stake => stake.tokenAddress),
+      ...ownedSuperTokens.map(token => token.tokenAddress)
+    ]));
+    
     const balanceResults = new Map();
+    
+    // Try to use cached balance data first
     for (const token of uniqueTokens) {
       const cacheKey = `${token}-${effectiveAddress}`;
       const cachedData = balanceData.get(cacheKey);
@@ -615,13 +783,6 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
           balance: cachedData.tokenBalance,
           timestamp: cachedData.lastUpdated
         });
-      } else {
-        // Trigger refresh for this token
-        const tokenData = tokenDataMap.get(token);
-        // Find pool address if this is a staked token
-        const membership = validMemberships.find(m => m.pool.token.id === token);
-        const poolAddress = membership?.pool.id;
-        await refreshTokenData(token, tokenData?.staking_address, poolAddress);
       }
     }
     
@@ -643,92 +804,84 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
       });
     }
 
-    // Step 3: Build initial data structures
-    const stakesData: StakeData[] = [];
-    const superTokensData: SuperTokenData[] = [];
-
-    // Process stakes
-    validMemberships.forEach((membership) => {
-      const tokenAddress = membership.pool.token.id;
-      const tokenData = tokenDataMap.get(tokenAddress);
-      const balanceCacheKey = `balance-${tokenAddress}-${effectiveAddress}`;
+    // Update states with balance data
+    const stakesWithBalances = stakes.map(stake => {
+      const balanceCacheKey = `balance-${stake.tokenAddress}-${effectiveAddress}`;
       const balanceData = balanceResults.get(balanceCacheKey);
-
       const formattedBalance = balanceData?.balance
         ? Number(formatUnits(balanceData.balance, 18))
         : 0;
-
-      // Calculate user flow rate
-      const totalUnits = BigInt(membership.pool.totalUnits || "0");
-      const memberUnits = BigInt(membership.units || "0");
-      let userFlowRate = 0;
-
-      if (totalUnits > 0n) {
-        const percentage = (Number(memberUnits) * 100) / Number(totalUnits);
-        const totalFlowRate = Number(
-          formatUnits(BigInt(membership.pool.flowRate), 18)
-        );
-        userFlowRate = totalFlowRate * (percentage / 100) * 86400;
-      }
-
-      stakesData.push({
-        membership,
-        tokenAddress,
-        stakingAddress: tokenData?.staking_address || "",
-        stakingPoolAddress: membership.pool.id,
+      
+      return {
+        ...stake,
         receivedBalance: formattedBalance,
         baseAmount: formattedBalance,
-        lastUpdateTime: Date.now(),
-        userFlowRate,
-        stakedBalance: BigInt(0), // Will be loaded below before setting state
-        logo: tokenData?.logo,
-        marketData: tokenData?.marketData,
-        isConnectedToPool: membership.isConnected, // Use from subgraph initially
-      });
+      };
     });
 
-    // Process super tokens (avoiding duplicates)
-    validSnapshots.forEach((snapshot) => {
-      const tokenAddress = snapshot.token.id;
-      const isAlreadyStaked = stakesData.some(
-        (stake) =>
-          safeToLowerCase(stake.tokenAddress) === safeToLowerCase(tokenAddress)
-      );
-
-      if (!isAlreadyStaked) {
-        const tokenData = tokenDataMap.get(tokenAddress);
-        const balanceCacheKey = `balance-${tokenAddress}-${effectiveAddress}`;
-        const balanceData = balanceResults.get(balanceCacheKey);
-
-        const formattedBalance = balanceData?.balance
-          ? Number(formatUnits(balanceData.balance, 18))
-          : 0;
-
-        superTokensData.push({
-          tokenAddress,
-          symbol: snapshot.token.symbol,
-          balance: formattedBalance,
-          stakingAddress: tokenData?.staking_address,
-          isNativeAssetSuperToken: snapshot.token.isNativeAssetSuperToken,
-          logo: tokenData?.logo,
-          marketData: tokenData?.marketData,
-          isConnectedToPool: false,
-        });
-      }
+    const superTokensWithBalances = ownedSuperTokens.map(token => {
+      const balanceCacheKey = `balance-${token.tokenAddress}-${effectiveAddress}`;
+      const balanceData = balanceResults.get(balanceCacheKey);
+      const formattedBalance = balanceData?.balance
+        ? Number(formatUnits(balanceData.balance, 18))
+        : 0;
+      
+      return {
+        ...token,
+        balance: formattedBalance,
+      };
     });
 
-    // Step 4: Load staking data and update stakes array BEFORE setting state
-    const finalStakesData = await loadStakingDataSync(stakesData);
-
-    // Step 5: Set state with complete data (no need for secondary update)
+    // Load staking data for stakes
+    const finalStakesData = await loadStakingDataSync(stakesWithBalances);
+    
     setStakes(finalStakesData);
-    setOwnedSuperTokens(superTokensData);
+    setOwnedSuperTokens(superTokensWithBalances);
+    
+    // Trigger Phase 3 after a brief delay
+    setTimeout(() => {
+      setLoadingPhase('metadata');
+    }, 300);
+  };
+
+  // Phase 3: Load metadata (logos, market data) and liquidity data - non-critical
+  const processPhase3 = async () => {
+    if (!effectiveAddress || stakes.length === 0 && ownedSuperTokens.length === 0) return;
+    
+    const uniqueTokens = Array.from(new Set([
+      ...stakes.map(stake => stake.tokenAddress),
+      ...ownedSuperTokens.map(token => token.tokenAddress)
+    ]));
+    
+    const tokenDataMap = await fetchTokenDataBatch(uniqueTokens);
+    
+    // Check liquidity for all tokens
+    await checkLiquidityBatch(uniqueTokens);
+    
+    // Update states with metadata
+    const stakesWithMetadata = stakes.map(stake => ({
+      ...stake,
+      stakingAddress: tokenDataMap.get(stake.tokenAddress)?.staking_address || "",
+      logo: tokenDataMap.get(stake.tokenAddress)?.logo,
+      marketData: tokenDataMap.get(stake.tokenAddress)?.marketData,
+    }));
+
+    const superTokensWithMetadata = ownedSuperTokens.map(token => ({
+      ...token,
+      stakingAddress: tokenDataMap.get(token.tokenAddress)?.staking_address,
+      logo: tokenDataMap.get(token.tokenAddress)?.logo,
+      marketData: tokenDataMap.get(token.tokenAddress)?.marketData,
+    }));
+
+    setStakes(stakesWithMetadata);
+    setOwnedSuperTokens(superTokensWithMetadata);
+    setLoadingPhase('complete');
     
     // Register active tokens for automatic refresh
-    finalStakesData.forEach(stake => {
+    stakesWithMetadata.forEach(stake => {
       registerActiveToken(stake.tokenAddress);
     });
-    superTokensData.forEach(token => {
+    superTokensWithMetadata.forEach(token => {
       registerActiveToken(token.tokenAddress);
     });
   };
@@ -852,29 +1005,110 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     return percentage.toFixed(2);
   };
 
-  // Helper function to format market cap like in TokenGrid
-  const formatMarketCap = (marketCap: number | undefined) => {
-    if (!marketCap) return "-";
 
-    if (marketCap >= 1000000) {
-      return `$${(marketCap / 1000000).toFixed(1)}M`;
-    } else if (marketCap >= 1000) {
-      return `$${(marketCap / 1000).toFixed(1)}K`;
-    } else {
-      return `$${marketCap.toFixed(0)}`;
+  // Helper function to render 24h change
+  const render24hChange = (change24h: number | undefined) => {
+    const { formatted, isPositive } = format24hChange(change24h);
+    if (isPositive === null) return formatted;
+    
+    return (
+      <span className={isPositive ? "text-green-500" : "text-red-500"}>
+        {formatted}
+      </span>
+    );
+  };
+
+  // Helper function to calculate total USD value for a stake
+  const calculateStakeUSDValue = (stake: StakeData): number => {
+    const price = stake.marketData?.price || 0;
+    const stakedBalance = Number(formatUnits(stake.stakedBalance || 0n, 18));
+    const currentBalance = stake.baseAmount || 0;
+    return (stakedBalance + currentBalance) * price;
+  };
+
+  // Helper function to calculate USD value for a super token
+  const calculateTokenUSDValue = (token: SuperTokenData): number => {
+    const price = token.marketData?.price || 0;
+    return token.balance * price;
+  };
+
+  // Function to check liquidity for multiple tokens
+  const checkLiquidityBatch = async (tokenAddresses: string[]) => {
+    const newLiquidityCache = new Map(liquidityCache);
+    
+    // Check liquidity for each token that's not already cached
+    const uncachedTokens = tokenAddresses.filter(addr => !newLiquidityCache.has(addr.toLowerCase()));
+    
+    console.log('Checking liquidity for tokens:', uncachedTokens);
+    
+    if (uncachedTokens.length === 0) {
+      console.log('All tokens already cached');
+      return;
+    }
+
+    try {
+      // Use a simplified liquidity check based on market cap and age
+      for (const tokenAddress of uncachedTokens) {
+        try {
+          console.log(`Checking liquidity for token: ${tokenAddress}`);
+          const response = await fetch(`/api/tokens/single?address=${tokenAddress}`);
+          
+          if (response.ok) {
+            const result = await response.json();
+            const tokenData = result.data;
+            
+            console.log(`Token data for ${tokenAddress}:`, tokenData);
+            
+            if (tokenData?.marketData) {
+              const marketCap = tokenData.marketData.marketCap || 0;
+              // Try different date fields that might exist
+              const launchTime = tokenData.created_at || 
+                                tokenData.timestamp?.seconds ? new Date(tokenData.timestamp.seconds * 1000) :
+                                tokenData.timestamp?._seconds ? new Date(tokenData.timestamp._seconds * 1000) :
+                                new Date();
+              const hoursSinceLaunch = (Date.now() - new Date(launchTime).getTime()) / (1000 * 60 * 60);
+              
+              // Consider low liquidity if:
+              // 1. Market cap is very low (< $5000) AND token is older than 1 hour
+              // 2. Or market cap is extremely low (< $1000) regardless of age
+              const isLowLiquidity = (marketCap < 5000 && hoursSinceLaunch > 1) || marketCap < 1000;
+              
+              console.log(`Token ${tokenAddress}: marketCap=${marketCap}, hoursSinceLaunch=${hoursSinceLaunch}, isLowLiquidity=${isLowLiquidity}`);
+              
+              newLiquidityCache.set(tokenAddress.toLowerCase(), isLowLiquidity);
+            } else {
+              console.log(`No market data for ${tokenAddress}, assuming normal liquidity`);
+              // If no market data, assume normal liquidity
+              newLiquidityCache.set(tokenAddress.toLowerCase(), false);
+            }
+          } else {
+            console.warn(`API call failed for ${tokenAddress}: ${response.status}`);
+            newLiquidityCache.set(tokenAddress.toLowerCase(), false);
+          }
+        } catch (error) {
+          console.warn(`Failed to check liquidity for ${tokenAddress}:`, error);
+          // Default to normal liquidity on error
+          newLiquidityCache.set(tokenAddress.toLowerCase(), false);
+        }
+      }
+      
+      console.log('Updated liquidity cache:', Array.from(newLiquidityCache.entries()));
+      setLiquidityCache(newLiquidityCache);
+    } catch (error) {
+      console.warn('Batch liquidity check failed:', error);
     }
   };
 
-  // Helper function to format 24h change
-  const format24hChange = (change24h: number | undefined) => {
-    if (change24h === undefined) return "-";
-    const isPositive = change24h >= 0;
-    return (
-      <span className={isPositive ? "text-green-500" : "text-red-500"}>
-        {isPositive ? "+" : ""}
-        {change24h.toFixed(2)}%
-      </span>
-    );
+  // Helper function to determine if a stake has low liquidity
+  const isStakeLowLiquidity = (stake: StakeData): boolean => {
+    const tokenAddress = stake.tokenAddress.toLowerCase();
+    return liquidityCache.get(tokenAddress) || false;
+  };
+
+  // Helper function to determine if a token has low liquidity
+  const isTokenLowLiquidity = (token: SuperTokenData): boolean => {
+    const tokenAddress = token.tokenAddress.toLowerCase();
+    return liquidityCache.get(tokenAddress) || false;
   };
 
   // Targeted update functions
@@ -970,6 +1204,11 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
         await refreshAllData();
       }, 500);
     }
+    
+    // Refresh staked balances to update unstake timers
+    setTimeout(() => {
+      refreshStakedBalances();
+    }, 1000);
   };
 
   const handleConnectPoolSuccess = async (
@@ -1260,10 +1499,18 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                     );
                   })
                   .sort((a, b) => {
-                    // Sort by staked amount (units) in descending order (highest stake first)
-                    const aUnits = parseFloat(a.membership.units || "0");
-                    const bUnits = parseFloat(b.membership.units || "0");
-                    return bUnits - aUnits;
+                    // First sort by liquidity status (normal liquidity tokens first)
+                    const aIsLowLiquidity = isStakeLowLiquidity(a);
+                    const bIsLowLiquidity = isStakeLowLiquidity(b);
+                    
+                    if (aIsLowLiquidity !== bIsLowLiquidity) {
+                      return aIsLowLiquidity ? 1 : -1; // Normal liquidity first
+                    }
+                    
+                    // Within the same liquidity group, sort by total USD value in descending order
+                    const aUSDValue = calculateStakeUSDValue(a);
+                    const bUSDValue = calculateStakeUSDValue(b);
+                    return bUSDValue - aUSDValue;
                   })
                   .map((stake, index) => (
                     <div
@@ -1275,7 +1522,9 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                           <div className="flex items-center gap-3">
                             {/* Token Logo */}
                             <div className="w-8 h-8 rounded-full overflow-hidden bg-base-200 flex items-center justify-center">
-                              {stake.logo ? (
+                              {loadingPhase !== 'complete' && !stake.logo ? (
+                                <div className="w-full h-full bg-base-300 animate-pulse" />
+                              ) : stake.logo ? (
                                 <img
                                   src={stake.logo}
                                   alt={stake.membership.pool.token.symbol}
@@ -1291,7 +1540,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                               ) : null}
                               <div
                                 className={`${
-                                  stake.logo ? "hidden" : ""
+                                  stake.logo || (loadingPhase !== 'complete' && !stake.logo) ? "hidden" : ""
                                 } w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold`}
                               >
                                 {stake.membership.pool.token.symbol.charAt(0)}
@@ -1318,16 +1567,23 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                             <div className="text-right text-xs uppercase tracking-wider opacity-50">
                               MKT CAP
                             </div>
-                            <div className="flex gap-2 items-baseline">
-                              <div className="font-mono text-sm font-bold">
-                                {formatMarketCap(stake.marketData?.marketCap)}
+                            {loadingPhase !== 'complete' ? (
+                              <div className="flex gap-2 items-baseline">
+                                <div className="h-4 w-16 bg-base-300 rounded animate-pulse" />
+                                <div className="h-3 w-12 bg-base-300 rounded animate-pulse" />
                               </div>
-                              <div className="text-xs mt-1">
-                                {format24hChange(
-                                  stake.marketData?.priceChange24h
-                                )}
+                            ) : (
+                              <div className="flex gap-2 items-baseline">
+                                <div className="font-mono text-sm font-bold">
+                                  {formatMarketCap(stake.marketData?.marketCap)}
+                                </div>
+                                <div className="text-xs mt-1">
+                                  {render24hChange(
+                                    stake.marketData?.priceChange24h
+                                  )}
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </div>
                         </div>
 
@@ -1411,7 +1667,14 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                         </div>
 
                         {/* Action buttons - show if we have a valid staking address */}
-                        {stake.stakingAddress &&
+                        {loadingPhase !== 'complete' && stake.stakingAddress === "" ? (
+                          <div className="pt-3">
+                            <div className="btn btn-disabled btn-sm w-full">
+                              <span className="loading loading-spinner loading-xs"></span>
+                              Loading staking info...
+                            </div>
+                          </div>
+                        ) : stake.stakingAddress &&
                         stake.stakingAddress !==
                           "0x0000000000000000000000000000000000000000" ? (
                           <div className="space-y-2">
@@ -1503,8 +1766,18 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                     );
                   })
                   .sort((a, b) => {
-                    // Sort by balance in descending order (highest balance first)
-                    return b.balance - a.balance;
+                    // First sort by liquidity status (normal liquidity tokens first)
+                    const aIsLowLiquidity = isTokenLowLiquidity(a);
+                    const bIsLowLiquidity = isTokenLowLiquidity(b);
+                    
+                    if (aIsLowLiquidity !== bIsLowLiquidity) {
+                      return aIsLowLiquidity ? 1 : -1; // Normal liquidity first
+                    }
+                    
+                    // Within the same liquidity group, sort by USD value in descending order
+                    const aUSDValue = calculateTokenUSDValue(a);
+                    const bUSDValue = calculateTokenUSDValue(b);
+                    return bUSDValue - aUSDValue;
                   })
                   .map((token, index) => (
                     <div
@@ -1516,7 +1789,9 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                           <div className="flex items-center gap-3">
                             {/* Token Logo */}
                             <div className="w-8 h-8 rounded-full overflow-hidden bg-base-200 flex items-center justify-center">
-                              {token.logo ? (
+                              {loadingPhase !== 'complete' ? (
+                                <div className="w-full h-full bg-base-300 rounded-full animate-pulse" />
+                              ) : token.logo ? (
                                 <img
                                   src={token.logo}
                                   alt={token.symbol}
@@ -1529,14 +1804,11 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                     );
                                   }}
                                 />
-                              ) : null}
-                              <div
-                                className={`${
-                                  token.logo ? "hidden" : ""
-                                } w-full h-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold`}
-                              >
-                                {token.symbol.charAt(0)}
-                              </div>
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                                  {token.symbol.charAt(0)}
+                                </div>
+                              )}
                             </div>
                             <div>
                               <a
@@ -1559,16 +1831,23 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                               <div className="text-right text-xs uppercase tracking-wider opacity-50">
                                 MKT CAP
                               </div>
-                              <div className="flex gap-2 items-baseline">
-                                <div className="font-mono text-sm font-bold">
-                                  {formatMarketCap(token.marketData?.marketCap)}
+                              {loadingPhase !== 'complete' ? (
+                                <div className="flex gap-2 items-baseline">
+                                  <div className="h-4 w-16 bg-base-300 rounded animate-pulse" />
+                                  <div className="h-3 w-12 bg-base-300 rounded animate-pulse" />
                                 </div>
-                                <div className="text-xs mt-1">
-                                  {format24hChange(
-                                    token.marketData?.priceChange24h
-                                  )}
+                              ) : (
+                                <div className="flex gap-2 items-baseline">
+                                  <div className="font-mono text-sm font-bold">
+                                    {formatMarketCap(token.marketData?.marketCap)}
+                                  </div>
+                                  <div className="text-xs mt-1">
+                                    {render24hChange(
+                                      token.marketData?.priceChange24h
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
+                              )}
                             </div>
                           </div>
                         </div>
