@@ -82,7 +82,7 @@ export function CreateForm() {
 
       // Add a delay to allow backend indexing before redirect
       setTimeout(() => {
-        router.push(`/created-tokens`);
+        router.push(`/launched-tokens`);
       }, 3000); // 3 second delay
     }
   }, [isTxSuccess, deployedTokenAddress, router, deployHash]);
@@ -289,10 +289,10 @@ export function CreateForm() {
   const buttonText = !isWalletConnected
     ? isMiniAppView
       ? "WALLET CONNECTING..."
-      : "CONNECT WALLET TO CREATE"
+      : "CONNECT WALLET TO LAUNCH"
     : isDeploying
-    ? "CREATING TOKEN..."
-    : "CREATE TOKEN";
+    ? "LAUNCHING TOKEN..."
+    : "LAUNCH TOKEN";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto">

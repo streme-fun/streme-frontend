@@ -156,7 +156,7 @@ export function Navbar() {
               onClick={async () => {
                 if (isSDKLoaded && sdk) {
                   try {
-                    const castText = `@streme Create a token for me
+                    const castText = `@streme Launch a token for me
 
 Name: [your token name]
 Symbol: $[your ticker]
@@ -194,7 +194,7 @@ Symbol: $[your ticker]
                   d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
                 ></path>
               </svg>
-              Create
+              Launch
             </button>
 
             {/* Leaderboard Button */}
@@ -362,8 +362,8 @@ Symbol: $[your ticker]
 
           <div className="hidden lg:flex items-center gap-6">
             {/* link to create page */}
-            <Link href="/create" className="btn btn-primary">
-              Create a Token
+            <Link href="/launch" className="btn btn-primary">
+              Launch a Token
             </Link>
 
             <button
@@ -405,15 +405,15 @@ Symbol: $[your ticker]
                         onClick={() => setIsAddressDropdownOpen(false)}
                         className="block w-full px-4 py-2 text-left hover:bg-base-200 cursor-pointer"
                       >
-                        Streme Wallet
+                        My Tokens
                       </Link>
 
                       <Link
-                        href="/created-tokens"
+                        href="/launched-tokens"
                         onClick={() => setIsAddressDropdownOpen(false)}
                         className="block w-full px-4 py-2 text-left hover:bg-base-200 cursor-pointer"
                       >
-                        Created Tokens
+                        Launched Tokens
                       </Link>
                       <button
                         onClick={() => {
@@ -443,10 +443,10 @@ Symbol: $[your ticker]
         >
           <div className="px-4 py-4 space-y-3">
             <Link
-              href="/create"
+              href="/launch"
               className="btn btn-primary w-full justify-start"
             >
-              Create a Token
+              Launch a Token
             </Link>
 
             {privyAuthenticated && (
@@ -475,11 +475,11 @@ Symbol: $[your ticker]
 
             {privyAuthenticated && (
               <Link
-                href="/created-tokens"
+                href="/launched-tokens"
                 className="btn btn-ghost w-full justify-start"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Created Tokens
+                Launched Tokens
               </Link>
             )}
 

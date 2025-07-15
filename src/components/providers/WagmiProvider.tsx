@@ -8,7 +8,7 @@ import {
   unichain,
 } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { farcasterFrame } from "@farcaster/frame-wagmi-connector";
+import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { coinbaseWallet, metaMask } from "wagmi/connectors";
 import { APP_NAME, APP_ICON_URL, APP_URL } from "../../lib/constants";
 import { useEffect, useState } from "react";
@@ -133,7 +133,7 @@ export const config = createConfig({
       appLogoUrl: APP_ICON_URL,
       preference: "all",
     }),
-    farcasterFrame(),
+    farcasterMiniApp(),
   ],
 });
 

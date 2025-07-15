@@ -71,7 +71,7 @@ interface EnrichedLaunchedToken extends LaunchedToken {
   };
 }
 
-export default function CreatedTokensPage() {
+export default function LaunchedTokensPage() {
   const router = useRouter();
   const [tokens, setTokens] = useState<EnrichedLaunchedToken[]>([]);
   const [loading, setLoading] = useState(false);

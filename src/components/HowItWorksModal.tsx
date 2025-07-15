@@ -34,10 +34,10 @@ export function HowItWorksModal({
         <div className="space-y-6">
           <div>
             <h3 className="text-lg font-semibold mb-2 text-primary">
-              Create Tokens with Built-in Staking
+              Launch Tokens with Built-in Staking
             </h3>
             <p className="opacity-80">
-              Create tokens with automatic staking rewards. 20% of supply
+              Launch tokens with automatic staking rewards. 20% of supply
               streams to stakers over 365 days.
             </p>
           </div>
@@ -62,8 +62,8 @@ export function HowItWorksModal({
           {/* Add launch a token button */}
           <div>
             <div className="text-center pt-4">
-              <Link href="/create" className="btn btn-primary btn-lg w-full">
-                Create Your Streme Token
+              <Link href="/launch" className="btn btn-primary btn-lg w-full">
+                Launch Your Streme Token
               </Link>
             </div>
           </div>
