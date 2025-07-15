@@ -14,7 +14,7 @@ import { Button } from "../components/ui/button";
 import { base } from "wagmi/chains";
 import Image from "next/image";
 import { usePostHog } from "posthog-js/react";
-import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal";
+// import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal";
 import { SPAMMER_BLACKLIST } from "../lib/blacklist";
 import Link from "next/link";
 
@@ -26,20 +26,20 @@ function App() {
   const hasInitiallyFetched = useRef(false);
 
   // Tutorial modal state
-  const [showTutorialModal, setShowTutorialModal] = useState(false);
-  const [hasSkippedTutorial, setHasSkippedTutorial] = useState(false);
-  const [hasShownTutorialThisSession, setHasShownTutorialThisSession] =
-    useState(false);
+  // const [showTutorialModal, setShowTutorialModal] = useState(false);
+  // const [hasSkippedTutorial, setHasSkippedTutorial] = useState(false);
+  // const [hasShownTutorialThisSession, setHasShownTutorialThisSession] =
+  //   useState(false);
 
   // Load tutorial skip state from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const skipped = localStorage.getItem("streme-tutorial-skipped");
-      if (skipped === "true") {
-        setHasSkippedTutorial(true);
-      }
-    }
-  }, []);
+  // useEffect(() => {
+  //   if (typeof window !== "undefined") {
+  //     const skipped = localStorage.getItem("streme-tutorial-skipped");
+  //     if (skipped === "true") {
+  //       setHasSkippedTutorial(true);
+  //     }
+  //   }
+  // }, []);
 
   const {
     isSDKLoaded,
@@ -55,7 +55,7 @@ function App() {
     // disconnect,
     promptToAddMiniApp,
     hasPromptedToAdd,
-    hasAddedMiniApp,
+    // hasAddedMiniApp,
   } = useAppFrameLogic();
 
   const postHog = usePostHog();
@@ -162,33 +162,33 @@ function App() {
   }, [isMiniAppView, isSDKLoaded, hasPromptedToAdd, promptToAddMiniApp]);
 
   // Show tutorial modal for mini-app users who haven't added the app
-  useEffect(() => {
-    if (
-      isMiniAppView &&
-      isSDKLoaded &&
-      !hasAddedMiniApp &&
-      !hasSkippedTutorial &&
-      !hasShownTutorialThisSession
-    ) {
-      // Small delay to ensure everything is loaded
-      const timer = setTimeout(() => {
-        setShowTutorialModal(true);
-        setHasShownTutorialThisSession(true);
-        // Track tutorial modal shown
-        postHog?.capture("mini_app_tutorial_shown", {
-          context: "farcaster_mini_app",
-        });
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [
-    isMiniAppView,
-    isSDKLoaded,
-    hasAddedMiniApp,
-    hasSkippedTutorial,
-    hasShownTutorialThisSession,
-    postHog,
-  ]);
+  // useEffect(() => {
+  //   if (
+  //     isMiniAppView &&
+  //     isSDKLoaded &&
+  //     !hasAddedMiniApp &&
+  //     !hasSkippedTutorial &&
+  //     !hasShownTutorialThisSession
+  //   ) {
+  //     // Small delay to ensure everything is loaded
+  //     const timer = setTimeout(() => {
+  //       setShowTutorialModal(true);
+  //       setHasShownTutorialThisSession(true);
+  //       // Track tutorial modal shown
+  //       postHog?.capture("mini_app_tutorial_shown", {
+  //         context: "farcaster_mini_app",
+  //       });
+  //     }, 1000);
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [
+  //   isMiniAppView,
+  //   isSDKLoaded,
+  //   hasAddedMiniApp,
+  //   hasSkippedTutorial,
+  //   hasShownTutorialThisSession,
+  //   postHog,
+  // ]);
 
   // Auto-connect to Farcaster wallet if not connected in mini app context
   useEffect(() => {
@@ -219,30 +219,30 @@ function App() {
   ]);
 
   // Tutorial modal handlers
-  const handleCloseTutorial = () => {
-    setShowTutorialModal(false);
-    // Save completion state so user doesn't see tutorial again
-    if (typeof window !== "undefined") {
-      localStorage.setItem("streme-tutorial-skipped", "true");
-    }
-    // Track tutorial completion
-    postHog?.capture("mini_app_tutorial_completed", {
-      context: "farcaster_mini_app",
-    });
-  };
+  // const handleCloseTutorial = () => {
+  //   setShowTutorialModal(false);
+  //   // Save completion state so user doesn't see tutorial again
+  //   if (typeof window !== "undefined") {
+  //     localStorage.setItem("streme-tutorial-skipped", "true");
+  //   }
+  //   // Track tutorial completion
+  //   postHog?.capture("mini_app_tutorial_completed", {
+  //     context: "farcaster_mini_app",
+  //   });
+  // };
 
-  const handleSkipTutorial = () => {
-    setHasSkippedTutorial(true);
-    setShowTutorialModal(false);
-    // Save to localStorage so user doesn't see tutorial again
-    if (typeof window !== "undefined") {
-      localStorage.setItem("streme-tutorial-skipped", "true");
-    }
-    // Track tutorial skip
-    postHog?.capture("mini_app_tutorial_skipped", {
-      context: "farcaster_mini_app",
-    });
-  };
+  // const handleSkipTutorial = () => {
+  //   setHasSkippedTutorial(true);
+  //   setShowTutorialModal(false);
+  //   // Save to localStorage so user doesn't see tutorial again
+  //   if (typeof window !== "undefined") {
+  //     localStorage.setItem("streme-tutorial-skipped", "true");
+  //   }
+  //   // Track tutorial skip
+  //   postHog?.capture("mini_app_tutorial_skipped", {
+  //     context: "farcaster_mini_app",
+  //   });
+  // };
 
   if (!isSDKLoaded) {
     return <div className="text-center py-8">Loading SDK...</div>;
@@ -267,7 +267,7 @@ function App() {
                 onChange={(value) => setSearchQuery(value)}
               />
             </div>
-            <div className="flex-shrink-0">
+            {/* <div className="flex-shrink-0">
               <button
                 onClick={() => setShowTutorialModal(true)}
                 className="bg-base-50 backdrop-blur-sm cursor-pointer"
@@ -288,7 +288,7 @@ function App() {
                   />
                 </svg>
               </button>
-            </div>
+            </div> */}
           </div>
 
           <div className="w-full max-w-md">
@@ -326,11 +326,11 @@ function App() {
         </div>
 
         {/* Tutorial Modal */}
-        <MiniAppTutorialModal
+        {/* <MiniAppTutorialModal
           isOpen={showTutorialModal}
           onClose={handleCloseTutorial}
           onSkip={handleSkipTutorial}
-        />
+        /> */}
       </div>
     );
   }
