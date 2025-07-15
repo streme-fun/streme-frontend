@@ -6,6 +6,7 @@ import { useAccount, useConnect, useSwitchChain, useDisconnect } from "wagmi";
 import { base } from "wagmi/chains";
 import type { Context as FarcasterContextType } from "@farcaster/miniapp-core";
 import sdk from "@farcaster/frame-sdk";
+import { useFarcasterAuth } from "./useFarcasterAuth";
 
 export function useAppFrameLogic() {
   // Quick sync detection as initial fallback
@@ -17,11 +18,15 @@ export function useAppFrameLogic() {
   const [isDetectionComplete, setIsDetectionComplete] = useState(false);
   const [hasPromptedToAdd, setHasPromptedToAdd] = useState(false);
   const [hasAddedMiniApp, setHasAddedMiniApp] = useState(false);
+  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
   const { context: farcasterContext, isSDKLoaded } = useFrame();
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { disconnect } = useDisconnect();
+  
+  // Auto-login functionality for mini-app
+  const { signIn, isAuthenticated, isLoading: authLoading } = useFarcasterAuth();
 
   // Load mini app addition status from localStorage on mount
   useEffect(() => {
@@ -118,7 +123,26 @@ export function useAppFrameLogic() {
         clearTimeout(detectionTimeoutId);
       }
     };
-  }, [isDetectionComplete, farcasterContext?.client?.clientFid]);
+  }, [isDetectionComplete, farcasterContext?.client?.clientFid, farcasterContext, isSDKLoaded]);
+
+  // Auto-login when mini-app is detected and SDK is ready
+  useEffect(() => {
+    const shouldAutoLogin = 
+      isDetectionComplete && 
+      isMiniAppView && 
+      !autoLoginAttempted && 
+      !isAuthenticated && 
+      !authLoading;
+
+    if (shouldAutoLogin) {
+      setAutoLoginAttempted(true);
+      console.log("Auto-login: Attempting to sign in to Farcaster...");
+      
+      signIn().catch((error) => {
+        console.warn("Auto-login failed, user can manually sign in later:", error);
+      });
+    }
+  }, [isDetectionComplete, isMiniAppView, autoLoginAttempted, isAuthenticated, authLoading, signIn]);
 
   // Check if mini app is already added when context loads
   useEffect(() => {
@@ -228,5 +252,9 @@ export function useAppFrameLogic() {
     hasPromptedToAdd,
     hasAddedMiniApp,
     getSafeEthereumProvider,
+    // Auto-login state
+    isAuthenticated,
+    authLoading,
+    autoLoginAttempted,
   };
 }
