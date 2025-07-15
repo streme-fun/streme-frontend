@@ -1,4 +1,3 @@
-import localtunnel from "localtunnel";
 import { spawn } from "child_process";
 import { createServer } from "net";
 import dotenv from "dotenv";
@@ -11,7 +10,7 @@ dotenv.config({ path: ".env.local" });
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(path.normalize(path.join(__dirname, "..")));
 
-let tunnel;
+let tunnelProcess;
 let nextDev;
 let isCleaningUp = false;
 
@@ -64,9 +63,72 @@ async function killProcessOnPort(port) {
       });
       await new Promise((resolve) => lsof.on("close", resolve));
     }
-  } catch (e) {
+  } catch {
     // Ignore errors if no process found
   }
+}
+
+async function checkCloudflared() {
+  return new Promise((resolve) => {
+    const checkProcess = spawn("cloudflared", ["--version"], {
+      shell: true,
+      stdio: "pipe"
+    });
+    
+    checkProcess.on("error", () => {
+      resolve(false);
+    });
+    
+    checkProcess.on("exit", (code) => {
+      resolve(code === 0);
+    });
+  });
+}
+
+async function startCloudflaredTunnel() {
+  return new Promise((resolve, reject) => {
+    console.log("🚇 Starting Cloudflare tunnel...");
+    
+    tunnelProcess = spawn("cloudflared", ["tunnel", "--url", "http://localhost:3000"], {
+      shell: true,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+
+    let tunnelUrl = null;
+    
+    tunnelProcess.stderr.on("data", (data) => {
+      const output = data.toString();
+      
+      // Look for the tunnel URL in the output
+      const urlMatch = output.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+      if (urlMatch && !tunnelUrl) {
+        tunnelUrl = urlMatch[0];
+        resolve(tunnelUrl);
+      }
+      
+      // Still log the output for debugging
+      if (output.includes("error") || output.includes("Error")) {
+        console.error(output);
+      }
+    });
+
+    tunnelProcess.on("error", (error) => {
+      reject(new Error(`Failed to start cloudflared: ${error.message}`));
+    });
+
+    tunnelProcess.on("exit", (code) => {
+      if (code !== 0 && !tunnelUrl) {
+        reject(new Error(`cloudflared exited with code ${code}`));
+      }
+    });
+
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      if (!tunnelUrl) {
+        reject(new Error("Timeout waiting for cloudflared tunnel URL"));
+      }
+    }, 10000);
+  });
 }
 
 async function startDev() {
@@ -89,42 +151,51 @@ async function startDev() {
   let frameUrl;
 
   if (useTunnel) {
-    // Start localtunnel and get URL
-    tunnel = await localtunnel({ port: 3000 });
-    let ip;
-    try {
-      ip = await fetch("https://ipv4.icanhazip.com")
-        .then((res) => res.text())
-        .then((ip) => ip.trim());
-    } catch (error) {
-      console.error("Error getting IP address:", error);
+    // Check if cloudflared is installed
+    const hasCloudflared = await checkCloudflared();
+    if (!hasCloudflared) {
+      console.error(`
+❌ cloudflared is not installed!
+
+To install cloudflared:
+
+macOS:
+  brew install cloudflared
+
+Linux:
+  Visit: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
+
+Windows:
+  Download from: https://github.com/cloudflare/cloudflared/releases
+  Add to PATH after installation
+
+After installation, run this command again.
+`);
+      process.exit(1);
     }
 
-    frameUrl = tunnel.url;
-    console.log(`
-🌐 Local tunnel URL: ${tunnel.url}
+    try {
+      frameUrl = await startCloudflaredTunnel();
+      console.log(`
+🌐 Cloudflare tunnel URL: ${frameUrl}
 
 💻 To test on desktop:
-   1. Open the localtunnel URL in your browser: ${tunnel.url}
-   2. Enter your IP address in the password field${
-     ip ? `: ${ip}` : ""
-   } (note that this IP may be incorrect if you are using a VPN)
-   3. Click "Click to Submit" -- your mini app should now load in the browser
-   4. Navigate to the Warpcast Mini App Developer Tools: https://farcaster.xyz/~/developers
-   5. Enter your mini app URL: ${tunnel.url}
-   6. Click "Preview" to launch your mini app within Warpcast (note that it may take ~10 seconds to load)
-
-
-❗️ You will not be able to load your mini app in Warpcast until    ❗️
-❗️ you submit your IP address in the localtunnel password field ❗️
-
+   1. Navigate to the Warpcast Mini App Developer Tools: https://farcaster.xyz/~/developers
+   2. Enter your mini app URL: ${frameUrl}
+   3. Click "Preview" to launch your mini app within Warpcast (note that it may take ~10 seconds to load)
 
 📱 To test in Warpcast mobile app:
    1. Open Warpcast on your phone
    2. Go to Settings > Developer > Mini Apps
-   4. Enter this URL: ${tunnel.url}
-   5. Click "Preview" (note that it may take ~10 seconds to load)
+   3. Enter this URL: ${frameUrl}
+   4. Click "Preview" (note that it may take ~10 seconds to load)
+
+🔥 Cloudflare tunnels are more reliable than localtunnel and don't require IP whitelisting!
 `);
+    } catch (error) {
+      console.error("Failed to start tunnel:", error.message);
+      process.exit(1);
+    }
   } else {
     frameUrl = "http://localhost:3000";
     console.log(`
@@ -170,17 +241,17 @@ async function startDev() {
             }
           }
           console.log("🛑 Next.js dev server stopped");
-        } catch (e) {
+        } catch {
           // Ignore errors when killing nextDev
           console.log("Note: Next.js process already terminated");
         }
       }
 
-      if (tunnel) {
+      if (tunnelProcess) {
         try {
-          await tunnel.close();
-          console.log("🌐 Tunnel closed");
-        } catch (e) {
+          tunnelProcess.kill("SIGKILL");
+          console.log("🌐 Cloudflare tunnel closed");
+        } catch {
           console.log("Note: Tunnel already closed");
         }
       }
@@ -198,9 +269,6 @@ async function startDev() {
   process.on("SIGINT", cleanup);
   process.on("SIGTERM", cleanup);
   process.on("exit", cleanup);
-  if (tunnel) {
-    tunnel.on("close", cleanup);
-  }
 }
 
 startDev().catch(console.error);
