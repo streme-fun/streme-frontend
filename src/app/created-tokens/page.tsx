@@ -87,7 +87,8 @@ export default function CreatedTokensPage() {
     isSDKLoaded,
   } = useAppFrameLogic();
 
-  // Get the correct wallet address - prioritize wagmi address, then privy wallet
+  // Get the correct wallet address for non-mini-app contexts  
+  // Temporarily prioritize wagmi over privy to fix address issue
   const userAddress = wagmiAddress || privyUser?.wallet?.address;
 
   // Simple wallet detection - just like the original working version
@@ -96,6 +97,22 @@ export default function CreatedTokensPage() {
     : authenticated && !!userAddress;
 
   const deployerAddress = isMiniAppView ? fcAddress : userAddress;
+  
+  // Debug logging for address changes
+  useEffect(() => {
+    console.log("📍 Address change debug:", {
+      isMiniAppView,
+      fcAddress,
+      userAddress: userAddress,
+      privyAddress: privyUser?.wallet?.address,
+      wagmiAddress,
+      deployerAddress,
+      fcIsConnected,
+      authenticated,
+      isWalletConnected,
+      timestamp: new Date().toISOString()
+    });
+  }, [isMiniAppView, fcAddress, userAddress, privyUser?.wallet?.address, wagmiAddress, deployerAddress, fcIsConnected, authenticated, isWalletConnected]);
   const [selectedTokenStakers, setSelectedTokenStakers] = useState<{
     token: EnrichedLaunchedToken;
     isOpen: boolean;

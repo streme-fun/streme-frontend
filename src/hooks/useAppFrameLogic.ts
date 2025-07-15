@@ -9,9 +9,11 @@ import sdk from "@farcaster/frame-sdk";
 import { useFarcasterAuth } from "./useFarcasterAuth";
 
 export function useAppFrameLogic() {
-  // Quick sync detection as initial fallback
+  // Quick sync detection as initial fallback - be more conservative on localhost
   const quickDetection =
     typeof window !== "undefined" &&
+    !window.location.hostname.includes('localhost') &&
+    !window.location.hostname.includes('127.0.0.1') &&
     (window.parent !== window || window.location !== window.parent.location);
 
   const [isMiniAppView, setIsMiniAppView] = useState(quickDetection);
@@ -45,11 +47,8 @@ export function useAppFrameLogic() {
     const detectMiniApp = async () => {
       try {
         console.log("Starting mini app detection...", {
-          isSDKLoaded,
-          isDetectionComplete,
           hasContext: !!farcasterContext,
           clientFid: farcasterContext?.client?.clientFid,
-          timestamp: new Date().toISOString(),
         });
 
         // Check for clientFid first - this is the most reliable way to detect mini-app
@@ -63,25 +62,18 @@ export function useAppFrameLogic() {
         // Try detection even if SDK isn't "fully loaded" - it might still work
         const isMiniApp = await sdk.isInMiniApp();
 
-        console.log("Mini app detection result:", {
-          isMiniApp,
-          hasContext: !!farcasterContext,
-          isSDKLoaded,
-          timestamp: new Date().toISOString(),
-          globalFlag:
-            typeof window !== "undefined"
-              ? window.__FARCASTER_SDK_INITIALIZED__
-              : null,
-        });
+        console.log("Mini app detection result:", { isMiniApp });
 
         setIsMiniAppView(isMiniApp);
         setIsDetectionComplete(true);
       } catch (error) {
         console.error("Error checking if in mini app:", error);
 
-        // Try to detect based on window properties as fallback
+        // Try to detect based on window properties as fallback - be conservative on localhost
         const fallbackDetection =
           typeof window !== "undefined" &&
+          !window.location.hostname.includes('localhost') &&
+          !window.location.hostname.includes('127.0.0.1') &&
           (window.parent !== window ||
             window.location !== window.parent.location);
 
@@ -105,6 +97,8 @@ export function useAppFrameLogic() {
           console.log("Mini app detection timeout - using fallback");
           const fallbackDetection =
             typeof window !== "undefined" &&
+            !window.location.hostname.includes('localhost') &&
+            !window.location.hostname.includes('127.0.0.1') &&
             (window.parent !== window ||
               window.location !== window.parent.location);
           setIsMiniAppView(fallbackDetection);
@@ -123,7 +117,7 @@ export function useAppFrameLogic() {
         clearTimeout(detectionTimeoutId);
       }
     };
-  }, [isDetectionComplete, farcasterContext?.client?.clientFid, farcasterContext, isSDKLoaded]);
+  }, [isDetectionComplete, farcasterContext?.client?.clientFid, farcasterContext, isSDKLoaded, quickDetection]);
 
   // Auto-login when mini-app is detected and SDK is ready
   useEffect(() => {
@@ -136,12 +130,13 @@ export function useAppFrameLogic() {
 
     if (shouldAutoLogin) {
       setAutoLoginAttempted(true);
-      console.log("Auto-login: Attempting to sign in to Farcaster...");
+      console.log("Auto-login: Attempting to sign in to Farcaster for mini-app...");
       
       signIn().catch((error) => {
         console.warn("Auto-login failed, user can manually sign in later:", error);
       });
     }
+    
   }, [isDetectionComplete, isMiniAppView, autoLoginAttempted, isAuthenticated, authLoading, signIn]);
 
   // Check if mini app is already added when context loads
