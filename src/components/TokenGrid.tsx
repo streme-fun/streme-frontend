@@ -267,7 +267,7 @@ const TokenCardComponent = ({
                     {token.cast_hash && token.creator?.name && (
                       <button
                         onClick={handleFarcasterClick}
-                        className="hover:text-primary inline-flex items-center ml-auto"
+                        className="hover:text-primary inline-flex items-center ml-auto cursor-pointer"
                         title="View on Farcaster"
                       >
                         <Image

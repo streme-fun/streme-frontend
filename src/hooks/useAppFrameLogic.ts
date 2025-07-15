@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useFrame } from "../components/providers/FrameProvider";
 import { useAccount, useConnect, useSwitchChain, useDisconnect } from "wagmi";
 import { base } from "wagmi/chains";
-import type { Context as FarcasterContextType } from "@farcaster/frame-sdk";
+import type { Context as FarcasterContextType } from "@farcaster/miniapp-core";
 import sdk from "@farcaster/frame-sdk";
 
 export function useAppFrameLogic() {
@@ -203,7 +203,7 @@ export function useAppFrameLogic() {
     isSDKLoaded: isDetectionComplete, // Only require detection to complete, not SDK loading
     isMiniAppView,
     farcasterContext: farcasterContext as
-      | FarcasterContextType.FrameContext
+      | FarcasterContextType.MiniAppContext
       | undefined,
     address,
     isConnected,

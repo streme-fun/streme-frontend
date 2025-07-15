@@ -13,6 +13,7 @@ import { MyTokensModal } from "./MyTokensModal";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useWallets } from "@privy-io/react-auth";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
+import Link from "next/link";
 
 const WETH = "0x4200000000000000000000000000000000000006";
 const toHex = (address: string) => address as `0x${string}`;
@@ -478,9 +479,9 @@ export function ZapStakeButton({
                 Manage Stakes
               </button>
             ) : (
-              <a href={`/tokens`} className="btn btn-accent w-full">
+              <Link href="/tokens" className="btn btn-accent w-full">
                 Manage Stakes
-              </a>
+              </Link>
             )}
             <button
               onClick={() => setShowSuccessModal(false)}

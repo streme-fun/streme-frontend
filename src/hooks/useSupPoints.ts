@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import sdk from "@farcaster/frame-sdk";
 
 interface UserPointsData {
   fid: number;
@@ -30,23 +31,12 @@ export function useSupPoints() {
     error: null,
   });
 
-  const fetchUserData = useCallback(async (authToken: string) => {
-    if (!authToken) {
-      setState((prev) => ({
-        ...prev,
-        error: "No authentication token provided",
-      }));
-      return;
-    }
-
+  const fetchUserData = useCallback(async () => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const response = await fetch("/api/sup/points", {
-        headers: new Headers({
-          Authorization: "Bearer " + authToken,
-        }),
-      });
+      // Use the SDK's fetch method which automatically adds the Bearer token
+      const response = await sdk.quickAuth.fetch("/api/sup/points");
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

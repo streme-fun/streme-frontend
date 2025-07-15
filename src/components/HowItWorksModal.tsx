@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { ExternalLink } from "./ui/ExternalLink";
+
 export function HowItWorksModal({
   isOpen,
   onClose,
@@ -59,21 +62,19 @@ export function HowItWorksModal({
           {/* Add launch a token button */}
           <div>
             <div className="text-center pt-4">
-              <a href="/create" className="btn btn-primary btn-lg w-full">
+              <Link href="/create" className="btn btn-primary btn-lg w-full">
                 Create Your Streme Token
-              </a>
+              </Link>
             </div>
           </div>
           {/* Add docs link */}
           <div className="text-center">
-            <a
+            <ExternalLink
               href="https://docs.streme.fun"
-              target="_blank"
-              rel="noopener noreferrer"
               className="text-sm text-base-content/60 hover:text-base-content/80"
             >
               Read the Docs →
-            </a>
+            </ExternalLink>
           </div>
         </div>
       </div>

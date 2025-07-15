@@ -8,6 +8,7 @@ import sdk from "@farcaster/frame-sdk";
 import Image from "next/image";
 import FarcasterIcon from "@/public/farcaster.svg";
 import { MyTokensModal } from "./MyTokensModal";
+import Link from "next/link";
 
 interface StakeModalProps {
   isOpen: boolean;
@@ -318,9 +319,9 @@ ${shareUrl}`;
                     Manage Stakes
                   </button>
                 ) : (
-                  <a href="/tokens" className="btn btn-accent flex-1">
+                  <Link href="/tokens" className="btn btn-accent flex-1">
                     Manage Stakes
-                  </a>
+                  </Link>
                 )}
                 <button
                   onClick={handleShare}
@@ -434,9 +435,9 @@ ${shareUrl}`;
                   Manage Stakes
                 </button>
               ) : (
-                <a href="/tokens" className="btn btn-accent flex-1">
+                <Link href="/tokens" className="btn btn-accent flex-1">
                   Manage Stakes
-                </a>
+                </Link>
               )}
               <button onClick={handleShare} className="btn btn-outline flex-1">
                 <Image

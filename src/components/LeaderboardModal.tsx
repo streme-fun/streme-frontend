@@ -89,7 +89,6 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     isAuthenticated,
     isLoading: authLoading,
     error: authError,
-    token,
     signIn,
   } = useFarcasterAuth();
 
@@ -184,12 +183,12 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
 
   // Fetch user points data when authentication succeeds
   useEffect(() => {
-    if (isAuthenticated && token) {
-      fetchUserData(token);
+    if (isAuthenticated) {
+      fetchUserData();
     } else if (!isAuthenticated) {
       clearPointsData();
     }
-  }, [isAuthenticated, token, fetchUserData, clearPointsData]);
+  }, [isAuthenticated, fetchUserData, clearPointsData]);
 
   // Fetch SUP eligibility when address is available
   useEffect(() => {
@@ -649,7 +648,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
             {authError || pointsError}
           </p>
           <button
-            onClick={authError ? signIn : () => token && fetchUserData(token)}
+            onClick={authError ? signIn : () => fetchUserData()}
             className="text-primary hover:text-primary/80 text-sm underline"
           >
             {authError ? "Try Sign In Again" : "Retry Loading"}
