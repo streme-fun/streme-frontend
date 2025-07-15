@@ -43,8 +43,17 @@ export function useAppFrameLogic() {
           isSDKLoaded,
           isDetectionComplete,
           hasContext: !!farcasterContext,
+          clientFid: farcasterContext?.client?.clientFid,
           timestamp: new Date().toISOString(),
         });
+
+        // Check for clientFid first - this is the most reliable way to detect mini-app
+        if (farcasterContext?.client?.clientFid) {
+          console.log("Mini app detected via clientFid:", farcasterContext.client.clientFid);
+          setIsMiniAppView(true);
+          setIsDetectionComplete(true);
+          return;
+        }
 
         // Try detection even if SDK isn't "fully loaded" - it might still work
         const isMiniApp = await sdk.isInMiniApp();
@@ -78,7 +87,8 @@ export function useAppFrameLogic() {
     };
 
     // Start detection immediately when component mounts, don't wait for isSDKLoaded
-    if (!isDetectionComplete) {
+    // Also re-run when clientFid becomes available
+    if (!isDetectionComplete || farcasterContext?.client?.clientFid) {
       // Add a small delay to let the SDK settle, but don't wait for full loading
       const initialDelay = setTimeout(() => {
         detectMiniApp();
@@ -108,7 +118,7 @@ export function useAppFrameLogic() {
         clearTimeout(detectionTimeoutId);
       }
     };
-  }, [isDetectionComplete, farcasterContext]);
+  }, [isDetectionComplete, farcasterContext?.client?.clientFid]);
 
   // Check if mini app is already added when context loads
   useEffect(() => {
