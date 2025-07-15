@@ -402,7 +402,7 @@ export function StakerLeaderboard({
               <input
                 type="text"
                 placeholder="Search address or Farcaster username..."
-                className="input input-bordered w-full"
+                className="input input-bordered w-full text-base"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />

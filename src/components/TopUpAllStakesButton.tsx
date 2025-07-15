@@ -129,9 +129,9 @@ export function TopUpAllStakesButton({
           throw new Error("Wagmi wallet not connected");
         }
         userAddress = wagmiAddress;
-        const wallet = wallets.find((w) => w.address === wagmiAddress);
+        const wallet = wallets?.[0];
         if (!wallet) {
-          throw new Error("Wallet not found");
+          throw new Error("No wallet available");
         }
         provider = await wallet.getEthereumProvider();
         await provider.request({

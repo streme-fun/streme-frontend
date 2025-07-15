@@ -10,7 +10,7 @@ import { LaunchTokenModal } from "./LaunchTokenModal";
 import { LeaderboardModal } from "./LeaderboardModal";
 import { WalletProfileModal } from "./WalletProfileModal";
 import { MyTokensModal } from "./MyTokensModal";
-import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
+// import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import sdk from "@farcaster/frame-sdk";
@@ -51,12 +51,12 @@ export function Navbar() {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
-  const [isLaunchTokenOpen, setIsLaunchTokenOpen] = useState(false);
+  const [isCreateTokenOpen, setIsCreateTokenOpen] = useState(false);
   const [isAddressDropdownOpen, setIsAddressDropdownOpen] = useState(false);
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [isWalletProfileOpen, setIsWalletProfileOpen] = useState(false);
   const [isMyStakesOpen, setIsMyStakesOpen] = useState(false);
-  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  // const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
   // Profile picture state for mini-app
   const [miniAppProfileImage, setMiniAppProfileImage] = useState<string>("");
@@ -168,13 +168,13 @@ Symbol: $[your ticker]
                     });
                   } catch (error) {
                     console.error("Error composing cast:", error);
-                    setIsLaunchTokenOpen(true);
+                    setIsCreateTokenOpen(true);
                   }
                 } else {
                   console.warn(
-                    "Farcaster SDK not loaded or sdk not available. Opening LaunchTokenModal as fallback."
+                    "Farcaster SDK not loaded or sdk not available. Opening CreateTokenModal as fallback."
                   );
-                  setIsLaunchTokenOpen(true);
+                  setIsCreateTokenOpen(true);
                 }
               }}
               className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer"
@@ -267,8 +267,8 @@ Symbol: $[your ticker]
           onClose={() => setIsHowItWorksOpen(false)}
         />
         <LaunchTokenModal
-          isOpen={isLaunchTokenOpen}
-          onClose={() => setIsLaunchTokenOpen(false)}
+          isOpen={isCreateTokenOpen}
+          onClose={() => setIsCreateTokenOpen(false)}
         />
         <LeaderboardModal
           isOpen={isLeaderboardModalOpen}
@@ -282,11 +282,11 @@ Symbol: $[your ticker]
           isOpen={isMyStakesOpen}
           onClose={() => setIsMyStakesOpen(false)}
         />
-        <MiniAppTutorialModal
+        {/* <MiniAppTutorialModal
           isOpen={isTutorialOpen}
           onClose={() => setIsTutorialOpen(false)}
           onSkip={() => setIsTutorialOpen(false)}
-        />
+        /> */}
       </>
     );
   }
@@ -327,22 +327,7 @@ Symbol: $[your ticker]
                 d="M143.802 30V0.90909H163.404V5.98011H149.952V12.9119H162.396V17.983H149.952V24.929H163.461V30H143.802Z"
                 className="fill-primary"
               />
-              <path
-                d="M168.741 30.1847C168.273 30.1847 167.87 30.0189 167.534 29.6875C167.203 29.3513 167.037 28.9489 167.037 28.4801C167.037 28.0161 167.203 27.6184 167.534 27.2869C167.87 26.9555 168.273 26.7898 168.741 26.7898C169.196 26.7898 169.594 26.9555 169.935 27.2869C170.276 27.6184 170.446 28.0161 170.446 28.4801C170.446 28.7926 170.366 29.0791 170.205 29.3395C170.048 29.5952 169.842 29.8011 169.587 29.9574C169.331 30.1089 169.049 30.1847 168.741 30.1847Z"
-                className="fill-primary"
-              />
-              <path
-                d="M172.987 30V15.4545H182.618V17.9901H176.062V21.456H181.978V23.9915H176.062V30H172.987Z"
-                className="fill-accent"
-              />
-              <path
-                d="M193.67 15.4545H196.746V24.9006C196.746 25.9612 196.492 26.8892 195.986 27.6847C195.484 28.4801 194.781 29.1004 193.876 29.5455C192.972 29.9858 191.919 30.206 190.716 30.206C189.509 30.206 188.453 29.9858 187.548 29.5455C186.644 29.1004 185.941 28.4801 185.439 27.6847C184.937 26.8892 184.686 25.9612 184.686 24.9006V15.4545H187.761V24.6378C187.761 25.1918 187.882 25.6842 188.124 26.1151C188.37 26.5459 188.715 26.8845 189.161 27.1307C189.606 27.3769 190.124 27.5 190.716 27.5C191.313 27.5 191.831 27.3769 192.271 27.1307C192.716 26.8845 193.06 26.5459 193.301 26.1151C193.547 25.6842 193.67 25.1918 193.67 24.6378V15.4545Z"
-                className="fill-accent"
-              />
-              <path
-                d="M211.442 15.4545V30H208.786L202.458 20.8452H202.351V30H199.276V15.4545H201.975L208.253 24.6023H208.381V15.4545H211.442Z"
-                className="fill-accent"
-              />
+
               <path
                 d="M81.6143 30V25.071H101.501V30H81.6143ZM84.0433 17.6847V12.9261H99.1712V17.6847H84.0433ZM82.1541 5.90909V0.90909H100.592V5.90909H82.1541Z"
                 className="fill-secondary"
@@ -376,18 +361,10 @@ Symbol: $[your ticker]
           </button>
 
           <div className="hidden lg:flex items-center gap-6">
-            <button
-              onClick={() => setIsLaunchTokenOpen(true)}
-              className="btn btn-primary"
-            >
+            {/* link to create page */}
+            <Link href="/launch" className="btn btn-primary">
               Launch a Token
-            </button>
-
-            {privyAuthenticated && (
-              <Link href="/tokens" className="btn btn-accent">
-                My Tokens
-              </Link>
-            )}
+            </Link>
 
             <Link href="/missions" className="btn btn-secondary">
               🎯 Missions
@@ -428,6 +405,14 @@ Symbol: $[your ticker]
                   {isAddressDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-base-100 rounded-lg shadow-lg border border-base-300">
                       <Link
+                        href="/tokens"
+                        onClick={() => setIsAddressDropdownOpen(false)}
+                        className="block w-full px-4 py-2 text-left hover:bg-base-200 cursor-pointer"
+                      >
+                        My Tokens
+                      </Link>
+
+                      <Link
                         href="/launched-tokens"
                         onClick={() => setIsAddressDropdownOpen(false)}
                         className="block w-full px-4 py-2 text-left hover:bg-base-200 cursor-pointer"
@@ -461,15 +446,12 @@ Symbol: $[your ticker]
           } border-t border-black/[.1] dark:border-white/[.1] bg-background/95 backdrop-blur-sm`}
         >
           <div className="px-4 py-4 space-y-3">
-            <button
-              onClick={() => {
-                setIsLaunchTokenOpen(true);
-                setIsMenuOpen(false);
-              }}
+            <Link
+              href="/launch"
               className="btn btn-primary w-full justify-start"
             >
               Launch a Token
-            </button>
+            </Link>
 
             {privyAuthenticated && (
               <Link
@@ -543,8 +525,8 @@ Symbol: $[your ticker]
         onClose={() => setIsHowItWorksOpen(false)}
       />
       <LaunchTokenModal
-        isOpen={isLaunchTokenOpen}
-        onClose={() => setIsLaunchTokenOpen(false)}
+        isOpen={isCreateTokenOpen}
+        onClose={() => setIsCreateTokenOpen(false)}
       />
     </>
   );

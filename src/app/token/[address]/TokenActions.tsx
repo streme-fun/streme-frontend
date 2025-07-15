@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy } from "@privy-io/react-auth";
+import { useAccount } from "wagmi";
 import { Token } from "@/src/app/types/token";
 import { StakeButton } from "@/src/components/StakeButton";
 import { publicClient } from "@/src/lib/viemClient";
@@ -9,11 +10,11 @@ import { UnstakeButton } from "@/src/components/UnstakeButton";
 import { ConnectPoolButton } from "@/src/components/ConnectPoolButton";
 import { ZapStakeButton } from "@/src/components/ZapStakeButton";
 import { SwapButton } from "@/src/components/SwapButton";
+import { LiquidityWarning } from "@/src/components/LiquidityWarning";
 import { Wallet } from "lucide-react";
 import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { Button as UiButton } from "@/src/components/ui/button";
-import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 import { parseEther } from "viem";
 import { getPrices, convertToUSD } from "@/src/lib/priceUtils";
 import { useTokenBalance } from "@/src/hooks/useTokenData";
@@ -112,53 +113,30 @@ export function TokenActions({
     // farcasterContext,
   } = useAppFrameLogic();
 
-  const { user: privyUser, ready: privyReady, login: privyLogin } = usePrivy();
-  const { wallets } = useWallets();
-  const { primaryAddress } = useWalletAddressChange();
+  const { login: privyLogin, ready: privyReady } = usePrivy();
+  const { address: wagmiAddress } = useAccount();
 
   // Simplified mini app detection - use the improved detection from useAppFrameLogic
   const isEffectivelyMiniApp = isMiniAppViewProp ?? detectedMiniAppView;
 
-  let currentAddress: `0x${string}` | undefined;
-  let walletIsConnected: boolean;
-  let effectiveLogin: () => void;
-
-  if (isEffectivelyMiniApp) {
-    currentAddress = addressProp ?? fcAddress;
-    walletIsConnected = isConnectedProp ?? fcIsConnected;
-    effectiveLogin = () => {
-      if (fcConnect && fcConnectors && fcConnectors.length > 0) {
-        fcConnect({ connector: fcConnectors[0] });
-      } else {
-        console.warn("Farcaster connect function not available");
+  // Simplified wallet connection logic - match MyTokensModal pattern
+  const currentAddress = isEffectivelyMiniApp 
+    ? (addressProp ?? fcAddress)
+    : wagmiAddress;
+  
+  const walletIsConnected = isEffectivelyMiniApp 
+    ? (isConnectedProp ?? fcIsConnected)
+    : !!wagmiAddress;
+  
+  const effectiveLogin = isEffectivelyMiniApp 
+    ? () => {
+        if (fcConnect && fcConnectors && fcConnectors.length > 0) {
+          fcConnect({ connector: fcConnectors[0] });
+        } else {
+          console.warn("Farcaster connect function not available");
+        }
       }
-    };
-  } else {
-    // For non-mini apps, use primaryAddress from useWalletAddressChange hook for better wallet switching support
-    currentAddress = (primaryAddress || privyUser?.wallet?.address) as
-      | `0x${string}`
-      | undefined;
-    // Check if Privy is ready, user has a wallet, and wallets array is populated
-    const hasPrivyWallet = privyReady && !!privyUser?.wallet?.address;
-    const walletsReady = wallets && wallets.length > 0;
-    const exactWalletMatch =
-      walletsReady &&
-      wallets.some((w) => w.address === privyUser?.wallet?.address);
-    const caseInsensitiveMatch =
-      walletsReady &&
-      wallets.some(
-        (w) =>
-          w.address?.toLowerCase() === privyUser?.wallet?.address?.toLowerCase()
-      );
-    const singleWalletFallback =
-      walletsReady && wallets.length === 1 && hasPrivyWallet;
-
-    walletIsConnected =
-      hasPrivyWallet &&
-      walletsReady &&
-      (exactWalletMatch || caseInsensitiveMatch || singleWalletFallback);
-    effectiveLogin = privyLogin;
-  }
+    : privyLogin;
 
   // Enhanced 0x API integration
   const getGaslessQuote = useCallback(
@@ -616,7 +594,7 @@ export function TokenActions({
                 value={tradeAmount}
                 onChange={(e) => setTradeAmount(e.target.value)}
                 placeholder={tradeDirection === "buy" ? "0.001" : ""}
-                className="w-full p-5 bg-base-200 border border-base-300 rounded-lg text-lg font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full p-5 bg-base-200 border border-base-300 rounded-lg text-base font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 step="0.001"
                 min="0"
               />
@@ -716,6 +694,19 @@ export function TokenActions({
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
               {validation.error}
             </div>
+          )}
+
+          {/* Liquidity Warning - only show for buy direction */}
+          {tradeDirection === "buy" && (
+            <LiquidityWarning
+              tokenAddress={contractAddress}
+              tokenLaunchTime={token.timestamp ? 
+                new Date(token.timestamp._seconds * 1000 + token.timestamp._nanoseconds / 1000000) : 
+                token.created_at
+              }
+              tokenSymbol={token.symbol}
+              className="mb-4"
+            />
           )}
 
           {/* Action Buttons */}

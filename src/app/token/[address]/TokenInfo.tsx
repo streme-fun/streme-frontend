@@ -7,8 +7,9 @@ import { useState, useEffect } from "react";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import DexscreenerIcon from "@/public/dexscreener.webp";
 import InterfaceIcon from "@/public/interface.png";
-import sdk from "@farcaster/frame-sdk";
 import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
+import { useNavigation } from "@/src/hooks/useNavigation";
+import { ExternalLink } from "@/src/components/ui/ExternalLink";
 
 const formatPrice = (price: number | undefined) => {
   if (!price || isNaN(price)) return "-";
@@ -98,36 +99,16 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
     }
   };
 
+  const { openExternalUrl } = useNavigation();
+
   const handleDexscreenerLink = async () => {
     const dexscreenerUrl = `https://dexscreener.com/base/${token.contract_address}`;
-
-    if (isMiniAppView) {
-      try {
-        await sdk.actions.openUrl(dexscreenerUrl);
-      } catch (err) {
-        console.error("Failed to open URL with Mini App SDK:", err);
-        // Fallback to regular window.open if SDK fails
-        window.open(dexscreenerUrl, "_blank", "noopener,noreferrer");
-      }
-    } else {
-      window.open(dexscreenerUrl, "_blank", "noopener,noreferrer");
-    }
+    await openExternalUrl(dexscreenerUrl);
   };
 
   const handleInterfaceLink = async () => {
     const interfaceUrl = `https://app.interface.social/token/8453/${token.contract_address}`;
-
-    if (isMiniAppView) {
-      try {
-        await sdk.actions.openUrl(interfaceUrl);
-      } catch (err) {
-        console.error("Failed to open URL with Mini App SDK:", err);
-        // Fallback to regular window.open if SDK fails
-        window.open(interfaceUrl, "_blank", "noopener,noreferrer");
-      }
-    } else {
-      window.open(interfaceUrl, "_blank", "noopener,noreferrer");
-    }
+    await openExternalUrl(interfaceUrl);
   };
 
   return (
@@ -164,10 +145,8 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
       {/* Creator Information */}
       {token.creator && (
         <div className="flex items-center gap-2 ml-1">
-          <a
+          <ExternalLink
             href={`https://farcaster.xyz/${token.creator.name}`}
-            target="_blank"
-            rel="noopener noreferrer"
             className="text-base opacity-60 hover:opacity-100 hover:underline flex gap-2 items-center"
           >
             <div className="avatar">
@@ -184,14 +163,12 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
               </div>
             </div>
             {token.creator.name}
-          </a>
+          </ExternalLink>
           {token.cast_hash && (
-            <a
+            <ExternalLink
               href={`https://farcaster.xyz/${token.creator.name}/${shortenHash(
                 token.cast_hash
               )}`}
-              target="_blank"
-              rel="noopener noreferrer"
               className="hover:text-primary inline-flex items-center"
               title="View original cast"
             >
@@ -202,7 +179,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
                 height={14}
                 className="opacity-60 hover:opacity-100"
               />
-            </a>
+            </ExternalLink>
           )}
         </div>
       )}

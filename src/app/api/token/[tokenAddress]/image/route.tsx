@@ -21,7 +21,7 @@ export async function GET(
     console.log(`[Image Gen] Base URL: ${baseUrl}`);
 
     // Fetch background image and convert to data URL
-    const bgImageUrl = `${baseUrl}/og-bg.png`;
+    const bgImageUrl = `${baseUrl}/og-light.png`;
     console.log(`[Image Gen] Background image URL: ${bgImageUrl}`);
 
     let backgroundDataUrl = null;
@@ -70,6 +70,7 @@ export async function GET(
     }
 
     const tokenData = await tokenResponse.json();
+    console.log(tokenData);
     console.log(`[Image Gen] Token data received:`, {
       hasData: !!tokenData.data,
       name: tokenData.data?.name,
@@ -128,11 +129,12 @@ export async function GET(
               <img
                 src={token.img_url}
                 alt={token.name}
-                width="500"
-                height="500"
+                width="700"
+                height="700"
                 style={{
                   borderRadius: "50%",
                   objectFit: "cover",
+                  backgroundColor: "white",
                   border: "4px solid rgba(255, 255, 255, 0.9)",
                   boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3)",
                 }}

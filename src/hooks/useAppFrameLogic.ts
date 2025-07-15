@@ -4,23 +4,31 @@ import { useState, useEffect } from "react";
 import { useFrame } from "../components/providers/FrameProvider";
 import { useAccount, useConnect, useSwitchChain, useDisconnect } from "wagmi";
 import { base } from "wagmi/chains";
-import type { Context as FarcasterContextType } from "@farcaster/frame-sdk";
+import type { Context as FarcasterContextType } from "@farcaster/miniapp-core";
 import sdk from "@farcaster/frame-sdk";
+import { useFarcasterAuth } from "./useFarcasterAuth";
 
 export function useAppFrameLogic() {
-  // Quick sync detection as initial fallback
-  const quickDetection = typeof window !== 'undefined' && 
+  // Quick sync detection as initial fallback - be more conservative on localhost
+  const quickDetection =
+    typeof window !== "undefined" &&
+    !window.location.hostname.includes('localhost') &&
+    !window.location.hostname.includes('127.0.0.1') &&
     (window.parent !== window || window.location !== window.parent.location);
-    
+
   const [isMiniAppView, setIsMiniAppView] = useState(quickDetection);
   const [isDetectionComplete, setIsDetectionComplete] = useState(false);
   const [hasPromptedToAdd, setHasPromptedToAdd] = useState(false);
   const [hasAddedMiniApp, setHasAddedMiniApp] = useState(false);
+  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
   const { context: farcasterContext, isSDKLoaded } = useFrame();
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { disconnect } = useDisconnect();
+  
+  // Auto-login functionality for mini-app
+  const { signIn, isAuthenticated, isLoading: authLoading } = useFarcasterAuth();
 
   // Load mini app addition status from localStorage on mount
   useEffect(() => {
@@ -35,36 +43,40 @@ export function useAppFrameLogic() {
   // Enhanced mini app detection with proper timeout and fallback
   useEffect(() => {
     let detectionTimeoutId: NodeJS.Timeout;
-    
+
     const detectMiniApp = async () => {
       try {
         console.log("Starting mini app detection...", {
-          isSDKLoaded,
-          isDetectionComplete,
           hasContext: !!farcasterContext,
-          timestamp: new Date().toISOString()
+          clientFid: farcasterContext?.client?.clientFid,
         });
+
+        // Check for clientFid first - this is the most reliable way to detect mini-app
+        if (farcasterContext?.client?.clientFid) {
+          console.log("Mini app detected via clientFid:", farcasterContext.client.clientFid);
+          setIsMiniAppView(true);
+          setIsDetectionComplete(true);
+          return;
+        }
 
         // Try detection even if SDK isn't "fully loaded" - it might still work
         const isMiniApp = await sdk.isInMiniApp();
 
-        console.log("Mini app detection result:", {
-          isMiniApp,
-          hasContext: !!farcasterContext,
-          isSDKLoaded,
-          timestamp: new Date().toISOString(),
-          globalFlag: typeof window !== 'undefined' ? window.__FARCASTER_SDK_INITIALIZED__ : null
-        });
+        console.log("Mini app detection result:", { isMiniApp });
 
         setIsMiniAppView(isMiniApp);
         setIsDetectionComplete(true);
       } catch (error) {
         console.error("Error checking if in mini app:", error);
-        
-        // Try to detect based on window properties as fallback
-        const fallbackDetection = typeof window !== 'undefined' && 
-          (window.parent !== window || window.location !== window.parent.location);
-        
+
+        // Try to detect based on window properties as fallback - be conservative on localhost
+        const fallbackDetection =
+          typeof window !== "undefined" &&
+          !window.location.hostname.includes('localhost') &&
+          !window.location.hostname.includes('127.0.0.1') &&
+          (window.parent !== window ||
+            window.location !== window.parent.location);
+
         console.log("Using fallback detection:", fallbackDetection);
         setIsMiniAppView(fallbackDetection);
         setIsDetectionComplete(true);
@@ -72,7 +84,8 @@ export function useAppFrameLogic() {
     };
 
     // Start detection immediately when component mounts, don't wait for isSDKLoaded
-    if (!isDetectionComplete) {
+    // Also re-run when clientFid becomes available
+    if (!isDetectionComplete || farcasterContext?.client?.clientFid) {
       // Add a small delay to let the SDK settle, but don't wait for full loading
       const initialDelay = setTimeout(() => {
         detectMiniApp();
@@ -82,8 +95,12 @@ export function useAppFrameLogic() {
       detectionTimeoutId = setTimeout(() => {
         if (!isDetectionComplete) {
           console.log("Mini app detection timeout - using fallback");
-          const fallbackDetection = typeof window !== 'undefined' && 
-            (window.parent !== window || window.location !== window.parent.location);
+          const fallbackDetection =
+            typeof window !== "undefined" &&
+            !window.location.hostname.includes('localhost') &&
+            !window.location.hostname.includes('127.0.0.1') &&
+            (window.parent !== window ||
+              window.location !== window.parent.location);
           setIsMiniAppView(fallbackDetection);
           setIsDetectionComplete(true);
         }
@@ -100,7 +117,27 @@ export function useAppFrameLogic() {
         clearTimeout(detectionTimeoutId);
       }
     };
-  }, [isDetectionComplete, farcasterContext]);
+  }, [isDetectionComplete, farcasterContext?.client?.clientFid, farcasterContext, isSDKLoaded, quickDetection]);
+
+  // Auto-login when mini-app is detected and SDK is ready
+  useEffect(() => {
+    const shouldAutoLogin = 
+      isDetectionComplete && 
+      isMiniAppView && 
+      !autoLoginAttempted && 
+      !isAuthenticated && 
+      !authLoading;
+
+    if (shouldAutoLogin) {
+      setAutoLoginAttempted(true);
+      console.log("Auto-login: Attempting to sign in to Farcaster for mini-app...");
+      
+      signIn().catch((error) => {
+        console.warn("Auto-login failed, user can manually sign in later:", error);
+      });
+    }
+    
+  }, [isDetectionComplete, isMiniAppView, autoLoginAttempted, isAuthenticated, authLoading, signIn]);
 
   // Check if mini app is already added when context loads
   useEffect(() => {
@@ -178,7 +215,7 @@ export function useAppFrameLogic() {
     if (!isMiniAppView || !isSDKLoaded) {
       throw new Error("Not in Mini App context");
     }
-    
+
     try {
       const provider = await sdk.wallet.getEthereumProvider();
       if (!provider) {
@@ -191,20 +228,11 @@ export function useAppFrameLogic() {
     }
   };
 
-  // Debug the return values (can be removed later)
-  console.log("useAppFrameLogic return values:", {
-    isSDKLoaded,
-    isDetectionComplete,
-    isMiniAppView,
-    quickDetection: typeof window !== 'undefined' && 
-      (window.parent !== window || window.location !== window.parent.location)
-  });
-
   return {
     isSDKLoaded: isDetectionComplete, // Only require detection to complete, not SDK loading
     isMiniAppView,
     farcasterContext: farcasterContext as
-      | FarcasterContextType.FrameContext
+      | FarcasterContextType.MiniAppContext
       | undefined,
     address,
     isConnected,
@@ -219,5 +247,9 @@ export function useAppFrameLogic() {
     hasPromptedToAdd,
     hasAddedMiniApp,
     getSafeEthereumProvider,
+    // Auto-login state
+    isAuthenticated,
+    authLoading,
+    autoLoginAttempted,
   };
 }

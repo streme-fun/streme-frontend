@@ -1,4 +1,4 @@
-import { createConfig, http, WagmiProvider } from "wagmi";
+import { createConfig, http, fallback, WagmiProvider } from "wagmi";
 import {
   base,
   baseSepolia,
@@ -8,7 +8,7 @@ import {
   unichain,
 } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { farcasterFrame } from "@farcaster/frame-wagmi-connector";
+import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { coinbaseWallet, metaMask } from "wagmi/connectors";
 import { APP_NAME, APP_ICON_URL, APP_URL } from "../../lib/constants";
 import { useEffect, useState } from "react";
@@ -91,10 +91,30 @@ function useCoinbaseWalletAutoConnect() {
   return isCoinbaseWallet;
 }
 
+// RPC endpoints for Base (same as viemClient.ts)
+const baseRpcEndpoints = [
+  "https://rpc-endpoints.superfluid.dev/base-mainnet?app=streme-x8fsj6",
+  "https://mainnet.base.org",
+  "https://developer-access-mainnet.base.org",
+  process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL!,
+  "https://base.meowrpc.com",
+  "https://1rpc.io/base",
+].filter(Boolean); // Remove any undefined/null values
+
 export const config = createConfig({
   chains: [base, baseSepolia, optimism, mainnet, degen, unichain],
   transports: {
-    [base.id]: http(),
+    [base.id]: fallback(
+      baseRpcEndpoints.map((url) =>
+        http(url, {
+          timeout: 10_000,
+          retryCount: 2,
+          retryDelay: 1000,
+          batch: true,
+        })
+      ),
+      { rank: false }
+    ),
     [baseSepolia.id]: http(),
     [optimism.id]: http(),
     [mainnet.id]: http(),
@@ -113,7 +133,7 @@ export const config = createConfig({
       appLogoUrl: APP_ICON_URL,
       preference: "all",
     }),
-    farcasterFrame(),
+    farcasterMiniApp(),
   ],
 });
 

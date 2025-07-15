@@ -1,6 +1,6 @@
 import { fetchTokenFromStreme, enrichTokensWithData } from "@/src/lib/apiUtils";
 
-// Helper function to retry with exponential backoff
+// Helper function to retry with exponential backoff for network errors only
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   maxRetries: number = 2,
@@ -13,6 +13,11 @@ async function retryWithBackoff<T>(
       return await fn();
     } catch (error) {
       lastError = error as Error;
+      
+      // Don't retry for token-not-found errors
+      if (lastError.message === "TOKEN_NOT_FOUND") {
+        throw lastError;
+      }
 
       if (attempt === maxRetries) {
         throw lastError;
@@ -44,14 +49,33 @@ export async function GET(request: Request) {
 
     // console.log(`[API] Fetching token data for: ${address}`);
 
-    // Fetch single token with retry logic
+    // Fetch single token with smart retry logic
     const token = await retryWithBackoff(async () => {
-      const result = await fetchTokenFromStreme(address);
-      if (!result) {
-        throw new Error("Token not found or service unavailable");
+      try {
+        const result = await fetchTokenFromStreme(address);
+        if (result === null) {
+          // Token doesn't exist - don't retry this
+          throw new Error("TOKEN_NOT_FOUND");
+        }
+        return result;
+      } catch (error) {
+        // Re-throw network/service errors for retry, but not token-not-found
+        if (error instanceof Error && error.message === "TOKEN_NOT_FOUND") {
+          throw error; // Don't retry this
+        }
+        // Retry other errors (network issues, timeouts, etc.)
+        throw new Error("Token service error");
       }
-      return result;
+    }).catch((error) => {
+      if (error instanceof Error && error.message === "TOKEN_NOT_FOUND") {
+        return null; // Convert to null for 404 response
+      }
+      throw error; // Re-throw other errors
     });
+    
+    if (!token) {
+      return Response.json({ error: "Token not found" }, { status: 404 });
+    }
 
     // console.log(`[API] Successfully fetched token: ${token.name || "Unknown"}`);
 

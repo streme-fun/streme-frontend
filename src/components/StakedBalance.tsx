@@ -40,6 +40,7 @@ export function StakedBalance({
   const [baseAmount, setBaseAmount] = useState<number>(0);
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
@@ -55,8 +56,18 @@ export function StakedBalance({
     pauseWhenHidden: true
   });
 
-  const refresh = () => setRefreshTrigger((prev) => prev + 1);
+  const refresh = () => {
+    // Debounce refresh calls to prevent rapid successive updates
+    const now = Date.now();
+    if (now - lastFetchTime < 1000) {
+      console.log('[StakedBalance] Ignoring refresh - too soon since last call');
+      return;
+    }
+    setRefreshTrigger((prev) => prev + 1);
+  };
 
+  // Main data fetching effect
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (
       !effectiveIsConnected ||
@@ -67,7 +78,17 @@ export function StakedBalance({
       return;
 
     const fetchData = async () => {
+      // Prevent calls if we just fetched data recently (within 30 seconds)
+      const now = Date.now();
+      if (now - lastFetchTime < 30000) {
+        console.log('Skipping fetch - too soon since last fetch');
+        return;
+      }
+      
       try {
+        setLastFetchTime(now);
+        console.log(`[StakedBalance] Fetching balance for ${effectiveAddress} at ${new Date(now).toLocaleTimeString()}`);
+        
         // Get staked balance
         const staked = await publicClient.readContract({
           address: stakingAddress as `0x${string}`,
@@ -171,11 +192,12 @@ export function StakedBalance({
     fetchData();
 
     // Set up periodic refresh only if page is visible
+    // Increased interval to 60 seconds to reduce API calls
     const interval = setInterval(() => {
       if (!document.hidden) {
         fetchData();
       }
-    }, 300000);
+    }, 60000); // 60 seconds instead of 300 seconds
 
     // Listen for visibility changes to fetch fresh data when page becomes visible
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -191,6 +213,7 @@ export function StakedBalance({
     stakingPool,
     tokenAddress,
     refreshTrigger,
+    // Note: Intentionally excluding baseAmount and lastFetchTime to prevent re-render loops
   ]);
 
 
@@ -200,7 +223,7 @@ export function StakedBalance({
       element.addEventListener("refresh", refresh);
       return () => element.removeEventListener("refresh", refresh);
     }
-  }, []);
+  }, [refresh]);
 
   // Don't render anything if wallet is not connected or address is missing
   if (!effectiveIsConnected || !effectiveAddress) return null;

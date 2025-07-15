@@ -83,13 +83,21 @@ export function UnstakedTokensModal({
     }
 
     if (!effectiveAddress || !effectiveIsConnected) {
-      console.log("UnstakedTokensModal: No address or not connected", { effectiveAddress, effectiveIsConnected });
+      console.log("UnstakedTokensModal: No address or not connected", {
+        effectiveAddress,
+        effectiveIsConnected,
+      });
       return;
     }
 
     // Additional validation for mini app
-    if (isMiniAppView && (!effectiveAddress.startsWith('0x') || effectiveAddress.length !== 42)) {
-      console.log("UnstakedTokensModal: Invalid mini app address format", { effectiveAddress });
+    if (
+      isMiniAppView &&
+      (!effectiveAddress.startsWith("0x") || effectiveAddress.length !== 42)
+    ) {
+      console.log("UnstakedTokensModal: Invalid mini app address format", {
+        effectiveAddress,
+      });
       return;
     }
 
@@ -114,7 +122,7 @@ export function UnstakedTokensModal({
       unstakedTokensCount: unstakedTokens.length,
       effectiveAddress,
       isMiniAppView,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     if (hasStakableTokens) {
@@ -124,7 +132,13 @@ export function UnstakedTokensModal({
         setIsOpen(true);
       }, 1000);
     }
-  }, [effectiveAddress, effectiveIsConnected, unstakedTokens, isDetectionComplete, isMiniAppView]);
+  }, [
+    effectiveAddress,
+    effectiveIsConnected,
+    unstakedTokens,
+    isDetectionComplete,
+    isMiniAppView,
+  ]);
 
   const handleDismiss = () => {
     sessionStorage.setItem("unstakedTokensModalDismissed", "true");
@@ -976,12 +990,11 @@ https://streme.fun`;
                 </svg>
               </div>
               <h2 className="text-lg font-bold mb-2">
-                Woah, you&apos;ve got unstaked tokens!
+                You&apos;ve got unstaked Streme tokens!
               </h2>
-              <p className="text-sm text-base-content/70">
-                1-click stake your tokens to start receiving rewards streamed to
-                your wallet every second, no claiming required. Unstake at any
-                time after 24 hours.
+              <p className="text-sm text-base-content">
+                Stake to start receiving rewards streamed to your wallet every
+                second.
               </p>
             </div>
 
@@ -1015,7 +1028,9 @@ https://streme.fun`;
                         {token.symbol.charAt(0)}
                       </div>
                     </div>
-                    <span className="font-medium text-sm text-base-content">{token.symbol}</span>
+                    <span className="font-medium text-sm text-base-content">
+                      {token.symbol}
+                    </span>
                   </div>
                   <span className="text-sm font-mono text-base-content">
                     {token.balance.toLocaleString("en-US", {

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { useAccount, useWalletClient } from "wagmi";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { GDA_FORWARDER } from "@/src/lib/contracts";
 import sdk from "@farcaster/frame-sdk";
+import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
+import { useWallets } from "@privy-io/react-auth";
 
 const toHex = (address: string) => address as `0x${string}`;
 
@@ -26,16 +28,28 @@ export function ConnectPoolButton({
   farcasterIsConnected,
 }: ConnectPoolButtonProps) {
   const [isConnecting, setIsConnecting] = useState(false);
-  const { user } = usePrivy();
+  
+  const { address: wagmiAddress } = useAccount();
+  const { data: walletClient } = useWalletClient();
   const { wallets } = useWallets();
+  const {
+    address: fcAddress,
+    isConnected: fcIsConnected,
+  } = useAppFrameLogic();
 
-  const effectiveIsConnected = isMiniApp
-    ? farcasterIsConnected
-    : !!user?.wallet?.address;
-  const effectiveAddress = isMiniApp ? farcasterAddress : user?.wallet?.address;
+  // Use explicit mini-app check with fallback to passed prop
+  const isEffectivelyMiniApp = isMiniApp || false;
+  
+  const currentAddress = isEffectivelyMiniApp 
+    ? (farcasterAddress ?? fcAddress)
+    : wagmiAddress;
+  
+  const walletIsConnected = isEffectivelyMiniApp 
+    ? (farcasterIsConnected ?? fcIsConnected)
+    : !!wagmiAddress;
 
   const handleConnectPool = async () => {
-    if (!effectiveIsConnected || !effectiveAddress) {
+    if (!walletIsConnected || !currentAddress) {
       toast.error("Wallet not connected or address unavailable.");
       return;
     }
@@ -54,7 +68,7 @@ export function ConnectPoolButton({
         "0x" as const,
       ]);
 
-      if (isMiniApp) {
+      if (isEffectivelyMiniApp) {
         const ethProvider = await sdk.wallet.getEthereumProvider();
         if (!ethProvider) {
           throw new Error("Farcaster Ethereum provider not available.");
@@ -65,7 +79,7 @@ export function ConnectPoolButton({
           params: [
             {
               to: toHex(GDA_FORWARDER),
-              from: effectiveAddress as `0x${string}`,
+              from: currentAddress as `0x${string}`,
               data: toHex(data),
             },
           ],
@@ -76,80 +90,56 @@ export function ConnectPoolButton({
           );
         }
       } else {
-        // Privy Path (updated to match StakeButton pattern)
-        console.log(
-          "ConnectPoolButton: Privy transaction path - debugging wallet lookup:",
-          {
-            userWalletAddress: user?.wallet?.address,
-            availableWallets: wallets?.map((w) => ({
-              address: w.address,
-              type: w.walletClientType,
-            })),
-            walletsLength: wallets?.length,
+        // Desktop/Mobile Path - use wagmi/privy for transaction
+        if (!currentAddress) {
+          throw new Error("Wallet not connected.");
+        }
+
+        // Get provider from Privy wallets or wagmi
+        if (walletClient) {
+          // Use wagmi wallet client for pool connection
+          txHash = await walletClient.writeContract({
+            address: toHex(GDA_FORWARDER),
+            abi: [{
+              inputs: [
+                { name: "pool", type: "address" },
+                { name: "userData", type: "bytes" },
+              ],
+              name: "connectPool",
+              outputs: [{ name: "", type: "bool" }],
+              stateMutability: "nonpayable",
+              type: "function",
+            }],
+            functionName: "connectPool",
+            args: [toHex(stakingPoolAddress), "0x"],
+          });
+        } else {
+          // Fallback to Privy wallet
+          const wallet = wallets.find((w) => w.address === wagmiAddress);
+          if (!wallet) {
+            throw new Error("Wallet not found");
           }
-        );
-
-        if (!user?.wallet?.address)
-          throw new Error("Privy wallet not connected.");
-
-        // Wait for wallets to be ready
-        if (!wallets || wallets.length === 0) {
-          throw new Error("Wallets not ready. Please try again in a moment.");
+          const provider = await wallet.getEthereumProvider();
+          await provider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x2105" }],
+          });
+          
+          txHash = await provider.request({
+            method: "eth_sendTransaction",
+            params: [
+              {
+                to: toHex(GDA_FORWARDER),
+                from: currentAddress as `0x${string}`,
+                data: toHex(data),
+              },
+            ],
+          });
         }
-
-        let wallet = wallets.find((w) => w.address === user.wallet?.address);
-
-        // Fallback: if exact match fails, try case-insensitive match
-        if (!wallet) {
-          wallet = wallets.find(
-            (w) =>
-              w.address?.toLowerCase() === user.wallet?.address?.toLowerCase()
-          );
-        }
-
-        // Fallback: if still no match and there's only one wallet, use it
-        if (!wallet && wallets.length === 1) {
-          console.warn(
-            "ConnectPoolButton: Using fallback to first available wallet"
-          );
-          wallet = wallets[0];
-        }
-
-        if (!wallet) {
-          console.error(
-            "ConnectPoolButton: Wallet not found in available wallets:",
-            {
-              searchingFor: user.wallet.address,
-              availableAddresses: wallets?.map((w) => w.address),
-            }
-          );
-          throw new Error("Wallet not found. Please reconnect.");
-        }
-
-        // Use the wallet's actual address, not user.wallet.address
-        const walletAddress = wallet.address;
-        if (!walletAddress) throw new Error("Wallet address not available");
-
-        const provider = await wallet.getEthereumProvider();
-        await provider.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x2105" }], // Base Mainnet
-        });
-
-        const privyTxHash = await provider.request({
-          method: "eth_sendTransaction",
-          params: [
-            {
-              to: toHex(GDA_FORWARDER),
-              from: toHex(walletAddress), // Use wallet's actual address
-              data: toHex(data),
-            },
-          ],
-        });
-        txHash = privyTxHash as `0x${string}`;
+        
         if (!txHash) {
           throw new Error(
-            "Pool connection transaction hash not received (Privy). User might have cancelled."
+            "Pool connection transaction hash not received. User might have cancelled."
           );
         }
       }
@@ -225,7 +215,7 @@ export function ConnectPoolButton({
   return (
     <button
       onClick={handleConnectPool}
-      disabled={isConnecting || !effectiveIsConnected}
+      disabled={isConnecting || !walletIsConnected}
       className="btn btn-primary w-full"
     >
       {isConnecting ? (

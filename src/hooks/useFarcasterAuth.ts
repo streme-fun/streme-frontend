@@ -24,10 +24,11 @@ export function useFarcasterAuth() {
     try {
       console.log("Starting Farcaster authentication...");
 
-      // First, try the experimental quickAuth method
+      // Use the new quickAuth.getToken() method
       try {
-        console.log("Attempting quickAuth...");
-        const { token } = await sdk.experimental.quickAuth();
+        console.log("Attempting quickAuth.getToken()...");
+        const result = await sdk.quickAuth.getToken();
+        const token = result.token;
         console.log(
           "QuickAuth successful, got token:",
           token ? "Token received" : "No token"
@@ -126,10 +127,49 @@ export function useFarcasterAuth() {
     });
   }, []);
 
+  // Helper function to get a valid token (refreshes if needed)
+  const getValidToken = useCallback(async () => {
+    try {
+      // Use the SDK's getToken method which handles caching and expiration
+      const result = await sdk.quickAuth.getToken();
+      const token = result.token;
+      
+      // Update state with the latest token
+      setAuthState((prev) => ({
+        ...prev,
+        token,
+        isAuthenticated: true,
+      }));
+      
+      return token;
+    } catch (error) {
+      console.error("Failed to get valid token:", error);
+      setAuthState((prev) => ({
+        ...prev,
+        isAuthenticated: false,
+        error: error instanceof Error ? error.message : "Failed to get token",
+      }));
+      throw error;
+    }
+  }, []);
+
+  // Helper function to make authenticated requests using SDK's fetch wrapper
+  const authenticatedFetch = useCallback(async (url: string, options?: RequestInit) => {
+    try {
+      // Use the SDK's fetch method which automatically adds the Bearer token
+      return await sdk.quickAuth.fetch(url, options);
+    } catch (error) {
+      console.error("Authenticated fetch failed:", error);
+      throw error;
+    }
+  }, []);
+
   return {
     ...authState,
     signIn,
     signOut,
+    getValidToken,
+    authenticatedFetch,
   };
 }
 
