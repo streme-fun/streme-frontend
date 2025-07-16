@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { GDA_FORWARDER } from "@/src/lib/contracts";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/miniapp-sdk";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useWallets } from "@privy-io/react-auth";
 

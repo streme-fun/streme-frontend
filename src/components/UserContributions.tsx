@@ -1,19 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
+import { formatUnits } from "viem";
 import {
   useStremeStakingContract,
   useStakingContractActions,
   formatStakeAmount,
 } from "@/src/hooks/useStremeStakingContract";
-import { useStremePrice } from "@/src/hooks/useStremePrice";
+import { getPrices } from "@/src/lib/priceUtils";
 
 export const UserContributions = () => {
   const { isConnected } = useAccount();
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [stremePrice, setStremePrice] = useState<number | null>(null);
 
   const { userDepositBalance, totalBalance, isPaused, refetchUserBalance } =
     useStremeStakingContract();
@@ -27,7 +29,52 @@ export const UserContributions = () => {
     hash,
   } = useStakingContractActions();
 
-  const { formatUsd } = useStremePrice();
+  // STREME token contract address
+  const STREME_TOKEN_ADDRESS = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
+
+  // Fetch STREME price using the same method as missions page
+  useEffect(() => {
+    const fetchStremePrice = async () => {
+      try {
+        const prices = await getPrices([STREME_TOKEN_ADDRESS]);
+        if (prices && prices[STREME_TOKEN_ADDRESS.toLowerCase()]) {
+          setStremePrice(prices[STREME_TOKEN_ADDRESS.toLowerCase()]);
+        } else {
+          // Fallback: try to get price from the token's single API endpoint
+          const response = await fetch(
+            `/api/tokens/single?address=${STREME_TOKEN_ADDRESS}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            const tokenPrice = data.data?.price || data.data?.marketData?.price;
+            if (tokenPrice && !isNaN(tokenPrice)) {
+              setStremePrice(tokenPrice);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(
+          "Error fetching STREME price in UserContributions:",
+          error
+        );
+      }
+    };
+
+    fetchStremePrice();
+    // Update price every 2 minutes
+    const interval = setInterval(fetchStremePrice, 120000);
+    return () => clearInterval(interval);
+  }, [STREME_TOKEN_ADDRESS]);
+
+  // Format USD function using raw bigint amount
+  const formatUsd = (stremeAmountBigint: bigint | undefined): string => {
+    if (!stremePrice || !stremeAmountBigint) return "$0.00";
+    // Convert from wei to actual token amount (18 decimals)
+    const stremeAmount = Number(formatUnits(stremeAmountBigint, 18));
+    const usdValue = stremeAmount * stremePrice;
+
+    return `$${usdValue.toFixed(4)}`;
+  };
 
   const userContribution = formatStakeAmount(userDepositBalance);
   const userPercentage =
@@ -97,8 +144,8 @@ export const UserContributions = () => {
               <p className="text-sm">
                 You&apos;re contributing{" "}
                 <span className="font-bold">{userContribution} STREME</span> (
-                {formatUsd(parseFloat(userContribution))}) to the QR auction
-                fund - that&apos;s {userPercentage}% of the total pool!
+                {formatUsd(userDepositBalance)}) to the QR auction fund -
+                that&apos;s {userPercentage}% of the total pool!
               </p>
             </div>
           </div>
@@ -137,9 +184,7 @@ export const UserContributions = () => {
               <div className="text-3xl font-bold text-primary mb-1">
                 {userContribution} STREME
               </div>
-              <div className="text-lg">
-                {formatUsd(parseFloat(userContribution))}
-              </div>
+              <div className="text-lg">{formatUsd(userDepositBalance)}</div>
               <div className="text-sm text-base-content/70 mt-2">
                 Available to withdraw
               </div>

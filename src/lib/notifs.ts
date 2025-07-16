@@ -1,7 +1,7 @@
 import {
   SendNotificationRequest,
   sendNotificationResponseSchema,
-} from "@farcaster/frame-sdk";
+} from "@farcaster/miniapp-sdk";
 import { getUserNotificationDetails } from "./kv";
 import { APP_URL } from "./constants";
 

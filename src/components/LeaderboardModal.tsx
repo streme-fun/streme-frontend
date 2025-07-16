@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/miniapp-sdk";
 import Image from "next/image";
 import { X } from "lucide-react";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";

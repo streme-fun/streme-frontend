@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/miniapp-sdk";
 import Image from "next/image";
 import FarcasterIcon from "@/public/farcaster.svg";
 import { useWallets } from "@privy-io/react-auth";

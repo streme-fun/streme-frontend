@@ -5,7 +5,7 @@ import { useFrame } from "../components/providers/FrameProvider";
 import { useAccount, useConnect, useSwitchChain, useDisconnect } from "wagmi";
 import { base } from "wagmi/chains";
 import type { Context as FarcasterContextType } from "@farcaster/miniapp-core";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/miniapp-sdk";
 import { useFarcasterAuth } from "./useFarcasterAuth";
 
 export function useAppFrameLogic() {

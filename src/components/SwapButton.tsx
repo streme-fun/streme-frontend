@@ -4,7 +4,7 @@ import { useState } from "react";
 import { parseEther } from "viem";
 import { toast } from "sonner";
 import { publicClient } from "@/src/lib/viemClient";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/miniapp-sdk";
 import { useAccount, useWalletClient } from "wagmi";
 import confetti from "canvas-confetti";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";

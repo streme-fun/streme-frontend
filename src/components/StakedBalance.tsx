@@ -67,7 +67,7 @@ export function StakedBalance({
   };
 
   // Main data fetching effect
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (
       !effectiveIsConnected ||

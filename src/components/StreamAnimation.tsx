@@ -6,13 +6,13 @@ interface StreamAnimationProps {
 }
 
 export const StreamAnimation = ({
-  contributorCount,
+  contributorCount: _contributorCount, // eslint-disable-line @typescript-eslint/no-unused-vars
   growthRate,
 }: StreamAnimationProps) => {
-  // Generate stream paths based on contributor count
+  // Generate stream paths - always use 20 lines
   const generateStreamPaths = () => {
     const streams = [];
-    const maxStreams = Math.min(contributorCount, 20);
+    const maxStreams = 20;
 
     for (let i = 0; i < maxStreams; i++) {
       // Distribute streams around the perimeter of the animation with longer reach
@@ -49,8 +49,9 @@ export const StreamAnimation = ({
   const baseAnimationDuration = Math.max(2, 4 - growthRate);
 
   return (
-    <div className="relative w-full h-60 overflow-hidden rounded-lg bg-transparent">
+    <div className="relative w-full h-52 sm:h-64 rounded-lg bg-transparent">
       <div className="absolute inset-0 opacity-80">
+        
         <style>
           {`
             @keyframes streamHighlight {
@@ -252,7 +253,7 @@ export const StreamAnimation = ({
         <svg
           width="100%"
           height="100%"
-          viewBox="0 0 450 300"
+          viewBox="-25 -25 500 350"
           preserveAspectRatio="xMidYMid meet"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"

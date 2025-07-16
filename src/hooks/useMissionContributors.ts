@@ -46,9 +46,9 @@ export const useMissionContributors = () => {
       console.log('🔗 Fetching from contract:', STREME_STAKING_REWARDS_FUNDER_ADDRESS);
       
       // Get current block number to limit search range for better performance
-      // Use a much larger range to catch older deposits - search last 100k blocks
+      // Use a smaller range due to RPC limitations - search last 10k blocks
       const currentBlock = await publicClient.getBlockNumber();
-      const fromBlock = currentBlock > 100000n ? currentBlock - 100000n : 0n;
+      const fromBlock = currentBlock > 10000n ? currentBlock - 10000n : 0n;
       
       console.log(`📦 Searching blocks ${fromBlock} to latest (current: ${currentBlock})`);
 
@@ -78,17 +78,22 @@ export const useMissionContributors = () => {
       }).filter(Boolean))] as string[];
 
       console.log(`👥 Found ${addresses.length} unique contributors:`, addresses);
+      console.log('📝 Raw deposit events:', logs.map(log => ({
+        user: log.args?.user,
+        amount: log.args?.amount?.toString(),
+        blockNumber: log.blockNumber?.toString()
+      })));
       
       if (addresses.length === 0) {
         console.log('⚠️ No contributors found in events, using fallback addresses');
         return [
-          "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e",
-          "0x1234567890123456789012345678901234567890"
+          getAddress("0x764E427020Ad72624075c61260192C6E486D15a5"),
+          getAddress("0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e")
         ];
       }
       
       // Always include the known contributor in case events miss them
-      const knownContributor = "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e";
+      const knownContributor = getAddress("0x764E427020Ad72624075c61260192C6E486D15a5");
       if (!addresses.includes(knownContributor)) {
         console.log('🔧 Adding known contributor to address list');
         addresses.push(knownContributor);
@@ -100,8 +105,8 @@ export const useMissionContributors = () => {
       // Fallback to mock addresses if event fetching fails
       console.log('🔄 Using fallback addresses');
       return [
-        "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e",
-        "0x1234567890123456789012345678901234567890"
+        getAddress("0x764E427020Ad72624075c61260192C6E486D15a5"),
+        getAddress("0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e")
       ];
     }
   };
@@ -116,13 +121,13 @@ export const useMissionContributors = () => {
       
       // For development, using realistic mock data based on common Farcaster patterns
       const mockFarcasterUsers: Record<string, FarcasterUser> = {
-        "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e": {
+        "0x764E427020Ad72624075c61260192C6E486D15a5": {
           fid: 12345,
           username: "streamer1",
           display_name: "Top Streamer",
           pfp_url: "/api/placeholder/40/40"
         },
-        "0x1234567890123456789012345678901234567890": {
+        "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e": {
           fid: 23456,
           username: "defi_builder", 
           display_name: "DeFi Builder",
@@ -251,10 +256,16 @@ export const useMissionContributors = () => {
         // If no real contributors found, show mock data for development
         if (filteredAndSorted.length === 0 && totalBalance && totalBalance > 0n) {
           console.log('🎭 No real contributors found, showing mock data for development');
+          console.log('Debug info:', {
+            totalBalance: totalBalance.toString(),
+            rawContributorData: contributorData.length,
+            contributorsWithBalances: filteredAndSorted.length,
+            allAddressesChecked: contributorData.map(c => ({ address: c.address, balance: c.balance.toString() }))
+          });
           const mockContributors: ContributorData[] = [
             {
-              address: "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e",
-              balance: totalBalance / 3n, // 1/3 of total
+              address: getAddress("0x764E427020Ad72624075c61260192C6E486D15a5"),
+              balance: totalBalance, // Show full balance for the actual user
               farcasterUser: {
                 fid: 12345,
                 username: "streamer1",
@@ -262,26 +273,7 @@ export const useMissionContributors = () => {
                 pfp_url: "/api/placeholder/40/40"
               },
               rank: 1,
-              percentage: 33.33
-            },
-            {
-              address: "0x1234567890123456789012345678901234567890",
-              balance: totalBalance / 4n, // 1/4 of total
-              farcasterUser: {
-                fid: 23456,
-                username: "defi_builder", 
-                display_name: "DeFi Builder",
-                pfp_url: "/api/placeholder/40/40"
-              },
-              rank: 2,
-              percentage: 25.0
-            },
-            {
-              address: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-              balance: totalBalance / 6n, // 1/6 of total
-              farcasterUser: undefined,
-              rank: 3,
-              percentage: 16.67
+              percentage: 100.0
             }
           ];
           setContributors(mockContributors);

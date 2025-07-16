@@ -6,7 +6,7 @@ import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/miniapp-sdk";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
 interface TokenStaker {

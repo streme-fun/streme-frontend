@@ -5,7 +5,7 @@ import { useAccount, useWalletClient } from "wagmi";
 import { UnstakeModal } from "./UnstakeModal";
 import { publicClient } from "@/src/lib/viemClient";
 import { Interface } from "@ethersproject/abi";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/miniapp-sdk";
 import { toast } from "sonner";
 import { usePostHog } from "posthog-js/react";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";

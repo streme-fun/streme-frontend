@@ -12,7 +12,7 @@ import { Modal } from "@/src/components/Modal";
 import { LaunchTokenModal } from "@/src/components/LaunchTokenModal";
 import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
 import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/miniapp-sdk";
 
 interface TokenStaker {
   account: {

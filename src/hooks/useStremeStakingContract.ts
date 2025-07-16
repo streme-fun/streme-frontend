@@ -9,8 +9,9 @@ import {
   ERC20_ABI 
 } from "@/src/lib/contracts/StremeStakingRewardsFunder";
 
-export const useStremeStakingContract = () => {
-  const { address } = useAccount();
+export const useStremeStakingContract = (overrideAddress?: string) => {
+  const { address: wagmiAddress } = useAccount();
+  const address = overrideAddress || wagmiAddress;
   const [stakedStremeCoinAddress, setStakedStremeCoinAddress] = useState<string>("");
   const [stremeCoinAddress, setStremeCoinAddress] = useState<string>("");
 
@@ -41,11 +42,15 @@ export const useStremeStakingContract = () => {
     address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
     abi: STREME_STAKING_REWARDS_FUNDER_ABI,
     functionName: "balanceOf",
-    args: address ? [address] : undefined,
+    args: address ? [address as `0x${string}`] : undefined,
+    query: {
+      enabled: !!address,
+    },
   });
 
+
   // Read total balance in contract
-  const { data: totalBalance } = useReadContract({
+  const { data: totalBalance, refetch: refetchTotalBalance } = useReadContract({
     address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
     abi: STREME_STAKING_REWARDS_FUNDER_ABI,
     functionName: "totalBalance",
@@ -63,7 +68,7 @@ export const useStremeStakingContract = () => {
     address: stakedStremeCoinAddress as `0x${string}`,
     abi: ERC20_ABI,
     functionName: "balanceOf",
-    args: address ? [address] : undefined,
+    args: address ? [address as `0x${string}`] : undefined,
     query: {
       enabled: !!stakedStremeCoinAddress && !!address,
     },
@@ -74,7 +79,7 @@ export const useStremeStakingContract = () => {
     address: stakedStremeCoinAddress as `0x${string}`,
     abi: ERC20_ABI,
     functionName: "allowance",
-    args: address ? [address, STREME_STAKING_REWARDS_FUNDER_ADDRESS] : undefined,
+    args: address ? [address as `0x${string}`, STREME_STAKING_REWARDS_FUNDER_ADDRESS] : undefined,
     query: {
       enabled: !!stakedStremeCoinAddress && !!address,
     },
@@ -105,88 +110,272 @@ export const useStremeStakingContract = () => {
     
     // Refetch functions
     refetchUserBalance,
+    refetchTotalBalance,
     refetchAllowance,
   };
 };
 
-export const useStakingContractActions = () => {
+export const useStakingContractActions = (overrideAddress?: string) => {
   const { writeContract, data: hash, error, isPending } = useWriteContract();
   const [isApproving, setIsApproving] = useState(false);
   const [isDepositing, setIsDepositing] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [customHash, setCustomHash] = useState<`0x${string}` | undefined>();
+  const [customError, setCustomError] = useState<Error | null>(null);
 
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
+    hash: hash || customHash,
   });
 
-  const { stakedStremeCoinAddress, refetchUserBalance, refetchAllowance } = useStremeStakingContract();
+  const { 
+    stakedStremeCoinAddress, 
+    userStakedTokenBalance, 
+    userDepositBalance, 
+    refetchUserBalance, 
+    refetchTotalBalance, 
+    refetchAllowance 
+  } = useStremeStakingContract(overrideAddress);
+
+  // Combined error from wagmi or custom transactions
+  const effectiveError = error || customError;
+  const effectiveHash = hash || customHash;
+
+  // Helper to convert address to hex
+  const toHex = (address: string) => address as `0x${string}`;
 
   // Approve tokens for the contract
-  const approveTokens = async (amount: string) => {
+  const approveTokens = async (amount: string, isMiniApp?: boolean, address?: string) => {
     if (!stakedStremeCoinAddress) {
       throw new Error("Staked STREME token address not loaded");
     }
 
     setIsApproving(true);
+    setCustomError(null);
+    
     try {
-      const amountBigInt = parseUnits(amount, 18);
-      writeContract({
-        address: stakedStremeCoinAddress as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: "approve",
-        args: [STREME_STAKING_REWARDS_FUNDER_ADDRESS, amountBigInt],
-      });
+      let amountBigInt = parseUnits(amount, 18);
+      
+      // For approval, add a small buffer to prevent rounding errors
+      // This ensures approval is always >= the actual amount to be spent
+      const buffer = amountBigInt / 10000n; // 0.01% buffer
+      amountBigInt = amountBigInt + buffer;
+
+      if (isMiniApp && address) {
+        // Handle mini-app transaction
+        const sdk = await import("@farcaster/miniapp-sdk");
+        const ethProvider = await sdk.default.wallet.getEthereumProvider();
+        if (!ethProvider) {
+          throw new Error("Farcaster Ethereum provider not available");
+        }
+
+        const { Interface } = await import("@ethersproject/abi");
+        const iface = new Interface(ERC20_ABI);
+        const data = iface.encodeFunctionData("approve", [
+          STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+          amountBigInt,
+        ]);
+
+        const txHash = await ethProvider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: toHex(stakedStremeCoinAddress),
+              from: toHex(address),
+              data: toHex(data),
+            },
+          ],
+        });
+
+        if (!txHash) {
+          throw new Error("Transaction hash not received. User might have cancelled.");
+        }
+
+        setCustomHash(txHash);
+      } else {
+        // Handle wagmi transaction
+        writeContract({
+          address: stakedStremeCoinAddress as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [STREME_STAKING_REWARDS_FUNDER_ADDRESS, amountBigInt],
+        });
+      }
     } catch (err) {
       setIsApproving(false);
+      if (err instanceof Error) {
+        setCustomError(err);
+      }
       throw err;
     }
   };
 
   // Deposit staked STREME tokens
-  const depositTokens = async (amount: string) => {
+  const depositTokens = async (amount: string, isMiniApp?: boolean, address?: string) => {
     setIsDepositing(true);
+    setCustomError(null);
+    
     try {
-      const amountBigInt = parseUnits(amount, 18);
-      writeContract({
-        address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
-        abi: STREME_STAKING_REWARDS_FUNDER_ABI,
-        functionName: "deposit",
-        args: [amountBigInt],
-      });
+      let amountBigInt = parseUnits(amount, 18);
+      
+      // For deposit, ensure we don't exceed the user's actual balance
+      // This prevents rounding errors when staking max amount
+      if (userStakedTokenBalance && amountBigInt > userStakedTokenBalance) {
+        amountBigInt = userStakedTokenBalance;
+      }
+
+      if (isMiniApp && address) {
+        // Handle mini-app transaction
+        const sdk = await import("@farcaster/miniapp-sdk");
+        const ethProvider = await sdk.default.wallet.getEthereumProvider();
+        if (!ethProvider) {
+          throw new Error("Farcaster Ethereum provider not available");
+        }
+
+        const { Interface } = await import("@ethersproject/abi");
+        const iface = new Interface(STREME_STAKING_REWARDS_FUNDER_ABI);
+        const data = iface.encodeFunctionData("deposit", [amountBigInt]);
+
+        const txHash = await ethProvider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: toHex(STREME_STAKING_REWARDS_FUNDER_ADDRESS),
+              from: toHex(address),
+              data: toHex(data),
+            },
+          ],
+        });
+
+        if (!txHash) {
+          throw new Error("Transaction hash not received. User might have cancelled.");
+        }
+
+        setCustomHash(txHash);
+      } else {
+        // Handle wagmi transaction
+        writeContract({
+          address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+          abi: STREME_STAKING_REWARDS_FUNDER_ABI,
+          functionName: "deposit",
+          args: [amountBigInt],
+        });
+      }
     } catch (err) {
       setIsDepositing(false);
+      if (err instanceof Error) {
+        setCustomError(err);
+      }
       throw err;
     }
   };
 
   // Withdraw specific amount
-  const withdrawTokens = async (amount: string) => {
+  const withdrawTokens = async (amount: string, isMiniApp?: boolean, address?: string) => {
     setIsWithdrawing(true);
+    setCustomError(null);
+    
     try {
-      const amountBigInt = parseUnits(amount, 18);
-      writeContract({
-        address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
-        abi: STREME_STAKING_REWARDS_FUNDER_ABI,
-        functionName: "withdraw",
-        args: [amountBigInt],
-      });
+      let amountBigInt = parseUnits(amount, 18);
+      
+      // For withdraw, ensure we don't exceed the user's deposit balance
+      // This prevents rounding errors when withdrawing max amount
+      if (userDepositBalance && amountBigInt > userDepositBalance) {
+        amountBigInt = userDepositBalance;
+      }
+
+      if (isMiniApp && address) {
+        // Handle mini-app transaction
+        const sdk = await import("@farcaster/miniapp-sdk");
+        const ethProvider = await sdk.default.wallet.getEthereumProvider();
+        if (!ethProvider) {
+          throw new Error("Farcaster Ethereum provider not available");
+        }
+
+        const { Interface } = await import("@ethersproject/abi");
+        const iface = new Interface(STREME_STAKING_REWARDS_FUNDER_ABI);
+        const data = iface.encodeFunctionData("withdraw", [amountBigInt]);
+
+        const txHash = await ethProvider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: toHex(STREME_STAKING_REWARDS_FUNDER_ADDRESS),
+              from: toHex(address),
+              data: toHex(data),
+            },
+          ],
+        });
+
+        if (!txHash) {
+          throw new Error("Transaction hash not received. User might have cancelled.");
+        }
+
+        setCustomHash(txHash);
+      } else {
+        // Handle wagmi transaction
+        writeContract({
+          address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+          abi: STREME_STAKING_REWARDS_FUNDER_ABI,
+          functionName: "withdraw",
+          args: [amountBigInt],
+        });
+      }
     } catch (err) {
       setIsWithdrawing(false);
+      if (err instanceof Error) {
+        setCustomError(err);
+      }
       throw err;
     }
   };
 
   // Withdraw all tokens
-  const withdrawAllTokens = async () => {
+  const withdrawAllTokens = async (isMiniApp?: boolean, address?: string) => {
     setIsWithdrawing(true);
+    setCustomError(null);
+    
     try {
-      writeContract({
-        address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
-        abi: STREME_STAKING_REWARDS_FUNDER_ABI,
-        functionName: "withdrawAll",
-      });
+      if (isMiniApp && address) {
+        // Handle mini-app transaction
+        const sdk = await import("@farcaster/miniapp-sdk");
+        const ethProvider = await sdk.default.wallet.getEthereumProvider();
+        if (!ethProvider) {
+          throw new Error("Farcaster Ethereum provider not available");
+        }
+
+        const { Interface } = await import("@ethersproject/abi");
+        const iface = new Interface(STREME_STAKING_REWARDS_FUNDER_ABI);
+        const data = iface.encodeFunctionData("withdrawAll", []);
+
+        const txHash = await ethProvider.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              to: toHex(STREME_STAKING_REWARDS_FUNDER_ADDRESS),
+              from: toHex(address),
+              data: toHex(data),
+            },
+          ],
+        });
+
+        if (!txHash) {
+          throw new Error("Transaction hash not received. User might have cancelled.");
+        }
+
+        setCustomHash(txHash);
+      } else {
+        // Handle wagmi transaction
+        writeContract({
+          address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+          abi: STREME_STAKING_REWARDS_FUNDER_ABI,
+          functionName: "withdrawAll",
+        });
+      }
     } catch (err) {
       setIsWithdrawing(false);
+      if (err instanceof Error) {
+        setCustomError(err);
+      }
       throw err;
     }
   };
@@ -200,9 +389,20 @@ export const useStakingContractActions = () => {
       
       // Refetch balances after successful transaction
       refetchUserBalance();
+      refetchTotalBalance();
       refetchAllowance();
     }
-  }, [isConfirmed, refetchUserBalance, refetchAllowance]);
+  }, [isConfirmed, refetchUserBalance, refetchTotalBalance, refetchAllowance]);
+
+  // Reset loading states when there's an error (transaction failed or cancelled)
+  useEffect(() => {
+    if (effectiveError) {
+      console.log("Transaction error detected, resetting loading states:", effectiveError);
+      setIsApproving(false);
+      setIsDepositing(false);
+      setIsWithdrawing(false);
+    }
+  }, [effectiveError]);
 
   return {
     // Actions
@@ -212,8 +412,8 @@ export const useStakingContractActions = () => {
     withdrawAllTokens,
     
     // Transaction status
-    hash,
-    error,
+    hash: effectiveHash,
+    error: effectiveError,
     isPending,
     isConfirming,
     isConfirmed,

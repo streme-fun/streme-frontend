@@ -1,81 +1,122 @@
 "use client";
 
-import Link from "next/link";
-import { ExternalLink } from "./ui/ExternalLink";
+import { useEffect } from "react";
+
+interface HowItWorksModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  isMiniApp?: boolean;
+}
 
 export function HowItWorksModal({
   isOpen,
   onClose,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-}) {
+  isMiniApp = false,
+}: HowItWorksModalProps) {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div
+      className={`fixed inset-0 z-50 ${
+        isMiniApp ? "flex items-end" : "flex items-center justify-center"
+      }`}
+    >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+        className="absolute inset-0"
+        style={{ backgroundColor: "rgba(0, 0, 0, 0.4)" }}
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="relative bg-base-100 w-full max-w-lg mx-4 p-8 shadow-xl border border-black/[.1] dark:border-white/[.1]">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 btn btn-ghost btn-sm"
-        >
-          ✕
-        </button>
-
-        <h2 className="text-2xl font-bold mb-6">Streme 101</h2>
-
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold mb-2 text-primary">
-              Launch Tokens with Built-in Staking
-            </h3>
-            <p className="opacity-80">
-              Launch tokens with automatic staking rewards. 20% of supply
-              streams to stakers over 365 days.
-            </p>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold mb-2 text-secondary">
-              Stake for Streaming Rewards
-            </h3>
-            <p className="opacity-80">
-              Stake to earn streaming rewards proportional to your share of the
-              pool, streamed to your wallet every second. No claiming needed.
-            </p>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold mb-2 text-accent">
-              Streme to Earn $SUP
-            </h3>
-            <p className="opacity-80">
-              Every action you can do on Streme earns Superfluid $SUP. Launch,
-              trade, stake, and hold to maximize your claim.
-            </p>
-          </div>
-          {/* Add launch a token button */}
-          <div>
-            <div className="text-center pt-4">
-              <Link href="/launch" className="btn btn-primary btn-lg w-full">
-                Launch Your Streme Token
-              </Link>
-            </div>
-          </div>
-          {/* Add docs link */}
-          <div className="text-center">
-            <ExternalLink
-              href="https://docs.streme.fun"
-              className="text-sm text-base-content/60 hover:text-base-content/80"
+      <div
+        className={`relative bg-base-100 p-6 max-h-[90vh] overflow-y-auto shadow-xl border border-base-300 ${
+          isMiniApp ? "w-full rounded-t-xl" : "rounded-xl max-w-md mx-4"
+        }`}
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">How Missions Work</h2>
+          <button onClick={onClose} className="btn btn-ghost btn-sm btn-circle">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              Read the Docs →
-            </ExternalLink>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold text-base mb-2">🎯 The Mission</h3>
+            <p className="text-sm text-base-content/70">
+              Help Streme win a QR auction by pooling STREME tokens together.
+              The more we raise, the better our chances of winning!
+            </p>
           </div>
+
+          <div>
+            <h3 className="font-semibold text-base mb-2">
+              💰 How to Contribute
+            </h3>
+            <p className="text-sm text-base-content/70">
+              Stake your STREME tokens in the crowdfund pool. Your tokens are
+              pooled with other contributors to reach our $1,000 goal.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="font-semibold text-base mb-2">🎁 Rewards</h3>
+            <p className="text-sm text-base-content/70">
+              Earn $SUP tokens for your contributions! The more you contribute,
+              the more rewards you&apos;ll receive.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="font-semibold text-base mb-2">🔒 Safety</h3>
+            <p className="text-sm text-base-content/70">
+              Your staked tokens remain yours at all times. You can withdraw
+              them anytime with no lock-up period.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="font-semibold text-base mb-2">📊 Progress</h3>
+            <p className="text-sm text-base-content/70">
+              Track our progress toward the $1,000 goal. The animation shows
+              tokens flowing into the QR auction pool in real-time.
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-6 pt-4 border-t border-base-300">
+          <button onClick={onClose} className="btn btn-primary w-full">
+            Got it!
+          </button>
         </div>
       </div>
     </div>

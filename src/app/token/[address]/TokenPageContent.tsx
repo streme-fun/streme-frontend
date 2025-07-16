@@ -7,7 +7,7 @@ import { Token } from "@/src/app/types/token";
 import { TokenInfo } from "./TokenInfo";
 import { StakedBalance } from "@/src/components/StakedBalance";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/miniapp-sdk";
 import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
 import { StakerLeaderboard } from "@/src/components/StakerLeaderboard";
 import { StakerLeaderboardEmbed } from "@/src/components/StakerLeaderboardEmbed";

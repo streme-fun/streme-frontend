@@ -17,6 +17,7 @@ import { usePostHog } from "posthog-js/react";
 // import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal";
 import { SPAMMER_BLACKLIST } from "../lib/blacklist";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -24,6 +25,11 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("trending");
   const hasInitiallyFetched = useRef(false);
+  
+  // Easter egg state for mini-app logo clicking
+  const [logoClickCount, setLogoClickCount] = useState(0);
+  const [lastLogoClickTime, setLastLogoClickTime] = useState(0);
+  const router = useRouter();
 
   // Tutorial modal state
   // const [showTutorialModal, setShowTutorialModal] = useState(false);
@@ -59,6 +65,27 @@ function App() {
   } = useAppFrameLogic();
 
   const postHog = usePostHog();
+
+  // Easter egg function for mini-app logo clicking
+  const handleLogoClick = useCallback(() => {
+    const now = Date.now();
+    const timeSinceLastClick = now - lastLogoClickTime;
+    
+    // Reset count if too much time has passed (2 seconds)
+    if (timeSinceLastClick > 2000) {
+      setLogoClickCount(1);
+    } else {
+      setLogoClickCount(prev => prev + 1);
+    }
+    
+    setLastLogoClickTime(now);
+    
+    // Navigate to missions page on 5th click
+    if (logoClickCount + 1 >= 5) {
+      router.push('/missions');
+      setLogoClickCount(0);
+    }
+  }, [logoClickCount, lastLogoClickTime, router]);
 
   // PostHog user identification when wallet connects
   useEffect(() => {
@@ -253,14 +280,18 @@ function App() {
       <div className="font-[family-name:var(--font-geist-sans)]">
         <div className="flex flex-col gap-2 row-start-2 items-center w-full p-4 pt-20">
           <div className="fixed top-0 left-0 right-0 flex items-center p-4 z-10 bg-base-100/80 backdrop-blur-sm">
-            <Link href="/" className="flex-shrink-0">
-              <Image
-                src="/icon-transparent.png"
-                alt="Streme Logo"
-                width={30}
-                height={30}
-              />
-            </Link>
+            <div className="flex-shrink-0">
+              <Link href="/" className="flex items-center">
+                <Image
+                  src="/icon-transparent.png"
+                  alt="Streme Logo"
+                  width={30}
+                  height={30}
+                  onClick={handleLogoClick}
+                  className="cursor-pointer"
+                />
+              </Link>
+            </div>
             <div className="flex-1 ml-6 mr-4 max-w-xs">
               <SearchBar
                 value={searchQuery}

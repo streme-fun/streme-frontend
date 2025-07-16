@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/miniapp-sdk";
 import type { Context, MiniAppNotificationDetails } from "@farcaster/miniapp-core";
 import { createStore } from "mipd";
 import React from "react";
