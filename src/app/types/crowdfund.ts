@@ -1,4 +1,4 @@
-export interface Mission {
+export interface Crowdfund {
   id: string;
   title: string;
   description: string;
@@ -8,15 +8,15 @@ export interface Mission {
   startDate: string;
   endDate?: string;
   isActive: boolean;
-  category: MissionCategory;
-  rewards?: MissionReward[];
+  category: CrowdfundCategory;
+  rewards?: CrowdfundReward[];
   createdBy: string; // Address of creator
   totalContributors: number;
 }
 
-export interface MissionContribution {
+export interface CrowdfundContribution {
   id: string;
-  missionId: string;
+  crowdfundId: string;
   contributorAddress: string;
   amount: number; // Amount of staked STREME dedicated
   timestamp: string;
@@ -29,7 +29,7 @@ export interface MissionContribution {
   };
 }
 
-export interface MissionLeaderboardEntry {
+export interface CrowdfundLeaderboardEntry {
   rank: number;
   contributorAddress: string;
   totalContribution: number;
@@ -42,7 +42,7 @@ export interface MissionLeaderboardEntry {
   };
 }
 
-export interface MissionReward {
+export interface CrowdfundReward {
   type: 'nft' | 'token' | 'badge' | 'access';
   name: string;
   description: string;
@@ -50,7 +50,7 @@ export interface MissionReward {
   imageUrl?: string;
 }
 
-export enum MissionCategory {
+export enum CrowdfundCategory {
   DEFI = 'defi',
   GAMING = 'gaming',
   SOCIAL = 'social',
@@ -60,25 +60,25 @@ export enum MissionCategory {
   OTHER = 'other'
 }
 
-export interface MissionStats {
-  totalMissions: number;
-  activeMissions: number;
+export interface CrowdfundStats {
+  totalCrowdfunds: number;
+  activeCrowdfunds: number;
   totalValueLocked: number;
   totalContributors: number;
-  completedMissions: number;
+  completedCrowdfunds: number;
 }
 
-export interface UserMissionData {
+export interface UserCrowdfundData {
   userAddress: string;
   totalContributions: number;
-  activeMissions: string[]; // Mission IDs
-  completedMissions: string[]; // Mission IDs
+  activeCrowdfunds: string[]; // Crowdfund IDs
+  completedCrowdfunds: string[]; // Crowdfund IDs
   badges: string[]; // Badge IDs earned
   rank?: number; // Global contributor rank
 }
 
 // Contract interaction types
-export interface MissionContractData {
+export interface CrowdfundContractData {
   contractAddress: string;
   stakingRewardsFunderAddress: string; // 0xceaCfbB5A17b6914051D12D8c91d3461382d503b
   stremeCoinAddress: string;

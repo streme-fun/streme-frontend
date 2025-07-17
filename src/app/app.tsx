@@ -25,7 +25,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("trending");
   const hasInitiallyFetched = useRef(false);
-  
+
   // Easter egg state for mini-app logo clicking
   const [logoClickCount, setLogoClickCount] = useState(0);
   const [lastLogoClickTime, setLastLogoClickTime] = useState(0);
@@ -70,19 +70,19 @@ function App() {
   const handleLogoClick = useCallback(() => {
     const now = Date.now();
     const timeSinceLastClick = now - lastLogoClickTime;
-    
+
     // Reset count if too much time has passed (2 seconds)
     if (timeSinceLastClick > 2000) {
       setLogoClickCount(1);
     } else {
-      setLogoClickCount(prev => prev + 1);
+      setLogoClickCount((prev) => prev + 1);
     }
-    
+
     setLastLogoClickTime(now);
-    
-    // Navigate to missions page on 5th click
+
+    // Navigate to crowdfund page on 5th click
     if (logoClickCount + 1 >= 5) {
-      router.push('/missions');
+      router.push("/crowdfund");
       setLogoClickCount(0);
     }
   }, [logoClickCount, lastLogoClickTime, router]);
@@ -278,7 +278,7 @@ function App() {
   if (isMiniAppView) {
     return (
       <div className="font-[family-name:var(--font-geist-sans)]">
-        <div className="flex flex-col gap-2 row-start-2 items-center w-full p-4 pt-20">
+        <div className="flex flex-col gap-2 row-start-2 w-full p-4 pt-20">
           <div className="fixed top-0 left-0 right-0 flex items-center p-4 z-10 bg-base-100/80 backdrop-blur-sm">
             <div className="flex-shrink-0">
               <Link href="/" className="flex items-center">
@@ -322,6 +322,49 @@ function App() {
             </div> */}
           </div>
 
+          {/* Streaming Experiments Section */}
+          <div className="w-full max-w-md mb-4">
+            <h3 className="font-semibold text-base-content mb-2">
+              Streme Experiments
+            </h3>
+            <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden">
+              <div className="relative h-24 bg-gradient-to-br from-primary/10 to-secondary/10 border-t border-base-300 flex items-center justify-center">
+                {/* Add hero animation mini as a background inside the card but behind the qr image */}
+                <div className="absolute inset-0 opacity-30">
+                  <HeroAnimationMini />
+                </div>
+                <Image
+                  src="/qr.png"
+                  alt="QR Code"
+                  width={60}
+                  height={60}
+                  className="opacity-80 relative z-10"
+                />
+              </div>
+
+              <div className="p-4 pt-3 flex items-center justify-between gap-2">
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-base-content/70 font-semibold">
+                    Streme QR Crowdfund
+                  </p>
+                  <p className="text-sm text-base-content/70 mb-3">
+                    Contribute your staking rewards to help Streme win a QR
+                    auction. Earn $SUP for your contribution.
+                  </p>
+                </div>
+                <Link href="/crowdfund">
+                  <button className="btn btn-primary btn-sm w-full">
+                    Open
+                  </button>
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <h3 className="font-semibold text-base-content text-left">
+            Streme Tokens
+          </h3>
+
           <div className="w-full max-w-md">
             <div className="flex items-center gap-4 my-2">
               <div className="flex-none w-full">
@@ -352,9 +395,9 @@ function App() {
             </Button>
           ) : null}
         </div>
-        <div className="fixed inset-0 -z-10">
+        {/* <div className="fixed inset-0 -z-10">
           <HeroAnimationMini />
-        </div>
+        </div> */}
 
         {/* Tutorial Modal */}
         {/* <MiniAppTutorialModal

@@ -1,122 +1,78 @@
 "use client";
 
-import { useEffect } from "react";
-
-interface HowItWorksModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  isMiniApp?: boolean;
-}
-
 export function HowItWorksModal({
   isOpen,
   onClose,
-  isMiniApp = false,
-}: HowItWorksModalProps) {
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [isOpen]);
-
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) {
   if (!isOpen) return null;
 
   return (
-    <div
-      className={`fixed inset-0 z-50 ${
-        isMiniApp ? "flex items-end" : "flex items-center justify-center"
-      }`}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0"
-        style={{ backgroundColor: "rgba(0, 0, 0, 0.4)" }}
+        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div
-        className={`relative bg-base-100 p-6 max-h-[90vh] overflow-y-auto shadow-xl border border-base-300 ${
-          isMiniApp ? "w-full rounded-t-xl" : "rounded-xl max-w-md mx-4"
-        }`}
-      >
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">How Missions Work</h2>
-          <button onClick={onClose} className="btn btn-ghost btn-sm btn-circle">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
+      <div className="relative bg-base-100 w-full max-w-lg mx-4 p-8 shadow-xl border border-black/[.1] dark:border-white/[.1]">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 btn btn-ghost btn-sm"
+        >
+          ✕
+        </button>
 
-        {/* Content */}
-        <div className="space-y-4">
-          <div>
-            <h3 className="font-semibold text-base mb-2">🎯 The Mission</h3>
-            <p className="text-sm text-base-content/70">
-              Help Streme win a QR auction by pooling STREME tokens together.
-              The more we raise, the better our chances of winning!
-            </p>
-          </div>
+        <h2 className="text-2xl font-bold mb-6">How STREME.FUN Works</h2>
 
+        <div className="space-y-6">
           <div>
-            <h3 className="font-semibold text-base mb-2">
-              💰 How to Contribute
+            <h3 className="text-lg font-semibold mb-2 text-primary">
+              Streaming Rewards
             </h3>
-            <p className="text-sm text-base-content/70">
-              Stake your STREME tokens in the crowdfund pool. Your tokens are
-              pooled with other contributors to reach our $1,000 goal.
+            <p className="opacity-80">
+              Streme.fun is a token launcher, where every token launched
+              automatically streams rewards directly to stakers&apos; wallets -
+              no claiming needed.
             </p>
           </div>
 
           <div>
-            <h3 className="font-semibold text-base mb-2">🎁 Rewards</h3>
-            <p className="text-sm text-base-content/70">
-              Earn $SUP tokens for your contributions! The more you contribute,
-              the more rewards you&apos;ll receive.
+            <h3 className="text-lg font-semibold mb-2 text-secondary">
+              Fair Distribution
+            </h3>
+            <p className="opacity-80">
+              20% of each token&apos;s total supply is allocated to the rewards
+              pool, distributed over 365 days proportionally to stakers.
             </p>
           </div>
 
           <div>
-            <h3 className="font-semibold text-base mb-2">🔒 Safety</h3>
-            <p className="text-sm text-base-content/70">
-              Your staked tokens remain yours at all times. You can withdraw
-              them anytime with no lock-up period.
+            <h3 className="text-lg font-semibold mb-2 text-accent">
+              Simple Staking
+            </h3>
+            <p className="opacity-80">
+              Staking is simple but secure. When you stake tokens, they&apos;re
+              locked for 24 hours. After the lock period, you can unstake
+              anytime. Your rewards continue streaming whether they&apos;re
+              locked or not.
             </p>
           </div>
 
-          <div>
-            <h3 className="font-semibold text-base mb-2">📊 Progress</h3>
-            <p className="text-sm text-base-content/70">
-              Track our progress toward the $1,000 goal. The animation shows
-              tokens flowing into the QR auction pool in real-time.
-            </p>
+          {/* Add docs link */}
+          <div className="text-center pt-4">
+            <a
+              href="https://docs.streme.fun"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary hover:underline"
+            >
+              Read the full documentation →
+            </a>
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-6 pt-4 border-t border-base-300">
-          <button onClick={onClose} className="btn btn-primary w-full">
-            Got it!
-          </button>
         </div>
       </div>
     </div>

@@ -64,7 +64,7 @@ export const useStremeStakingContract = (overrideAddress?: string) => {
   });
 
   // Read user's staked STREME token balance
-  const { data: userStakedTokenBalance } = useReadContract({
+  const { data: userStakedTokenBalance, refetch: refetchUserStakedTokenBalance } = useReadContract({
     address: stakedStremeCoinAddress as `0x${string}`,
     abi: ERC20_ABI,
     functionName: "balanceOf",
@@ -112,6 +112,7 @@ export const useStremeStakingContract = (overrideAddress?: string) => {
     refetchUserBalance,
     refetchTotalBalance,
     refetchAllowance,
+    refetchUserStakedTokenBalance,
   };
 };
 
@@ -133,7 +134,8 @@ export const useStakingContractActions = (overrideAddress?: string) => {
     userDepositBalance, 
     refetchUserBalance, 
     refetchTotalBalance, 
-    refetchAllowance 
+    refetchAllowance,
+    refetchUserStakedTokenBalance
   } = useStremeStakingContract(overrideAddress);
 
   // Combined error from wagmi or custom transactions
@@ -391,8 +393,9 @@ export const useStakingContractActions = (overrideAddress?: string) => {
       refetchUserBalance();
       refetchTotalBalance();
       refetchAllowance();
+      refetchUserStakedTokenBalance();
     }
-  }, [isConfirmed, refetchUserBalance, refetchTotalBalance, refetchAllowance]);
+  }, [isConfirmed, refetchUserBalance, refetchTotalBalance, refetchAllowance, refetchUserStakedTokenBalance]);
 
   // Reset loading states when there's an error (transaction failed or cancelled)
   useEffect(() => {

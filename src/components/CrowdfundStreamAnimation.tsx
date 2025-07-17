@@ -16,7 +16,7 @@ interface StreamParticle {
   progress: number;
 }
 
-export const MissionStreamAnimation = () => {
+export const CrowdfundStreamAnimation = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [, setParticles] = useState<StreamParticle[]>([]);
   const animationRef = useRef<number>(0);
@@ -46,18 +46,24 @@ export const MissionStreamAnimation = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    const updateCanvasSize = () => {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      
+      // Create mission targets (representing different missions) based on current size
+      const missionTargets = [
+        { x: rect.width * 0.2, y: rect.height * 0.3 },
+        { x: rect.width * 0.5, y: rect.height * 0.2 },
+        { x: rect.width * 0.8, y: rect.height * 0.4 },
+        { x: rect.width * 0.3, y: rect.height * 0.7 },
+        { x: rect.width * 0.7, y: rect.height * 0.8 }
+      ];
+      
+      return { rect, missionTargets };
+    };
 
-    // Create mission targets (representing different missions)
-    const missionTargets = [
-      { x: rect.width * 0.2, y: rect.height * 0.3 },
-      { x: rect.width * 0.5, y: rect.height * 0.2 },
-      { x: rect.width * 0.8, y: rect.height * 0.4 },
-      { x: rect.width * 0.3, y: rect.height * 0.7 },
-      { x: rect.width * 0.7, y: rect.height * 0.8 }
-    ];
+    const { rect, missionTargets } = updateCanvasSize();
 
     const colors = [
       '#6366f1', // Primary blue
@@ -70,19 +76,26 @@ export const MissionStreamAnimation = () => {
 
     const newParticles: StreamParticle[] = [];
     
-    // Create particles for each mission
-    for (let i = 0; i < 50; i++) {
+    // Create particles based on container size (more particles for larger containers)
+    const particleCount = Math.min(50, Math.max(20, Math.floor((rect.width * rect.height) / 1000)));
+    
+    for (let i = 0; i < particleCount; i++) {
       const targetIndex = Math.floor(Math.random() * missionTargets.length);
       const target = missionTargets[targetIndex];
+      
+      // Scale particle properties based on container size
+      const scaleX = rect.width / 300; // Base width of 300px
+      const scaleY = rect.height / 100; // Base height of 100px
+      const scale = Math.min(scaleX, scaleY);
       
       newParticles.push({
         id: i,
         x: Math.random() * rect.width,
         y: rect.height + 50, // Start from bottom
-        targetX: target.x + (Math.random() - 0.5) * 100,
-        targetY: target.y + (Math.random() - 0.5) * 60,
+        targetX: target.x + (Math.random() - 0.5) * (100 * scaleX),
+        targetY: target.y + (Math.random() - 0.5) * (60 * scaleY),
         speed: 0.3 + Math.random() * 0.7,
-        size: 2 + Math.random() * 4,
+        size: (2 + Math.random() * 4) * scale,
         opacity: 0.3 + Math.random() * 0.7,
         color: colors[Math.floor(Math.random() * colors.length)],
         angle: Math.random() * Math.PI * 2,
@@ -127,7 +140,7 @@ export const MissionStreamAnimation = () => {
             particle.y = canvas.height + 50;
             particle.progress = 0;
             
-            // Choose new random target
+            // Choose new random target with responsive scaling
             const targets = [
               { x: canvas.width * 0.2, y: canvas.height * 0.3 },
               { x: canvas.width * 0.5, y: canvas.height * 0.2 },
@@ -136,8 +149,10 @@ export const MissionStreamAnimation = () => {
               { x: canvas.width * 0.7, y: canvas.height * 0.8 }
             ];
             const newTarget = targets[Math.floor(Math.random() * targets.length)];
-            particle.targetX = newTarget.x + (Math.random() - 0.5) * 100;
-            particle.targetY = newTarget.y + (Math.random() - 0.5) * 60;
+            const scaleX = canvas.width / 300;
+            const scaleY = canvas.height / 100;
+            particle.targetX = newTarget.x + (Math.random() - 0.5) * (100 * scaleX);
+            particle.targetY = newTarget.y + (Math.random() - 0.5) * (60 * scaleY);
           }
 
           // Draw particle
@@ -177,9 +192,10 @@ export const MissionStreamAnimation = () => {
         ctx.save();
         ctx.globalAlpha = 0.6;
         
-        // Pulsing effect
+        // Pulsing effect with responsive radius
         const pulse = Math.sin(Date.now() * 0.003 + index) * 0.3 + 0.7;
-        const radius = 20 * pulse;
+        const baseRadius = Math.min(canvas.width, canvas.height) / 15; // Responsive base radius
+        const radius = baseRadius * pulse;
         
         // Gradient for glow effect
         const gradient = ctx.createRadialGradient(
@@ -216,7 +232,7 @@ export const MissionStreamAnimation = () => {
     };
   }, [isDark]);
 
-  // Handle resize
+  // Handle resize - simplified to just update canvas size
   useEffect(() => {
     const handleResize = () => {
       const canvas = canvasRef.current;

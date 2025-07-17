@@ -62,7 +62,7 @@ export function Navbar() {
 
   // Profile picture state for mini-app
   const [miniAppProfileImage, setMiniAppProfileImage] = useState<string>("");
-  
+
   // Easter egg state for logo clicking
   const [logoClickCount, setLogoClickCount] = useState(0);
   const [lastLogoClickTime, setLastLogoClickTime] = useState(0);
@@ -76,19 +76,19 @@ export function Navbar() {
   const handleLogoClick = () => {
     const now = Date.now();
     const timeSinceLastClick = now - lastLogoClickTime;
-    
+
     // Reset count if too much time has passed (2 seconds)
     if (timeSinceLastClick > 2000) {
       setLogoClickCount(1);
     } else {
-      setLogoClickCount(prev => prev + 1);
+      setLogoClickCount((prev) => prev + 1);
     }
-    
+
     setLastLogoClickTime(now);
-    
-    // Navigate to missions page on 5th click
+
+    // Navigate to crowdfund page on 5th click
     if (logoClickCount + 1 >= 5) {
-      router.push('/missions');
+      router.push("/crowdfund");
       setLogoClickCount(0);
     }
   };
@@ -156,6 +156,7 @@ export function Navbar() {
               </svg>
               Home
             </Link>
+
             {/* My Stakes Button */}
             <button
               onClick={() => setIsMyStakesOpen(true)}
@@ -223,6 +224,7 @@ Symbol: $[your ticker]
               </svg>
               Launch
             </button>
+
 
             {/* Leaderboard Button */}
             <button
@@ -491,7 +493,7 @@ Symbol: $[your ticker]
             )}
 
             <Link
-              href="/missions"
+              href="/crowdfund"
               className="btn btn-secondary w-full justify-start"
               onClick={() => setIsMenuOpen(false)}
             >

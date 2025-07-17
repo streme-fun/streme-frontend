@@ -39,22 +39,22 @@ export function ContributionModal({
   isWithdrawing,
   isConfirming,
   isPaused,
-  hash,
   onAmountChange,
   onSliderChange,
   onContribute,
   onWithdraw,
   isMiniApp = false,
 }: ContributionModalProps) {
-  const [activeTab, setActiveTab] = useState<'add' | 'withdraw'>('add');
+  const [activeTab, setActiveTab] = useState<"add" | "withdraw">("add");
   const [withdrawPercentage, setWithdrawPercentage] = useState(0);
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [isBackdropClickable, setIsBackdropClickable] = useState(false);
 
   // Helper function to calculate withdraw amount from percentage of current contribution
   const calculateWithdrawAmountFromPercentage = (percent: number): string => {
     if (!hasActiveContribution) return "0";
     // Parse the current contribution amount (remove commas and convert to number)
-    const currentAmount = parseFloat(userContribution.replace(/,/g, ''));
+    const currentAmount = parseFloat(userContribution.replace(/,/g, ""));
     const withdrawAmount = (currentAmount * percent) / 100;
     return withdrawAmount.toFixed(2);
   };
@@ -62,7 +62,7 @@ export function ContributionModal({
   // Helper function to calculate withdraw percentage from amount
   const calculateWithdrawPercentageFromAmount = (amount: string): number => {
     if (!hasActiveContribution || !amount) return 0;
-    const currentAmount = parseFloat(userContribution.replace(/,/g, ''));
+    const currentAmount = parseFloat(userContribution.replace(/,/g, ""));
     const amountValue = parseFloat(amount);
     if (currentAmount <= 0) return 0;
     return Math.min(100, Math.max(0, (amountValue / currentAmount) * 100));
@@ -82,15 +82,20 @@ export function ContributionModal({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      // Delay backdrop clickability to prevent accidental closes on mobile
+      setIsBackdropClickable(false);
+      const timer = setTimeout(() => {
+        setIsBackdropClickable(true);
+      }, 300);
+      return () => {
+        clearTimeout(timer);
+        document.body.style.overflow = "unset";
+      };
     } else {
       document.body.style.overflow = "unset";
+      setIsBackdropClickable(false);
     }
-
-    return () => {
-      document.body.style.overflow = "unset";
-    };
   }, [isOpen]);
-
 
   if (!isOpen) return null;
 
@@ -106,7 +111,9 @@ export function ContributionModal({
         style={{ backgroundColor: "rgba(0, 0, 0, 0.4)" }}
         onClick={(e) => {
           e.stopPropagation();
-          onClose();
+          if (isBackdropClickable) {
+            onClose();
+          }
         }}
       />
 
@@ -119,7 +126,13 @@ export function ContributionModal({
       >
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Manage Your Redirect</h2>
+          <div>
+            <h2 className="text-xl font-bold">
+              {hasActiveContribution
+                ? "Manage Contribution"
+                : "Contribute to Streme QR Fund"}
+            </h2>
+          </div>
           <button
             onClick={onClose}
             className="btn btn-ghost btn-sm btn-circle cursor-pointer"
@@ -141,45 +154,32 @@ export function ContributionModal({
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="tabs tabs-boxed mb-4">
-          <button 
-            className={`tab flex-1 ${activeTab === 'add' ? 'tab-active bg-success text-success-content' : 'hover:bg-success/20'}`}
-            onClick={() => setActiveTab('add')}
-          >
-            <span className="mr-2">➕</span>
-            Add More
-          </button>
-          {hasActiveContribution && (
-            <button 
-              className={`tab flex-1 ${activeTab === 'withdraw' ? 'tab-active bg-warning text-warning-content' : 'hover:bg-warning/20'}`}
-              onClick={() => setActiveTab('withdraw')}
+        {/* Tab Navigation - only show if user has active contribution */}
+        {hasActiveContribution && (
+          <div className="tabs tabs-boxed mb-4">
+            <button
+              className={`tab flex-1 ${
+                activeTab === "add"
+                  ? "tab-active bg-primary text-primary-content hover:text-white"
+                  : "hover:bg-primary/20"
+              }`}
+              onClick={() => setActiveTab("add")}
+            >
+              Add More
+            </button>
+            <button
+              className={`tab flex-1 ${
+                activeTab === "withdraw"
+                  ? "tab-active bg-warning text-warning-content"
+                  : "hover:bg-warning/20"
+              }`}
+              onClick={() => setActiveTab("withdraw")}
             >
               <span className="mr-2">➖</span>
               Withdraw
             </button>
-          )}
-        </div>
-
-        {/* Info about redirecting - only show on Add tab for initial contributions */}
-        {activeTab === 'add' && !hasActiveContribution && (
-          <div className="bg-info/10 border border-info/20 rounded-lg p-4 mb-4">
-            <div className="flex items-start gap-3">
-              <div className="text-info flex-shrink-0 mt-0.5">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="text-sm">
-                <p className="font-semibold text-info mb-1">You&apos;re redirecting, not giving away</p>
-                <p className="text-base-content/70">
-                  This redirects your staking rewards to fund the mission. Your staked tokens remain yours and you can withdraw them anytime.
-                </p>
-              </div>
-            </div>
           </div>
         )}
-
 
         {/* Error Display */}
         {error && (
@@ -190,39 +190,43 @@ export function ContributionModal({
 
         {/* Tab Content */}
         <div className="space-y-4">
-          {activeTab === 'add' ? (
+          {!hasActiveContribution || activeTab === "add" ? (
             /* Add More Tab */
             <div className="space-y-4">
-              {/* Add More Slider */}
-              <div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    className="range range-success flex-1"
-                    value={percentage}
-                    onChange={(e) => onSliderChange(Number(e.target.value))}
-                    disabled={isApproving || isDepositing || isConfirming}
-                  />
-                  <span className="text-sm font-medium w-8 text-right">{percentage.toFixed(0)}%</span>
-                </div>
-                <div className="flex">
-                  <div className="flex-1 flex justify-between text-xs px-2 mt-1">
-                    <span>0%</span>
-                    <span>50%</span>
-                    <span>100%</span>
-                  </div>
-                  <div className="w-8"></div>
-                </div>
-              </div>
-
               {/* Add More Amount Input */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Additional Amount (STREME)
+                  Amount (stSTREME)
                 </label>
+
+                {/* Add More Slider - right above input */}
+                <div className="mb-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        className="range range-sm range-primary w-full"
+                        value={percentage}
+                        onChange={(e) => onSliderChange(Number(e.target.value))}
+                        disabled={isApproving || isDepositing || isConfirming}
+                      />
+                      <div className="flex justify-between text-xs mt-1 text-base-content/60 px-2">
+                        <span>0%</span>
+                        <span>25%</span>
+                        <span>50%</span>
+                        <span>75%</span>
+                        <span>100%</span>
+                      </div>
+                    </div>
+                    <div className="text-sm font-medium w-12 text-right mt-1">
+                      {percentage.toFixed(0)}%
+                    </div>
+                  </div>
+                </div>
+
                 <input
                   type="number"
                   placeholder="0.0"
@@ -233,7 +237,8 @@ export function ContributionModal({
                 />
                 {userStakedTokenBalance && userStakedTokenBalance > 0n && (
                   <p className="text-xs text-base-content/60 mt-1">
-                    Available: {formatStakeAmount(userStakedTokenBalance)} STREME
+                    Available: {formatStakeAmount(userStakedTokenBalance)}{" "}
+                    stSTREME
                   </p>
                 )}
               </div>
@@ -241,7 +246,7 @@ export function ContributionModal({
               {/* Add More Button */}
               <button
                 onClick={onContribute}
-                className="btn btn-success w-full"
+                className="btn btn-primary w-full"
                 disabled={
                   !amount ||
                   parseFloat(amount) <= 0 ||
@@ -251,52 +256,60 @@ export function ContributionModal({
                   isPaused
                 }
               >
-                {isApproving || isDepositing || isConfirming ? (
+                {isApproving ? (
                   <>
                     <span className="loading loading-spinner loading-sm"></span>
-                    Processing...
+                    Approving...
+                  </>
+                ) : isDepositing || isConfirming ? (
+                  <>
+                    <span className="loading loading-spinner loading-sm"></span>
+                    Contributing...
                   </>
                 ) : (
-                  <>
-                    <span className="mr-2">➕</span>
-                    {hasActiveContribution ? 'Add More to Redirect' : 'Start Redirecting'}
-                  </>
+                  <>{hasActiveContribution ? "Add More" : "Contribute"}</>
                 )}
               </button>
             </div>
           ) : (
             /* Withdraw Tab */
             <div className="space-y-4">
-              {/* Withdraw Slider */}
-              <div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    className="range range-warning flex-1"
-                    value={withdrawPercentage}
-                    onChange={(e) => handleWithdrawSliderChange(Number(e.target.value))}
-                    disabled={isWithdrawing || isConfirming}
-                  />
-                  <span className="text-sm font-medium w-8 text-right">{withdrawPercentage.toFixed(0)}%</span>
-                </div>
-                <div className="flex">
-                  <div className="flex-1 flex justify-between text-xs px-2 mt-1">
-                    <span>0%</span>
-                    <span>50%</span>
-                    <span>100%</span>
-                  </div>
-                  <div className="w-8"></div>
-                </div>
-              </div>
-
               {/* Withdraw Amount Input */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Amount to Withdraw (STREME)
+                  Amount to Withdraw (stSTREME)
                 </label>
+
+                {/* Withdraw Slider - right above input */}
+                <div className="mb-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        className="range range-warning w-full"
+                        value={withdrawPercentage}
+                        onChange={(e) =>
+                          handleWithdrawSliderChange(Number(e.target.value))
+                        }
+                        disabled={isWithdrawing || isConfirming}
+                      />
+                      <div className="flex justify-between text-xs mt-1 text-base-content/60 px-2">
+                        <span>0%</span>
+                        <span>25%</span>
+                        <span>50%</span>
+                        <span>75%</span>
+                        <span>100%</span>
+                      </div>
+                    </div>
+                    <div className="text-sm font-medium w-12 text-right mt-1">
+                      {withdrawPercentage.toFixed(0)}%
+                    </div>
+                  </div>
+                </div>
+
                 <input
                   type="number"
                   placeholder="0.0"
@@ -306,7 +319,7 @@ export function ContributionModal({
                   disabled={isWithdrawing || isConfirming}
                 />
                 <p className="text-xs text-base-content/60 mt-1">
-                  Currently redirecting: {userContribution} STREME
+                  Current Stake: {userContribution} stSTREME
                 </p>
               </div>
 
@@ -325,36 +338,21 @@ export function ContributionModal({
                 {isWithdrawing || isConfirming ? (
                   <>
                     <span className="loading loading-spinner loading-sm"></span>
-                    Processing...
+                    Withdrawing...
                   </>
                 ) : (
-                  <>
-                    <span className="mr-2">➖</span>
-                    Withdraw Amount
-                  </>
+                  <>Withdraw</>
                 )}
               </button>
             </div>
           )}
         </div>
 
-        {/* Transaction Hash */}
-        {hash && (
-          <div className="text-center mt-4">
-            <p className="text-sm text-base-content/70">
-              Transaction:{" "}
-              <span className="font-mono">
-                {hash.slice(0, 10)}...{hash.slice(-8)}
-              </span>
-            </p>
-          </div>
-        )}
-
         {/* Informational Text */}
-        {!hasActiveContribution && activeTab === 'add' && (
+        {!hasActiveContribution && (
           <div className="text-center pt-4 border-t border-base-300 mt-4">
             <p className="text-xs text-base-content/60">
-              Your staked tokens remain yours • Withdraw anytime • No lock-up
+              Your staked tokens remain yours • Withdraw anytime
             </p>
           </div>
         )}

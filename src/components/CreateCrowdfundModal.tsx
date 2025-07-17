@@ -1,19 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Mission, MissionCategory } from "@/src/app/types/mission";
+import { Crowdfund, CrowdfundCategory } from "@/src/app/types/crowdfund";
 
-interface CreateMissionModalProps {
+interface CreateCrowdfundModalProps {
   onClose: () => void;
-  onMissionCreated: (mission: Mission) => void;
+  onCrowdfundCreated: (crowdfund: Crowdfund) => void;
 }
 
-export const CreateMissionModal = ({ onClose, onMissionCreated }: CreateMissionModalProps) => {
+export const CreateCrowdfundModal = ({ onClose, onCrowdfundCreated }: CreateCrowdfundModalProps) => {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     goal: "",
-    category: MissionCategory.OTHER,
+    category: CrowdfundCategory.OTHER,
     endDate: "",
     imageUrl: ""
   });
@@ -25,7 +25,7 @@ export const CreateMissionModal = ({ onClose, onMissionCreated }: CreateMissionM
 
     try {
       // In a real implementation, this would call your API
-      const newMission: Mission = {
+      const newCrowdfund: Crowdfund = {
         id: Date.now().toString(),
         title: formData.title,
         description: formData.description,
@@ -43,38 +43,38 @@ export const CreateMissionModal = ({ onClose, onMissionCreated }: CreateMissionM
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      onMissionCreated(newMission);
+      onCrowdfundCreated(newCrowdfund);
     } catch (error) {
-      console.error("Error creating mission:", error);
+      console.error("Error creating crowdfund:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const categories = [
-    { value: MissionCategory.DEFI, label: "DeFi" },
-    { value: MissionCategory.GAMING, label: "Gaming" },
-    { value: MissionCategory.SOCIAL, label: "Social" },
-    { value: MissionCategory.CHARITY, label: "Charity" },
-    { value: MissionCategory.DEVELOPMENT, label: "Development" },
-    { value: MissionCategory.COMMUNITY, label: "Community" },
-    { value: MissionCategory.OTHER, label: "Other" }
+    { value: CrowdfundCategory.DEFI, label: "DeFi" },
+    { value: CrowdfundCategory.GAMING, label: "Gaming" },
+    { value: CrowdfundCategory.SOCIAL, label: "Social" },
+    { value: CrowdfundCategory.CHARITY, label: "Charity" },
+    { value: CrowdfundCategory.DEVELOPMENT, label: "Development" },
+    { value: CrowdfundCategory.COMMUNITY, label: "Community" },
+    { value: CrowdfundCategory.OTHER, label: "Other" }
   ];
 
   return (
     <div className="modal modal-open">
       <div className="modal-box max-w-2xl">
-        <h3 className="font-bold text-lg mb-4">Create New Mission</h3>
+        <h3 className="font-bold text-lg mb-4">Create New Crowdfund</h3>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div className="form-control">
             <label className="label">
-              <span className="label-text">Mission Title</span>
+              <span className="label-text">Crowdfund Title</span>
             </label>
             <input
               type="text"
-              placeholder="Enter mission title"
+              placeholder="Enter crowdfund title"
               className="input input-bordered"
               value={formData.title}
               onChange={(e) => setFormData({...formData, title: e.target.value})}
@@ -88,7 +88,7 @@ export const CreateMissionModal = ({ onClose, onMissionCreated }: CreateMissionM
               <span className="label-text">Description</span>
             </label>
             <textarea
-              placeholder="Describe your mission and its goals"
+              placeholder="Describe your crowdfund and its goals"
               className="textarea textarea-bordered h-24"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
@@ -119,7 +119,7 @@ export const CreateMissionModal = ({ onClose, onMissionCreated }: CreateMissionM
               <select
                 className="select select-bordered"
                 value={formData.category}
-                onChange={(e) => setFormData({...formData, category: e.target.value as MissionCategory})}
+                onChange={(e) => setFormData({...formData, category: e.target.value as CrowdfundCategory})}
               >
                 {categories.map(cat => (
                   <option key={cat.value} value={cat.value}>{cat.label}</option>
@@ -177,7 +177,7 @@ export const CreateMissionModal = ({ onClose, onMissionCreated }: CreateMissionM
                   Creating...
                 </>
               ) : (
-                "Create Mission"
+                "Create Crowdfund"
               )}
             </button>
           </div>

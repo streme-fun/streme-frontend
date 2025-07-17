@@ -32,7 +32,7 @@ export const UserContributions = () => {
   // STREME token contract address
   const STREME_TOKEN_ADDRESS = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
 
-  // Fetch STREME price using the same method as missions page
+  // Fetch STREME price using the same method as crowdfund page
   useEffect(() => {
     const fetchStremePrice = async () => {
       try {
