@@ -352,11 +352,9 @@ function App() {
                     auction. Earn $SUP for your contribution.
                   </p>
                 </div>
-                <Link href="/crowdfund">
-                  <button className="btn btn-primary btn-sm w-full">
-                    Open
-                  </button>
-                </Link>
+                {/* <Link href="/crowdfund"> */}
+                <button className="btn btn-disabled btn-sm">Coming Soon</button>
+                {/* </Link> */}
               </div>
             </div>
           </div>
