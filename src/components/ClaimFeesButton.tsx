@@ -7,7 +7,7 @@ import { LP_FACTORY_ADDRESS } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/miniapp-sdk";
 import { useWallets } from "@privy-io/react-auth";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 

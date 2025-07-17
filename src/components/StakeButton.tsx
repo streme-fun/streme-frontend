@@ -7,7 +7,7 @@ import { StakeModal } from "./StakeModal";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient"; // Import the centralized client
 import { toast } from "sonner"; // Added for Mini App placeholder
-import sdk from "@farcaster/frame-sdk"; // Added Farcaster SDK
+import sdk from "@farcaster/miniapp-sdk"; // Added Farcaster SDK
 import { usePostHog } from "posthog-js/react"; // Added PostHog hook
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics"; // Added analytics constants

@@ -8,7 +8,7 @@ import { Interface } from "@ethersproject/abi";
 import { Modal } from "./Modal";
 import { Zap } from "lucide-react";
 import { publicClient } from "@/src/lib/viemClient";
-import sdk from "@farcaster/frame-sdk";
+import sdk from "@farcaster/miniapp-sdk";
 import { MyTokensModal } from "./MyTokensModal";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useWallets } from "@privy-io/react-auth";

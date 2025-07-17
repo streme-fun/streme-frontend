@@ -60,10 +60,10 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
   const [shareSuccess, setShareSuccess] = useState<boolean>(false);
 
   // Use the reward counter hook for animated rewards
-  const currentRewards = useRewardCounter(
+  const { currentRewards } = useRewardCounter(
     initialRewards,
     REWARDS_PER_SECOND,
-    50 // 50ms for smooth animation
+    150 // Balanced between performance and smoothness
   );
 
   useEffect(() => {

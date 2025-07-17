@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Contributors</title>
+</head>
+<body>
+    <h1>Contributor Hook Debug</h1>
+    <p>Open the browser console to see debug logs from the useMissionContributors hook.</p>
+    <p>Go to the missions page and check the console for:</p>
+    <ul>
+        <li>🔍 Loading contributor addresses...</li>
+        <li>📦 Searching blocks X to latest</li>
+        <li>📋 Found X deposit events</li>
+        <li>👥 Found X unique contributors</li>
+        <li>💰 Processing contributors...</li>
+        <li>✅ Final contributors: X with balances</li>
+    </ul>
+    
+    <h2>What to check:</h2>
+    <ol>
+        <li><strong>Public client available:</strong> Should be true</li>
+        <li><strong>Block range:</strong> Should show recent blocks being searched</li>
+        <li><strong>Events found:</strong> Number of Deposit events found</li>
+        <li><strong>Unique addresses:</strong> Should extract unique contributor addresses</li>
+        <li><strong>Balance checking:</strong> Each address should have balance checked</li>
+        <li><strong>Final result:</strong> Only addresses with non-zero balances should remain</li>
+    </ol>
+
+    <h2>Common issues:</h2>
+    <ul>
+        <li><strong>No events found:</strong> Contract might be new or no deposits made recently</li>
+        <li><strong>All zero balances:</strong> Contributors might have withdrawn</li>
+        <li><strong>Network issues:</strong> RPC might be slow or failing</li>
+        <li><strong>Event signature mismatch:</strong> ABI might not match actual contract</li>
+    </ul>
+</body>
+</html>

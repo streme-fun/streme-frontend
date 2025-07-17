@@ -14,10 +14,10 @@ export function Hero() {
   const [initialTotalRewards, setInitialTotalRewards] = useState(0);
 
   // Use the reward counter hook for animated total rewards
-  const currentTotalRewards = useRewardCounter(
+  const { currentRewards: currentTotalRewards } = useRewardCounter(
     initialTotalRewards,
     REWARDS_PER_SECOND,
-    50 // 50ms for smooth animation
+    150 // Balanced between performance and smoothness
   );
 
   useEffect(() => {

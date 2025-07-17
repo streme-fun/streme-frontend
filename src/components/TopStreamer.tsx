@@ -14,10 +14,10 @@ export function TopStreamer() {
   const [totalStakers, setTotalStakers] = useState(0);
 
   // Use the reward counter hook for animated rewards
-  const currentRewards = useRewardCounter(
+  const { currentRewards } = useRewardCounter(
     initialRewards,
     REWARDS_PER_SECOND,
-    50 // 50ms interval for smooth animation (matches original)
+    150 // Balanced between performance and smoothness
   );
 
   // Helper function to format market cap

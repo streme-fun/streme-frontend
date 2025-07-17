@@ -126,10 +126,10 @@ const TokenCardComponent = ({
   const [totalStakers, setTotalStakers] = useState<number>(token.totalStakers);
 
   // Use the reward counter hook for animated rewards
-  const currentRewards = useRewardCounter(
+  const { currentRewards, elementRef } = useRewardCounter(
     token.rewards,
     REWARDS_PER_SECOND,
-    isMiniApp ? 60 : 60 // Slower updates in mini-app for performance
+    isMiniApp ? 200 : 150 // Faster updates for smoother animations
   );
 
   useEffect(() => {
@@ -196,6 +196,7 @@ const TokenCardComponent = ({
   return (
     <Link href={`/token/${token.contract_address}`} className="block group">
       <div
+        ref={elementRef}
         className="card card-side bg-base-100 rounded-md border-1 border-base-300 
         hover:bg-base-200/50  transition-all duration-300 ease-out
         hover:shadow-lg hover:-translate-y-1 group-hover:border-primary/20"
