@@ -29,7 +29,6 @@ export default function CrowdfundPage() {
     isMiniAppView,
     address: farcasterAddress,
     isConnected: farcasterIsConnected,
-    isAuthenticated: farcasterIsAuthenticated,
   } = useAppFrameLogic();
   const [price, setPrice] = useState<number | null>(null);
   const [baseUsdValue, setBaseUsdValue] = useState<number>(0);
@@ -52,7 +51,7 @@ export default function CrowdfundPage() {
     ? farcasterIsConnected
     : isConnected;
   const effectiveAuthenticated = isMiniAppView
-    ? farcasterIsAuthenticated
+    ? farcasterIsConnected
     : authenticated;
   const effectiveAddress = isMiniAppView ? farcasterAddress : wagmiAddress;
 
