@@ -11,11 +11,18 @@ interface Contributor {
 export async function GET() {
   try {
     console.log('Fetching contributors from external API...');
-    const response = await fetch('https://api.streme.fun/api/qr/members');
-    console.log('Contributors API response status:', response.status);
+    // Add cache busting timestamp to external API call
+    const timestamp = Date.now();
+    const apiResponse = await fetch(`https://api.streme.fun/api/qr/members?t=${timestamp}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+      },
+    });
+    console.log('Contributors API response status:', apiResponse.status);
     
-    if (response.ok) {
-      const data: Contributor[] = await response.json();
+    if (apiResponse.ok) {
+      const data: Contributor[] = await apiResponse.json();
       console.log('Contributors data:', data);
       
       // Merge contributors with the same username
@@ -24,12 +31,18 @@ export async function GET() {
       // Calculate percentages
       const contributorsWithPercentages = calculatePercentages(mergedContributors);
       
-      return NextResponse.json(contributorsWithPercentages);
+      const response = NextResponse.json(contributorsWithPercentages);
+      // Add cache-busting headers to prevent browser caching
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      response.headers.set('Expires', '0');
+      
+      return response;
     } else {
-      console.error('Contributors API failed with status:', response.status);
+      console.error('Contributors API failed with status:', apiResponse.status);
       return NextResponse.json(
         { error: 'Failed to fetch contributors' },
-        { status: response.status }
+        { status: apiResponse.status }
       );
     }
   } catch (error) {

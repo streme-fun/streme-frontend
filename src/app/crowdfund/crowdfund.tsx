@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAccount } from "wagmi";
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
@@ -20,6 +20,8 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import sdk from "@farcaster/miniapp-sdk";
+import { publicClient } from "@/src/lib/viemClient";
 
 export default function CrowdfundPage() {
   const { isConnected, address: wagmiAddress } = useAccount();
@@ -29,6 +31,7 @@ export default function CrowdfundPage() {
     isMiniAppView,
     address: farcasterAddress,
     isConnected: farcasterIsConnected,
+    isSDKLoaded,
   } = useAppFrameLogic();
   const [price, setPrice] = useState<number | null>(null);
   const [baseUsdValue, setBaseUsdValue] = useState<number>(0);
@@ -51,10 +54,37 @@ export default function CrowdfundPage() {
     }>
   >([]);
   const [isLoadingContributors, setIsLoadingContributors] = useState(true);
+  const [isRefreshingAfterTransaction, setIsRefreshingAfterTransaction] =
+    useState(false);
+  const [isTransactionSuccess, setIsTransactionSuccess] = useState(false);
+  const [successAmount, setSuccessAmount] = useState("");
+  const [successPercentage, setSuccessPercentage] = useState("");
+  const [isWithdrawalSuccess, setIsWithdrawalSuccess] = useState(false);
+  const [lastTransactionType, setLastTransactionType] = useState<
+    "contribution" | "withdrawal" | null
+  >(null);
+  const [lastWithdrawAmount, setLastWithdrawAmount] = useState("");
+  const [unlockTime, setUnlockTime] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState<string>("");
 
   const STREME_TOKEN_ADDRESS = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
   const DEPOSIT_CONTRACT_ADDRESS = "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
   const GOAL = 1000; // $1000 USD goal
+
+  // ABI for the staking contract to check deposit timestamps
+  const stakingAbi = useMemo(
+    () =>
+      [
+        {
+          name: "depositTimestamps",
+          type: "function",
+          stateMutability: "view",
+          inputs: [{ name: "account", type: "address" }],
+          outputs: [{ name: "", type: "uint256" }],
+        },
+      ] as const,
+    []
+  );
 
   // Effective connection status for mini-app vs regular
   const effectiveIsConnected = isMiniAppView
@@ -84,6 +114,7 @@ export default function CrowdfundPage() {
     refetchTotalBalance,
     refetchAllowance,
     refetchUserStakedTokenBalance,
+    stakedStremeCoinAddress,
   } = useStremeStakingContract(effectiveAddress);
 
   const {
@@ -244,35 +275,66 @@ export default function CrowdfundPage() {
   }, [baseStremeAmount]);
 
   // Fetch contributors leaderboard
-  useEffect(() => {
-    const fetchContributors = async () => {
-      try {
-        console.log("Fetching contributors from API...");
-        setIsLoadingContributors(true);
-        const response = await fetch("/api/crowdfund/leaderboard");
-        console.log("Contributors API response status:", response.status);
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Contributors data:", data);
-          setContributors(data);
-        } else {
-          console.error(
-            "Contributors API failed with status:",
-            response.status
-          );
-        }
-      } catch (error) {
-        console.error("Error fetching contributors:", error);
-      } finally {
-        setIsLoadingContributors(false);
-      }
-    };
+  const fetchContributors = useCallback(async (bustCache = false) => {
+    try {
+      console.log(
+        "Fetching contributors from API...",
+        bustCache ? "(cache busting)" : ""
+      );
+      setIsLoadingContributors(true);
 
-    fetchContributors();
-    // Refresh contributors every 30 seconds
-    const interval = setInterval(fetchContributors, 30000);
-    return () => clearInterval(interval);
+      // Add cache busting when explicitly requested
+      const url = bustCache
+        ? `/api/crowdfund/leaderboard?t=${Date.now()}`
+        : "/api/crowdfund/leaderboard";
+
+      const response = await fetch(url, {
+        cache: bustCache ? "no-store" : "default",
+        headers: bustCache ? { "Cache-Control": "no-cache" } : {},
+      });
+
+      console.log("Contributors API response status:", response.status);
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Contributors data:", data);
+        setContributors(data);
+      } else {
+        console.error("Contributors API failed with status:", response.status);
+      }
+    } catch (error) {
+      console.error("Error fetching contributors:", error);
+    } finally {
+      setIsLoadingContributors(false);
+    }
   }, []);
+
+  // Fetch contributors with retry logic for transaction updates
+  const fetchContributorsWithRetry = useCallback(async () => {
+    console.log("Fetching contributors after transaction with retry logic...");
+    setIsRefreshingAfterTransaction(true);
+
+    // First attempt - immediate refresh with cache busting
+    await fetchContributors(true);
+
+    // If external API is slow to update, retry with delays
+    setTimeout(() => {
+      console.log("Retry 1: Fetching contributors after 2 seconds...");
+      fetchContributors(true);
+    }, 2000);
+
+    setTimeout(() => {
+      console.log("Retry 2: Fetching contributors after 5 seconds...");
+      fetchContributors(true);
+      setIsRefreshingAfterTransaction(false); // Stop showing refresh indicator after final retry
+    }, 5000);
+  }, [fetchContributors]);
+
+  useEffect(() => {
+    fetchContributors();
+    // Refresh contributors every 20 seconds
+    const interval = setInterval(fetchContributors, 20000);
+    return () => clearInterval(interval);
+  }, [fetchContributors]);
 
   // Handle approval completion - proceed to deposit
   useEffect(() => {
@@ -333,15 +395,32 @@ export default function CrowdfundPage() {
       hash !== processedHash
     ) {
       // Transaction completed successfully
+      const isWithdrawal = lastTransactionType === "withdrawal";
+      const transactionAmount = isWithdrawal
+        ? lastWithdrawAmount
+        : amount || "0";
+
+      // Refetch balances to get updated values
       refetchUserBalance();
       refetchTotalBalance();
       refetchUserStakedTokenBalance();
+
+      // Fetch updated contributors leaderboard with retry logic
+      fetchContributorsWithRetry();
+
+      // Set success state with the amount
+      setSuccessAmount(transactionAmount);
+      setIsWithdrawalSuccess(isWithdrawal);
+      setIsTransactionSuccess(true);
+
+      // The percentage will be calculated after refetch completes
+      // We'll use a separate effect to update the percentage once new balance is available
+
       setAmount("");
       setPercentage(0);
-      setShowContributionModal(false);
+      setLastWithdrawAmount("");
+      setLastTransactionType(null);
       setProcessedHash(hash);
-
-      // Contributors will be updated by the real data fetching
     }
   }, [
     isDepositing,
@@ -355,7 +434,108 @@ export default function CrowdfundPage() {
     refetchUserBalance,
     refetchTotalBalance,
     refetchUserStakedTokenBalance,
+    fetchContributorsWithRetry,
+    amount,
+    totalBalance,
+    lastTransactionType,
+    lastWithdrawAmount,
   ]);
+
+  // Update success percentage when balances are updated and we're in success state
+  useEffect(() => {
+    if (
+      isTransactionSuccess &&
+      userDepositBalance &&
+      totalBalance &&
+      totalBalance > 0n
+    ) {
+      const updatedPercentage = (
+        (Number(userDepositBalance) / Number(totalBalance)) *
+        100
+      ).toFixed(1);
+      setSuccessPercentage(updatedPercentage);
+    }
+  }, [isTransactionSuccess, userDepositBalance, totalBalance]);
+
+  // Fetch unlock time when user has staked tokens
+  const fetchUnlockTime = useCallback(async () => {
+    if (!effectiveIsConnected || !effectiveAddress || !stakedStremeCoinAddress)
+      return;
+
+    try {
+      const timestamp = await publicClient.readContract({
+        address: stakedStremeCoinAddress as `0x${string}`,
+        abi: stakingAbi,
+        functionName: "depositTimestamps",
+        args: [effectiveAddress as `0x${string}`],
+      });
+
+      const unlockTimeStamp = Number(timestamp) + 86400; // 24 hours in seconds
+      setUnlockTime(unlockTimeStamp);
+    } catch (error) {
+      console.error("Error fetching unlock time:", error);
+    }
+  }, [
+    effectiveIsConnected,
+    effectiveAddress,
+    stakedStremeCoinAddress,
+    stakingAbi,
+  ]);
+
+  // Fetch unlock time automatically when user has staked tokens
+  useEffect(() => {
+    if (
+      userStakedTokenBalance &&
+      userStakedTokenBalance > 0n &&
+      effectiveIsConnected &&
+      effectiveAddress &&
+      stakedStremeCoinAddress &&
+      unlockTime === null
+    ) {
+      fetchUnlockTime();
+    }
+  }, [
+    userStakedTokenBalance,
+    effectiveIsConnected,
+    effectiveAddress,
+    stakedStremeCoinAddress,
+    unlockTime,
+    fetchUnlockTime,
+  ]);
+
+  // Update timer when unlock time is set
+  useEffect(() => {
+    if (!unlockTime) return;
+
+    const updateTimer = () => {
+      const now = Math.floor(Date.now() / 1000);
+      const secondsLeft = unlockTime - now;
+
+      if (secondsLeft <= 0) {
+        setTimeLeft("");
+        return;
+      }
+
+      const hours = Math.floor(secondsLeft / 3600);
+      const minutes = Math.floor((secondsLeft % 3600) / 60);
+      const seconds = secondsLeft % 60;
+
+      setTimeLeft(
+        `${hours}h ${minutes.toString().padStart(2, "0")}m ${seconds
+          .toString()
+          .padStart(2, "0")}s`
+      );
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [unlockTime]);
+
+  // Check if tokens are locked
+  const isLocked = unlockTime
+    ? Math.floor(Date.now() / 1000) < unlockTime
+    : false;
 
   // Contributors are now fetched from real contract data above
 
@@ -399,6 +579,7 @@ export default function CrowdfundPage() {
       }
 
       // Then deposit (if already approved)
+      setLastTransactionType("contribution");
       depositTokens(amount, isMiniAppView, effectiveAddress);
       // Don't close modal yet - wait for deposit to complete
     } catch (err) {
@@ -413,10 +594,15 @@ export default function CrowdfundPage() {
   ) => {
     try {
       setError("");
+      setLastTransactionType("withdrawal");
+
       if (withdrawAll) {
+        // For withdraw all, we'll use the current user deposit balance
+        setLastWithdrawAmount(formatStakeAmount(userDepositBalance));
         withdrawAllTokens(isMiniAppView, effectiveAddress);
       } else {
         const amountToWithdraw = customAmount || amount;
+        setLastWithdrawAmount(amountToWithdraw);
         withdrawTokens(amountToWithdraw, isMiniAppView, effectiveAddress);
       }
       // Don't close modal yet - wait for withdrawal to complete
@@ -460,6 +646,38 @@ export default function CrowdfundPage() {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
+  // Handle sharing to Farcaster
+  const handleShareToFarcaster = async () => {
+    const shareUrl = `https://streme.fun/crowdfund`;
+    const shareText = `I just contributed ${successAmount} STREME to @streme's streaming QR crowdfund! Streme On 🎶 🚀`;
+
+    if (isMiniAppView && isSDKLoaded && sdk) {
+      try {
+        await sdk.actions.composeCast({
+          text: shareText,
+          embeds: [shareUrl],
+        });
+      } catch (error) {
+        console.error("Error composing cast:", error);
+        // Fallback to opening Farcaster
+        window.open(
+          `https://farcaster.xyz/~/compose?text=${encodeURIComponent(
+            shareText
+          )}&embeds%5B%5D=${encodeURIComponent(shareUrl)}`,
+          "_blank"
+        );
+      }
+    } else {
+      // Desktop version - open Farcaster web compose
+      window.open(
+        `https://farcaster.xyz/~/compose?text=${encodeURIComponent(
+          shareText
+        )}&embeds%5B%5D=${encodeURIComponent(shareUrl)}`,
+        "_blank"
+      );
+    }
+  };
+
   // Format contributor amount
   const formatContributorAmount = (amountWei: string) => {
     const amount = Number(formatUnits(BigInt(amountWei), 18));
@@ -473,7 +691,9 @@ export default function CrowdfundPage() {
 
   return (
     <div
-      className={`min-h-screen sm:mt-20 ${isMiniAppView ? "pb-24" : "pb-4"}`}
+      className={`min-h-screen sm:mt-24 sm:max-w-xl mx-auto ${
+        isMiniAppView ? "pb-24" : "pb-4"
+      }`}
     >
       {/* Back Button - Only show in mini app */}
       {isMiniAppView && (
@@ -506,8 +726,8 @@ export default function CrowdfundPage() {
           <div className="flex justify-between items-start">
             <div className="flex-1 flex flex-col gap-1">
               <div className="flex items-center gap-1 justify-between">
-                <h2 className="text-lg font-bold text-base-content">
-                  Fund a Streme QR Auction Win
+                <h2 className="text-lg md:text-xl font-bold text-base-content">
+                  Win a QR Auction for Streme
                 </h2>
                 {/* Info button in top right */}
                 <button
@@ -552,9 +772,9 @@ export default function CrowdfundPage() {
                 </div>
               </div>
               <p className="text-sm text-base-content/70 leading-snug">
-                Contribute your staking $STREME yield to earn SUP rewards and
-                help Streme get discovered by 10,000+ quality users via QR
-                Auction.
+                Help Streme get discovered by 10,000+ quality users via QR
+                Auction. Contribute your staking $STREME yield to earn SUP
+                rewards.
               </p>
             </div>
           </div>
@@ -653,9 +873,19 @@ export default function CrowdfundPage() {
                         setShowContributionModal(true);
                       }, 100);
                     }}
+                    disabled={isPaused || isLocked}
                     className="btn btn-primary btn-lg w-full h-11 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                    title={
+                      timeLeft
+                        ? `Staked tokens unlock in ${timeLeft}`
+                        : undefined
+                    }
                   >
-                    {hasActiveContribution ? (
+                    {isPaused ? (
+                      "Crowdfund Paused"
+                    ) : isLocked ? (
+                      `Staked tokens unlock in ${timeLeft}`
+                    ) : hasActiveContribution ? (
                       <div className="flex items-center justify-center gap-2">
                         <svg
                           className="w-4 h-4"
@@ -840,7 +1070,41 @@ export default function CrowdfundPage() {
       {(contributors.length > 0 || isLoadingContributors) && (
         <div className="container mx-auto mt-6 mb-8">
           <div className="">
-            <h3 className="text-lg font-bold mb-4 text-center">Contributors</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">Contributors</h3>
+              <div className="flex items-center gap-2">
+                {isRefreshingAfterTransaction && (
+                  <div className="flex items-center gap-1">
+                    <div className="loading loading-spinner loading-xs"></div>
+                    <span className="text-xs text-base-content/60">
+                      Updating...
+                    </span>
+                  </div>
+                )}
+                <button
+                  onClick={() => fetchContributors(true)}
+                  disabled={
+                    isLoadingContributors || isRefreshingAfterTransaction
+                  }
+                  className="btn btn-ghost btn-xs"
+                  title="Refresh leaderboard"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
             <div className="space-y-3">
               {isLoadingContributors && contributors.length === 0 ? (
                 <div className="flex justify-center py-8">
@@ -923,6 +1187,10 @@ export default function CrowdfundPage() {
         onClose={() => {
           setShowContributionModal(false);
           setError("");
+          setIsTransactionSuccess(false);
+          setSuccessAmount("");
+          setSuccessPercentage("");
+          setIsWithdrawalSuccess(false);
         }}
         hasActiveContribution={hasActiveContribution}
         userContribution={userContribution}
@@ -941,6 +1209,13 @@ export default function CrowdfundPage() {
         onContribute={handleContribute}
         onWithdraw={handleWithdraw}
         isMiniApp={isMiniAppView}
+        isSuccess={isTransactionSuccess}
+        successAmount={successAmount}
+        successPercentage={successPercentage}
+        onShareToFarcaster={
+          !isWithdrawalSuccess ? handleShareToFarcaster : undefined
+        }
+        isWithdrawal={isWithdrawalSuccess}
       />
 
       {/* FAQ Section */}
@@ -958,8 +1233,26 @@ export default function CrowdfundPage() {
               </div>
               <div className="collapse-content">
                 <p className="text-sm text-base-content/70 pt-2">
-                  QR auctions provide 24-hour homepage features for winning
-                  projects. We think this will be good for Streme.
+                  QR runs a daily auction, where the winner chooses the link the
+                  QR code will point to for a day. It&apos;s a great way to
+                  drive attention to anything on the internet. Around 10,000
+                  people check out our winners every day. Learn more at{" "}
+                  <a
+                    href="https://qrcoin.fun/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary"
+                  >
+                    QR Coin
+                  </a>{" "}
+                  or from{" "}
+                  <a
+                    href="https://farcaster.xyz/jake"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Jake on Farcaster
+                  </a>
                 </p>
               </div>
             </div>
@@ -1071,7 +1364,8 @@ export default function CrowdfundPage() {
                 <p className="text-sm text-base-content/70 pt-2">
                   Wait until your lock expires (24 hours after staking). No need
                   to unstake, the lock just can&apos;t be active while you
-                  contribute.
+                  contribute. The button will show a countdown timer if your
+                  tokens are still locked.
                 </p>
               </div>
             </div>
