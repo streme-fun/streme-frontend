@@ -24,14 +24,13 @@ import { publicClient } from "@/src/lib/viemClient";
 
 export default function CrowdfundPage() {
   const router = useRouter();
-  const { isMiniAppView, isSDKLoaded } = useAppFrameLogic();
+  const { isSDKLoaded } = useAppFrameLogic();
 
   // Use unified wallet connection logic
   const {
     isConnected: unifiedIsConnected,
     address: unifiedAddress,
     isEffectivelyMiniApp: unifiedIsMiniApp,
-    raw: unifiedRaw,
   } = useUnifiedWallet();
   const [price, setPrice] = useState<number | null>(null);
   const [baseUsdValue, setBaseUsdValue] = useState<number>(0);
@@ -66,7 +65,6 @@ export default function CrowdfundPage() {
   const [lastWithdrawAmount, setLastWithdrawAmount] = useState("");
   const [unlockTime, setUnlockTime] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>("");
-  const [showDebugMenu, setShowDebugMenu] = useState(false);
 
   const STREME_TOKEN_ADDRESS = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
   const DEPOSIT_CONTRACT_ADDRESS = "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
@@ -134,41 +132,57 @@ export default function CrowdfundPage() {
   // State for real flow rate data
   const [realFlowRate, setRealFlowRate] = useState<number>(0);
 
-  // Fetch real flow rate from Superfluid subgraph
+  // Fetch real flow rate from GDA Forwarder contract
   useEffect(() => {
     const fetchFlowRate = async () => {
       try {
-        const stakingPoolAddress = "0xceaCfbB5A17b6914051D12D8c91d3461382d503b"; // The staking pool address
+        const GDA_FORWARDER_ADDRESS =
+          "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
+        const STREME_TOKEN_ADDRESS =
+          "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
+        const CROWDFUND_ADDRESS = "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
 
-        const query = `
-          query PoolData {
-            pool(id: "${stakingPoolAddress.toLowerCase()}") {
-              flowRate
-            }
-          }
-        `;
-
-        const response = await fetch(
-          "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",
+        // ABI for getNetFlow function
+        const gdaForwarderAbi = [
           {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query }),
-          }
-        );
+            name: "getNetFlow",
+            type: "function",
+            stateMutability: "view",
+            inputs: [
+              { name: "token", type: "address" },
+              { name: "account", type: "address" },
+            ],
+            outputs: [{ name: "", type: "int96" }],
+          },
+        ] as const;
 
-        const data = await response.json();
-        if (data.data?.pool?.flowRate) {
+        const netFlowRate = await publicClient.readContract({
+          address: GDA_FORWARDER_ADDRESS as `0x${string}`,
+          abi: gdaForwarderAbi,
+          functionName: "getNetFlow",
+          args: [
+            STREME_TOKEN_ADDRESS as `0x${string}`,
+            CROWDFUND_ADDRESS as `0x${string}`,
+          ],
+        });
+
+        if (netFlowRate) {
           // Convert flow rate from wei per second to tokens per second
-          const flowRatePerSecond = Number(
-            formatUnits(BigInt(data.data.pool.flowRate), 18)
+          // Note: netFlowRate is int96, can be negative, so we take absolute value
+          const flowRatePerSecond = Math.abs(
+            Number(formatUnits(BigInt(netFlowRate.toString()), 18))
           );
           setRealFlowRate(flowRatePerSecond);
+          console.log(
+            "Real flow rate fetched:",
+            flowRatePerSecond,
+            "tokens/second"
+          );
         }
       } catch (error) {
         console.error("Error fetching flow rate:", error);
-        // Fallback to simulated rate
-        setRealFlowRate(1.0);
+        // Keep realFlowRate as 0 to fall back to simulated rate
+        setRealFlowRate(0);
       }
     };
 
@@ -349,7 +363,7 @@ export default function CrowdfundPage() {
     pendingDepositAmount,
     refetchAllowance,
     depositTokens,
-    isMiniAppView,
+    unifiedIsMiniApp,
     effectiveAddress,
   ]);
 
@@ -543,6 +557,23 @@ export default function CrowdfundPage() {
   const remainingUsd = Math.max(0, GOAL - totalUsdValue);
   const isCompleted = totalUsdValue >= GOAL;
 
+  // Calculate estimated time to completion
+  // const estimatedTimeToCompletion = useMemo(() => {
+  //   if (!price || usdGrowthRate <= 0 || remainingUsd <= 0) return null;
+
+  //   const secondsToGoal = remainingUsd / usdGrowthRate;
+  //   if (secondsToGoal === Infinity || secondsToGoal <= 0) return null;
+
+  //   const days = Math.floor(secondsToGoal / 86400);
+  //   const hours = Math.floor((secondsToGoal % 86400) / 3600);
+  //   const minutes = Math.floor((secondsToGoal % 3600) / 60);
+
+  //   if (days > 365) return "More than a year";
+  //   if (days > 0) return `${days}d ${hours}h`;
+  //   if (hours > 0) return `${hours}h ${minutes}m`;
+  //   return `${minutes}m`;
+  // }, [price, usdGrowthRate, remainingUsd]);
+
   // User contribution calculations
   const userContribution = formatStakeAmount(userDepositBalance);
   const userPercentage =
@@ -730,28 +761,8 @@ export default function CrowdfundPage() {
                 <h2 className="text-lg md:text-xl font-bold text-base-content">
                   Win a QR Auction for Streme
                 </h2>
-                {/* Debug and Info buttons in top right */}
+                {/* Info button in top right */}
                 <div className="flex items-center gap-1 ml-2">
-                  <button
-                    onClick={() => setShowDebugMenu(!showDebugMenu)}
-                    className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
-                    title="Debug wallet info"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"
-                      />
-                    </svg>
-                  </button>
                   <button
                     onClick={() => setShowHowItWorks(true)}
                     className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
@@ -803,75 +814,6 @@ export default function CrowdfundPage() {
           </div>
         </div>
       </div>
-
-      {/* Debug Menu */}
-      {showDebugMenu && (
-        <div className="container mx-auto px-4 mb-4">
-          <div className="bg-gray-100 border border-gray-300 rounded-lg p-4 text-xs font-mono">
-            <div className="font-bold mb-3 text-gray-800">
-              🔧 Wallet Debug Info
-            </div>
-
-            <div className="space-y-2">
-              <div className="bg-white p-2 rounded border">
-                <div className="font-semibold text-gray-700">
-                  Connection Status:
-                </div>
-                <div>
-                  Connected: {effectiveIsConnected ? "✅ Yes" : "❌ No"}
-                </div>
-                <div>Mini App: {unifiedIsMiniApp ? "✅ Yes" : "❌ No"}</div>
-              </div>
-
-              <div className="bg-white p-2 rounded border">
-                <div className="font-semibold text-gray-700">Addresses:</div>
-                <div>Unified: {unifiedAddress || "None"}</div>
-                <div>Wagmi: {unifiedRaw.wagmiAddress || "None"}</div>
-                <div>
-                  Privy User: {unifiedRaw.privyUserWalletAddress || "None"}
-                </div>
-                <div>
-                  Privy Connected: {unifiedRaw.privyConnectedAddress || "None"}
-                </div>
-                <div>Farcaster: {unifiedRaw.farcasterAddress || "None"}</div>
-              </div>
-
-              <div className="bg-white p-2 rounded border">
-                <div className="font-semibold text-gray-700">Balances:</div>
-                <div>
-                  Staked:{" "}
-                  {userStakedTokenBalance
-                    ? userStakedTokenBalance.toString()
-                    : "None"}
-                </div>
-                <div>
-                  Deposit:{" "}
-                  {userDepositBalance ? userDepositBalance.toString() : "None"}
-                </div>
-                <div>
-                  Has Contribution: {hasActiveContribution ? "✅ Yes" : "❌ No"}
-                </div>
-              </div>
-
-              <div className="bg-white p-2 rounded border">
-                <div className="font-semibold text-gray-700">Raw States:</div>
-                <div>
-                  Privy Auth:{" "}
-                  {unifiedRaw.privyAuthenticated ? "✅ Yes" : "❌ No"}
-                </div>
-                <div>
-                  Wagmi Connected:{" "}
-                  {unifiedRaw.wagmiIsConnected ? "✅ Yes" : "❌ No"}
-                </div>
-                <div>
-                  Farcaster Connected:{" "}
-                  {unifiedRaw.farcasterIsConnected ? "✅ Yes" : "❌ No"}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="container mx-auto">
         {/* Combined Animation and Contribution Section */}
@@ -1011,6 +953,56 @@ export default function CrowdfundPage() {
                   </button>
                 </div>
               )}
+
+              {/* Crowdfund Stats Section */}
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-sm">Crowdfund Stats</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div>
+                    <div className="text-xs text-base-content/60 mb-1">
+                      stSTREME Deposited
+                    </div>
+                    <div className="font-mono font-semibold text-sm">
+                      {totalBalance
+                        ? (Number(totalBalance) / 1e18).toLocaleString(
+                            "en-US",
+                            {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            }
+                          )
+                        : "0"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-base-content/60 mb-1">
+                      Flow Rate
+                    </div>
+                    <div className="font-mono font-semibold text-sm">
+                      {stremeGrowthRate > 0 ? (
+                        <>
+                          {(stremeGrowthRate * 86400).toFixed(1)}
+                          <span className="text-xs"> /day</span>
+                        </>
+                      ) : (
+                        <span className="text-xs">Loading...</span>
+                      )}
+                    </div>
+                  </div>
+                  {/* <div>
+                    <div className="text-xs text-base-content/60 mb-1">
+                      Est. Time
+                    </div>
+                    <div className="font-mono font-semibold text-sm">
+                      {estimatedTimeToCompletion || (
+                        <span className="text-xs">--</span>
+                      )}
+                    </div>
+                  </div> */}
+                </div>
+              </div>
 
               {/* Current Contribution Status */}
               {hasActiveContribution && (
@@ -1153,6 +1145,56 @@ export default function CrowdfundPage() {
                   </div>
                 </button>
               </div>
+
+              {/* Crowdfund Stats Section */}
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-sm">Crowdfund Stats</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div>
+                    <div className="text-xs text-base-content/60 mb-1">
+                      stSTREME Deposited
+                    </div>
+                    <div className="font-mono font-semibold text-sm">
+                      {totalBalance
+                        ? (Number(totalBalance) / 1e18).toLocaleString(
+                            "en-US",
+                            {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            }
+                          )
+                        : "0"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-base-content/60 mb-1">
+                      Flow Rate
+                    </div>
+                    <div className="font-mono font-semibold text-sm">
+                      {stremeGrowthRate > 0 ? (
+                        <>
+                          {(stremeGrowthRate * 86400).toFixed(1)}
+                          <span className="text-xs"> /day</span>
+                        </>
+                      ) : (
+                        <span className="text-xs">Loading...</span>
+                      )}
+                    </div>
+                  </div>
+                  {/* <div>
+                    <div className="text-xs text-base-content/60 mb-1">
+                      Est. Time
+                    </div>
+                    <div className="font-mono font-semibold text-sm">
+                      {estimatedTimeToCompletion || (
+                        <span className="text-xs">--</span>
+                      )}
+                    </div>
+                  </div> */}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -1222,7 +1264,7 @@ export default function CrowdfundPage() {
                               alt={contributor.username || "Contributor"}
                               width={24}
                               height={24}
-                              className="rounded-full"
+                              className="rounded-full object-fill"
                               unoptimized={
                                 contributor.pfp_url.includes(".gif") ||
                                 contributor.pfp_url.includes(
@@ -1239,14 +1281,19 @@ export default function CrowdfundPage() {
                           )}
                           <div>
                             <div className="text-sm font-medium">
-                              {contributor.username ||
-                                truncateAddress(contributor.address)}
+                              {contributor.username ? (
+                                <a
+                                  href={`https://farcaster.xyz/${contributor.username}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hover:underline"
+                                >
+                                  {contributor.username}
+                                </a>
+                              ) : (
+                                truncateAddress(contributor.address)
+                              )}
                             </div>
-                            {contributor.username && (
-                              <div className="text-xs text-base-content/60">
-                                {truncateAddress(contributor.address)}
-                              </div>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -1401,21 +1448,6 @@ export default function CrowdfundPage() {
                 <p className="text-sm text-base-content/70 pt-2">
                   Yes, you can withdraw your full principal at any time. Your
                   Streme rewards will go back to your wallet.
-                </p>
-              </div>
-            </div>
-
-            <div className="collapse collapse-arrow bg-base-200">
-              <input type="radio" name="faq-accordion" />
-              <div className="collapse-title font-semibold">
-                What happens if we win the auction?
-              </div>
-              <div className="collapse-content">
-                <p className="text-sm text-base-content/70 pt-2">
-                  STREME gets featured on QR Coin&apos;s homepage for 24 hours,
-                  exposing our project to thousands of potential investors and
-                  users. This visibility typically leads to increased trading
-                  volume and token adoption.
                 </p>
               </div>
             </div>
