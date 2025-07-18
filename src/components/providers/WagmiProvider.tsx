@@ -1,4 +1,5 @@
-import { createConfig, http, fallback, WagmiProvider } from "wagmi";
+import { createConfig, http, fallback, WagmiProvider as WagmiProviderBase } from "wagmi";
+import { WagmiProvider as PrivyWagmiProvider } from "@privy-io/wagmi";
 import {
   base,
   baseSepolia,
@@ -149,12 +150,61 @@ function CoinbaseWalletAutoConnect({
   return <>{children}</>;
 }
 
-export default function Provider({ children }: { children: React.ReactNode }) {
+// Conditional WagmiProvider that detects mini-app environment
+function ConditionalWagmiProvider({ children }: { children: React.ReactNode }) {
+  const [isMiniApp, setIsMiniApp] = useState(false);
+  const [isDetected, setIsDetected] = useState(false);
+
+  useEffect(() => {
+    const detectMiniApp = async () => {
+      try {
+        // Quick detection for mini-app
+        const quickDetection = 
+          typeof window !== "undefined" &&
+          !window.location.hostname.includes("localhost") &&
+          !window.location.hostname.includes("127.0.0.1") &&
+          (window.parent !== window || window.location !== window.parent.location);
+
+        if (quickDetection) {
+          // Try to detect with Farcaster SDK
+          const sdk = await import("@farcaster/miniapp-sdk");
+          const isInMiniApp = await sdk.default.isInMiniApp();
+          setIsMiniApp(isInMiniApp);
+        } else {
+          setIsMiniApp(false);
+        }
+      } catch (error) {
+        console.error("Error detecting mini-app:", error);
+        setIsMiniApp(false);
+      } finally {
+        setIsDetected(true);
+      }
+    };
+
+    detectMiniApp();
+  }, []);
+
+  // Show loading until detection is complete
+  if (!isDetected) {
+    return <div>Loading...</div>;
+  }
+
+  // Use regular wagmi provider for mini-app, Privy provider for others
+  const WagmiProvider = isMiniApp ? WagmiProviderBase : PrivyWagmiProvider;
+
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        <CoinbaseWalletAutoConnect>{children}</CoinbaseWalletAutoConnect>
-      </QueryClientProvider>
+      {children}
     </WagmiProvider>
+  );
+}
+
+export default function Provider({ children }: { children: React.ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ConditionalWagmiProvider>
+        <CoinbaseWalletAutoConnect>{children}</CoinbaseWalletAutoConnect>
+      </ConditionalWagmiProvider>
+    </QueryClientProvider>
   );
 }

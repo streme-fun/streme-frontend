@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { useAccount } from "wagmi";
 import { Token } from "@/src/app/types/token";
 import { StakeButton } from "@/src/components/StakeButton";
 import { publicClient } from "@/src/lib/viemClient";
@@ -14,6 +13,7 @@ import { LiquidityWarning } from "@/src/components/LiquidityWarning";
 import { Wallet } from "lucide-react";
 import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
+import { useUnifiedWallet } from "@/src/hooks/useUnifiedWallet";
 import { Button as UiButton } from "@/src/components/ui/button";
 import { parseEther } from "viem";
 import { getPrices, convertToUSD } from "@/src/lib/priceUtils";
@@ -105,38 +105,24 @@ export function TokenActions({
 
   const {
     isSDKLoaded: fcSDKLoaded,
-    isMiniAppView: detectedMiniAppView,
-    address: fcAddress,
-    isConnected: fcIsConnected,
-    connect: fcConnect,
-    connectors: fcConnectors,
-    // farcasterContext,
   } = useAppFrameLogic();
 
-  const { login: privyLogin, ready: privyReady } = usePrivy();
-  const { address: wagmiAddress } = useAccount();
+  const { ready: privyReady } = usePrivy();
 
-  // Simplified mini app detection - use the improved detection from useAppFrameLogic
-  const isEffectivelyMiniApp = isMiniAppViewProp ?? detectedMiniAppView;
+  // Use unified wallet connection logic
+  const {
+    isConnected: unifiedIsConnected,
+    address: unifiedAddress,
+    connect: unifiedConnect,
+    isEffectivelyMiniApp: unifiedIsMiniApp,
+    isLoading: unifiedIsLoading,
+  } = useUnifiedWallet();
 
-  // Simplified wallet connection logic - match MyTokensModal pattern
-  const currentAddress = isEffectivelyMiniApp 
-    ? (addressProp ?? fcAddress)
-    : wagmiAddress;
-  
-  const walletIsConnected = isEffectivelyMiniApp 
-    ? (isConnectedProp ?? fcIsConnected)
-    : !!wagmiAddress;
-  
-  const effectiveLogin = isEffectivelyMiniApp 
-    ? () => {
-        if (fcConnect && fcConnectors && fcConnectors.length > 0) {
-          fcConnect({ connector: fcConnectors[0] });
-        } else {
-          console.warn("Farcaster connect function not available");
-        }
-      }
-    : privyLogin;
+  // Override with props if provided (for component-level control)
+  const isEffectivelyMiniApp = isMiniAppViewProp ?? unifiedIsMiniApp;
+  const currentAddress = addressProp ?? unifiedAddress;
+  const walletIsConnected = isConnectedProp ?? unifiedIsConnected;
+  const effectiveLogin = unifiedConnect;
 
   // Enhanced 0x API integration
   const getGaslessQuote = useCallback(
@@ -471,25 +457,15 @@ export function TokenActions({
     return () => clearInterval(interval);
   }, [contractAddress, token.price]);
 
-  if (isEffectivelyMiniApp && !fcSDKLoaded) {
+  // Show loading state if wallet is initializing
+  if (unifiedIsLoading || (isEffectivelyMiniApp && !fcSDKLoaded) || (!isEffectivelyMiniApp && !privyReady)) {
     return (
       <div className="card bg-base-100 border border-black/[.1]1]">
         <div className="card-body items-center justify-center min-h-[100px]">
           <span className="loading loading-spinner loading-sm"></span>
           <p className="text-sm text-base-content/70">
-            Loading Farcaster SDK...
+            {isEffectivelyMiniApp ? "Loading Farcaster SDK..." : "Initializing wallet..."}
           </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isEffectivelyMiniApp && !privyReady) {
-    return (
-      <div className="card bg-base-100 border border-black/[.1]1]">
-        <div className="card-body items-center justify-center min-h-[100px]">
-          <span className="loading loading-spinner loading-sm"></span>
-          <p className="text-sm text-base-content/70">Initializing wallet...</p>
         </div>
       </div>
     );
@@ -725,7 +701,7 @@ export function TokenActions({
               }}
               isMiniApp={isEffectivelyMiniApp}
               farcasterAddress={currentAddress}
-              farcasterIsConnected={walletIsConnected}
+              farcasterIsConnected={!!walletIsConnected}
               disabled={!validation.isValid}
               className={`w-full btn ${
                 tradeDirection === "buy"
@@ -748,7 +724,7 @@ export function TokenActions({
               disabled={!stakingAddress || !validation.isValid}
               isMiniApp={isEffectivelyMiniApp}
               farcasterAddress={currentAddress}
-              farcasterIsConnected={walletIsConnected}
+              farcasterIsConnected={!!walletIsConnected}
               amount={tradeAmount}
               className="w-full btn btn-outline relative before:absolute before:inset-0 before:bg-gradient-to-r before:from-[#ff75c3] before:via-[#ffa647] before:to-[#ffe83f] before:opacity-30 hover:before:opacity-40 border-[#ffa647]/30 hover:border-[#ffa647]/50 shadow-[0_0_5px_rgba(255,166,71,0.3)] hover:shadow-[0_0_10px_rgba(255,166,71,0.5),0_0_20px_rgba(255,131,63,0.3)]"
             />
@@ -770,7 +746,7 @@ export function TokenActions({
             className="btn btn-outline border-base-300 hover:border-base-400 text-base-content hover:text-base-content bg-base-100 hover:bg-base-200 w-full disabled:border-base-200 disabled:text-base-content/40 disabled:bg-base-100"
             isMiniApp={isEffectivelyMiniApp}
             farcasterAddress={currentAddress}
-            farcasterIsConnected={walletIsConnected}
+            farcasterIsConnected={!!walletIsConnected}
             tokenBalance={balance}
           />
         )}
@@ -787,7 +763,7 @@ export function TokenActions({
           className="btn btn-outline border-base-300 hover:border-base-400 text-base-content hover:text-base-content bg-base-100 hover:bg-base-200 w-full disabled:border-base-200 disabled:text-base-content/40 disabled:bg-base-100"
           isMiniApp={isEffectivelyMiniApp}
           farcasterAddress={currentAddress}
-          farcasterIsConnected={walletIsConnected}
+          farcasterIsConnected={!!walletIsConnected}
         />
 
         {/* Pool Connection Status Indicator */}
@@ -817,7 +793,7 @@ export function TokenActions({
                   }}
                   isMiniApp={isEffectivelyMiniApp}
                   farcasterAddress={currentAddress}
-                  farcasterIsConnected={walletIsConnected}
+                  farcasterIsConnected={!!walletIsConnected}
                 />
               </>
             )}
@@ -832,7 +808,7 @@ export function TokenActions({
             }}
             isMiniApp={isEffectivelyMiniApp}
             farcasterAddress={currentAddress}
-            farcasterIsConnected={walletIsConnected}
+            farcasterIsConnected={!!walletIsConnected}
           />
         )}
       </div>

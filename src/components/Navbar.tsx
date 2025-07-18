@@ -225,7 +225,6 @@ Symbol: $[your ticker]
               Launch
             </button>
 
-
             {/* Leaderboard Button */}
             <button
               onClick={() => {
@@ -491,14 +490,6 @@ Symbol: $[your ticker]
                 My Tokens
               </Link>
             )}
-
-            <Link
-              href="/crowdfund"
-              className="btn btn-secondary w-full justify-start"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              🎯 Missions
-            </Link>
 
             <button
               onClick={() => {

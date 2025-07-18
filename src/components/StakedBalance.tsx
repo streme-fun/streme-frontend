@@ -53,21 +53,23 @@ export function StakedBalance({
     flowRatePerSecond: Number(flowRate) / 86400, // Convert daily rate to per-second
     lastUpdateTime,
     updateInterval: 50, // 50ms for smooth animation (matches original)
-    pauseWhenHidden: true
+    pauseWhenHidden: true,
   });
 
   const refresh = () => {
     // Debounce refresh calls to prevent rapid successive updates
     const now = Date.now();
     if (now - lastFetchTime < 1000) {
-      console.log('[StakedBalance] Ignoring refresh - too soon since last call');
+      console.log(
+        "[StakedBalance] Ignoring refresh - too soon since last call"
+      );
       return;
     }
     setRefreshTrigger((prev) => prev + 1);
   };
 
   // Main data fetching effect
-   
+
   useEffect(() => {
     if (
       !effectiveIsConnected ||
@@ -81,14 +83,18 @@ export function StakedBalance({
       // Prevent calls if we just fetched data recently (within 30 seconds)
       const now = Date.now();
       if (now - lastFetchTime < 30000) {
-        console.log('Skipping fetch - too soon since last fetch');
+        console.log("Skipping fetch - too soon since last fetch");
         return;
       }
-      
+
       try {
         setLastFetchTime(now);
-        console.log(`[StakedBalance] Fetching balance for ${effectiveAddress} at ${new Date(now).toLocaleTimeString()}`);
-        
+        console.log(
+          `[StakedBalance] Fetching balance for ${effectiveAddress} at ${new Date(
+            now
+          ).toLocaleTimeString()}`
+        );
+
         // Get staked balance
         const staked = await publicClient.readContract({
           address: stakingAddress as `0x${string}`,
@@ -216,7 +222,6 @@ export function StakedBalance({
     // Note: Intentionally excluding baseAmount and lastFetchTime to prevent re-render loops
   ]);
 
-
   useEffect(() => {
     const element = document.querySelector("[data-staking-balance]");
     if (element) {
@@ -234,7 +239,7 @@ export function StakedBalance({
   return (
     <div
       data-staking-balance
-      className="space-y-4 card bg-base-100 border-gray-100 border-2 p-4 relative z-10"
+      className="space-y-4 card bg-base-100 border border-base-300 p-4 relative z-10"
     >
       <div>
         <div className="text-sm opacity-60 mb-1">My Staked Balance</div>

@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useAccount } from "wagmi";
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
-import { usePrivy } from "@privy-io/react-auth";
 import { ERC20_ABI } from "@/src/lib/contracts/StremeStakingRewardsFunder";
 import { getPrices } from "@/src/lib/priceUtils";
 import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
 import { StreamAnimation } from "@/src/components/StreamAnimation";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
+import { useUnifiedWallet } from "@/src/hooks/useUnifiedWallet";
 import { HowCrowdfundWorksModal } from "@/src/components/HowCrowdfundWorksModal";
 import { ContributionModal } from "@/src/components/ContributionModal";
 import {
@@ -24,15 +23,16 @@ import sdk from "@farcaster/miniapp-sdk";
 import { publicClient } from "@/src/lib/viemClient";
 
 export default function CrowdfundPage() {
-  const { isConnected, address: wagmiAddress } = useAccount();
-  const { authenticated } = usePrivy();
   const router = useRouter();
+  const { isMiniAppView, isSDKLoaded } = useAppFrameLogic();
+
+  // Use unified wallet connection logic
   const {
-    isMiniAppView,
-    address: farcasterAddress,
-    isConnected: farcasterIsConnected,
-    isSDKLoaded,
-  } = useAppFrameLogic();
+    isConnected: unifiedIsConnected,
+    address: unifiedAddress,
+    isEffectivelyMiniApp: unifiedIsMiniApp,
+    raw: unifiedRaw,
+  } = useUnifiedWallet();
   const [price, setPrice] = useState<number | null>(null);
   const [baseUsdValue, setBaseUsdValue] = useState<number>(0);
   const [lastUsdUpdateTime, setLastUsdUpdateTime] = useState<number>(
@@ -66,6 +66,7 @@ export default function CrowdfundPage() {
   const [lastWithdrawAmount, setLastWithdrawAmount] = useState("");
   const [unlockTime, setUnlockTime] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>("");
+  const [showDebugMenu, setShowDebugMenu] = useState(false);
 
   const STREME_TOKEN_ADDRESS = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
   const DEPOSIT_CONTRACT_ADDRESS = "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
@@ -86,14 +87,10 @@ export default function CrowdfundPage() {
     []
   );
 
-  // Effective connection status for mini-app vs regular
-  const effectiveIsConnected = isMiniAppView
-    ? farcasterIsConnected
-    : isConnected;
-  const effectiveAuthenticated = isMiniAppView
-    ? farcasterIsConnected
-    : authenticated;
-  const effectiveAddress = isMiniAppView ? farcasterAddress : wagmiAddress;
+  // Use unified wallet state with fallback to individual hooks for backwards compatibility
+  const effectiveIsConnected = unifiedIsConnected;
+  const effectiveAuthenticated = unifiedIsConnected;
+  const effectiveAddress = unifiedAddress;
 
   // Read STREME token balance
   const { data: stremeBalance } = useReadContract({
@@ -342,7 +339,7 @@ export default function CrowdfundPage() {
       // Approval completed, now proceed to deposit
       console.log("Approval completed, proceeding to deposit");
       refetchAllowance(); // Refresh allowance
-      depositTokens(pendingDepositAmount, isMiniAppView, effectiveAddress);
+      depositTokens(pendingDepositAmount, unifiedIsMiniApp, effectiveAddress);
       setPendingDepositAmount(""); // Clear pending amount
     }
   }, [
@@ -573,14 +570,14 @@ export default function CrowdfundPage() {
       if (!userAllowance || userAllowance < amountBigInt) {
         console.log("Need approval first");
         setPendingDepositAmount(amount); // Store amount for after approval
-        approveTokens(amount, isMiniAppView, effectiveAddress);
+        approveTokens(amount, unifiedIsMiniApp, effectiveAddress);
         // Don't close modal yet - wait for approval to complete
         return;
       }
 
       // Then deposit (if already approved)
       setLastTransactionType("contribution");
-      depositTokens(amount, isMiniAppView, effectiveAddress);
+      depositTokens(amount, unifiedIsMiniApp, effectiveAddress);
       // Don't close modal yet - wait for deposit to complete
     } catch (err) {
       console.error("Contribution error:", err);
@@ -599,11 +596,11 @@ export default function CrowdfundPage() {
       if (withdrawAll) {
         // For withdraw all, we'll use the current user deposit balance
         setLastWithdrawAmount(formatStakeAmount(userDepositBalance));
-        withdrawAllTokens(isMiniAppView, effectiveAddress);
+        withdrawAllTokens(unifiedIsMiniApp, effectiveAddress);
       } else {
         const amountToWithdraw = customAmount || amount;
         setLastWithdrawAmount(amountToWithdraw);
-        withdrawTokens(amountToWithdraw, isMiniAppView, effectiveAddress);
+        withdrawTokens(amountToWithdraw, unifiedIsMiniApp, effectiveAddress);
       }
       // Don't close modal yet - wait for withdrawal to complete
     } catch (err) {
@@ -651,7 +648,7 @@ export default function CrowdfundPage() {
     const shareUrl = `https://streme.fun/crowdfund`;
     const shareText = `I just contributed ${successAmount} STREME to @streme's streaming QR crowdfund! Streme On 🎶 🚀`;
 
-    if (isMiniAppView && isSDKLoaded && sdk) {
+    if (unifiedIsMiniApp && isSDKLoaded && sdk) {
       try {
         await sdk.actions.composeCast({
           text: shareText,
@@ -692,11 +689,11 @@ export default function CrowdfundPage() {
   return (
     <div
       className={`min-h-screen sm:mt-24 sm:max-w-xl mx-auto ${
-        isMiniAppView ? "pb-24" : "pb-4"
+        unifiedIsMiniApp ? "pb-24" : "pb-4"
       }`}
     >
       {/* Back Button - Only show in mini app */}
-      {isMiniAppView && (
+      {unifiedIsMiniApp && (
         <div className="px-4 pt-4 pb-2">
           <button
             onClick={() => router.push("/")}
@@ -720,8 +717,12 @@ export default function CrowdfundPage() {
           </button>
         </div>
       )}
-
-      <div className="container mx-auto px-4">
+      {/* if not mini-app, add pt-24 */}
+      <div
+        className={`container mx-auto px-4 sm:pt-4 ${
+          unifiedIsMiniApp ? "pt-2" : "pt-24"
+        }`}
+      >
         <div className="mb-1">
           <div className="flex justify-between items-start">
             <div className="flex-1 flex flex-col gap-1">
@@ -729,27 +730,49 @@ export default function CrowdfundPage() {
                 <h2 className="text-lg md:text-xl font-bold text-base-content">
                   Win a QR Auction for Streme
                 </h2>
-                {/* Info button in top right */}
-                <button
-                  onClick={() => setShowHowItWorks(true)}
-                  className="btn btn-ghost btn-sm btn-circle ml-2 flex-shrink-0"
-                  title="How it works"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
+                {/* Debug and Info buttons in top right */}
+                <div className="flex items-center gap-1 ml-2">
+                  <button
+                    onClick={() => setShowDebugMenu(!showDebugMenu)}
+                    className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
+                    title="Debug wallet info"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setShowHowItWorks(true)}
+                    className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
+                    title="How it works"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Image
@@ -780,6 +803,75 @@ export default function CrowdfundPage() {
           </div>
         </div>
       </div>
+
+      {/* Debug Menu */}
+      {showDebugMenu && (
+        <div className="container mx-auto px-4 mb-4">
+          <div className="bg-gray-100 border border-gray-300 rounded-lg p-4 text-xs font-mono">
+            <div className="font-bold mb-3 text-gray-800">
+              🔧 Wallet Debug Info
+            </div>
+
+            <div className="space-y-2">
+              <div className="bg-white p-2 rounded border">
+                <div className="font-semibold text-gray-700">
+                  Connection Status:
+                </div>
+                <div>
+                  Connected: {effectiveIsConnected ? "✅ Yes" : "❌ No"}
+                </div>
+                <div>Mini App: {unifiedIsMiniApp ? "✅ Yes" : "❌ No"}</div>
+              </div>
+
+              <div className="bg-white p-2 rounded border">
+                <div className="font-semibold text-gray-700">Addresses:</div>
+                <div>Unified: {unifiedAddress || "None"}</div>
+                <div>Wagmi: {unifiedRaw.wagmiAddress || "None"}</div>
+                <div>
+                  Privy User: {unifiedRaw.privyUserWalletAddress || "None"}
+                </div>
+                <div>
+                  Privy Connected: {unifiedRaw.privyConnectedAddress || "None"}
+                </div>
+                <div>Farcaster: {unifiedRaw.farcasterAddress || "None"}</div>
+              </div>
+
+              <div className="bg-white p-2 rounded border">
+                <div className="font-semibold text-gray-700">Balances:</div>
+                <div>
+                  Staked:{" "}
+                  {userStakedTokenBalance
+                    ? userStakedTokenBalance.toString()
+                    : "None"}
+                </div>
+                <div>
+                  Deposit:{" "}
+                  {userDepositBalance ? userDepositBalance.toString() : "None"}
+                </div>
+                <div>
+                  Has Contribution: {hasActiveContribution ? "✅ Yes" : "❌ No"}
+                </div>
+              </div>
+
+              <div className="bg-white p-2 rounded border">
+                <div className="font-semibold text-gray-700">Raw States:</div>
+                <div>
+                  Privy Auth:{" "}
+                  {unifiedRaw.privyAuthenticated ? "✅ Yes" : "❌ No"}
+                </div>
+                <div>
+                  Wagmi Connected:{" "}
+                  {unifiedRaw.wagmiIsConnected ? "✅ Yes" : "❌ No"}
+                </div>
+                <div>
+                  Farcaster Connected:{" "}
+                  {unifiedRaw.farcasterIsConnected ? "✅ Yes" : "❌ No"}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="container mx-auto">
         {/* Combined Animation and Contribution Section */}
@@ -1208,7 +1300,7 @@ export default function CrowdfundPage() {
         onSliderChange={handleSliderChange}
         onContribute={handleContribute}
         onWithdraw={handleWithdraw}
-        isMiniApp={isMiniAppView}
+        isMiniApp={unifiedIsMiniApp}
         isSuccess={isTransactionSuccess}
         successAmount={successAmount}
         successPercentage={successPercentage}
@@ -1377,7 +1469,7 @@ export default function CrowdfundPage() {
       <HowCrowdfundWorksModal
         isOpen={showHowItWorks}
         onClose={() => setShowHowItWorks(false)}
-        isMiniApp={isMiniAppView}
+        isMiniApp={unifiedIsMiniApp}
       />
     </div>
   );

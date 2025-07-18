@@ -77,7 +77,6 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
     });
   }, [token.created_at, token.contract_address, token.staking_pool]);
 
-
   const handleCopyAddress = async () => {
     try {
       await navigator.clipboard.writeText(token.contract_address);
@@ -113,8 +112,8 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
 
   return (
     <div
-      className={`space-y-3 card bg-base-100 border-base-300 border-2 p-4 relative z-10 ${
-        isMiniAppView ? "mt-0" : "mt-12 md:mt-0"
+      className={`space-y-3 card bg-base-100 border border-base-300 p-4 relative z-10 ${
+        isMiniAppView ? "mt-0" : "mt-16 md:mt-0"
       }`}
     >
       {/* Token Header */}
@@ -139,7 +138,6 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
             <span className="text-sm opacity-60">${token.symbol}</span>
           </div>
         </div>
-
       </div>
 
       {/* Creator Information */}
