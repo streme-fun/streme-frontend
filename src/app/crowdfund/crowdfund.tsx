@@ -578,7 +578,14 @@ export default function CrowdfundPage() {
   const userContribution = formatStakeAmount(userDepositBalance);
   const userPercentage =
     userDepositBalance && totalBalance && totalBalance > 0n
-      ? ((Number(userDepositBalance) / Number(totalBalance)) * 100).toFixed(1)
+      ? (() => {
+          const percentage = (Number(userDepositBalance) / Number(totalBalance)) * 100;
+          // Show more decimals for very small percentages
+          if (percentage < 0.01) return percentage.toFixed(4);
+          if (percentage < 0.1) return percentage.toFixed(3);
+          if (percentage < 1) return percentage.toFixed(2);
+          return percentage.toFixed(1);
+        })()
       : "0";
 
   // Check if user has active contribution
@@ -1303,7 +1310,10 @@ export default function CrowdfundPage() {
                         </div>
                         {contributor.percentage !== undefined && (
                           <div className="text-xs text-base-content/60">
-                            {contributor.percentage.toFixed(1)}% of pool
+                            {contributor.percentage < 0.1 && contributor.percentage > 0 
+                              ? `<0.1% of pool`
+                              : `${contributor.percentage.toFixed(1)}% of pool`
+                            }
                           </div>
                         )}
                       </div>

@@ -521,39 +521,65 @@ export function StakerLeaderboardEmbed({
 
               {/* Profile */}
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                {staker.farcasterUser?.pfp_url && (
-                  <div className="avatar">
-                    <div className="mask mask-squircle w-6 h-6">
-                      <img
-                        src={staker.farcasterUser.pfp_url}
-                        alt={staker.farcasterUser.username || "User"}
-                      />
+                {/* Special handling for crowdfund address */}
+                {staker.account.id.toLowerCase() === "0xceacfbb5a17b6914051d12d8c91d3461382d503b" ? (
+                  <>
+                    <div className="avatar">
+                      <div className="mask mask-squircle w-6 h-6">
+                        <img
+                          src="/qr.png"
+                          alt="QR Crowdfund"
+                        />
+                      </div>
                     </div>
-                  </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">
+                        <a
+                          href="/crowdfund"
+                          className="hover:underline text-secondary"
+                        >
+                          QR Crowdfund
+                        </a>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {staker.farcasterUser?.pfp_url && (
+                      <div className="avatar">
+                        <div className="mask mask-squircle w-6 h-6">
+                          <img
+                            src={staker.farcasterUser.pfp_url}
+                            alt={staker.farcasterUser.username || "User"}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      {staker.farcasterUser?.username ? (
+                        <div className="text-sm font-medium">
+                          @{staker.farcasterUser.username}
+                        </div>
+                      ) : (
+                        <div className="font-mono text-xs text-primary">
+                          <a
+                            href={`https://basescan.org/address/${staker.account.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:underline"
+                          >
+                            {staker.account.id
+                              ? `${staker.account.id.slice(
+                                  0,
+                                  6
+                                )}...${staker.account.id.slice(-4)}`
+                              : "Unknown"}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
-                <div className="flex-1 min-w-0">
-                  {staker.farcasterUser?.username ? (
-                    <div className="text-sm font-medium">
-                      @{staker.farcasterUser.username}
-                    </div>
-                  ) : (
-                    <div className="font-mono text-xs text-primary">
-                      <a
-                        href={`https://basescan.org/address/${staker.account.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline"
-                      >
-                        {staker.account.id
-                          ? `${staker.account.id.slice(
-                              0,
-                              6
-                            )}...${staker.account.id.slice(-4)}`
-                          : "Unknown"}
-                      </a>
-                    </div>
-                  )}
-                </div>
               </div>
 
               {/* Staked Amount */}
