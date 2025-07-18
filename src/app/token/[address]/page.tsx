@@ -200,8 +200,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         title,
         description,
         images: [imageUrl],
-        creator: token.creator ? `@${token.creator.name}` : "@streme_fun",
-        site: "@streme_fun",
+        creator: token.creator ? `@${token.creator.name}` : "@streme",
+        site: "@streme",
       },
       other: {
         // Farcaster Frame metadata - correct format
@@ -256,7 +256,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         title: "Streme",
         description: "Trade tokens on Streme",
         images: [`${baseUrl}/streme-og.png`],
-        site: "@streme_fun",
+        site: "@streme",
       },
       other: {
         // Fallback frame metadata
