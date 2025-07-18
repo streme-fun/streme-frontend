@@ -872,7 +872,7 @@ Symbol: $[your ticker]
               {deployerAddress ? (
                 <>
                   Tokens launched by:{" "}
-                  <span className="font-mono">{deployerAddress}</span>
+                  <span className="font-mono">{deployerAddress.slice(0, 6).toLowerCase()}...{deployerAddress.slice(-4).toLowerCase()}</span>
                 </>
               ) : (
                 "Connect your wallet to view your launched tokens"
