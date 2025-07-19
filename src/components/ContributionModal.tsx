@@ -146,7 +146,7 @@ export function ContributionModal({
               <h2 className="text-xl font-bold">
                 {isWithdrawal
                   ? "Withdrawal Successful! 💸"
-                  : "Contribution Successful! 🎉"}
+                  : "Deposit Successful! 🎉"}
               </h2>
               <button
                 onClick={onClose}
@@ -173,7 +173,7 @@ export function ContributionModal({
             <div className="bg-base-200 rounded-lg p-4 space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-base-content/70">
-                  {isWithdrawal ? "Amount Withdrawn" : "Amount Contributed"}
+                  {isWithdrawal ? "Amount Withdrawn" : "Amount Deposited"}
                 </span>
                 <span className="font-mono font-bold">
                   {successAmount} STREME
@@ -203,9 +203,7 @@ export function ContributionModal({
                     <p>
                       ✅ Your staked STREME has been returned to your wallet
                     </p>
-                    <p>
-                      📊 You can still re-contribute to the crowdfund anytime
-                    </p>
+                    <p>📊 You can still re-deposit to the crowdfund anytime</p>
                   </div>
                 </>
               )}
@@ -240,8 +238,8 @@ export function ContributionModal({
               <div>
                 <h2 className="text-xl font-bold">
                   {hasActiveContribution
-                    ? "Manage Contribution"
-                    : "Contribute to Streme QR Fund"}
+                    ? "Manage Deposit"
+                    : "Deposit to Streme QR Fund"}
                 </h2>
               </div>
               <button
@@ -379,10 +377,10 @@ export function ContributionModal({
                     ) : isDepositing || isConfirming ? (
                       <>
                         <span className="loading loading-spinner loading-sm"></span>
-                        Contributing...
+                        Depositing...
                       </>
                     ) : (
-                      <>{hasActiveContribution ? "Add More" : "Contribute"}</>
+                      <>{hasActiveContribution ? "Add More" : "Deposit"}</>
                     )}
                   </button>
                 </div>
@@ -436,7 +434,7 @@ export function ContributionModal({
                       disabled={isWithdrawing || isConfirming}
                     />
                     <p className="text-xs text-base-content/60 mt-1">
-                      Current Stake: {userContribution} stSTREME
+                      Current Deposit: {userContribution} stSTREME
                     </p>
                   </div>
 
@@ -468,9 +466,7 @@ export function ContributionModal({
             {/* Informational Text */}
             {!hasActiveContribution && (
               <div className="text-center pt-4 border-t border-base-300 mt-4">
-                <p className="text-xs text-base-content/60">
-                  Your staked tokens remain yours • Withdraw anytime
-                </p>
+                <p className="text-xs text-base-content/60">Withdraw anytime</p>
               </div>
             )}
           </>

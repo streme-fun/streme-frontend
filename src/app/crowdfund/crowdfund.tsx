@@ -579,7 +579,8 @@ export default function CrowdfundPage() {
   const userPercentage =
     userDepositBalance && totalBalance && totalBalance > 0n
       ? (() => {
-          const percentage = (Number(userDepositBalance) / Number(totalBalance)) * 100;
+          const percentage =
+            (Number(userDepositBalance) / Number(totalBalance)) * 100;
           // Show more decimals for very small percentages
           if (percentage < 0.01) return percentage.toFixed(4);
           if (percentage < 0.1) return percentage.toFixed(3);
@@ -814,8 +815,7 @@ export default function CrowdfundPage() {
               </div>
               <p className="text-sm text-base-content/70 leading-snug">
                 Help Streme get discovered by 10,000+ quality users via QR
-                Auction. Contribute your staking $STREME yield to earn SUP
-                rewards.
+                Auction. Deposit your staked $STREME to earn SUP rewards.
               </p>
             </div>
           </div>
@@ -939,7 +939,7 @@ export default function CrowdfundPage() {
                             clipRule="evenodd"
                           />
                         </svg>
-                        Manage Contribution
+                        Manage Deposit
                       </div>
                     ) : (
                       <div className="flex items-center justify-center gap-2">
@@ -954,7 +954,7 @@ export default function CrowdfundPage() {
                             clipRule="evenodd"
                           />
                         </svg>
-                        Contribute STREME
+                        Deposit STREME
                       </div>
                     )}
                   </button>
@@ -1015,15 +1015,12 @@ export default function CrowdfundPage() {
               {hasActiveContribution && (
                 <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-3">
                   <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-semibold text-sm">Your Contribution</h3>
+                    <h3 className="font-semibold text-sm">Your Deposit</h3>
                     <div className="badge badge-primary badge-sm">
                       {userPercentage}%
                     </div>
                   </div>
                   <div className="text-sm">
-                    <p className="text-xs text-base-content/70">
-                      Contributing STREME (yield only • tokens stay yours)
-                    </p>
                     <p className="font-bold font-mono">{userContribution}</p>
                   </div>
                 </div>
@@ -1310,10 +1307,10 @@ export default function CrowdfundPage() {
                         </div>
                         {contributor.percentage !== undefined && (
                           <div className="text-xs text-base-content/60">
-                            {contributor.percentage < 0.1 && contributor.percentage > 0 
+                            {contributor.percentage < 0.1 &&
+                            contributor.percentage > 0
                               ? `<0.1% of pool`
-                              : `${contributor.percentage.toFixed(1)}% of pool`
-                            }
+                              : `${contributor.percentage.toFixed(1)}% of pool`}
                           </div>
                         )}
                       </div>
@@ -1492,14 +1489,14 @@ export default function CrowdfundPage() {
             <div className="collapse collapse-arrow bg-base-200">
               <input type="radio" name="faq-accordion" />
               <div className="collapse-title font-semibold">
-                I just topped up my $STREME stake. How do I contribute?
+                I just topped up my $STREME stake. How do I deposit?
               </div>
               <div className="collapse-content">
                 <p className="text-sm text-base-content/70 pt-2">
                   Wait until your lock expires (24 hours after staking). No need
-                  to unstake, the lock just can&apos;t be active while you
-                  contribute. The button will show a countdown timer if your
-                  tokens are still locked.
+                  to unstake, the lock just can&apos;t be active when you
+                  deposit. The button will show a countdown timer if your tokens
+                  are still locked.
                 </p>
               </div>
             </div>
