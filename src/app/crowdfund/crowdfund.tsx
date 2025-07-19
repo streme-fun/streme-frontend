@@ -685,7 +685,7 @@ export default function CrowdfundPage() {
   // Handle sharing to Farcaster
   const handleShareToFarcaster = async () => {
     const shareUrl = `https://streme.fun/crowdfund`;
-    const shareText = `I just contributed ${successAmount} STREME to @streme's streaming QR crowdfund! Streme On 🎶 🚀`;
+    const shareText = `I just contributed ${successAmount} $streme to @streme's streaming QR crowdfund! Streme On 🎶 🚀`;
 
     if (unifiedIsMiniApp && isSDKLoaded && sdk) {
       try {
