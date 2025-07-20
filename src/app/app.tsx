@@ -352,7 +352,7 @@ function App() {
                       auction. Earn $SUP for your contribution.
                     </p>
                   </div>
-                  <button className="btn btn-sm">Join</button>
+                  <button className="btn btn-sm btn-primary">Join</button>
                 </div>
               </div>
             </Link>
