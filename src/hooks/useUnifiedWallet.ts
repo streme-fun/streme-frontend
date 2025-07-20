@@ -28,32 +28,18 @@ export function useUnifiedWallet() {
   const isEffectivelyMiniApp = isMiniAppView;
 
   // Get the connected wallet address from Privy
-  // Try to find any connected wallet, not just 'privy' client type
   const connectedWallet = wallets.find(wallet => wallet.address) || wallets[0];
   const privyConnectedAddress = connectedWallet?.address;
 
-
-  // Unified connection logic - match navbar approach
-  // For mobile, prioritize Privy authentication even if mini-app detection is confused
-  const isConnected = isEffectivelyMiniApp 
-    ? farcasterIsConnected
-    : privyAuthenticated;
-
-  const address = isEffectivelyMiniApp 
-    ? farcasterAddress 
-    : wagmiAddress || privyConnectedAddress;
-
-  // Safety fallback: if we think we're in mini-app but have no farcaster connection
-  // but DO have privy authentication, use privy instead
-  const hasFarcasterConnection = farcasterIsConnected && farcasterAddress;
-  const hasPrivyConnection = privyAuthenticated && (wagmiAddress || privyConnectedAddress);
-  
+  // Simplified connection logic
+  // For mini-app: trust wagmi's useAccount() directly (uses farcasterMiniApp connector)
+  // For regular apps: use Privy authentication + wagmi address
   const finalIsConnected = isEffectivelyMiniApp 
-    ? (hasFarcasterConnection || (!hasFarcasterConnection && hasPrivyConnection))
+    ? wagmiIsConnected
     : privyAuthenticated;
     
   const finalAddress = isEffectivelyMiniApp 
-    ? (farcasterAddress || (!hasFarcasterConnection && hasPrivyConnection ? (wagmiAddress || privyConnectedAddress) : undefined))
+    ? wagmiAddress
     : wagmiAddress || privyConnectedAddress;
 
   const connect = isEffectivelyMiniApp
@@ -96,11 +82,6 @@ export function useUnifiedWallet() {
       farcasterIsConnected,
       isMiniAppView,
       isSDKLoaded,
-      // Debugging values
-      originalIsConnected: isConnected,
-      originalAddress: address,
-      hasFarcasterConnection,
-      hasPrivyConnection,
     }
   };
 }
