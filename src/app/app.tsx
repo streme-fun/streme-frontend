@@ -347,9 +347,9 @@ function App() {
                     <p className="text-sm text-base-content/70 font-semibold">
                       Streme QR Crowdfund
                     </p>
-                    <p className="text-sm text-base-content/70 mb-3">
+                    <p className="text-sm text-base-content/70 mb-3 mr-3">
                       Contribute your staking rewards to help Streme win a QR
-                      auction. Earn $SUP for your contribution.
+                      auction. Earn $SUP for your help!
                     </p>
                   </div>
                   <button className="btn btn-sm btn-primary">Join</button>
