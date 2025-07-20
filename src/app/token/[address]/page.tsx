@@ -162,11 +162,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // console.log(`[Frame Debug] Token: ${token.name}, Image URL: ${imageUrl}`);
 
     // Create the Farcaster Frame Embed object
+    // Ensure button title stays within 32 character limit
+    const maxTitleLength = 32;
+    const titlePrefix = "View ";
+    const titleSuffix = " on Streme";
+    const ellipsis = "...";
+    const maxTokenNameLength = maxTitleLength - titlePrefix.length - titleSuffix.length;
+    
+    let displayName = token.name;
+    if (displayName.length > maxTokenNameLength) {
+      displayName = token.name.substring(0, maxTokenNameLength - ellipsis.length) + ellipsis;
+    }
+    
+    const buttonTitle = `${titlePrefix}${displayName}${titleSuffix}`;
+    
     const frameEmbed = {
       version: "next",
       imageUrl: imageUrl,
       button: {
-        title: `View ${token.name} on Streme`,
+        title: buttonTitle,
         action: {
           type: "launch_frame",
           name: "Streme",
