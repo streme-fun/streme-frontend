@@ -17,6 +17,7 @@ import { usePostHog } from "posthog-js/react";
 import { SPAMMER_BLACKLIST } from "../lib/blacklist";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useCheckin } from "../hooks/useCheckin";
 
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -28,6 +29,7 @@ function App() {
   // Easter egg state for mini-app logo clicking
   const [logoClickCount, setLogoClickCount] = useState(0);
   const [lastLogoClickTime, setLastLogoClickTime] = useState(0);
+  const [showDebugButton, setShowDebugButton] = useState(false);
   const router = useRouter();
 
   // Tutorial modal state
@@ -64,6 +66,12 @@ function App() {
   } = useAppFrameLogic();
 
   const postHog = usePostHog();
+  const {
+    performCheckin,
+    checkinData,
+    error: checkinError,
+    isLoading: checkinLoading,
+  } = useCheckin();
 
   // Easter egg function for mini-app logo clicking
   const handleLogoClick = useCallback(() => {
@@ -79,12 +87,17 @@ function App() {
 
     setLastLogoClickTime(now);
 
-    // Navigate to crowdfund page on 5th click
+    // Show debug button on 5th click for mini-app, navigate to crowdfund for web
     if (logoClickCount + 1 >= 5) {
-      router.push("/crowdfund");
+      if (isMiniAppView) {
+        setShowDebugButton(true);
+        console.log("Debug mode activated! Checkin button will appear.");
+      } else {
+        router.push("/crowdfund");
+      }
       setLogoClickCount(0);
     }
-  }, [logoClickCount, lastLogoClickTime, router]);
+  }, [logoClickCount, lastLogoClickTime, isMiniAppView, router]);
 
   // PostHog user identification when wallet connects
   useEffect(() => {
@@ -115,6 +128,20 @@ function App() {
     farcasterContext,
     postHog,
   ]);
+
+  // Log checkin results
+  useEffect(() => {
+    if (checkinData) {
+      console.log("Daily checkin successful:", {
+        totalCheckins: checkinData.totalCheckins,
+        currentStreak: checkinData.currentStreak,
+        dropAmount: checkinData.dropAmount,
+      });
+    }
+    if (checkinError) {
+      console.log("Checkin error:", checkinError);
+    }
+  }, [checkinData, checkinError]);
 
   // Fixed iterative pagination instead of recursive
   const fetchTokens = useCallback(async () => {
@@ -282,20 +309,14 @@ function App() {
             <div className="flex-shrink-0">
               <Link href="/" className="flex items-center">
                 <Image
-                  src="/icon-transparent.png"
+                  src="/streme.svg"
                   alt="Streme Logo"
-                  width={30}
-                  height={30}
+                  width={100}
+                  height={100}
                   onClick={handleLogoClick}
                   className="cursor-pointer"
                 />
               </Link>
-            </div>
-            <div className="flex-1 ml-6 mr-4 max-w-xs">
-              <SearchBar
-                value={searchQuery}
-                onChange={(value) => setSearchQuery(value)}
-              />
             </div>
             {/* <div className="flex-shrink-0">
               <button
@@ -358,9 +379,28 @@ function App() {
             </Link>
           </div>
 
-          <h3 className="font-semibold text-base-content text-left">
-            Streme Tokens
-          </h3>
+          {/* Debug Checkin Button - only show after logo easter egg */}
+          {isMiniAppView && isConnected && isOnCorrectNetwork && showDebugButton && (
+            <Button
+              onClick={performCheckin}
+              disabled={checkinLoading}
+              className="btn btn-sm btn-secondary mt-2"
+            >
+              {checkinLoading ? "Checking in..." : "🐛 Debug Checkin"}
+            </Button>
+          )}
+
+          <div className="flex items-center">
+            <h3 className="font-semibold text-base-content text-left">
+              Streme Tokens
+            </h3>
+            <div className="flex-1 ml-3 max-w-xs">
+              <SearchBar
+                value={searchQuery}
+                onChange={(value) => setSearchQuery(value)}
+              />
+            </div>
+          </div>
 
           <div className="w-full max-w-md">
             <div className="flex items-center gap-4 my-2">
