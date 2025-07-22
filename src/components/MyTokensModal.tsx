@@ -249,52 +249,68 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     // Batch fetch remaining tokens
     if (toFetch.length > 0) {
       try {
-        // Use Promise.allSettled to handle partial failures gracefully
-        const fetchPromises = toFetch.map(async (address) => {
+        // Split into batches of 30 (Firestore limit)
+        const batches = [];
+        for (let i = 0; i < toFetch.length; i += 30) {
+          batches.push(toFetch.slice(i, i + 30));
+        }
+
+        // Fetch all batches in parallel
+        const batchPromises = batches.map(async (batch) => {
           try {
-            const response = await fetch(
-              `/api/tokens/single?address=${address}`
-            );
+            const response = await fetch("/api/tokens/multiple", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ tokenAddresses: batch }),
+            });
+
             if (response.ok) {
               const result = await response.json();
-              const tokenData = {
-                staking_address: result.data?.staking_address,
-                logo:
-                  result.data?.img_url ||
-                  result.data?.logo ||
-                  result.data?.image,
-                marketData: result.data?.marketData,
-              };
-
-              // Cache the result
-              tokenDataCache.set(address, {
-                data: tokenData,
-                timestamp: now,
-              });
-
-              return { address, data: tokenData };
+              return { batch, tokens: result.tokens };
             }
             throw new Error(`HTTP ${response.status}`);
           } catch (error) {
-            console.warn(`Failed to fetch token data for ${address}:`, error);
-            const fallbackData = {
-              staking_address: undefined,
-              logo: undefined,
-              marketData: undefined,
-            };
-            tokenDataCache.set(address, {
-              data: fallbackData,
-              timestamp: now,
-            });
-            return { address, data: fallbackData };
+            console.warn(`Failed to fetch batch of tokens:`, error);
+            return { batch, tokens: batch.map(() => null) };
           }
         });
 
-        const fetchResults = await Promise.allSettled(fetchPromises);
-        fetchResults.forEach((result) => {
-          if (result.status === "fulfilled" && result.value) {
-            results.set(result.value.address, result.value.data);
-          }
+        const batchResults = await Promise.all(batchPromises);
+        
+        // Process results
+        batchResults.forEach(({ batch, tokens }) => {
+          batch.forEach((address, index) => {
+            const tokenData = tokens[index];
+            if (tokenData) {
+              const processedData = {
+                staking_address: tokenData.staking_address,
+                logo: tokenData.img_url || tokenData.logo || tokenData.image,
+                marketData: tokenData.marketData,
+              };
+              
+              // Cache the result
+              tokenDataCache.set(address, {
+                data: processedData,
+                timestamp: now,
+              });
+              
+              results.set(address, processedData);
+            } else {
+              // Token not found in database
+              const fallbackData = {
+                staking_address: undefined,
+                logo: undefined,
+                marketData: undefined,
+              };
+              tokenDataCache.set(address, {
+                data: fallbackData,
+                timestamp: now,
+              });
+              results.set(address, fallbackData);
+            }
+          });
         });
       } catch (error) {
         console.error("Batch token data fetch failed:", error);
@@ -1047,48 +1063,66 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     }
 
     try {
-      // Use a simplified liquidity check based on market cap and age
-      for (const tokenAddress of uncachedTokens) {
+      // Use the batch endpoint for efficiency
+      const batches = [];
+      for (let i = 0; i < uncachedTokens.length; i += 30) {
+        batches.push(uncachedTokens.slice(i, i + 30));
+      }
+
+      for (const batch of batches) {
         try {
-          console.log(`Checking liquidity for token: ${tokenAddress}`);
-          const response = await fetch(`/api/tokens/single?address=${tokenAddress}`);
+          const response = await fetch("/api/tokens/multiple", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ tokenAddresses: batch }),
+          });
           
           if (response.ok) {
             const result = await response.json();
-            const tokenData = result.data;
             
-            console.log(`Token data for ${tokenAddress}:`, tokenData);
-            
-            if (tokenData?.marketData) {
-              const marketCap = tokenData.marketData.marketCap || 0;
-              // Try different date fields that might exist
-              const launchTime = tokenData.created_at || 
-                                tokenData.timestamp?.seconds ? new Date(tokenData.timestamp.seconds * 1000) :
-                                tokenData.timestamp?._seconds ? new Date(tokenData.timestamp._seconds * 1000) :
-                                new Date();
-              const hoursSinceLaunch = (Date.now() - new Date(launchTime).getTime()) / (1000 * 60 * 60);
+            batch.forEach((tokenAddress, index) => {
+              const tokenData = result.tokens[index];
               
-              // Consider low liquidity if:
-              // 1. Market cap is very low (< $5000) AND token is older than 1 hour
-              // 2. Or market cap is extremely low (< $1000) regardless of age
-              const isLowLiquidity = (marketCap < 5000 && hoursSinceLaunch > 1) || marketCap < 1000;
+              console.log(`Token data for ${tokenAddress}:`, tokenData);
               
-              console.log(`Token ${tokenAddress}: marketCap=${marketCap}, hoursSinceLaunch=${hoursSinceLaunch}, isLowLiquidity=${isLowLiquidity}`);
-              
-              newLiquidityCache.set(tokenAddress.toLowerCase(), isLowLiquidity);
-            } else {
-              console.log(`No market data for ${tokenAddress}, assuming normal liquidity`);
-              // If no market data, assume normal liquidity
-              newLiquidityCache.set(tokenAddress.toLowerCase(), false);
-            }
+              if (tokenData?.marketData) {
+                const marketCap = tokenData.marketData.marketCap || 0;
+                // Try different date fields that might exist
+                const launchTime = tokenData.created_at || 
+                                  tokenData.timestamp?.seconds ? new Date(tokenData.timestamp.seconds * 1000) :
+                                  tokenData.timestamp?._seconds ? new Date(tokenData.timestamp._seconds * 1000) :
+                                  new Date();
+                const hoursSinceLaunch = (Date.now() - new Date(launchTime).getTime()) / (1000 * 60 * 60);
+                
+                // Consider low liquidity if:
+                // 1. Market cap is very low (< $5000) AND token is older than 1 hour
+                // 2. Or market cap is extremely low (< $1000) regardless of age
+                const isLowLiquidity = (marketCap < 5000 && hoursSinceLaunch > 1) || marketCap < 1000;
+                
+                console.log(`Token ${tokenAddress}: marketCap=${marketCap}, hoursSinceLaunch=${hoursSinceLaunch}, isLowLiquidity=${isLowLiquidity}`);
+                
+                newLiquidityCache.set(tokenAddress.toLowerCase(), isLowLiquidity);
+              } else {
+                console.log(`No market data for ${tokenAddress}, assuming normal liquidity`);
+                // If no market data, assume normal liquidity
+                newLiquidityCache.set(tokenAddress.toLowerCase(), false);
+              }
+            });
           } else {
-            console.warn(`API call failed for ${tokenAddress}: ${response.status}`);
-            newLiquidityCache.set(tokenAddress.toLowerCase(), false);
+            console.warn(`Batch API call failed: ${response.status}`);
+            // Default all tokens in batch to normal liquidity on error
+            batch.forEach(tokenAddress => {
+              newLiquidityCache.set(tokenAddress.toLowerCase(), false);
+            });
           }
         } catch (error) {
-          console.warn(`Failed to check liquidity for ${tokenAddress}:`, error);
-          // Default to normal liquidity on error
-          newLiquidityCache.set(tokenAddress.toLowerCase(), false);
+          console.warn(`Failed to check liquidity for batch:`, error);
+          // Default all tokens in batch to normal liquidity on error
+          batch.forEach(tokenAddress => {
+            newLiquidityCache.set(tokenAddress.toLowerCase(), false);
+          });
         }
       }
       

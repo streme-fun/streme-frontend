@@ -190,7 +190,8 @@ export default function TokensPage() {
     return value.toLowerCase();
   };
 
-  // Helper function to fetch token data with caching
+  // Helper function to fetch token data with caching (kept for backward compatibility)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const fetchTokenData = async (tokenAddress: string) => {
     // Don't make API calls for blacklisted tokens
     if (
@@ -238,6 +239,97 @@ export default function TokensPage() {
     };
     tokenDataCache.set(tokenAddress, fallbackData);
     return fallbackData;
+  };
+
+  // Batch fetch token data for multiple addresses
+  const fetchTokenDataBatch = async (tokenAddresses: string[]) => {
+    const results = new Map();
+    const toFetch: string[] = [];
+
+    // Check cache and filter out blacklisted tokens
+    tokenAddresses.forEach((address) => {
+      if (BLACKLISTED_TOKENS.includes(safeToLowerCase(address))) {
+        results.set(address, {
+          staking_address: undefined,
+          logo: undefined,
+          marketData: undefined,
+        });
+        return;
+      }
+
+      const cached = tokenDataCache.get(address);
+      if (cached) {
+        results.set(address, cached);
+      } else {
+        toFetch.push(address);
+      }
+    });
+
+    // Batch fetch remaining tokens
+    if (toFetch.length > 0) {
+      try {
+        // Split into batches of 30 (Firestore limit)
+        const batches = [];
+        for (let i = 0; i < toFetch.length; i += 30) {
+          batches.push(toFetch.slice(i, i + 30));
+        }
+
+        // Fetch all batches in parallel
+        const batchPromises = batches.map(async (batch) => {
+          try {
+            const response = await fetch("/api/tokens/multiple", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ tokenAddresses: batch }),
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              return { batch, tokens: result.tokens };
+            }
+            throw new Error(`HTTP ${response.status}`);
+          } catch (error) {
+            console.warn(`Failed to fetch batch of tokens:`, error);
+            return { batch, tokens: batch.map(() => null) };
+          }
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        
+        // Process results
+        batchResults.forEach(({ batch, tokens }) => {
+          batch.forEach((address, index) => {
+            const tokenData = tokens[index];
+            if (tokenData) {
+              const processedData = {
+                staking_address: tokenData.staking_address,
+                logo: tokenData.img_url || tokenData.logo || tokenData.image,
+                marketData: tokenData.marketData,
+              };
+              
+              // Cache the result
+              tokenDataCache.set(address, processedData);
+              results.set(address, processedData);
+            } else {
+              // Token not found in database
+              const fallbackData = {
+                staking_address: undefined,
+                logo: undefined,
+                marketData: undefined,
+              };
+              tokenDataCache.set(address, fallbackData);
+              results.set(address, fallbackData);
+            }
+          });
+        });
+      } catch (error) {
+        console.error("Batch token data fetch failed:", error);
+      }
+    }
+
+    return results;
   };
 
   // Helper function to batch balance calls using centralized data with fallback
@@ -650,10 +742,10 @@ export default function TokensPage() {
     // Only enhance a maximum of 5 tokens at once to reduce API load
     const stakesToEnhance = initialStakes.slice(0, 5);
 
-    const tokenDataPromises = stakesToEnhance.map((stake) =>
-      fetchTokenData(stake.tokenAddress)
-    );
-    const tokenDataResults = await Promise.all(tokenDataPromises);
+    // Use batch fetch for token data
+    const tokenAddresses = stakesToEnhance.map(stake => stake.tokenAddress);
+    const tokenDataMap = await fetchTokenDataBatch(tokenAddresses);
+    const tokenDataResults = tokenAddresses.map(addr => tokenDataMap.get(addr));
 
     // Batch all the staked balance calls together
     const stakedBalancePromises = stakesToEnhance.map(async (stake, index) => {
@@ -755,10 +847,10 @@ export default function TokensPage() {
     if (batch.length === 0) return;
 
     try {
-      const tokenDataPromises = batch.map((stake) =>
-        fetchTokenData(stake.tokenAddress)
-      );
-      const tokenDataResults = await Promise.all(tokenDataPromises);
+      // Use batch fetch for token data
+      const tokenAddresses = batch.map(stake => stake.tokenAddress);
+      const tokenDataMap = await fetchTokenDataBatch(tokenAddresses);
+      const tokenDataResults = tokenAddresses.map(addr => tokenDataMap.get(addr));
 
       const stakedBalancePromises = batch.map(async (stake, index) => {
         const tokenData = tokenDataResults[index];
@@ -912,10 +1004,10 @@ export default function TokensPage() {
     // Limit to maximum 8 tokens to reduce API load
     const limitedTokens = tokensToEnhance.slice(0, 8);
 
-    const tokenDataPromises = limitedTokens.map((token) =>
-      fetchTokenData(token.tokenAddress)
-    );
-    const tokenDataResults = await Promise.all(tokenDataPromises);
+    // Use batch fetch for token data
+    const tokenAddresses = limitedTokens.map(token => token.tokenAddress);
+    const tokenDataMap = await fetchTokenDataBatch(tokenAddresses);
+    const tokenDataResults = tokenAddresses.map(addr => tokenDataMap.get(addr));
 
     // Only check pool connections for tokens that actually have staking addresses
     const poolConnectionPromises = limitedTokens.map(async (token, index) => {
@@ -992,10 +1084,10 @@ export default function TokensPage() {
     if (batch.length === 0) return;
 
     try {
-      const tokenDataPromises = batch.map((token) =>
-        fetchTokenData(token.tokenAddress)
-      );
-      const tokenDataResults = await Promise.all(tokenDataPromises);
+      // Use batch fetch for token data
+      const tokenAddresses = batch.map(token => token.tokenAddress);
+      const tokenDataMap = await fetchTokenDataBatch(tokenAddresses);
+      const tokenDataResults = tokenAddresses.map(addr => tokenDataMap.get(addr));
 
       const poolConnectionPromises = batch.map(async (token, index) => {
         const tokenData = tokenDataResults[index];
