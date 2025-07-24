@@ -95,7 +95,7 @@ export function CheckinSuccessModal({
         const poolData = data.data.pool;
         const currentMember = data.data.poolMember;
         
-        // Get current units (stSTREME balance)
+        // Get current units (stSTREME balance) - 0 for new users
         const currentUnits = BigInt(currentMember?.units || "0");
         // Add the drop amount (converted to wei)
         const dropAmountWei = BigInt(parseFloat(dropAmount) * 1e18);
@@ -104,11 +104,26 @@ export function CheckinSuccessModal({
         // Calculate total units after drop (assuming drop succeeds)
         const totalUnits = BigInt(poolData.totalUnits || "0") + dropAmountWei;
         
-        if (totalUnits > 0n) {
+        console.log("[CheckinSuccessModal] Calculation:", {
+          currentUnits: currentUnits.toString(),
+          dropAmountWei: dropAmountWei.toString(),
+          newUnits: newUnits.toString(),
+          totalUnits: totalUnits.toString(),
+          poolFlowRate: poolData.flowRate,
+        });
+        
+        if (totalUnits > 0n && newUnits > 0n) {
           const percentage = (Number(newUnits) * 100) / Number(totalUnits);
           const totalFlowRate = Number(formatUnits(BigInt(poolData.flowRate), 18));
           const userFlowRate = totalFlowRate * (percentage / 100);
           const flowRatePerDay = userFlowRate * 86400;
+          
+          console.log("[CheckinSuccessModal] Flow rate calculation:", {
+            percentage: percentage.toFixed(4),
+            totalFlowRate: totalFlowRate.toFixed(4),
+            userFlowRate: userFlowRate.toFixed(4),
+            flowRatePerDay: flowRatePerDay.toFixed(4),
+          });
           
           setCalculatedFlowRate(flowRatePerDay.toFixed(4));
         }
@@ -169,11 +184,11 @@ export function CheckinSuccessModal({
     const castText = `${randomQuote}
 
 Just claimed my daily staked $STREME drop and my new flow rate is ${
-      calculatedFlowRate
+      calculatedFlowRate && parseFloat(calculatedFlowRate) > 0
         ? `${parseInt(calculatedFlowRate).toLocaleString()} STREME/day`
-        : flowRate === "0"
-        ? "Starting soon"
-        : `${parseInt(flowRate).toLocaleString()} STREME/day`
+        : flowRate && parseFloat(flowRate) > 0
+        ? `${parseInt(flowRate).toLocaleString()} STREME/day`
+        : "Starting soon"
     }
 
 ${shareUrl}`;
@@ -270,14 +285,14 @@ ${shareUrl}`;
               Your new flow rate is{" "}
               {isCalculating || flowRateLoading ? (
                 <span className="loading loading-dots loading-xs"></span>
-              ) : calculatedFlowRate ? (
+              ) : calculatedFlowRate && parseFloat(calculatedFlowRate) > 0 ? (
                 <span className="text-success font-semibold">
                   {parseInt(calculatedFlowRate).toLocaleString()} $STREME/day
                 </span>
-              ) : flowRate === "0" ? (
-                "starting soon"
-              ) : (
+              ) : flowRate && parseFloat(flowRate) > 0 ? (
                 `${parseInt(flowRate).toLocaleString()} $STREME/day`
+              ) : (
+                "starting soon"
               )}
             </p>
           </div>
@@ -294,16 +309,16 @@ ${shareUrl}`;
           <div className="text-xs text-base-content/60 mt-1">
             {isCalculating || flowRateLoading ? (
               <span>Calculating flow...</span>
-            ) : calculatedFlowRate ? (
+            ) : calculatedFlowRate && parseFloat(calculatedFlowRate) > 0 ? (
               <span className="text-success">
                 +{parseInt(calculatedFlowRate).toLocaleString()} per day (after drop)
               </span>
-            ) : flowRate === "0" ? (
-              <span>Not streaming yet</span>
-            ) : (
+            ) : flowRate && parseFloat(flowRate) > 0 ? (
               <span className="text-success">
                 +{parseInt(flowRate).toLocaleString()} per day
               </span>
+            ) : (
+              <span>Starting soon</span>
             )}
           </div>
         </div>
