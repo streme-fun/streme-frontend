@@ -43,12 +43,18 @@ const safeProviderCheck = (providerName: string) => {
 };
 
 // Custom hook for Coinbase Wallet detection and auto-connection
-function useCoinbaseWalletAutoConnect() {
+function useCoinbaseWalletAutoConnect(isMiniApp: boolean) {
   const [isCoinbaseWallet, setIsCoinbaseWallet] = useState(false);
   const { connect, connectors } = useConnect();
   const { isConnected } = useAccount();
 
   useEffect(() => {
+    // Skip auto-connection logic if in mini-app context
+    if (isMiniApp) {
+      console.log("🚫 Skipping Coinbase auto-connection in mini-app context");
+      return;
+    }
+
     // Check if we're running in Coinbase Wallet
     const checkCoinbaseWallet = () => {
       const isInCoinbaseWallet = safeProviderCheck("coinbase");
@@ -71,9 +77,15 @@ function useCoinbaseWalletAutoConnect() {
     return () => {
       window.removeEventListener("ethereum#initialized", handleEthereumInit);
     };
-  }, []);
+  }, [isMiniApp]);
 
   useEffect(() => {
+    // Skip auto-connection if in mini-app context
+    if (isMiniApp) {
+      console.log("🚫 Skipping Coinbase wallet connection in mini-app context");
+      return;
+    }
+
     // Auto-connect if in Coinbase Wallet and not already connected
     if (isCoinbaseWallet && !isConnected && connectors.length > 1) {
       try {
@@ -87,7 +99,7 @@ function useCoinbaseWalletAutoConnect() {
         console.warn("Error auto-connecting Coinbase Wallet:", error);
       }
     }
-  }, [isCoinbaseWallet, isConnected, connect, connectors]);
+  }, [isCoinbaseWallet, isConnected, connect, connectors, isMiniApp]);
 
   return isCoinbaseWallet;
 }
@@ -102,7 +114,32 @@ const baseRpcEndpoints = [
   "https://1rpc.io/base",
 ].filter(Boolean); // Remove any undefined/null values
 
-export const config = createConfig({
+// Create separate configs for mini-app and browser environments
+const createConnectors = (isMiniApp: boolean) => {
+  if (isMiniApp) {
+    // In mini-app context, only use Farcaster connector
+    console.log("🔗 Creating mini-app connectors: [farcasterMiniApp]");
+    return [farcasterMiniApp()];
+  } else {
+    // In browser context, use all connectors except Farcaster
+    console.log("🔗 Creating browser connectors: [metaMask, coinbaseWallet]");
+    return [
+      metaMask({
+        dappMetadata: {
+          name: APP_NAME,
+          url: APP_URL,
+        },
+      }),
+      coinbaseWallet({
+        appName: APP_NAME,
+        appLogoUrl: APP_ICON_URL,
+        preference: "all",
+      }),
+    ];
+  }
+};
+
+const createWagmiConfig = (isMiniApp: boolean = false) => createConfig({
   chains: [base, baseSepolia, optimism, mainnet, degen, unichain],
   transports: {
     [base.id]: fallback(
@@ -122,31 +159,23 @@ export const config = createConfig({
     [degen.id]: http(),
     [unichain.id]: http(),
   },
-  connectors: [
-    metaMask({
-      dappMetadata: {
-        name: APP_NAME,
-        url: APP_URL,
-      },
-    }),
-    coinbaseWallet({
-      appName: APP_NAME,
-      appLogoUrl: APP_ICON_URL,
-      preference: "all",
-    }),
-    farcasterMiniApp(),
-  ],
+  connectors: createConnectors(isMiniApp),
 });
+
+// Default config for initial load (browser context)
+export const config = createWagmiConfig(false);
 
 const queryClient = new QueryClient();
 
 // Wrapper component that provides Coinbase Wallet auto-connection
 function CoinbaseWalletAutoConnect({
   children,
+  isMiniApp,
 }: {
   children: React.ReactNode;
+  isMiniApp: boolean;
 }) {
-  useCoinbaseWalletAutoConnect();
+  useCoinbaseWalletAutoConnect(isMiniApp);
   return <>{children}</>;
 }
 
@@ -154,6 +183,7 @@ function CoinbaseWalletAutoConnect({
 function ConditionalWagmiProvider({ children }: { children: React.ReactNode }) {
   const [isMiniApp, setIsMiniApp] = useState(false);
   const [isDetected, setIsDetected] = useState(false);
+  const [wagmiConfig, setWagmiConfig] = useState(config);
 
   useEffect(() => {
     const detectMiniApp = async () => {
@@ -165,17 +195,24 @@ function ConditionalWagmiProvider({ children }: { children: React.ReactNode }) {
           !window.location.hostname.includes("127.0.0.1") &&
           (window.parent !== window || window.location !== window.parent.location);
 
+        let detectedMiniApp = false;
         if (quickDetection) {
           // Try to detect with Farcaster SDK
           const sdk = await import("@farcaster/miniapp-sdk");
-          const isInMiniApp = await sdk.default.isInMiniApp();
-          setIsMiniApp(isInMiniApp);
-        } else {
-          setIsMiniApp(false);
+          detectedMiniApp = await sdk.default.isInMiniApp();
         }
+        
+        setIsMiniApp(detectedMiniApp);
+        
+        // Create appropriate config based on detection
+        const newConfig = createWagmiConfig(detectedMiniApp);
+        setWagmiConfig(newConfig);
+        
+        console.log(`Wagmi configured for ${detectedMiniApp ? 'mini-app' : 'browser'} context`);
       } catch (error) {
         console.error("Error detecting mini-app:", error);
         setIsMiniApp(false);
+        setWagmiConfig(createWagmiConfig(false));
       } finally {
         setIsDetected(true);
       }
@@ -193,8 +230,10 @@ function ConditionalWagmiProvider({ children }: { children: React.ReactNode }) {
   const WagmiProvider = isMiniApp ? WagmiProviderBase : PrivyWagmiProvider;
 
   return (
-    <WagmiProvider config={config}>
-      {children}
+    <WagmiProvider config={wagmiConfig}>
+      <CoinbaseWalletAutoConnect isMiniApp={isMiniApp}>
+        {children}
+      </CoinbaseWalletAutoConnect>
     </WagmiProvider>
   );
 }
@@ -203,7 +242,7 @@ export default function Provider({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ConditionalWagmiProvider>
-        <CoinbaseWalletAutoConnect>{children}</CoinbaseWalletAutoConnect>
+        {children}
       </ConditionalWagmiProvider>
     </QueryClientProvider>
   );
