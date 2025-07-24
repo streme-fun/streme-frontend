@@ -68,7 +68,7 @@ function App() {
   } = useAppFrameLogic();
 
   const postHog = usePostHog();
-  
+
   // Checkin modal logic
   const {
     checkinData,
@@ -158,7 +158,6 @@ function App() {
       console.log("Checkin error:", checkinError);
     }
   }, [checkinData, checkinError]);
-
 
   // Fixed iterative pagination instead of recursive
   const fetchTokens = useCallback(async () => {
@@ -397,26 +396,32 @@ function App() {
           </div>
 
           {/* Debug Buttons - only show after logo easter egg */}
-          {isMiniAppView && isConnected && isOnCorrectNetwork && showDebugButton && (
-            <div className="flex flex-col gap-2 mt-2">
-              <Button
-                onClick={handleDebugButtonClick}
-                disabled={hasCheckedIn}
-                className="btn btn-sm btn-secondary"
-              >
-                {hasCheckedIn 
-                  ? "✅ Already Checked In"
-                  : "🐛 Debug Checkin"
-                }
-              </Button>
-              <Button
-                onClick={showSuccessModalDebug}
-                className="btn btn-sm btn-accent"
-              >
-                🎉 Debug Success Modal
-              </Button>
-            </div>
-          )}
+          {isMiniAppView &&
+            isConnected &&
+            isOnCorrectNetwork &&
+            showDebugButton && (
+              <div className="flex flex-col gap-2 mt-2">
+                <Button
+                  onClick={handleDebugButtonClick}
+                  disabled={hasCheckedIn}
+                  className="btn btn-sm btn-secondary"
+                >
+                  {hasCheckedIn ? "✅ Already Checked In" : "🐛 Debug Checkin"}
+                </Button>
+                <Button
+                  onClick={showSuccessModalDebug}
+                  className="btn btn-sm btn-accent"
+                >
+                  🎉 Debug Success Modal
+                </Button>
+                <Link href="/gda" className="btn btn-sm btn-primary">
+                  🌊 GDA Page
+                </Link>
+                <Link href="/cfa" className="btn btn-sm btn-secondary">
+                  💧 CFA Page
+                </Link>
+              </div>
+            )}
 
           <div className="flex items-center">
             <h3 className="font-semibold text-base-content text-left">

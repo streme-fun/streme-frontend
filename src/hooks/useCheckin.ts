@@ -62,6 +62,7 @@ export function useCheckin() {
 
       const checkinData: CheckinData = await response.json();
 
+
       setState((prev) => ({
         ...prev,
         checkinData,
@@ -180,3 +181,4 @@ export function useCheckin() {
     showSuccessModalDebug,
   };
 }
+

@@ -13,6 +13,14 @@ interface PoolData {
   }>;
 }
 
+interface AccountTokenSnapshot {
+  totalNetFlowRate: string;
+  totalInflowRate: string;
+  totalOutflowRate: string;
+  balanceUntilUpdatedAt: string;
+  updatedAtTimestamp: string;
+}
+
 export function useStremeFlowRate() {
   const { address: wagmiAddress } = useAccount();
   const { isMiniAppView, address: fcAddress } = useAppFrameLogic();
@@ -20,18 +28,76 @@ export function useStremeFlowRate() {
   const [isLoading, setIsLoading] = useState(false);
 
   // Get effective address based on mini-app or wallet connection
-  const effectiveAddress = isMiniAppView 
-    ? fcAddress 
-    : wagmiAddress;
+  const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
 
   const fetchFlowRate = async () => {
     if (!effectiveAddress) {
       console.log("[useStremeFlowRate] No address available");
       return;
     }
-    console.log("[useStremeFlowRate] Fetching flow rate for address:", effectiveAddress);
+    console.log(
+      "[useStremeFlowRate] Fetching flow rate for address:",
+      effectiveAddress
+    );
     setIsLoading(true);
     try {
+      // STREME token address
+      const stremeToken = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
+      
+      // Query for total net flow rate from AccountTokenSnapshot
+      const accountQuery = `
+        query GetStremeFlowRate($accountId: ID!, $tokenId: String!) {
+          account(id: $accountId) {
+            accountTokenSnapshots(where: { token: $tokenId }) {
+              totalNetFlowRate
+              totalInflowRate
+              totalOutflowRate
+              balanceUntilUpdatedAt
+              updatedAtTimestamp
+            }
+          }
+        }
+      `;
+
+      const accountResponse = await fetch(
+        "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            query: accountQuery,
+            variables: {
+              accountId: effectiveAddress.toLowerCase(),
+              tokenId: stremeToken.toLowerCase()
+            }
+          }),
+        }
+      );
+
+      const accountData = await accountResponse.json();
+      console.log("[useStremeFlowRate] Account token snapshot response:", accountData);
+
+      if (accountData.data?.account?.accountTokenSnapshots?.[0]) {
+        const snapshot = accountData.data.account.accountTokenSnapshots[0] as AccountTokenSnapshot;
+        const netFlowRate = BigInt(snapshot.totalNetFlowRate || "0");
+        
+        // Convert from wei/second to tokens/day
+        const flowRatePerSecond = Number(formatUnits(netFlowRate, 18));
+        const flowRatePerDay = flowRatePerSecond * 86400;
+        const formattedFlowRate = flowRatePerDay.toFixed(4);
+        
+        console.log(
+          "[useStremeFlowRate] Total net flow rate:",
+          formattedFlowRate,
+          "STREME/day"
+        );
+        setFlowRate(formattedFlowRate);
+        return;
+      }
+
+      // Fallback to pool-based calculation if no account snapshot found
+      console.log("[useStremeFlowRate] No account snapshot found, falling back to pool calculation");
+      
       // STREME staking pool address
       const stakingPool = "0xcbc2caf425f8cdca774128b3d14de37f2224b964";
       console.log("[useStremeFlowRate] Using staking pool:", stakingPool);
@@ -60,8 +126,8 @@ export function useStremeFlowRate() {
       );
 
       const data = await response.json();
-      console.log("[useStremeFlowRate] Subgraph response:", data);
-      
+      console.log("[useStremeFlowRate] Pool subgraph response:", data);
+
       if (!data.data?.pool) {
         console.log("[useStremeFlowRate] No pool data found");
         setFlowRate("0");
@@ -77,15 +143,19 @@ export function useStremeFlowRate() {
 
         if (totalUnits > 0n) {
           const percentage = (Number(memberUnits) * 100) / Number(totalUnits);
-          
+
           const totalFlowRate = Number(
             formatUnits(BigInt(poolData.flowRate), 18)
           );
           const userFlowRate = totalFlowRate * (percentage / 100);
           const flowRatePerDay = userFlowRate * 86400;
           const calculatedFlowRate = flowRatePerDay.toFixed(4);
-          
-          console.log("[useStremeFlowRate] Calculated flow rate:", calculatedFlowRate, "STREME/day");
+
+          console.log(
+            "[useStremeFlowRate] Calculated pool flow rate:",
+            calculatedFlowRate,
+            "STREME/day"
+          );
           setFlowRate(calculatedFlowRate);
         } else {
           console.log("[useStremeFlowRate] Total units is 0");

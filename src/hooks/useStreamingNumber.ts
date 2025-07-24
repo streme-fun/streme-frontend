@@ -13,7 +13,7 @@ export function useStreamingNumber({
   baseAmount,
   flowRatePerSecond,
   lastUpdateTime,
-  updateInterval = 50, // Faster for smoother animations
+  updateInterval = 33, // ~30fps for smoother animations
   pauseWhenHidden = true,
   isMobileOptimized = false,
 }: UseStreamingNumberOptions) {
@@ -47,7 +47,7 @@ export function useStreamingNumber({
           // Only update if the change is significant (avoids excessive renders)
           setStreamedAmount((prev) => {
             const diff = Math.abs(newStreamed - prev);
-            return diff > 0.01 ? newStreamed : prev;
+            return diff > 0.001 ? newStreamed : prev; // Lower threshold for smoother small number animations
           });
           lastUpdateRef.current = timestamp;
         }
@@ -71,7 +71,7 @@ export function useStreamingNumber({
         // Only update if the change is significant (avoids excessive renders)
         setStreamedAmount((prev) => {
           const diff = Math.abs(newStreamed - prev);
-          return diff > 0.01 ? newStreamed : prev;
+          return diff > 0.001 ? newStreamed : prev; // Lower threshold for smoother small number animations
         });
       };
 
@@ -190,7 +190,7 @@ export function useRewardCounter(
       // Only update if the change is significant (avoids excessive renders)
       setCurrentRewards((prevRewards) => {
         const diff = Math.abs(newRewards - prevRewards);
-        return diff > 0.01 ? newRewards : prevRewards;
+        return diff > 0.001 ? newRewards : prevRewards; // Lower threshold for smoother small number animations
       });
     };
 

@@ -82,6 +82,18 @@ const nextConfig = {
         protocol: "https",
         hostname: "cdn.recaster.org",
       },
+      {
+        protocol: "https",
+        hostname: "i.seadn.io",
+      },
+      {
+        protocol: "https",
+        hostname: "tba-mobile.mypinata.cloud",
+      },
+      {
+        protocol: "https",
+        hostname: "openseauserdata.com",
+      },
     ],
   },
   async headers() {

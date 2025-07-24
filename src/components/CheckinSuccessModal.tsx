@@ -39,7 +39,9 @@ export function CheckinSuccessModal({
   } = useStremeBalance();
 
   // State for calculated flow rate
-  const [calculatedFlowRate, setCalculatedFlowRate] = useState<string | null>(null);
+  const [calculatedFlowRate, setCalculatedFlowRate] = useState<string | null>(
+    null
+  );
   const [isCalculating, setIsCalculating] = useState(false);
 
   // Get effective address
@@ -56,13 +58,13 @@ export function CheckinSuccessModal({
   // Calculate new flow rate based on drop amount
   const calculateNewFlowRate = useCallback(async () => {
     if (!effectiveAddress || !dropAmount) return;
-    
+
     setIsCalculating(true);
     try {
       // Fetch current stSTREME balance and pool data
       const stakingPool = "0xcbc2caf425f8cdca774128b3d14de37f2224b964";
       const stSTREME_ADDRESS = "0x4eb4db20f96c51b088ad5afe1fa963ab36a5c602";
-      
+
       // Get current stSTREME balance
       const query = `
         query UserPoolData {
@@ -90,20 +92,20 @@ export function CheckinSuccessModal({
       );
 
       const data = await response.json();
-      
+
       if (data.data?.pool) {
         const poolData = data.data.pool;
         const currentMember = data.data.poolMember;
-        
+
         // Get current units (stSTREME balance) - 0 for new users
         const currentUnits = BigInt(currentMember?.units || "0");
         // Add the drop amount (converted to wei)
         const dropAmountWei = BigInt(parseFloat(dropAmount) * 1e18);
         const newUnits = currentUnits + dropAmountWei;
-        
+
         // Calculate total units after drop (assuming drop succeeds)
         const totalUnits = BigInt(poolData.totalUnits || "0") + dropAmountWei;
-        
+
         console.log("[CheckinSuccessModal] Calculation:", {
           currentUnits: currentUnits.toString(),
           dropAmountWei: dropAmountWei.toString(),
@@ -111,25 +113,30 @@ export function CheckinSuccessModal({
           totalUnits: totalUnits.toString(),
           poolFlowRate: poolData.flowRate,
         });
-        
+
         if (totalUnits > 0n && newUnits > 0n) {
           const percentage = (Number(newUnits) * 100) / Number(totalUnits);
-          const totalFlowRate = Number(formatUnits(BigInt(poolData.flowRate), 18));
+          const totalFlowRate = Number(
+            formatUnits(BigInt(poolData.flowRate), 18)
+          );
           const userFlowRate = totalFlowRate * (percentage / 100);
           const flowRatePerDay = userFlowRate * 86400;
-          
+
           console.log("[CheckinSuccessModal] Flow rate calculation:", {
             percentage: percentage.toFixed(4),
             totalFlowRate: totalFlowRate.toFixed(4),
             userFlowRate: userFlowRate.toFixed(4),
             flowRatePerDay: flowRatePerDay.toFixed(4),
           });
-          
+
           setCalculatedFlowRate(flowRatePerDay.toFixed(4));
         }
       }
     } catch (error) {
-      console.error("[CheckinSuccessModal] Error calculating flow rate:", error);
+      console.error(
+        "[CheckinSuccessModal] Error calculating flow rate:",
+        error
+      );
     } finally {
       setIsCalculating(false);
     }
@@ -311,7 +318,8 @@ ${shareUrl}`;
               <span>Calculating flow...</span>
             ) : calculatedFlowRate && parseFloat(calculatedFlowRate) > 0 ? (
               <span className="text-success">
-                +{parseInt(calculatedFlowRate).toLocaleString()} per day (after drop)
+                +{parseInt(calculatedFlowRate).toLocaleString()} per day (after
+                drop)
               </span>
             ) : flowRate && parseFloat(flowRate) > 0 ? (
               <span className="text-success">
