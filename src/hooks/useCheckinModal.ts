@@ -50,8 +50,11 @@ export function useCheckinModal({
     openCheckinModal();
   }, [hasStakedBalance, openCheckinModal, trackDebugButtonClicked]);
   
-  // Auto-show checkin modal for eligible users
+  // Auto-show checkin modal for eligible users - DISABLED FOR NOW
   useEffect(() => {
+    // Temporarily disabled auto-show functionality
+    return;
+    
     const shouldAutoShow = 
       isMiniAppView &&
       isConnected &&
