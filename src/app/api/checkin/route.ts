@@ -96,6 +96,10 @@ export async function POST(request: NextRequest) {
     let checkinData: CheckinResponse;
     try {
       checkinData = JSON.parse(responseText);
+      
+      // Debug: Log the actual response structure
+      console.log("Raw checkin response:", JSON.stringify(checkinData, null, 2));
+      
       console.log("Checkin successful:", {
         fid: checkinData.fid,
         totalCheckins: checkinData.totalCheckins,

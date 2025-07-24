@@ -17,7 +17,9 @@ import { usePostHog } from "posthog-js/react";
 import { SPAMMER_BLACKLIST } from "../lib/blacklist";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCheckin } from "../hooks/useCheckin";
+import { CheckinModal } from "../components/CheckinModal";
+import { CheckinSuccessModal } from "../components/CheckinSuccessModal";
+import { useCheckinModal } from "../hooks/useCheckinModal";
 
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -66,12 +68,26 @@ function App() {
   } = useAppFrameLogic();
 
   const postHog = usePostHog();
+  
+  // Checkin modal logic
   const {
-    performCheckin,
     checkinData,
-    error: checkinError,
-    isLoading: checkinLoading,
-  } = useCheckin();
+    checkinError,
+    checkinLoading,
+    showSuccessModal,
+    showCheckinModal,
+    hasCheckedIn,
+    hasStakedBalance,
+    performCheckin,
+    closeSuccessModal,
+    handleCloseCheckinModal,
+    handleDebugButtonClick,
+    showSuccessModalDebug,
+  } = useCheckinModal({
+    isMiniAppView,
+    isConnected,
+    isOnCorrectNetwork,
+  });
 
   // Easter egg function for mini-app logo clicking
   const handleLogoClick = useCallback(() => {
@@ -142,6 +158,7 @@ function App() {
       console.log("Checkin error:", checkinError);
     }
   }, [checkinData, checkinError]);
+
 
   // Fixed iterative pagination instead of recursive
   const fetchTokens = useCallback(async () => {
@@ -379,15 +396,26 @@ function App() {
             </Link>
           </div>
 
-          {/* Debug Checkin Button - only show after logo easter egg */}
+          {/* Debug Buttons - only show after logo easter egg */}
           {isMiniAppView && isConnected && isOnCorrectNetwork && showDebugButton && (
-            <Button
-              onClick={performCheckin}
-              disabled={checkinLoading}
-              className="btn btn-sm btn-secondary mt-2"
-            >
-              {checkinLoading ? "Checking in..." : "🐛 Debug Checkin"}
-            </Button>
+            <div className="flex flex-col gap-2 mt-2">
+              <Button
+                onClick={handleDebugButtonClick}
+                disabled={hasCheckedIn}
+                className="btn btn-sm btn-secondary"
+              >
+                {hasCheckedIn 
+                  ? "✅ Already Checked In"
+                  : "🐛 Debug Checkin"
+                }
+              </Button>
+              <Button
+                onClick={showSuccessModalDebug}
+                className="btn btn-sm btn-accent"
+              >
+                🎉 Debug Success Modal
+              </Button>
+            </div>
           )}
 
           <div className="flex items-center">
@@ -442,6 +470,25 @@ function App() {
           onClose={handleCloseTutorial}
           onSkip={handleSkipTutorial}
         /> */}
+
+        {/* Checkin Modal */}
+        <CheckinModal
+          isOpen={showCheckinModal}
+          onClose={handleCloseCheckinModal}
+          onCheckin={performCheckin}
+          isLoading={checkinLoading}
+          hasCheckedIn={hasCheckedIn}
+          hasStakedBalance={hasStakedBalance}
+        />
+
+        {/* Checkin Success Modal */}
+        <CheckinSuccessModal
+          isOpen={showSuccessModal}
+          onClose={closeSuccessModal}
+          dropAmount={checkinData?.dropAmount}
+          totalCheckins={checkinData?.totalCheckins}
+          currentStreak={checkinData?.currentStreak}
+        />
       </div>
     );
   }
