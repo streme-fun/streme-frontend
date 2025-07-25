@@ -12,6 +12,61 @@ interface CheckinResponse {
   error?: string;
 }
 
+interface CheckinStatusResponse {
+  fid: number;
+  checkedInToday: boolean;
+  lastCheckinDate?: string;
+  totalCheckins: number;
+  currentStreak: number;
+  dropHistory: Array<{
+    date: string;
+    amount: string;
+    txHash?: string;
+  }>;
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    // Extract bearer token from Authorization header
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Authorization required" },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.substring(7); // Remove "Bearer " prefix
+
+    // Forward the request to the external API
+    const response = await fetch("https://api.streme.fun/api/checkin", {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Checkin status API error:", errorText);
+      return NextResponse.json(
+        { error: "Failed to fetch checkin status" },
+        { status: response.status }
+      );
+    }
+
+    const data: CheckinStatusResponse = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("Error in checkin GET route:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Extract the authorization header

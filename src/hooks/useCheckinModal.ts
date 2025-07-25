@@ -103,5 +103,6 @@ export function useCheckinModal({
     handleCloseCheckinModal,
     handleDebugButtonClick,
     showSuccessModalDebug,
+    setShowCheckinModal: openCheckinModal,
   };
 }

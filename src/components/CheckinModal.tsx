@@ -66,11 +66,11 @@ export function CheckinModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-0"
       onClick={handleClose}
     >
       <div
-        className="bg-base-100 rounded-lg p-6 max-w-sm w-full text-center relative"
+        className="bg-base-100 rounded-t-2xl p-6 max-w-sm w-full text-center relative animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-base font-bold mb-4">

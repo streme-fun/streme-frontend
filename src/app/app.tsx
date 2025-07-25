@@ -83,6 +83,7 @@ function App() {
     handleCloseCheckinModal,
     handleDebugButtonClick,
     showSuccessModalDebug,
+    setShowCheckinModal,
   } = useCheckinModal({
     isMiniAppView,
     isConnected,
@@ -285,6 +286,62 @@ function App() {
     connectors,
     connect,
     isSDKLoaded,
+  ]);
+
+  // Check checkin status when miniapp first opens
+  useEffect(() => {
+    const checkCheckinStatus = async () => {
+      if (
+        isMiniAppView &&
+        isSDKLoaded &&
+        farcasterContext &&
+        !hasCheckedIn
+      ) {
+        try {
+          // Try to get FID from different possible locations
+          const userFid = farcasterContext?.user?.fid || 
+                         (farcasterContext as unknown as { client?: { user?: { fid?: number } } })?.client?.user?.fid;
+          
+          if (!userFid) {
+            console.log("No FID found in farcasterContext");
+            return;
+          }
+          
+          console.log(`Checking checkin status for FID: ${userFid}`);
+          
+          const response = await fetch(`/api/checkin/${userFid}`);
+          if (response.ok) {
+            const data = await response.json();
+            console.log("Checkin status:", data);
+            
+            // Only show modal if user hasn't checked in today
+            if (!data.checkedInToday) {
+              console.log("User hasn't checked in today, showing modal");
+              // Add another delay to ensure wallet is connected
+              setTimeout(() => {
+                setShowCheckinModal();
+              }, 2000);
+            } else {
+              console.log("User has already checked in today");
+            }
+          } else {
+            console.error("Failed to fetch checkin status:", response.status);
+          }
+        } catch (error) {
+          console.error("Error checking checkin status:", error);
+        }
+      }
+    };
+
+    // Add a small delay to ensure everything is properly initialized
+    const timer = setTimeout(checkCheckinStatus, 2000);
+    return () => clearTimeout(timer);
+  }, [
+    isMiniAppView,
+    isSDKLoaded,
+    farcasterContext,
+    hasCheckedIn,
+    setShowCheckinModal,
   ]);
 
   // Tutorial modal handlers
