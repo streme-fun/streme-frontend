@@ -19,5 +19,5 @@ export const CHECKIN_MESSAGES = {
 export const BUTTON_TEXT = {
   CLAIMING: "Claiming...",
   ALREADY_CLAIMED: "Already Claimed",
-  CLAIM: "Claim",
+  CLAIM: "CLAIM",
 } as const;

@@ -24,11 +24,14 @@ export function CheckinModal({
   hasStakedBalance = false,
 }: CheckinModalProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const { trackModalShown, trackClaimClicked, trackModalClosed } = useCheckinTracking();
+  const { trackModalShown, trackClaimClicked, trackModalClosed } =
+    useCheckinTracking();
 
   // Select random message for staked users
   const selectedMessage = useMemo(() => {
-    const randomIndex = Math.floor(Math.random() * CHECKIN_MESSAGES.STAKED_USERS.length);
+    const randomIndex = Math.floor(
+      Math.random() * CHECKIN_MESSAGES.STAKED_USERS.length
+    );
     return CHECKIN_MESSAGES.STAKED_USERS[randomIndex];
   }, []);
 
@@ -41,11 +44,13 @@ export function CheckinModal({
 
   const handleCheckin = async () => {
     setIsProcessing(true);
-    
+
     // Track claim button click
-    const messageShown = hasStakedBalance ? selectedMessage : CHECKIN_MESSAGES.NEW_USER;
+    const messageShown = hasStakedBalance
+      ? selectedMessage
+      : CHECKIN_MESSAGES.NEW_USER;
     trackClaimClicked(hasStakedBalance, messageShown);
-    
+
     try {
       await onCheckin();
       onClose();
@@ -61,7 +66,9 @@ export function CheckinModal({
 
   if (!isOpen) return null;
 
-  const displayMessage = hasStakedBalance ? selectedMessage : CHECKIN_MESSAGES.NEW_USER;
+  const displayMessage = hasStakedBalance
+    ? selectedMessage
+    : CHECKIN_MESSAGES.NEW_USER;
   const isButtonDisabled = isProcessing || isLoading || hasCheckedIn;
   const buttonText = getButtonText(isProcessing, isLoading, hasCheckedIn);
 
@@ -78,7 +85,7 @@ export function CheckinModal({
         <div className="mb-4">
           <CheckinAnimation />
         </div>
-        
+
         <h2 className="text-base font-bold mb-4">
           {CHECKIN_MESSAGES.MODAL_TITLE}
         </h2>
@@ -90,7 +97,7 @@ export function CheckinModal({
         <button
           onClick={handleCheckin}
           disabled={isButtonDisabled}
-          className="btn btn-primary w-full"
+          className="btn btn-lg btn-primary w-full"
         >
           {buttonText}
         </button>
@@ -100,7 +107,11 @@ export function CheckinModal({
 }
 
 // Helper function for button text
-function getButtonText(isProcessing: boolean, isLoading: boolean, hasCheckedIn: boolean): React.ReactNode {
+function getButtonText(
+  isProcessing: boolean,
+  isLoading: boolean,
+  hasCheckedIn: boolean
+): React.ReactNode {
   if (isProcessing || isLoading) {
     return (
       <>
@@ -109,10 +120,10 @@ function getButtonText(isProcessing: boolean, isLoading: boolean, hasCheckedIn: 
       </>
     );
   }
-  
+
   if (hasCheckedIn) {
     return BUTTON_TEXT.ALREADY_CLAIMED;
   }
-  
+
   return BUTTON_TEXT.CLAIM;
 }
