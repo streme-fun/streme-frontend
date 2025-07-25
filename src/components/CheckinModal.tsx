@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { CheckinData } from "../hooks/useCheckin";
 import { useCheckinTracking } from "../hooks/useCheckinTracking";
 import { CHECKIN_MESSAGES, BUTTON_TEXT } from "../constants/checkin";
+import { CheckinAnimation } from "./CheckinAnimation";
 
 interface CheckinModalProps {
   isOpen: boolean;
@@ -73,6 +74,11 @@ export function CheckinModal({
         className="bg-base-100 rounded-t-2xl p-6 max-w-sm w-full text-center relative animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Animation at the top */}
+        <div className="mb-4">
+          <CheckinAnimation />
+        </div>
+        
         <h2 className="text-base font-bold mb-4">
           {CHECKIN_MESSAGES.MODAL_TITLE}
         </h2>
