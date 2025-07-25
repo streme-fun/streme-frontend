@@ -17,7 +17,7 @@ export function Hero() {
   const { currentRewards: currentTotalRewards } = useRewardCounter(
     initialTotalRewards,
     REWARDS_PER_SECOND,
-    150 // Balanced between performance and smoothness
+    100 // Balanced between performance and smoothness
   );
 
   useEffect(() => {
@@ -51,23 +51,31 @@ export function Hero() {
   }, []);
 
   return (
-    <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-28 md:mt-20">
+    <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-40 md:mt-32">
       {/* Hero Text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center z-10 text-center">
-        <h1 className="text-6xl md:text-7xl font-extrabold tracking-tight mb-4">
-          <span className="text-primary drop-shadow-sm">Ape.</span>{" "}
-          <span className="text-secondary drop-shadow-sm">Stake.</span>{" "}
-          <span className="text-accent drop-shadow-sm">Earn.</span>
-        </h1>
-
-        <div className="text-2xl font-semibold mb-8">
-          <span className="font-mono">
-            {currentTotalRewards.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-          </span>
-          <span className="opacity-60"> rewards stremed</span>
+        {/* Transparent background container */}
+        <div className="backdrop-blur-sm bg-base-100/1 border border-base-300/20 rounded-3xl px-8 py-6 md:px-12 md:py-8">
+          <h1 className="text-6xl md:text-7xl font-extrabold tracking-tight mb-4">
+            <span className="text-primary drop-shadow-sm">Ape.</span>{" "}
+            <span className="text-secondary drop-shadow-sm">Stake.</span>{" "}
+            <span className="text-accent drop-shadow-sm">Earn.</span>
+          </h1>
+          <div className="text-2xl font-semibold">
+            <span className="font-mono">
+              {currentTotalRewards.toLocaleString(undefined, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              })}
+            </span>
+            <span className="text-base-content/60"> rewards stremed</span>
+          </div>
+          <h2 className="text-xl md:text-xl my-4 max-w-4xl mx-auto text-base-content">
+            Launch tokens with built-in streaming superpowers. Holders can stake
+            for a continuous rewards APY or join streaming experimental sinks
+            for extra Superfluid SUP — all flowing every second via Superfluid
+            protocol.
+          </h2>
         </div>
       </div>
 

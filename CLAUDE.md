@@ -40,6 +40,9 @@ src/
 - GDA V1 Forwarder: `0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08`
 - STREME Super Token: `0x3B3Cd21242BA44e9865B066e5EF5d1cC1030CC58`
 - STREME Staking Pool: `0xcbc2caf425f8cdca774128b3d14de37f2224b964`
+- STREME Staking Rewards Funder: (Address in useStremeStakingContract)
+- Macro Forwarder: `0xFD0268E33111565dE546af2675351A4b1587F89F`
+- Staking Macro V2: `0x5c4b8561363E80EE458D3F0f4F14eC671e1F54Af`
 - Fluid Locker Factory: `0xa6694cab43713287f7735dadc940b555db9d39d9`
 
 # Core Patterns
@@ -64,6 +67,8 @@ src/
 - `useStreamingNumber` - Animated number display for streaming values
 - `useDistributionPool` - GDA pool management
 - `useCheckin` - Daily check-in functionality
+- `useCheckinModal` - Check-in modal state management
+- `useStremeStakingContract` - STREME staking operations (deposit, withdraw, approve)
 - `useBestFriendsStreaming` - Farcaster best friends integration
 
 # Superfluid Integration
@@ -97,7 +102,32 @@ src/
 
 # Authentication / Wallet Connection
 
-- Privy handles desktop/mobile authentication, but wagmi is used for Farcaster mini-app.
+- Privy handles desktop/mobile authentication, but wagmi is used for Farcaster mini-app
+- Mini-app wallet isolation: Connectors are conditionally configured to prevent browser wallet interference in mini-app context
+
+## Mini-App Transaction Best Practices
+
+When implementing transactions in mini-app context (via `eth_sendTransaction`), always include:
+
+```typescript
+const txHash = await ethProvider.request({
+  method: "eth_sendTransaction",
+  params: [{
+    to: contractAddress,
+    from: userAddress,
+    data: encodedData,
+    chainId: "0x2105", // Base mainnet chain ID (8453 in hex) - REQUIRED
+    // ... other params
+  }],
+});
+```
+
+**Critical**: Missing `chainId` parameter causes transactions to execute on whatever network the wallet is connected to, not Base. This affects all components that use `eth_sendTransaction` including:
+- StakeButton, UnstakeButton, SwapButton
+- TopUpAllStakesButton, StakeAllButton  
+- ClaimFeesButton, ZapStakeButton
+- ConnectPoolButton, UnstakedTokensModal
+- StakerLeaderboardEmbed
 
 # Testing
 
@@ -170,6 +200,25 @@ Enable debug mode by clicking the floating button in development.
 - React Hook dependencies: Some are intentionally omitted to prevent re-render loops
 - Superfluid queries: The subgraph sometimes returns incomplete data, always validate
 - Flow rates: Can be negative (net outflow), handle UI accordingly
+- Mini-app transactions: ALWAYS include `chainId: "0x2105"` in `eth_sendTransaction` calls
+- CFA streams: Don't have automatic end dates - require manual termination or Flow Scheduler
+- Mini-app detection: Use `clientFid` presence and other robust checks to prevent browser wallet interference
+
+# Troubleshooting
+
+## Network Issues
+- **Transactions on wrong network**: Check `chainId` parameter in `eth_sendTransaction` calls
+- **Mini-app wallet conflicts**: Verify conditional connector configuration in `WagmiProvider`
+- **Stream not starting**: Ensure all required Superfluid contract addresses are correct
+
+## Superfluid Issues  
+- **Active streams not showing**: Use token address directly in query, not as variable
+- **Incorrect flow rates**: Use `accountTokenSnapshots` for net rates, not individual streams
+- **Missing receiver data**: Extract from stream ID format `sender-receiver-token-userData`
+
+## Balance Issues
+- **Streaming balance shows 0**: Use `balanceOf` instead of `realtimeBalanceOfNow` for actual balance
+- **Animation not updating**: Check `useStreamingNumber` configuration and flow rate calculations
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.

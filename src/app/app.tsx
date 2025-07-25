@@ -506,7 +506,7 @@ function App() {
           <Hero />
 
           {/* Streaming Experiments Section */}
-          <div className="w-full max-w-[1200px] px-4 mb-8 mx-auto">
+          <div className="w-full max-w-[1200px] px-4 my-12 mx-auto">
             <h3 className="font-semibold text-base-content mb-4 text-xl">
               Streme Experiments
             </h3>
