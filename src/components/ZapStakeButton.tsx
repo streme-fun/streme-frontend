@@ -184,6 +184,7 @@ export function ZapStakeButton({
               from: toHex(currentAddress!),
               data: zapDataWithReferral,
               value: `0x${amountInWei.toString(16)}`,
+              chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
           ],
         });
@@ -274,6 +275,7 @@ export function ZapStakeButton({
                 from: toHex(currentAddress!),
                 data: zapDataWithReferral,
                 value: `0x${amountInWei.toString(16)}`,
+                chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
               },
             ],
           });

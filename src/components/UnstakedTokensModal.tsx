@@ -287,6 +287,7 @@ https://streme.fun`;
         to: toHex(MACRO_FORWARDER),
         from: toHex(userAddress),
         data: toHex(macroData),
+        chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
       };
 
       // Add gas estimation for non-miniApp

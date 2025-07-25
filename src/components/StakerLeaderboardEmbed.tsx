@@ -320,6 +320,7 @@ export function StakerLeaderboardEmbed({
               from: toHex(effectiveAddress!),
               data: zapData,
               value: `0x${amountInWei.toString(16)}`,
+              chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
           ],
         });
@@ -372,6 +373,7 @@ export function StakerLeaderboardEmbed({
               data: zapData,
               value: `0x${amountInWei.toString(16)}`,
               gas: `0x${gasLimit.toString(16)}`,
+              chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
           ],
         });

@@ -189,6 +189,7 @@ export function SwapButton({
             to: tokenAddress as `0x${string}`,
             from: currentAddress as `0x${string}`,
             data: approveDataWithReferral,
+            chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
           },
         ],
       });
@@ -412,6 +413,7 @@ export function SwapButton({
               16
             )}`,
             gas: `0x${BigInt(quoteData.transaction.gas).toString(16)}`,
+            chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
           },
         ],
       });

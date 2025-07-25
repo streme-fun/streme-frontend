@@ -150,6 +150,7 @@ export function StakeAllButton({
         to: toHex(MACRO_FORWARDER),
         from: toHex(userAddress),
         data: toHex(macroData),
+        chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
       };
 
       // Add gas estimation for non-miniApp
@@ -212,6 +213,7 @@ export function StakeAllButton({
             to: toHex(GDA_FORWARDER),
             from: toHex(userAddress),
             data: toHex(connectData),
+            chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
           };
 
           connectTxHash = await provider.request({

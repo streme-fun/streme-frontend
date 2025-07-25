@@ -81,6 +81,7 @@ export function ConnectPoolButton({
               to: toHex(GDA_FORWARDER),
               from: currentAddress as `0x${string}`,
               data: toHex(data),
+              chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
           ],
         });
@@ -132,6 +133,7 @@ export function ConnectPoolButton({
                 to: toHex(GDA_FORWARDER),
                 from: currentAddress as `0x${string}`,
                 data: toHex(data),
+                chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
               },
             ],
           });

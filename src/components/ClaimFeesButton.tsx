@@ -92,6 +92,7 @@ export function ClaimFeesButton({
               to: LP_FACTORY_ADDRESS,
               from: currentAddress,
               data: claimDataWithReferral,
+              chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
           ],
         });
@@ -161,6 +162,7 @@ export function ClaimFeesButton({
                 to: LP_FACTORY_ADDRESS,
                 from: currentAddress,
                 data: claimDataWithReferral,
+                chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
               },
             ],
           });

@@ -184,6 +184,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
               to: toHex(stakedStremeCoinAddress),
               from: toHex(address),
               data: toHex(data),
+              chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
           ],
         });
@@ -244,6 +245,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
               to: toHex(STREME_STAKING_REWARDS_FUNDER_ADDRESS),
               from: toHex(address),
               data: toHex(data),
+              chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
           ],
         });
@@ -304,6 +306,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
               to: toHex(STREME_STAKING_REWARDS_FUNDER_ADDRESS),
               from: toHex(address),
               data: toHex(data),
+              chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
           ],
         });
@@ -356,6 +359,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
               to: toHex(STREME_STAKING_REWARDS_FUNDER_ADDRESS),
               from: toHex(address),
               data: toHex(data),
+              chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
           ],
         });

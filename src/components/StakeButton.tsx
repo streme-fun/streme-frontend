@@ -176,6 +176,7 @@ export function StakeButton({
                 to: toHex(tokenAddress),
                 from: toHex(currentAddress!),
                 data: approveDataWithReferral,
+                chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
               },
             ],
           });
@@ -224,6 +225,7 @@ export function StakeButton({
               to: toHex(stakingAddress),
               from: toHex(currentAddress!),
               data: stakeDataWithReferral,
+              chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
           ],
         });
@@ -273,6 +275,7 @@ export function StakeButton({
                   to: toHex(GDA_FORWARDER),
                   from: toHex(currentAddress!),
                   data: connectDataWithReferral,
+                  chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
                 },
               ],
             });
@@ -371,6 +374,7 @@ export function StakeButton({
                   to: toHex(tokenAddress),
                   from: toHex(currentAddress!),
                   data: approveDataWithReferral,
+                  chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
                 },
               ],
             });
@@ -455,6 +459,7 @@ export function StakeButton({
                 to: toHex(stakingAddress),
                 from: toHex(currentAddress!),
                 data: stakeDataWithReferral,
+                chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
               },
             ],
           });
@@ -540,6 +545,7 @@ export function StakeButton({
                     to: toHex(GDA_FORWARDER),
                     from: toHex(currentAddress!),
                     data: connectDataWithReferral,
+                    chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
                   },
                 ],
               });

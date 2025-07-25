@@ -217,6 +217,7 @@ export function UnstakeButton({
               to: toHex(stakingAddress),
               from: toHex(currentAddress!),
               data: unstakeDataWithReferral,
+              chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
           ],
         });
@@ -304,6 +305,7 @@ export function UnstakeButton({
                 to: toHex(stakingAddress),
                 from: toHex(currentAddress!),
                 data: unstakeDataWithReferral,
+                chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
               },
             ],
           });
