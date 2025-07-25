@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useAccount } from "wagmi";
@@ -35,9 +35,35 @@ export function Navbar() {
     login: privyLogin,
     logout: privyLogout,
     authenticated: privyAuthenticated,
+    ready: privyReady,
   } = usePrivy();
 
+  const { wallets } = useWallets();
   const { address: wagmiAddress } = useAccount();
+
+  // Get the connected wallet address from Privy as fallback
+  const connectedWallet = wallets.find(wallet => wallet.address) || wallets[0];
+  const privyConnectedAddress = connectedWallet?.address;
+
+  // Use wagmi address if available, otherwise fall back to Privy address
+  const displayAddress = wagmiAddress || privyConnectedAddress;
+
+  // Add some stability to prevent flickering during navigation
+  const [stableAddress, setStableAddress] = useState<string>("");
+  const [lastValidAddress, setLastValidAddress] = useState<string>("");
+
+  useEffect(() => {
+    if (displayAddress) {
+      setStableAddress(displayAddress);
+      setLastValidAddress(displayAddress);
+    } else if (privyAuthenticated && privyReady && lastValidAddress) {
+      // If we're authenticated but temporarily don't have an address, use the last valid one
+      console.log("[Navbar] Using stable address during reconnection:", lastValidAddress);
+      setStableAddress(lastValidAddress);
+    } else {
+      setStableAddress("");
+    }
+  }, [displayAddress, privyAuthenticated, privyReady, lastValidAddress]);
   const router = useRouter();
 
   const {
@@ -407,7 +433,7 @@ Symbol: $[your ticker]
 
             <ThemeSwitcher />
 
-            {privyAuthenticated ? (
+            {privyAuthenticated && privyReady ? (
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <button
@@ -415,8 +441,9 @@ Symbol: $[your ticker]
                       setIsAddressDropdownOpen(!isAddressDropdownOpen)
                     }
                     className="btn btn-ghost gap-2"
+                    disabled={!stableAddress}
                   >
-                    {truncateAddress(wagmiAddress || "")}
+                    {stableAddress ? truncateAddress(stableAddress) : "Connecting..."}
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 20 20"
@@ -481,7 +508,7 @@ Symbol: $[your ticker]
               Launch a Token
             </Link>
 
-            {privyAuthenticated && (
+            {privyAuthenticated && privyReady && (
               <Link
                 href="/tokens"
                 className="btn btn-accent w-full justify-start"
@@ -505,7 +532,7 @@ Symbol: $[your ticker]
               <ThemeSwitcher className="w-full justify-start" />
             </div>
 
-            {privyAuthenticated && (
+            {privyAuthenticated && privyReady && (
               <Link
                 href="/launched-tokens"
                 className="btn btn-ghost w-full justify-start"
@@ -515,7 +542,7 @@ Symbol: $[your ticker]
               </Link>
             )}
 
-            {privyAuthenticated ? (
+            {privyAuthenticated && privyReady ? (
               <button
                 onClick={() => {
                   privyLogout();
