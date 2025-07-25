@@ -502,11 +502,11 @@ function App() {
   return (
     <>
       <div className="font-[family-name:var(--font-geist-sans)]">
-        <div className="flex flex-col row-start-2 w-full">
+        <div className="flex flex-col row-start-2 w-full items-center">
           <Hero />
 
           {/* Streaming Experiments Section */}
-          <div className="w-full max-w-[1200px] px-4 mb-8">
+          <div className="w-full max-w-[1200px] px-4 mb-8 mx-auto">
             <h3 className="font-semibold text-base-content mb-4 text-xl">
               Streme Experiments
             </h3>
@@ -542,11 +542,11 @@ function App() {
           </div>
 
           {/* Streme Tokens */}
-          <h3 className="font-semibold text-base-content text-xl ml-4">
+          <h3 className="font-semibold text-base-content text-xl w-full max-w-[1200px] px-4 mx-auto">
             Streme Tokens
           </h3>
 
-          <div className="w-full max-w-[1200px] px-4">
+          <div className="w-full max-w-[1200px] px-4 mx-auto">
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 my-4">
               <div className="flex-none">
                 <SortButtons
