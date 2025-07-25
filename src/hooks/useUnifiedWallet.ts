@@ -3,12 +3,15 @@
 import { useAccount } from "wagmi";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useAppFrameLogic } from "./useAppFrameLogic";
+import { useState, useEffect } from "react";
 
 /**
  * Unified wallet connection hook that handles all environments:
  * - Desktop: Privy authentication + wagmi connection
  * - Mobile: Privy authentication (primary) + wagmi connection (secondary)
  * - Mini-app: Farcaster wallet connection
+ * 
+ * Provides stable address management to prevent flickering during navigation
  */
 export function useUnifiedWallet() {
   const { address: wagmiAddress, isConnected: wagmiIsConnected } = useAccount();
@@ -24,6 +27,11 @@ export function useUnifiedWallet() {
     isSDKLoaded,
   } = useAppFrameLogic();
 
+  // Stable address management to prevent flickering
+  const [stableAddress, setStableAddress] = useState<string>("");
+  const [lastValidAddress, setLastValidAddress] = useState<string>("");
+  const [isInitialized, setIsInitialized] = useState(false);
+
   // Determine if we're in a mini-app environment
   const isEffectivelyMiniApp = isMiniAppView;
 
@@ -38,9 +46,34 @@ export function useUnifiedWallet() {
     ? wagmiIsConnected && Boolean(wagmiAddress)  // Ensure we have both connection and address
     : privyAuthenticated && Boolean(wagmiAddress || privyConnectedAddress);
     
-  const finalAddress = isEffectivelyMiniApp 
+  const rawAddress = isEffectivelyMiniApp 
     ? wagmiAddress
     : wagmiAddress || privyConnectedAddress;
+
+  // Update stable address when we have a valid connection
+  useEffect(() => {
+    if (finalIsConnected && rawAddress && rawAddress !== lastValidAddress) {
+      console.log("[useUnifiedWallet] Updating stable address:", {
+        from: lastValidAddress,
+        to: rawAddress,
+        isConnected: finalIsConnected
+      });
+      setStableAddress(rawAddress);
+      setLastValidAddress(rawAddress);
+      setIsInitialized(true);
+    } else if (!finalIsConnected && isInitialized) {
+      // Only clear if we were previously connected (avoid initial empty state)
+      console.log("[useUnifiedWallet] Clearing stable address - disconnected");
+      setStableAddress("");
+      setLastValidAddress("");
+    } else if (!isInitialized && !finalIsConnected) {
+      // Initial state - mark as initialized even if not connected
+      setIsInitialized(true);
+    }
+  }, [finalIsConnected, rawAddress, lastValidAddress, isInitialized]);
+
+  // Use stable address for public interface, but fall back to raw if stable is empty
+  const finalAddress = stableAddress || rawAddress;
 
   const connect = isEffectivelyMiniApp
     ? () => {
@@ -69,6 +102,7 @@ export function useUnifiedWallet() {
       wagmiAddress,
       finalIsConnected,
       finalAddress,
+      stableAddress,
       isSDKLoaded,
       farcasterIsConnected,
       farcasterAddress,
@@ -89,6 +123,10 @@ export function useUnifiedWallet() {
     // Loading state
     isLoading,
     
+    // Stability indicators
+    isStable: Boolean(stableAddress), // True when we have a stable address cached
+    isInitialized,
+    
     // Raw states for debugging/advanced usage
     raw: {
       wagmiAddress,
@@ -100,6 +138,9 @@ export function useUnifiedWallet() {
       farcasterIsConnected,
       isMiniAppView,
       isSDKLoaded,
+      stableAddress,
+      lastValidAddress,
+      rawAddress,
     }
   };
 }

@@ -70,7 +70,7 @@ export function Hero() {
             </span>
             <span className="text-base-content/60"> rewards stremed</span>
           </div>
-          <h2 className="text-lg md:text-lg my-4 max-w-4xl mx-auto text-base-content">
+          <h2 className="hidden md:block text-lg md:text-lg my-4 max-w-4xl mx-auto text-base-content">
             Streme tokens provide new primitives for distribution and incentive
             design via streaming superpowers. Holders stake for rewards that
             stream continuously to their wallet (no claiming needed) and join

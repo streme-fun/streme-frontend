@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy } from "@privy-io/react-auth";
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { useAccount } from "wagmi";
 import { useRouter } from "next/navigation";
 import { HowItWorksModal } from "./HowItWorksModal";
 import { LaunchTokenModal } from "./LaunchTokenModal";
@@ -14,6 +13,7 @@ import { MyTokensModal } from "./MyTokensModal";
 // import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
+import { useUnifiedWallet } from "../hooks/useUnifiedWallet";
 import sdk from "@farcaster/miniapp-sdk";
 
 // Client-side function to fetch user data from our API
@@ -32,48 +32,21 @@ const fetchNeynarUser = async (fid: number) => {
 
 export function Navbar() {
   const {
-    login: privyLogin,
     logout: privyLogout,
-    authenticated: privyAuthenticated,
-    ready: privyReady,
   } = usePrivy();
 
-  const { wallets } = useWallets();
-  const { address: wagmiAddress } = useAccount();
-
-  // Get the connected wallet address from Privy as fallback
-  const connectedWallet = wallets.find(wallet => wallet.address) || wallets[0];
-  const privyConnectedAddress = connectedWallet?.address;
-
-  // Use wagmi address if available, otherwise fall back to Privy address
-  const displayAddress = wagmiAddress || privyConnectedAddress;
-
-  // Add some stability to prevent flickering during navigation
-  const [stableAddress, setStableAddress] = useState<string>("");
-  const [lastValidAddress, setLastValidAddress] = useState<string>("");
-
-  useEffect(() => {
-    if (displayAddress) {
-      setStableAddress(displayAddress);
-      setLastValidAddress(displayAddress);
-    } else if (privyAuthenticated && privyReady && lastValidAddress) {
-      // If we're authenticated but temporarily don't have an address, use the last valid one
-      console.log("[Navbar] Using stable address during reconnection:", lastValidAddress);
-      setStableAddress(lastValidAddress);
-    } else {
-      setStableAddress("");
-    }
-  }, [displayAddress, privyAuthenticated, privyReady, lastValidAddress]);
+  // Use unified wallet connection logic
+  const {
+    isConnected,
+    address,
+    connect,
+    isEffectivelyMiniApp,
+    isLoading,
+  } = useUnifiedWallet();
   const router = useRouter();
 
   const {
-    // address: wagmiAddress,
-    // isConnected: wagmiIsConnected,
-    // disconnect: wagmiDisconnect,
-    // connect: wagmiConnect,
-    // connectors: wagmiConnectors,
     isSDKLoaded,
-    isMiniAppView,
     farcasterContext,
   } = useAppFrameLogic();
 
@@ -122,7 +95,7 @@ export function Navbar() {
   // Fetch profile picture for mini-app view
   useEffect(() => {
     const fetchMiniAppProfile = async () => {
-      if (!isMiniAppView || !farcasterContext?.user?.fid) {
+      if (!isEffectivelyMiniApp || !farcasterContext?.user?.fid) {
         setMiniAppProfileImage("");
         return;
       }
@@ -139,7 +112,7 @@ export function Navbar() {
     };
 
     fetchMiniAppProfile();
-  }, [isMiniAppView, farcasterContext?.user?.fid]);
+  }, [isEffectivelyMiniApp, farcasterContext?.user?.fid]);
 
   // const handleMiniAppConnect = () => {
   //   const fcConnector = wagmiConnectors.find((c) => c.id === "farcaster");
@@ -155,7 +128,7 @@ export function Navbar() {
   //   }
   // };
 
-  if (isMiniAppView) {
+  if (isEffectivelyMiniApp) {
     return (
       <>
         <nav className="fixed bottom-0 left-0 right-0 z-50 pb-4 pt-2 bg-background/80 border-t border-black/[.1] bg-base-100 bg-opacity-80">
@@ -433,7 +406,7 @@ Symbol: $[your ticker]
 
             <ThemeSwitcher />
 
-            {privyAuthenticated && privyReady ? (
+            {isConnected ? (
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <button
@@ -441,9 +414,9 @@ Symbol: $[your ticker]
                       setIsAddressDropdownOpen(!isAddressDropdownOpen)
                     }
                     className="btn btn-ghost gap-2"
-                    disabled={!stableAddress}
+                    disabled={!address || isLoading}
                   >
-                    {stableAddress ? truncateAddress(stableAddress) : "Connecting..."}
+                    {address ? truncateAddress(address) : isLoading ? "Connecting..." : "No Address"}
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 20 20"
@@ -488,8 +461,8 @@ Symbol: $[your ticker]
                 </div>
               </div>
             ) : (
-              <button onClick={privyLogin} className="btn btn-ghost">
-                Login
+              <button onClick={connect} className="btn btn-ghost" disabled={isLoading}>
+                {isLoading ? "Connecting..." : "Login"}
               </button>
             )}
           </div>
@@ -508,7 +481,7 @@ Symbol: $[your ticker]
               Launch a Token
             </Link>
 
-            {privyAuthenticated && privyReady && (
+            {isConnected && (
               <Link
                 href="/tokens"
                 className="btn btn-accent w-full justify-start"
@@ -532,7 +505,7 @@ Symbol: $[your ticker]
               <ThemeSwitcher className="w-full justify-start" />
             </div>
 
-            {privyAuthenticated && privyReady && (
+            {isConnected && (
               <Link
                 href="/launched-tokens"
                 className="btn btn-ghost w-full justify-start"
@@ -542,7 +515,7 @@ Symbol: $[your ticker]
               </Link>
             )}
 
-            {privyAuthenticated && privyReady ? (
+            {isConnected ? (
               <button
                 onClick={() => {
                   privyLogout();
@@ -555,12 +528,13 @@ Symbol: $[your ticker]
             ) : (
               <button
                 onClick={() => {
-                  privyLogin();
+                  connect();
                   setIsMenuOpen(false);
                 }}
                 className="btn btn-ghost w-full justify-start"
+                disabled={isLoading}
               >
-                Login
+                {isLoading ? "Connecting..." : "Login"}
               </button>
             )}
           </div>
