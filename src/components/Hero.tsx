@@ -70,11 +70,12 @@ export function Hero() {
             </span>
             <span className="text-base-content/60"> rewards stremed</span>
           </div>
-          <h2 className="text-xl md:text-xl my-4 max-w-4xl mx-auto text-base-content">
-            Launch tokens with built-in streaming superpowers. Holders can stake
-            for a continuous rewards APY or join streaming experimental sinks
-            for extra Superfluid SUP — all flowing every second via Superfluid
-            protocol.
+          <h2 className="text-lg md:text-lg my-4 max-w-4xl mx-auto text-base-content">
+            Streme tokens provide new primitives for distribution and incentive
+            design via streaming superpowers. Holders stake for rewards that
+            stream continuously to their wallet (no claiming needed) and join
+            experimental sinks for extra Superfluid SUP — all flowing nonstop
+            every second via Superfluid protocol.
           </h2>
         </div>
       </div>

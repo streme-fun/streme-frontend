@@ -234,7 +234,10 @@ const TokenCardComponent = ({
                   className="card-title text-sm group-hover:text-primary transition-colors duration-300 truncate max-w-[200px] overflow-hidden"
                   title={token.name}
                 >
-                  {token.name}
+                  {token.name.length > 17 
+                    ? token.name.slice(0, 17) + "..."
+                    : token.name
+                  }
                 </h2>
                 <div className="flex items-center gap-2">
                   <div className="avatar transition-transform duration-300 group-hover:scale-110">
