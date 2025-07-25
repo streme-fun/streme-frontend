@@ -105,6 +105,42 @@ src/
 - Privy handles desktop/mobile authentication, but wagmi is used for Farcaster mini-app
 - Mini-app wallet isolation: Connectors are conditionally configured to prevent browser wallet interference in mini-app context
 
+## Mini-App Wallet Connection Guidelines
+
+**ALWAYS** reference the official Farcaster Mini-App documentation at https://miniapps.farcaster.xyz/llms-full.txt for wallet connection patterns.
+
+### Key Principles:
+1. **No Auto-Connection**: Never force wallet connections - the Farcaster Mini App connector will automatically connect if a user already has a wallet
+2. **User-Initiated Connection**: Only connect when user explicitly clicks a connect button
+3. **Standard Wagmi Pattern**: Use standard wagmi `connect()` with proper connector selection
+4. **Respect User Choice**: Let users decide when to connect their wallet
+
+### Correct Connection Pattern:
+```tsx
+function ConnectWallet() {
+  const { isConnected, address } = useAccount()
+  const { connect, connectors } = useConnect()
+
+  if (isConnected) {
+    return <div>Connected: {address}</div>
+  }
+
+  const handleConnect = () => {
+    const farcasterConnector = connectors.find(c => c.id === 'farcasterMiniApp')
+    if (farcasterConnector) {
+      connect({ connector: farcasterConnector })
+    }
+  }
+
+  return <button onClick={handleConnect}>Connect Wallet</button>
+}
+```
+
+### What NOT to do:
+- Force auto-connection on page load
+- Override user's wallet choice
+- Skip the connect button for mini-app users
+
 ## Mini-App Transaction Best Practices
 
 When implementing transactions in mini-app context (via `eth_sendTransaction`), always include:

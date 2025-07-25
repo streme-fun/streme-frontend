@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useReadContract } from "wagmi";
+import { useReadContract, useAccount } from "wagmi";
 import { formatUnits } from "viem";
 import { ERC20_ABI } from "@/src/lib/contracts/StremeStakingRewardsFunder";
 import { getPrices } from "@/src/lib/priceUtils";
@@ -31,7 +31,18 @@ export default function CrowdfundPage() {
     isConnected: unifiedIsConnected,
     address: unifiedAddress,
     isEffectivelyMiniApp: unifiedIsMiniApp,
+    connect: unifiedConnect,
+    isLoading: unifiedIsLoading,
   } = useUnifiedWallet();
+
+  // Fallback to direct wagmi connection for mini-app if unified wallet fails
+  const { address: wagmiAddress, isConnected: wagmiIsConnected } = useAccount();
+  
+  // For mini-app, prefer wagmi directly if unified wallet isn't working
+  const shouldUseWagmiFallback = unifiedIsMiniApp && (!unifiedIsConnected || !unifiedAddress) && (wagmiIsConnected && wagmiAddress);
+  
+  const effectiveIsConnected = shouldUseWagmiFallback ? wagmiIsConnected : unifiedIsConnected;
+  const effectiveAddress = shouldUseWagmiFallback ? wagmiAddress : unifiedAddress;
   const [price, setPrice] = useState<number | null>(null);
   const [baseUsdValue, setBaseUsdValue] = useState<number>(0);
   const [lastUsdUpdateTime, setLastUsdUpdateTime] = useState<number>(
@@ -85,10 +96,37 @@ export default function CrowdfundPage() {
     []
   );
 
-  // Use unified wallet state with fallback to individual hooks for backwards compatibility
-  const effectiveIsConnected = unifiedIsConnected;
-  const effectiveAuthenticated = unifiedIsConnected;
-  const effectiveAddress = unifiedAddress;
+  // Use effective wallet state (unified or wagmi fallback)
+  const effectiveAuthenticated = effectiveIsConnected;
+
+  // Debug logging for connection issues on crowdfund page
+  useEffect(() => {
+    if (unifiedIsMiniApp) {
+      console.log("[CrowdfundPage] Connection state:", {
+        unifiedIsConnected,
+        unifiedAddress,
+        wagmiIsConnected,
+        wagmiAddress,
+        shouldUseWagmiFallback,
+        effectiveIsConnected,
+        effectiveAddress,
+        unifiedIsLoading,
+      });
+    }
+  }, [
+    unifiedIsConnected,
+    unifiedAddress,
+    wagmiIsConnected,
+    wagmiAddress,
+    shouldUseWagmiFallback,
+    effectiveIsConnected,
+    effectiveAddress,
+    unifiedIsLoading,
+    unifiedIsMiniApp,
+  ]);
+
+  // According to Farcaster docs, the mini-app connector should auto-connect
+  // We should respect the user's choice and not force connections
 
   // Read STREME token balance
   const { data: stremeBalance } = useReadContract({
@@ -1126,28 +1164,50 @@ export default function CrowdfundPage() {
                     />
                   </svg>
                   <span className="text-sm">
-                    Connect your wallet to join the crowdfund
+                    {unifiedIsMiniApp ? "Connect your wallet to join the crowdfund" : "Connect your wallet to join the crowdfund"}
                   </span>
                 </div>
-                <button
-                  className="btn btn-primary btn-lg w-full h-11 text-base font-semibold opacity-60"
-                  disabled
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <svg
-                      className="w-4 h-4"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    Join the Fund
-                  </div>
-                </button>
+                {unifiedIsMiniApp ? (
+                  <button
+                    onClick={unifiedConnect}
+                    className="btn btn-primary btn-lg w-full h-11 text-base font-semibold"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <svg
+                        className="w-4 h-4"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Connect Wallet
+                    </div>
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-primary btn-lg w-full h-11 text-base font-semibold opacity-60"
+                    disabled
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <svg
+                        className="w-4 h-4"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Join the Fund
+                    </div>
+                  </button>
+                )}
               </div>
 
               {/* Crowdfund Stats Section */}

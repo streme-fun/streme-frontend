@@ -35,8 +35,8 @@ export function useUnifiedWallet() {
   // For mini-app: trust wagmi's useAccount() directly (uses farcasterMiniApp connector)
   // For regular apps: use Privy authentication + wagmi address
   const finalIsConnected = isEffectivelyMiniApp 
-    ? wagmiIsConnected
-    : privyAuthenticated;
+    ? wagmiIsConnected && Boolean(wagmiAddress)  // Ensure we have both connection and address
+    : privyAuthenticated && Boolean(wagmiAddress || privyConnectedAddress);
     
   const finalAddress = isEffectivelyMiniApp 
     ? wagmiAddress
@@ -44,8 +44,10 @@ export function useUnifiedWallet() {
 
   const connect = isEffectivelyMiniApp
     ? () => {
+        // For mini-apps, use the standard wagmi connect pattern
         if (farcasterConnect && farcasterConnectors && farcasterConnectors.length > 0) {
-          farcasterConnect({ connector: farcasterConnectors[0] });
+          const farcasterConnector = farcasterConnectors.find(c => c.id === 'farcasterMiniApp') || farcasterConnectors[0];
+          farcasterConnect({ connector: farcasterConnector });
         } else {
           console.warn("Farcaster connect function not available");
         }
@@ -56,6 +58,22 @@ export function useUnifiedWallet() {
   const isLoading = isEffectivelyMiniApp 
     ? !isSDKLoaded
     : false; // Privy doesn't have a loading state we need to wait for
+
+  // The Farcaster mini-app connector should auto-connect if user has a wallet
+  // We don't need to force connection - it should happen automatically
+
+  // Debug logging for connection issues
+  if (isEffectivelyMiniApp) {
+    console.log("[useUnifiedWallet] Mini-app state:", {
+      wagmiIsConnected,
+      wagmiAddress,
+      finalIsConnected,
+      finalAddress,
+      isSDKLoaded,
+      farcasterIsConnected,
+      farcasterAddress,
+    });
+  }
 
   return {
     // Connection state

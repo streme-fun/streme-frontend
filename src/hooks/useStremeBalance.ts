@@ -61,7 +61,11 @@ export function useStremeBalance() {
 
   // Set flow rate when it changes
   const updateFlowRate = (rate: string) => {
-    setFlowRatePerDay(parseFloat(rate) || 0);
+    const newRate = parseFloat(rate) || 0;
+    console.log("[useStremeBalance] Updating flow rate:", newRate);
+    setFlowRatePerDay(newRate);
+    // Also update the timestamp to trigger balance animation
+    setLastUpdateTime(Date.now());
   };
 
   useEffect(() => {

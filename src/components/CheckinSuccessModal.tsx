@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
-import { useStremeFlowRate } from "../hooks/useStremeFlowRate";
-import { useStremeBalance } from "../hooks/useStremeBalance";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import sdk from "@farcaster/miniapp-sdk";
 import confetti from "canvas-confetti";
-import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
+import { formatUnits } from "viem";
+import { publicClient } from "../lib/viemClient";
+import { useStreamingNumber } from "../hooks/useStreamingNumber";
 
 interface CheckinSuccessModalProps {
   isOpen: boolean;
@@ -24,60 +24,84 @@ export function CheckinSuccessModal({
   dropAmount,
 }: CheckinSuccessModalProps) {
   const [showInfo, setShowInfo] = useState(false);
-  const { isSDKLoaded, isMiniAppView, address: fcAddress } = useAppFrameLogic();
-  const { address: wagmiAddress } = useAccount();
-  const {
-    flowRate,
-    isLoading: flowRateLoading,
-    refetch: refetchFlowRate,
-  } = useStremeFlowRate();
+  const { isSDKLoaded, isMiniAppView, address: fcAddress, isConnected: fcIsConnected } = useAppFrameLogic();
+  const { address: wagmiAddress, isConnected: wagmiIsConnected } = useAccount();
 
-  const {
-    balance,
-    updateFlowRate: updateFlowRateRaw,
-    refetch: refetchBalance,
-  } = useStremeBalance();
+  // Balance animation state (based on StakedBalance)
+  const [baseAmount, setBaseAmount] = useState<number>(0);
+  const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
+  const [flowRate, setFlowRate] = useState<string>("0");
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
-  // State for calculated flow rate
-  const [calculatedFlowRate, setCalculatedFlowRate] = useState<string | null>(
-    null
-  );
-  const [isCalculating, setIsCalculating] = useState(false);
+  const [hasTriggeredEffects, setHasTriggeredEffects] = useState(false);
 
-  // Get effective address
+  // Get effective connection state and address
+  const effectiveIsConnected = isMiniAppView ? fcIsConnected : wagmiIsConnected;
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
 
-  // Stabilize function references
-  const updateFlowRate = useCallback(
-    (rate: string) => {
-      updateFlowRateRaw(rate);
-    },
-    [updateFlowRateRaw]
-  );
+  // STREME token address
+  const STREME_TOKEN_ADDRESS = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
+  const STREME_STAKING_POOL = "0xcbc2caf425f8cdca774128b3d14de37f2224b964";
 
-  // Calculate new flow rate based on drop amount
-  const calculateNewFlowRate = useCallback(async () => {
-    if (!effectiveAddress || !dropAmount) return;
+  // Use streaming number hook for animated balance
+  const currentBalance = useStreamingNumber({
+    baseAmount,
+    flowRatePerSecond: Number(flowRate) / 86400, // Convert daily rate to per-second
+    lastUpdateTime,
+    updateInterval: 50, // 50ms for smooth animation (matches StakedBalance)
+    pauseWhenHidden: true,
+  });
 
-    setIsCalculating(true);
+  // Fetch balance and flow rate data (based on StakedBalance logic)
+  const fetchBalanceData = async () => {
+    if (!effectiveIsConnected || !effectiveAddress) return;
+
+    // Prevent calls if we just fetched data recently (within 30 seconds)
+    const now = Date.now();
+    if (now - lastFetchTime < 30000) {
+      console.log("[CheckinSuccessModal] Skipping fetch - too soon since last fetch");
+      return;
+    }
+
     try {
-      // Fetch current stSTREME balance and pool data
-      const stakingPool = "0xcbc2caf425f8cdca774128b3d14de37f2224b964";
-      const stSTREME_ADDRESS = "0x4eb4db20f96c51b088ad5afe1fa963ab36a5c602";
+      setLastFetchTime(now);
+      console.log(`[CheckinSuccessModal] Fetching balance for ${effectiveAddress}`);
 
-      // Get current stSTREME balance
+      // Get STREME token balance
+      const balance = await publicClient.readContract({
+        address: STREME_TOKEN_ADDRESS as `0x${string}`,
+        abi: [
+          {
+            inputs: [{ name: "account", type: "address" }],
+            name: "balanceOf",
+            outputs: [{ name: "", type: "uint256" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ],
+        functionName: "balanceOf",
+        args: [effectiveAddress as `0x${string}`],
+      });
+
+      const formattedBalance = Number(formatUnits(balance as bigint, 18));
+
+      // Only update base amount and reset timer if the balance has actually changed
+      // This prevents the streaming animation from restarting unnecessarily
+      if (Math.abs(formattedBalance - baseAmount) > 0.0001) {
+        console.log(`[CheckinSuccessModal] Balance changed from ${baseAmount} to ${formattedBalance}`);
+        setBaseAmount(formattedBalance);
+        setLastUpdateTime(Date.now());
+      }
+
+      // Fetch pool data for flow rate
       const query = `
-        query UserPoolData {
-          pool(id: "${stakingPool.toLowerCase()}") {
+        query PoolData {
+          pool(id: "${STREME_STAKING_POOL.toLowerCase()}") {
             totalUnits
             flowRate
-            totalSupply
-          }
-          poolMember(id: "${stakingPool.toLowerCase()}-${effectiveAddress.toLowerCase()}") {
-            units
-          }
-          tokenStatistic(id: "${stSTREME_ADDRESS.toLowerCase()}") {
-            totalSupply
+            poolMembers(where: {account_: {id: "${effectiveAddress.toLowerCase()}"}}) {
+              units
+            }
           }
         }
       `;
@@ -92,60 +116,36 @@ export function CheckinSuccessModal({
       );
 
       const data = await response.json();
-
       if (data.data?.pool) {
         const poolData = data.data.pool;
-        const currentMember = data.data.poolMember;
+        const member = poolData.poolMembers[0];
 
-        // Get current units (stSTREME balance) - 0 for new users
-        const currentUnits = BigInt(currentMember?.units || "0");
-        // Add the drop amount (converted to wei)
-        const dropAmountWei = BigInt(parseFloat(dropAmount) * 1e18);
-        const newUnits = currentUnits + dropAmountWei;
+        if (member) {
+          const totalUnits = BigInt(poolData.totalUnits || "0");
+          const memberUnits = BigInt(member.units || "0");
 
-        // Calculate total units after drop (assuming drop succeeds)
-        const totalUnits = BigInt(poolData.totalUnits || "0") + dropAmountWei;
-
-        console.log("[CheckinSuccessModal] Calculation:", {
-          currentUnits: currentUnits.toString(),
-          dropAmountWei: dropAmountWei.toString(),
-          newUnits: newUnits.toString(),
-          totalUnits: totalUnits.toString(),
-          poolFlowRate: poolData.flowRate,
-        });
-
-        if (totalUnits > 0n && newUnits > 0n) {
-          const percentage = (Number(newUnits) * 100) / Number(totalUnits);
-          const totalFlowRate = Number(
-            formatUnits(BigInt(poolData.flowRate), 18)
-          );
-          const userFlowRate = totalFlowRate * (percentage / 100);
-          const flowRatePerDay = userFlowRate * 86400;
-
-          console.log("[CheckinSuccessModal] Flow rate calculation:", {
-            percentage: percentage.toFixed(4),
-            totalFlowRate: totalFlowRate.toFixed(4),
-            userFlowRate: userFlowRate.toFixed(4),
-            flowRatePerDay: flowRatePerDay.toFixed(4),
-          });
-
-          setCalculatedFlowRate(flowRatePerDay.toFixed(4));
+          if (totalUnits > 0n) {
+            const percentage = (Number(memberUnits) * 100) / Number(totalUnits);
+            const totalFlowRate = Number(formatUnits(BigInt(poolData.flowRate), 18));
+            const userFlowRate = totalFlowRate * (percentage / 100);
+            const flowRatePerDay = userFlowRate * 86400;
+            
+            console.log(`[CheckinSuccessModal] Flow rate: ${flowRatePerDay.toFixed(4)} STREME/day`);
+            setFlowRate(flowRatePerDay.toFixed(4));
+          }
         }
       }
     } catch (error) {
-      console.error(
-        "[CheckinSuccessModal] Error calculating flow rate:",
-        error
-      );
-    } finally {
-      setIsCalculating(false);
+      console.error("[CheckinSuccessModal] Error fetching balance data:", error);
     }
-  }, [effectiveAddress, dropAmount]);
+  };
 
-  // Trigger confetti effect when modal opens
+  // Trigger confetti effect when modal opens (only once per open)
   useEffect(() => {
-    if (isOpen) {
-      // Fire confetti
+    if (isOpen && dropAmount && !hasTriggeredEffects) {
+      setHasTriggeredEffects(true);
+      
+      // Fire confetti once
       confetti({
         particleCount: 100,
         spread: 70,
@@ -153,19 +153,26 @@ export function CheckinSuccessModal({
         colors: ["#8b5cf6", "#3b82f6", "#60a5fa"],
       });
 
-      console.log("[CheckinSuccessModal] Modal opened, fetching flow rate...");
-      refetchFlowRate();
-      refetchBalance();
-      calculateNewFlowRate();
+      console.log("[CheckinSuccessModal] Modal opened with drop amount:", dropAmount);
+      
+      // Trigger balance refresh to show the updated amount
+      fetchBalanceData();
     }
-  }, [isOpen, calculateNewFlowRate]); // Include calculateNewFlowRate
+  }, [isOpen, dropAmount, hasTriggeredEffects]);
 
-  // Update balance flow rate when flow rate changes
+  // Fetch balance data when modal opens or when address changes
   useEffect(() => {
-    if (flowRate && !flowRateLoading) {
-      updateFlowRate(flowRate);
+    if (isOpen && effectiveIsConnected && effectiveAddress) {
+      fetchBalanceData();
     }
-  }, [flowRate, flowRateLoading, updateFlowRate]);
+  }, [isOpen, effectiveIsConnected, effectiveAddress]);
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setHasTriggeredEffects(false);
+    }
+  }, [isOpen]);
 
   const handleShare = async () => {
     // Array of Streme-ified quotes with context
@@ -190,13 +197,7 @@ export function CheckinSuccessModal({
     const shareUrl = "https://streme.fun";
     const castText = `${randomQuote}
 
-Just claimed my daily staked $STREME drop and my new flow rate is ${
-      calculatedFlowRate && parseFloat(calculatedFlowRate) > 0
-        ? `${parseInt(calculatedFlowRate).toLocaleString()} STREME/day`
-        : flowRate && parseFloat(flowRate) > 0
-        ? `${parseInt(flowRate).toLocaleString()} STREME/day`
-        : "Starting soon"
-    }
+Just claimed my daily staked $STREME drop of ${dropAmount} STREME!
 
 ${shareUrl}`;
 
@@ -287,20 +288,7 @@ ${shareUrl}`;
                   </span>
                 )}
               </span>{" "}
-              sent to your wallet.
-              <br />
-              Your new flow rate is{" "}
-              {isCalculating || flowRateLoading ? (
-                <span className="loading loading-dots loading-xs"></span>
-              ) : calculatedFlowRate && parseFloat(calculatedFlowRate) > 0 ? (
-                <span className="text-success font-semibold">
-                  {parseInt(calculatedFlowRate).toLocaleString()} $STREME/day
-                </span>
-              ) : flowRate && parseFloat(flowRate) > 0 ? (
-                `${parseInt(flowRate).toLocaleString()} $STREME/day`
-              ) : (
-                "starting soon"
-              )}
+              sent to your wallet!
             </p>
           </div>
         )}
@@ -311,24 +299,15 @@ ${shareUrl}`;
             Your STREME Balance
           </div>
           <div className="text-2xl font-mono font-bold text-primary">
-            {balance.toFixed(4)}
+            {currentBalance.toFixed(4)}
           </div>
-          <div className="text-xs text-base-content/60 mt-1">
-            {isCalculating || flowRateLoading ? (
-              <span>Calculating flow...</span>
-            ) : calculatedFlowRate && parseFloat(calculatedFlowRate) > 0 ? (
+          {Number(flowRate) > 0 && (
+            <div className="text-xs text-base-content/60 mt-1">
               <span className="text-success">
-                +{parseInt(calculatedFlowRate).toLocaleString()} per day (after
-                drop)
+                +{Number(flowRate).toLocaleString()} per day
               </span>
-            ) : flowRate && parseFloat(flowRate) > 0 ? (
-              <span className="text-success">
-                +{parseInt(flowRate).toLocaleString()} per day
-              </span>
-            ) : (
-              <span>Starting soon</span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
