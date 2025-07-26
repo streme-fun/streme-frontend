@@ -51,12 +51,12 @@ export function Hero() {
   }, []);
 
   return (
-    <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-40 md:mt-32">
+    <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-14 md:mt-32">
       {/* Hero Text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center z-10 text-center">
         {/* Transparent background container */}
         <div className="backdrop-blur-sm bg-base-100/1 border border-base-300/20 rounded-3xl px-8 py-6 md:px-12 md:py-8">
-          <h1 className="text-6xl md:text-7xl font-extrabold tracking-tight mb-4">
+          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-4">
             <span className="text-primary drop-shadow-sm">Ape.</span>{" "}
             <span className="text-secondary drop-shadow-sm">Stake.</span>{" "}
             <span className="text-accent drop-shadow-sm">Earn.</span>
@@ -68,7 +68,7 @@ export function Hero() {
                 maximumFractionDigits: 0,
               })}
             </span>
-            <span className="text-base-content/60"> rewards stremed</span>
+            <span className="text-base-content/60"> rewards streamed</span>
           </div>
           <h2 className="hidden md:block text-lg md:text-lg my-4 max-w-4xl mx-auto text-base-content">
             Streme tokens provide new primitives for distribution and incentive
