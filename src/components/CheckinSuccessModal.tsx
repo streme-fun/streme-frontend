@@ -228,7 +228,7 @@ export function CheckinSuccessModal({
     const shareUrl = "https://streme.fun";
     const castText = `${randomQuote}
 
-Just claimed my daily staked $STREME drop of 1000 staked STREME just for opening the app!
+Just claimed my daily drop of 1000 staked STREME just for opening the app!
 
 ${shareUrl}`;
 
