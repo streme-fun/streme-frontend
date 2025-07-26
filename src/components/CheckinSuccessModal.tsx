@@ -25,7 +25,12 @@ export function CheckinSuccessModal({
   dropAmount,
 }: CheckinSuccessModalProps) {
   const [showInfo, setShowInfo] = useState(false);
-  const { isSDKLoaded, isMiniAppView, address: fcAddress, isConnected: fcIsConnected } = useAppFrameLogic();
+  const {
+    isSDKLoaded,
+    isMiniAppView,
+    address: fcAddress,
+    isConnected: fcIsConnected,
+  } = useAppFrameLogic();
   const { address: wagmiAddress, isConnected: wagmiIsConnected } = useAccount();
 
   // Balance animation state (based on StakedBalance)
@@ -61,13 +66,17 @@ export function CheckinSuccessModal({
     // Prevent calls if we just fetched data recently (within 30 seconds)
     const now = Date.now();
     if (now - lastFetchTime < 30000) {
-      console.log("[CheckinSuccessModal] Skipping fetch - too soon since last fetch");
+      console.log(
+        "[CheckinSuccessModal] Skipping fetch - too soon since last fetch"
+      );
       return;
     }
 
     try {
       setLastFetchTime(now);
-      console.log(`[CheckinSuccessModal] Fetching balance for ${effectiveAddress}`);
+      console.log(
+        `[CheckinSuccessModal] Fetching balance for ${effectiveAddress}`
+      );
 
       // Get STREME token balance
       const balance = await publicClient.readContract({
@@ -90,7 +99,9 @@ export function CheckinSuccessModal({
       // Only update base amount and reset timer if the balance has actually changed
       // This prevents the streaming animation from restarting unnecessarily
       if (Math.abs(formattedBalance - baseAmount) > 0.0001) {
-        console.log(`[CheckinSuccessModal] Balance changed from ${baseAmount} to ${formattedBalance}`);
+        console.log(
+          `[CheckinSuccessModal] Balance changed from ${baseAmount} to ${formattedBalance}`
+        );
         setBaseAmount(formattedBalance);
         setLastUpdateTime(Date.now());
       }
@@ -128,11 +139,17 @@ export function CheckinSuccessModal({
 
           if (totalUnits > 0n) {
             const percentage = (Number(memberUnits) * 100) / Number(totalUnits);
-            const totalFlowRate = Number(formatUnits(BigInt(poolData.flowRate), 18));
+            const totalFlowRate = Number(
+              formatUnits(BigInt(poolData.flowRate), 18)
+            );
             const userFlowRate = totalFlowRate * (percentage / 100);
             const flowRatePerDay = userFlowRate * 86400;
-            
-            console.log(`[CheckinSuccessModal] Flow rate: ${flowRatePerDay.toFixed(4)} STREME/day`);
+
+            console.log(
+              `[CheckinSuccessModal] Flow rate: ${flowRatePerDay.toFixed(
+                4
+              )} STREME/day`
+            );
             setFlowRate(flowRatePerDay.toFixed(4));
             setIsConnectedToPool(true);
           } else {
@@ -144,7 +161,10 @@ export function CheckinSuccessModal({
         }
       }
     } catch (error) {
-      console.error("[CheckinSuccessModal] Error fetching balance data:", error);
+      console.error(
+        "[CheckinSuccessModal] Error fetching balance data:",
+        error
+      );
     }
   };
 
@@ -152,7 +172,7 @@ export function CheckinSuccessModal({
   useEffect(() => {
     if (isOpen && dropAmount && !hasTriggeredEffects) {
       setHasTriggeredEffects(true);
-      
+
       // Fire confetti once
       confetti({
         particleCount: 100,
@@ -161,8 +181,11 @@ export function CheckinSuccessModal({
         colors: ["#8b5cf6", "#3b82f6", "#60a5fa"],
       });
 
-      console.log("[CheckinSuccessModal] Modal opened with drop amount:", dropAmount);
-      
+      console.log(
+        "[CheckinSuccessModal] Modal opened with drop amount:",
+        dropAmount
+      );
+
       // Trigger balance refresh to show the updated amount
       fetchBalanceData();
     }
@@ -205,7 +228,7 @@ export function CheckinSuccessModal({
     const shareUrl = "https://streme.fun";
     const castText = `${randomQuote}
 
-Just claimed my daily staked $STREME drop of ${dropAmount} STREME!
+Just claimed my daily staked $STREME drop of 1000 staked STREME!
 
 ${shareUrl}`;
 
@@ -322,7 +345,8 @@ ${shareUrl}`;
         {effectiveIsConnected && !isConnectedToPool && (
           <div className="mb-6 p-4 bg-base-200 rounded-lg">
             <p className="text-sm text-base-content/70 mb-3">
-              You&apos;re not connected to the STREME reward pool yet. Connect to start earning rewards on your staked STREME!
+              You&apos;re not connected to the STREME reward pool yet. Connect
+              to start earning rewards on your staked STREME!
             </p>
             <ConnectPoolButton
               stakingPoolAddress={STREME_STAKING_POOL}
