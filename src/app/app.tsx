@@ -13,7 +13,7 @@ import { Button } from "../components/ui/button";
 import { base } from "wagmi/chains";
 import Image from "next/image";
 import { usePostHog } from "posthog-js/react";
-// import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal";
+import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal";
 import { SPAMMER_BLACKLIST } from "../lib/blacklist";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -35,20 +35,19 @@ function App() {
   const router = useRouter();
 
   // Tutorial modal state
-  // const [showTutorialModal, setShowTutorialModal] = useState(false);
-  // const [hasSkippedTutorial, setHasSkippedTutorial] = useState(false);
-  // const [hasShownTutorialThisSession, setHasShownTutorialThisSession] =
-  //   useState(false);
+  const [showTutorialModal, setShowTutorialModal] = useState(false);
+  const [hasSkippedTutorial, setHasSkippedTutorial] = useState(false);
+  const [hasShownTutorialThisSession, setHasShownTutorialThisSession] = useState(false);
 
   // Load tutorial skip state from localStorage on mount
-  // useEffect(() => {
-  //   if (typeof window !== "undefined") {
-  //     const skipped = localStorage.getItem("streme-tutorial-skipped");
-  //     if (skipped === "true") {
-  //       setHasSkippedTutorial(true);
-  //     }
-  //   }
-  // }, []);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const skipped = localStorage.getItem("streme-tutorial-skipped");
+      if (skipped === "true") {
+        setHasSkippedTutorial(true);
+      }
+    }
+  }, []);
 
   const {
     isSDKLoaded,
@@ -64,7 +63,7 @@ function App() {
     // disconnect,
     promptToAddMiniApp,
     hasPromptedToAdd,
-    // hasAddedMiniApp,
+    hasAddedMiniApp,
   } = useAppFrameLogic();
 
   const postHog = usePostHog();
@@ -232,33 +231,33 @@ function App() {
   }, [isMiniAppView, isSDKLoaded, hasPromptedToAdd, promptToAddMiniApp]);
 
   // Show tutorial modal for mini-app users who haven't added the app
-  // useEffect(() => {
-  //   if (
-  //     isMiniAppView &&
-  //     isSDKLoaded &&
-  //     !hasAddedMiniApp &&
-  //     !hasSkippedTutorial &&
-  //     !hasShownTutorialThisSession
-  //   ) {
-  //     // Small delay to ensure everything is loaded
-  //     const timer = setTimeout(() => {
-  //       setShowTutorialModal(true);
-  //       setHasShownTutorialThisSession(true);
-  //       // Track tutorial modal shown
-  //       postHog?.capture("mini_app_tutorial_shown", {
-  //         context: "farcaster_mini_app",
-  //       });
-  //     }, 1000);
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [
-  //   isMiniAppView,
-  //   isSDKLoaded,
-  //   hasAddedMiniApp,
-  //   hasSkippedTutorial,
-  //   hasShownTutorialThisSession,
-  //   postHog,
-  // ]);
+  useEffect(() => {
+    if (
+      isMiniAppView &&
+      isSDKLoaded &&
+      !hasAddedMiniApp &&
+      !hasSkippedTutorial &&
+      !hasShownTutorialThisSession
+    ) {
+      // Small delay to ensure everything is loaded
+      const timer = setTimeout(() => {
+        setShowTutorialModal(true);
+        setHasShownTutorialThisSession(true);
+        // Track tutorial modal shown
+        postHog?.capture("mini_app_tutorial_shown", {
+          context: "farcaster_mini_app",
+        });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [
+    isMiniAppView,
+    isSDKLoaded,
+    hasAddedMiniApp,
+    hasSkippedTutorial,
+    hasShownTutorialThisSession,
+    postHog,
+  ]);
 
   // Auto-connect to Farcaster wallet if not connected in mini app context
   useEffect(() => {
@@ -345,30 +344,30 @@ function App() {
   ]);
 
   // Tutorial modal handlers
-  // const handleCloseTutorial = () => {
-  //   setShowTutorialModal(false);
-  //   // Save completion state so user doesn't see tutorial again
-  //   if (typeof window !== "undefined") {
-  //     localStorage.setItem("streme-tutorial-skipped", "true");
-  //   }
-  //   // Track tutorial completion
-  //   postHog?.capture("mini_app_tutorial_completed", {
-  //     context: "farcaster_mini_app",
-  //   });
-  // };
+  const handleCloseTutorial = () => {
+    setShowTutorialModal(false);
+    // Save completion state so user doesn't see tutorial again
+    if (typeof window !== "undefined") {
+      localStorage.setItem("streme-tutorial-skipped", "true");
+    }
+    // Track tutorial completion
+    postHog?.capture("mini_app_tutorial_completed", {
+      context: "farcaster_mini_app",
+    });
+  };
 
-  // const handleSkipTutorial = () => {
-  //   setHasSkippedTutorial(true);
-  //   setShowTutorialModal(false);
-  //   // Save to localStorage so user doesn't see tutorial again
-  //   if (typeof window !== "undefined") {
-  //     localStorage.setItem("streme-tutorial-skipped", "true");
-  //   }
-  //   // Track tutorial skip
-  //   postHog?.capture("mini_app_tutorial_skipped", {
-  //     context: "farcaster_mini_app",
-  //   });
-  // };
+  const handleSkipTutorial = () => {
+    setHasSkippedTutorial(true);
+    setShowTutorialModal(false);
+    // Save to localStorage so user doesn't see tutorial again
+    if (typeof window !== "undefined") {
+      localStorage.setItem("streme-tutorial-skipped", "true");
+    }
+    // Track tutorial skip
+    postHog?.capture("mini_app_tutorial_skipped", {
+      context: "farcaster_mini_app",
+    });
+  };
 
   if (!isSDKLoaded) {
     return <div className="text-center py-8">Loading SDK...</div>;
@@ -378,7 +377,7 @@ function App() {
     return (
       <div className="font-[family-name:var(--font-geist-sans)]">
         <div className="flex flex-col gap-2 row-start-2 w-full p-4 pt-20">
-          <div className="fixed top-0 left-0 right-0 flex items-center p-4 z-10 bg-base-100/80 backdrop-blur-sm">
+          <div className="fixed top-0 left-0 right-0 flex items-center justify-between p-4 z-10 bg-base-100/80 backdrop-blur-sm">
             <div className="flex-shrink-0">
               <Link href="/" className="flex items-center">
                 <Image
@@ -391,14 +390,20 @@ function App() {
                 />
               </Link>
             </div>
-            {/* <div className="flex-shrink-0">
+            <div className="flex-shrink-0">
               <button
-                onClick={() => setShowTutorialModal(true)}
-                className="bg-base-50 backdrop-blur-sm cursor-pointer"
+                onClick={() => {
+                  setShowTutorialModal(true);
+                  postHog?.capture("mini_app_tutorial_opened", {
+                    context: "farcaster_mini_app",
+                    opened_by: "help_button",
+                  });
+                }}
+                className="btn btn-ghost btn-circle btn-sm"
                 title="Tutorial"
               >
                 <svg
-                  className="w-4 h-4"
+                  className="w-5 h-5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -408,11 +413,11 @@ function App() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth="2"
-                    d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
               </button>
-            </div> */}
+            </div>
           </div>
 
           {/* Streaming Experiments Section */}
@@ -527,11 +532,11 @@ function App() {
         </div> */}
 
         {/* Tutorial Modal */}
-        {/* <MiniAppTutorialModal
+        <MiniAppTutorialModal
           isOpen={showTutorialModal}
           onClose={handleCloseTutorial}
           onSkip={handleSkipTutorial}
-        /> */}
+        />
 
         {/* Checkin Modal */}
         <CheckinModal

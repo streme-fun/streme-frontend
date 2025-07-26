@@ -2,7 +2,8 @@
 
 import { Modal } from "./Modal";
 import { useState } from "react";
-import Image from "next/image";
+import { TutorialStreamingAnimation } from "./TutorialStreamingAnimation";
+import { StreamAnimation } from "./StreamAnimation";
 
 interface MiniAppTutorialModalProps {
   isOpen: boolean;
@@ -19,67 +20,64 @@ export function MiniAppTutorialModal({
 
   const steps = [
     {
-      title: "Streme 101",
+      title: "Launch tokens with streaming superpowers",
       content: (
         <div className="space-y-4">
+          <TutorialStreamingAnimation />
+
           <p className="text-base text-base-content/80">
-            Every token launched on Streme distributes 20% of its supply to
-            stakers over 365 days as rewards.
+            With Streme, launch Base tokens with built-in streaming superpowers
+            and streaming twists on staking, crowdfunding, and more.
           </p>
 
           <p className="text-base text-base-content/80">
-            Rewards are <span className="italic">streamed</span> to
-            stakers&apos; wallets every second proportional to their stake.
+            Earn from tokens you launch with 40% of LP fees, claimable as
+            frequently as you want.
           </p>
-          <Image
-            src="/onboarding-rewards.gif"
-            alt="Streme Mini App"
-            width={300}
-            height={300}
-          />
+        </div>
+      ),
+    },
+
+    {
+      title: "Stake to Earn Streaming Rewards",
+      content: (
+        <div className="space-y-4">
+          <StreamAnimation contributorCount={25} growthRate={2.5} />
+
+          <p className="text-base text-base-content/80">
+            Stake Streme coins to earn rewards streamed to your wallet every
+            second. The more you stake, the more you earn.
+          </p>
+          <p className="text-base text-base-content/80">
+            For qualifying tokens, reroute your staking rewards to support
+            marketing initiatives via streaming crowdfunds.
+          </p>
         </div>
       ),
     },
     {
-      title: "Streme to qualify for SUP",
+      title: "Use Streme to Earn SUP",
       content: (
         <div className="space-y-4">
-          <p className="text-base text-base-content/80">
-            Streme users can get in on the Superfluid SUP drop. We&apos;re tight
-            like that.
-          </p>
-          <p className="text-base text-base-content/80">
-            To qualify, do things like add the mini-app, hold or stake tokens,
-            or launch your own token. The more you do, the more you get.
-          </p>
-
-          <Image
-            src="/onboarding-SUP.png"
-            alt="Onboarding SUP"
-            width={150}
-            height={150}
-            className="rounded-lg"
-          />
-        </div>
-      ),
-    },
-    {
-      title: "Ape. Stake. Earn.",
-      content: (
-        <div className="space-y-4 text-center">
-          <div className="text-6xl mb-4">🎊</div>
-          <p className="text-base text-base-content/80">
-            Play around and explore. Launch, stake, earn rewards streamed to
-            your wallet, top up your stakes from time to time, and have fun. And
-            don&apos;t forget to and claim your SUP!
-          </p>
-          <div className="bg-accent/10 p-4 rounded-lg border border-accent/20">
-            <p className="text-sm font-medium">
-              💡 Need help or want to help? Hit up @zeni.eth or @markcarey on
-              Farcaster
-              <br />
-            </p>
+          <div className="flex justify-center mb-4">
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-32 h-32 object-contain"
+            >
+              <source src="/coinspin.webm" type="video/webm" />
+            </video>
           </div>
+          <p className="text-base text-base-content/80">
+            Streme is an official Superfluid ecosystem partner and distributor
+            of $SUP tokens.
+          </p>
+          <p className="text-base text-base-content/80">
+            There are lots of ways to earn — add the mini-app, stake or hodl
+            tokens, contribute to crowdfunds, or launch your own token!
+          </p>
         </div>
       ),
     },

@@ -19,23 +19,8 @@ export async function GET(request: NextRequest) {
       limit
     );
 
-    // Debug initial tokens
-    console.log("Initial tokens count:", tokens.length);
-    console.log(
-      "Tokens without requestor_fid:",
-      tokens
-        .filter((t) => !t.requestor_fid)
-        .map((t) => ({
-          name: t.name,
-          symbol: t.symbol,
-          address: t.contract_address,
-        }))
-    );
-
-    // Use market data from Streme API only - no need for additional enrichment
     const enrichedTokens = await enrichTokensWithData(tokens);
 
-    // Get the timestamp of the last token for next page
     const lastToken = tokens[tokens.length - 1];
     const nextPageTimestamp = lastToken?.timestamp?._seconds;
 
