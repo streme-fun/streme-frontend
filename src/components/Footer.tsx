@@ -1,24 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import { ExternalLink } from "./ui/ExternalLink";
+import { fetchTokenPrice } from "../lib/priceUtils";
+import Image from "next/image";
 
 export function Footer() {
   const { isMiniAppView } = useAppFrameLogic();
-  const [copied, setCopied] = useState(false);
+  const [stremePrice, setStremePrice] = useState<number | null>(null);
 
   const STREME_CONTRACT = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
+  const DEXSCREENER_URL =
+    "https://dexscreener.com/base/0x9187c24a3a81618f07a9722b935617458f532737";
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(STREME_CONTRACT);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
+  // Fetch STREME price on mount and periodically
+  useEffect(() => {
+    const fetchPrice = async () => {
+      const price = await fetchTokenPrice(STREME_CONTRACT);
+      setStremePrice(price);
+    };
+
+    fetchPrice();
+    // Update price every minute
+    const interval = setInterval(fetchPrice, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (isMiniAppView) {
     return null;
@@ -75,38 +82,32 @@ export function Footer() {
             </ExternalLink>
           </div>
 
-          {/* STREME Contract Address */}
-          <div className="flex items-center gap-2 text-xs opacity-60">
-            <span>CA:</span>
-            <span className="font-mono">{STREME_CONTRACT}</span>
-            <button
-              onClick={handleCopy}
-              className="btn btn-ghost btn-xs px-2 py-1 min-h-0 h-auto opacity-60 hover:opacity-100 transition-opacity"
-              title="Copy contract address"
+          {/* Powered by Streme with price */}
+          <div className="flex items-center gap-1 text-sm">
+            <span className="opacity-60">Powered by</span>
+            <a
+              href={DEXSCREENER_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer"
             >
-              {copied ? (
-                <svg
-                  className="w-4 h-4"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="w-4 h-4"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                  <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                </svg>
+              <span className="font-bold">Streme</span>
+              <Image
+                src="/icon-transparent.png"
+                alt="STREME"
+                width={20}
+                height={20}
+                className="inline-block"
+              />
+              {stremePrice !== null && (
+                <span className="text-primary font-mono">
+                  $
+                  {stremePrice < 0.01
+                    ? stremePrice.toFixed(6)
+                    : stremePrice.toFixed(4)}
+                </span>
               )}
-            </button>
+            </a>
           </div>
         </div>
       </div>

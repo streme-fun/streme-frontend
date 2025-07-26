@@ -9,6 +9,7 @@ import { useAccount } from "wagmi";
 import { formatUnits } from "viem";
 import { publicClient } from "../lib/viemClient";
 import { useStreamingNumber } from "../hooks/useStreamingNumber";
+import { ConnectPoolButton } from "./ConnectPoolButton";
 
 interface CheckinSuccessModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export function CheckinSuccessModal({
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
   const [hasTriggeredEffects, setHasTriggeredEffects] = useState(false);
+  const [isConnectedToPool, setIsConnectedToPool] = useState(false);
 
   // Get effective connection state and address
   const effectiveIsConnected = isMiniAppView ? fcIsConnected : wagmiIsConnected;
@@ -132,7 +134,13 @@ export function CheckinSuccessModal({
             
             console.log(`[CheckinSuccessModal] Flow rate: ${flowRatePerDay.toFixed(4)} STREME/day`);
             setFlowRate(flowRatePerDay.toFixed(4));
+            setIsConnectedToPool(true);
+          } else {
+            setIsConnectedToPool(false);
           }
+        } else {
+          // No member found, not connected to pool
+          setIsConnectedToPool(false);
         }
       }
     } catch (error) {
@@ -309,6 +317,24 @@ ${shareUrl}`;
             </div>
           )}
         </div>
+
+        {/* Connect Pool Button if not connected */}
+        {effectiveIsConnected && !isConnectedToPool && (
+          <div className="mb-6 p-4 bg-base-200 rounded-lg">
+            <p className="text-sm text-base-content/70 mb-3">
+              You&apos;re not connected to the STREME reward pool yet. Connect to start earning rewards on your staked STREME!
+            </p>
+            <ConnectPoolButton
+              stakingPoolAddress={STREME_STAKING_POOL}
+              onSuccess={() => {
+                fetchBalanceData();
+              }}
+              isMiniApp={isMiniAppView}
+              farcasterAddress={effectiveAddress as string}
+              farcasterIsConnected={effectiveIsConnected}
+            />
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex gap-2">

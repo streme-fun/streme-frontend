@@ -234,10 +234,9 @@ const TokenCardComponent = ({
                   className="card-title text-sm group-hover:text-primary transition-colors duration-300 truncate max-w-[200px] overflow-hidden"
                   title={token.name}
                 >
-                  {token.name.length > 17 
+                  {token.name.length > 17
                     ? token.name.slice(0, 17) + "..."
-                    : token.name
-                  }
+                    : token.name}
                 </h2>
                 <div className="flex items-center gap-2">
                   <div className="avatar transition-transform duration-300 group-hover:scale-110">
@@ -732,7 +731,7 @@ export function TokenGrid({
     displayedTokens.length < totalItemsCount && displayedTokens.length > 0;
 
   return (
-    <div className="mt-2 pb-24">
+    <div className="mt-2 pb-8 md:pb-24">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {displayedTokens.map((token) => (
           <TokenCardComponent
