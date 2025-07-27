@@ -4,7 +4,7 @@ import PrivyProviderWrapper from "../components/auth/PrivyProviderWrapper";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { FrameProvider } from "../components/providers/FrameProvider";
-import Provider from "../components/providers/WagmiProvider";
+import WagmiProvider from "../components/providers/WagmiProvider";
 import { TokenDataProvider } from "../hooks/useTokenData";
 import { Toaster } from "sonner";
 import React, { useEffect, useState } from "react";
@@ -513,13 +513,13 @@ export default function ClientLayout({
 }) {
   return (
     <PrivyProviderWrapper>
-      <Provider>
-        <FrameProvider>
+      <FrameProvider>
+        <WagmiProvider>
           <TokenDataProvider>
             <AppContent>{children}</AppContent>
           </TokenDataProvider>
-        </FrameProvider>
-      </Provider>
+        </WagmiProvider>
+      </FrameProvider>
     </PrivyProviderWrapper>
   );
 }

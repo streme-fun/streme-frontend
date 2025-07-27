@@ -1,4 +1,9 @@
-import { createConfig, http, fallback, WagmiProvider as WagmiProviderBase } from "wagmi";
+import {
+  createConfig,
+  http,
+  fallback,
+  WagmiProvider as WagmiProviderBase,
+} from "wagmi";
 import { WagmiProvider as PrivyWagmiProvider } from "@privy-io/wagmi";
 import {
   base,
@@ -9,7 +14,7 @@ import {
   unichain,
 } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
+import { farcasterMiniApp as miniAppConnector } from "@farcaster/miniapp-wagmi-connector";
 import { coinbaseWallet, metaMask } from "wagmi/connectors";
 import { APP_NAME, APP_ICON_URL, APP_URL } from "../../lib/constants";
 import { useEffect, useState } from "react";
@@ -118,8 +123,8 @@ const baseRpcEndpoints = [
 const createConnectors = (isMiniApp: boolean) => {
   if (isMiniApp) {
     // In mini-app context, only use Farcaster connector
-    console.log("🔗 Creating mini-app connectors: [farcasterMiniApp]");
-    return [farcasterMiniApp()];
+    console.log("🔗 Creating mini-app connectors: [miniAppConnector]");
+    return [miniAppConnector()];
   } else {
     // In browser context, use all connectors except Farcaster
     console.log("🔗 Creating browser connectors: [metaMask, coinbaseWallet]");
@@ -139,28 +144,29 @@ const createConnectors = (isMiniApp: boolean) => {
   }
 };
 
-const createWagmiConfig = (isMiniApp: boolean = false) => createConfig({
-  chains: [base, baseSepolia, optimism, mainnet, degen, unichain],
-  transports: {
-    [base.id]: fallback(
-      baseRpcEndpoints.map((url) =>
-        http(url, {
-          timeout: 10_000,
-          retryCount: 2,
-          retryDelay: 1000,
-          batch: true,
-        })
+const createWagmiConfig = (isMiniApp: boolean = false) =>
+  createConfig({
+    chains: [base, baseSepolia, optimism, mainnet, degen, unichain],
+    transports: {
+      [base.id]: fallback(
+        baseRpcEndpoints.map((url) =>
+          http(url, {
+            timeout: 10_000,
+            retryCount: 2,
+            retryDelay: 1000,
+            batch: true,
+          })
+        ),
+        { rank: false }
       ),
-      { rank: false }
-    ),
-    [baseSepolia.id]: http(),
-    [optimism.id]: http(),
-    [mainnet.id]: http(),
-    [degen.id]: http(),
-    [unichain.id]: http(),
-  },
-  connectors: createConnectors(isMiniApp),
-});
+      [baseSepolia.id]: http(),
+      [optimism.id]: http(),
+      [mainnet.id]: http(),
+      [degen.id]: http(),
+      [unichain.id]: http(),
+    },
+    connectors: createConnectors(isMiniApp),
+  });
 
 // Default config for initial load (browser context)
 export const config = createWagmiConfig(false);
@@ -189,11 +195,12 @@ function ConditionalWagmiProvider({ children }: { children: React.ReactNode }) {
     const detectMiniApp = async () => {
       try {
         // Quick detection for mini-app
-        const quickDetection = 
+        const quickDetection =
           typeof window !== "undefined" &&
           !window.location.hostname.includes("localhost") &&
           !window.location.hostname.includes("127.0.0.1") &&
-          (window.parent !== window || window.location !== window.parent.location);
+          (window.parent !== window ||
+            window.location !== window.parent.location);
 
         let detectedMiniApp = false;
         if (quickDetection) {
@@ -201,14 +208,18 @@ function ConditionalWagmiProvider({ children }: { children: React.ReactNode }) {
           const sdk = await import("@farcaster/miniapp-sdk");
           detectedMiniApp = await sdk.default.isInMiniApp();
         }
-        
+
         setIsMiniApp(detectedMiniApp);
-        
+
         // Create appropriate config based on detection
         const newConfig = createWagmiConfig(detectedMiniApp);
         setWagmiConfig(newConfig);
-        
-        console.log(`Wagmi configured for ${detectedMiniApp ? 'mini-app' : 'browser'} context`);
+
+        console.log(
+          `Wagmi configured for ${
+            detectedMiniApp ? "mini-app" : "browser"
+          } context`
+        );
       } catch (error) {
         console.error("Error detecting mini-app:", error);
         setIsMiniApp(false);
@@ -241,9 +252,7 @@ function ConditionalWagmiProvider({ children }: { children: React.ReactNode }) {
 export default function Provider({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <ConditionalWagmiProvider>
-        {children}
-      </ConditionalWagmiProvider>
+      <ConditionalWagmiProvider>{children}</ConditionalWagmiProvider>
     </QueryClientProvider>
   );
 }
