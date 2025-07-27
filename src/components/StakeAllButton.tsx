@@ -12,9 +12,7 @@ import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { formatUnits } from "viem";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
-// Contract addresses for macro system
-const STAKING_MACRO_V2 = "0x5c4b8561363E80EE458D3F0f4F14eC671e1F54Af";
-const MACRO_FORWARDER = "0xFD0268E33111565dE546af2675351A4b1587F89F";
+const STAKING_HELPER = "0x1738e0Fed480b04968A3B7b14086EAF4fDB685A3";
 
 const gdaABI = [
   {
@@ -29,22 +27,11 @@ const gdaABI = [
   },
 ] as const;
 
-// ABIs for the macro contracts
-const stakingMacroABI = [
-  {
-    inputs: [{ name: "tokens", type: "address[]" }],
-    name: "getParams",
-    outputs: [{ name: "", type: "bytes" }],
-    stateMutability: "view",
-    type: "function",
-  },
-] as const;
 
 const toHex = (address: string) => address as `0x${string}`;
 
 interface StakeAllButtonProps {
   tokenAddress: string;
-  stakingAddress: string;
   stakingPoolAddress: string;
   disabled?: boolean;
   className?: string;
@@ -125,52 +112,28 @@ export function StakeAllButton({
         });
       }
 
-      // Use macro system to stake all tokens without approval
-      toast.loading("Executing staking operation...", { id: toastId });
+      // Send all tokens directly to StakingHelper
+      toast.loading("Sending tokens to StakingHelper...", { id: toastId });
 
-      // Get encoded parameters from StakingMacroV2 for this single token
-      const encodedAddresses = await publicClient.readContract({
-        address: toHex(STAKING_MACRO_V2),
-        abi: stakingMacroABI,
-        functionName: "getParams",
-        args: [[toHex(tokenAddress)]],
-      });
-
-      // Execute the macro via MacroForwarder
-      // This handles everything in batch "in first person" by the user
-      const macroIface = new Interface([
-        "function runMacro(address macro, bytes calldata params) external",
+      const sendIface = new Interface([
+        "function send(address recipient, uint256 amount, bytes userData) external",
       ]);
-      const macroData = macroIface.encodeFunctionData("runMacro", [
-        toHex(STAKING_MACRO_V2),
-        encodedAddresses,
+      const sendData = sendIface.encodeFunctionData("send", [
+        toHex(STAKING_HELPER),
+        balance,
+        "0x", // empty userData
       ]);
-
-      const macroTxParams: Record<string, unknown> = {
-        to: toHex(MACRO_FORWARDER),
-        from: toHex(userAddress),
-        data: toHex(macroData),
-        chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
-      };
-
-      // Add gas estimation for non-miniApp
-      if (!isMiniApp) {
-        try {
-          const estimatedGas = await publicClient.estimateGas({
-            account: userAddress as `0x${string}`,
-            to: toHex(MACRO_FORWARDER),
-            data: macroData as `0x${string}`,
-          });
-          const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.5));
-          macroTxParams.gas = `0x${gasLimit.toString(16)}`;
-        } catch {
-          console.warn("Gas estimation failed, proceeding without gas limit");
-        }
-      }
 
       const stakeTxHash = await provider.request({
         method: "eth_sendTransaction",
-        params: [macroTxParams],
+        params: [
+          {
+            to: toHex(tokenAddress),
+            from: toHex(userAddress),
+            data: toHex(sendData),
+            chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
+          },
+        ],
       });
 
       if (!stakeTxHash) {
@@ -242,6 +205,7 @@ export function StakeAllButton({
       // PostHog event tracking
       postHog.capture(POSTHOG_EVENTS.STAKE_ALL_SUCCESS, {
         [ANALYTICS_PROPERTIES.TOKEN_ADDRESS]: tokenAddress,
+        [ANALYTICS_PROPERTIES.STAKING_ADDRESS]: STAKING_HELPER,
         [ANALYTICS_PROPERTIES.STAKING_POOL_ADDRESS]: stakingPoolAddress,
         [ANALYTICS_PROPERTIES.TOKEN_SYMBOL]: symbol,
         [ANALYTICS_PROPERTIES.AMOUNT_WEI]: balance.toString(),

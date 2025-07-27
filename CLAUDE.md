@@ -41,8 +41,9 @@ src/
 - STREME Super Token: `0x3B3Cd21242BA44e9865B066e5EF5d1cC1030CC58`
 - STREME Staking Pool: `0xcbc2caf425f8cdca774128b3d14de37f2224b964`
 - STREME Staking Rewards Funder: (Address in useStremeStakingContract)
-- Macro Forwarder: `0xFD0268E33111565dE546af2675351A4b1587F89F`
-- Staking Macro V2: `0x5c4b8561363E80EE458D3F0f4F14eC671e1F54Af`
+- Staking Helper: `0x1738e0Fed480b04968A3B7b14086EAF4fDB685A3` (Direct send() for auto-staking)
+- Macro Forwarder: `0xFD0268E33111565dE546af2675351A4b1587F89F` (Deprecated)
+- Staking Macro V2: `0x5c4b8561363E80EE458D3F0f4F14eC671e1F54Af` (Deprecated)
 - Fluid Locker Factory: `0xa6694cab43713287f7735dadc940b555db9d39d9`
 
 # Core Patterns
@@ -67,7 +68,7 @@ src/
 - `useStreamingNumber` - Animated number display for streaming values
 - `useDistributionPool` - GDA pool management
 - `useCheckin` - Daily check-in functionality
-- `useCheckinModal` - Check-in modal state management
+- `useCheckinModal` - Check-in modal state management (includes `fetchBalanceData` for refreshing)
 - `useStremeStakingContract` - STREME staking operations (deposit, withdraw, approve)
 - `useBestFriendsStreaming` - Farcaster best friends integration
 
@@ -159,8 +160,10 @@ const txHash = await ethProvider.request({
 ```
 
 **Critical**: Missing `chainId` parameter causes transactions to execute on whatever network the wallet is connected to, not Base. This affects all components that use `eth_sendTransaction` including:
-- StakeButton, UnstakeButton, SwapButton
-- TopUpAllStakesButton, StakeAllButton  
+- StakeButton (Now uses StakingHelper with direct send())
+- UnstakeButton, SwapButton
+- TopUpAllStakesButton
+- StakeAllButton (Now uses StakingHelper with direct send())
 - ClaimFeesButton, ZapStakeButton
 - ConnectPoolButton, UnstakedTokensModal
 - StakerLeaderboardEmbed
@@ -203,6 +206,13 @@ const txHash = await ethProvider.request({
 2. Always handle BigInt conversions properly
 3. Show real-time animations with `useStreamingNumber`
 4. Include proper error handling for failed transactions
+
+## Staking Implementation
+1. **Direct Staking**: Use StakingHelper contract (0x1738e0Fed480b04968A3B7b14086EAF4fDB685A3)
+   - Send SuperTokens directly using `send(recipient, amount, userData)` 
+   - No approval needed - StakingHelper auto-stakes on receipt
+   - Always include empty userData parameter: `"0x"`
+2. **Legacy Staking**: Individual token staking contracts still exist but require approve+stake
 
 ## API Route Best Practices
 1. Follow `/api/[resource]/[action]` pattern
@@ -255,6 +265,13 @@ Enable debug mode by clicking the floating button in development.
 ## Balance Issues
 - **Streaming balance shows 0**: Use `balanceOf` instead of `realtimeBalanceOfNow` for actual balance
 - **Animation not updating**: Check `useStreamingNumber` configuration and flow rate calculations
+
+## Token Display Issues
+- **Duplicate tokens in /tokens page**: 
+  - Stakes are deduplicated by token address (keeps highest stake if multiple pools)
+  - SuperTokens are deduplicated by token address
+  - React keys use `stake-${tokenAddress}-${index}` and `supertoken-${tokenAddress}-${index}`
+  - Debug logs available for STREME token to track data flow
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.

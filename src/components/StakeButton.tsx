@@ -16,6 +16,7 @@ import { useWallets } from "@privy-io/react-auth";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
+const STAKING_HELPER = "0x1738e0Fed480b04968A3B7b14086EAF4fDB685A3";
 
 const gdaABI = [
   {
@@ -30,25 +31,8 @@ const gdaABI = [
   },
 ] as const;
 
-const erc20ABI = [
-  {
-    inputs: [
-      { name: "owner", type: "address" },
-      { name: "spender", type: "address" },
-    ],
-    name: "allowance",
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-] as const;
-
 const toHex = (address: string) => address as `0x${string}`;
 
-// Add constant for unlimited allowance
-const MAX_UINT256 = BigInt(
-  "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-);
 
 interface StakeButtonProps {
   tokenAddress: string;
@@ -106,21 +90,6 @@ export function StakeButton({
     ? (farcasterIsConnected ?? fcIsConnected)
     : !!wagmiAddress;
 
-  const checkAllowance = async () => {
-    if (!currentAddress || !walletIsConnected) return 0n;
-    try {
-      const allowance = await publicClient.readContract({
-        address: toHex(tokenAddress),
-        abi: erc20ABI,
-        functionName: "allowance",
-        args: [toHex(currentAddress!), toHex(stakingAddress)],
-      });
-      return allowance as bigint;
-    } catch (error) {
-      console.error("Error checking allowance:", error);
-      return 0n;
-    }
-  };
 
   const handleStake = async (amount: bigint) => {
     if (!currentAddress || !walletIsConnected) {
@@ -143,7 +112,6 @@ export function StakeButton({
     const toastId = toast.loading("Preparing stake transaction...");
 
     try {
-      let approveTxHash: `0x${string}` | undefined;
       let stakeTxHash: `0x${string}` | undefined;
       let connectTxHash: `0x${string}` | undefined;
 
@@ -152,79 +120,26 @@ export function StakeButton({
         if (!ethProvider)
           throw new Error("Farcaster Ethereum provider not available.");
 
-        const currentAllowance = await checkAllowance();
-        if ((currentAllowance as bigint) < amount) {
-          toast.info(
-            "Requesting unlimited approval for future transactions...",
-            { id: toastId }
-          );
-          const approveIface = new Interface([
-            "function approve(address spender, uint256 amount) external returns (bool)",
-          ]);
-          const approveData = approveIface.encodeFunctionData("approve", [
-            toHex(stakingAddress),
-            MAX_UINT256, // Use unlimited allowance instead of just the amount
-          ]);
-          const approveDataWithReferral = await appendReferralTag(
-            toHex(approveData),
-            toHex(currentAddress!)
-          );
-          approveTxHash = await ethProvider.request({
-            method: "eth_sendTransaction",
-            params: [
-              {
-                to: toHex(tokenAddress),
-                from: toHex(currentAddress!),
-                data: approveDataWithReferral,
-                chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
-              },
-            ],
-          });
-          if (!approveTxHash)
-            throw new Error(
-              "Approval transaction hash not received. User might have cancelled."
-            );
-          toast.loading("Waiting for approval confirmation...", {
-            id: toastId,
-          });
-          const approveReceipt = await publicClient.waitForTransactionReceipt({
-            hash: approveTxHash,
-          });
-          if (approveReceipt.status !== "success")
-            throw new Error("Approval transaction failed");
-          
-          // Submit referral to Divvi
-          await submitDivviReferral(approveTxHash, 8453); // Base L2 chain ID
-          
-          toast.success(
-            "Approval successful! You won't need to approve again.",
-            { id: toastId }
-          );
-        } else {
-          toast.info("Sufficient allowance found, skipping approval...", {
-            id: toastId,
-          });
-        }
-
-        toast.loading("Requesting stake...", { id: toastId });
-        const stakeIface = new Interface([
-          "function stake(address to, uint256 amount) external",
+        toast.loading("Sending tokens to StakingHelper...", { id: toastId });
+        const sendIface = new Interface([
+          "function send(address recipient, uint256 amount, bytes userData) external",
         ]);
-        const stakeData = stakeIface.encodeFunctionData("stake", [
-          toHex(currentAddress!),
+        const sendData = sendIface.encodeFunctionData("send", [
+          toHex(STAKING_HELPER),
           amount,
+          "0x", // empty userData
         ]);
-        const stakeDataWithReferral = await appendReferralTag(
-          toHex(stakeData),
+        const sendDataWithReferral = await appendReferralTag(
+          toHex(sendData),
           toHex(currentAddress!)
         );
         stakeTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
           params: [
             {
-              to: toHex(stakingAddress),
+              to: toHex(tokenAddress),
               from: toHex(currentAddress!),
-              data: stakeDataWithReferral,
+              data: sendDataWithReferral,
               chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
           ],
@@ -316,149 +231,61 @@ export function StakeButton({
           });
         }
 
-        const currentAllowance = await checkAllowance();
-        if ((currentAllowance as bigint) < amount) {
-          toast.info(
-            "Requesting unlimited approval for future transactions...",
-            { id: toastId }
-          );
-          
-          if (walletClient) {
-            // Use wagmi wallet client for approval
-            const { encodeFunctionData } = await import("viem");
-            const abi = [{
-              inputs: [
-                { name: "spender", type: "address" },
-                { name: "amount", type: "uint256" },
-              ],
-              name: "approve",
-              outputs: [{ name: "", type: "bool" }],
-              stateMutability: "nonpayable",
-              type: "function",
-            }] as const;
-            
-            const approveData = encodeFunctionData({
-              abi,
-              functionName: "approve",
-              args: [toHex(stakingAddress), MAX_UINT256],
-            });
-            
-            const approveDataWithReferral = await appendReferralTag(
-              approveData,
-              toHex(currentAddress!)
-            );
-            
-            approveTxHash = await walletClient.sendTransaction({
-              to: toHex(tokenAddress),
-              data: approveDataWithReferral,
-              account: toHex(currentAddress!),
-              chain: undefined,
-            });
-          } else {
-            // Use Privy provider
-            const approveIface = new Interface([
-              "function approve(address spender, uint256 amount) external returns (bool)",
-            ]);
-            const approveData = approveIface.encodeFunctionData("approve", [
-              toHex(stakingAddress),
-              MAX_UINT256,
-            ]);
-            const approveDataWithReferral = await appendReferralTag(
-              toHex(approveData),
-              toHex(currentAddress!)
-            );
-            approveTxHash = await provider.request({
-              method: "eth_sendTransaction",
-              params: [
-                {
-                  to: toHex(tokenAddress),
-                  from: toHex(currentAddress!),
-                  data: approveDataWithReferral,
-                  chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
-                },
-              ],
-            });
-          }
-          
-          if (!approveTxHash)
-            throw new Error(
-              "Approval transaction hash not received. User might have cancelled."
-            );
-          toast.loading("Waiting for approval confirmation...", {
-            id: toastId,
-          });
-          const approveReceipt = await publicClient.waitForTransactionReceipt({
-            hash: approveTxHash,
-          });
-          if (approveReceipt.status !== "success")
-            throw new Error("Approval transaction failed");
-          
-          // Submit referral to Divvi
-          await submitDivviReferral(approveTxHash, 8453); // Base L2 chain ID
-          
-          toast.success(
-            "Approval successful! You won't need to approve again.",
-            { id: toastId }
-          );
-        } else {
-          toast.info("Sufficient allowance found, skipping approval...", {
-            id: toastId,
-          });
-        }
-
-        toast.loading("Requesting stake...", { id: toastId });
+        toast.loading("Sending tokens to StakingHelper...", { id: toastId });
         
         if (walletClient) {
-          // Use wagmi wallet client for staking
+          // Use wagmi wallet client for sending
           const { encodeFunctionData } = await import("viem");
           const abi = [{
             inputs: [
-              { name: "to", type: "address" },
+              { name: "recipient", type: "address" },
               { name: "amount", type: "uint256" },
+              { name: "userData", type: "bytes" },
             ],
-            name: "stake",
+            name: "send",
             outputs: [],
             stateMutability: "nonpayable",
             type: "function",
           }] as const;
           
-          const stakeData = encodeFunctionData({
+          const sendData = encodeFunctionData({
             abi,
-            functionName: "stake",
-            args: [toHex(currentAddress!), amount],
+            functionName: "send",
+            args: [toHex(STAKING_HELPER), amount, "0x"],
           });
           
-          const stakeDataWithReferral = await appendReferralTag(
-            stakeData,
+          const sendDataWithReferral = await appendReferralTag(
+            sendData,
             toHex(currentAddress!)
           );
           
           stakeTxHash = await walletClient.sendTransaction({
-            to: toHex(stakingAddress),
-            data: stakeDataWithReferral,
+            to: toHex(tokenAddress),
+            data: sendDataWithReferral,
             account: toHex(currentAddress!),
             chain: undefined,
           });
         } else {
           // Use Privy provider
-          const stakeIface = new Interface([
-            "function stake(address to, uint256 amount) external",
+          const sendIface = new Interface([
+            "function send(address recipient, uint256 amount, bytes userData) external",
           ]);
-          const stakeData = stakeIface.encodeFunctionData("stake", [
-            toHex(currentAddress!),
+          const sendData = sendIface.encodeFunctionData("send", [
+            toHex(STAKING_HELPER),
             amount,
+            "0x", // empty userData
           ]);
-          const stakeDataWithReferral = await appendReferralTag(
-            toHex(stakeData),
+          const sendDataWithReferral = await appendReferralTag(
+            toHex(sendData),
             toHex(currentAddress!)
           );
           stakeTxHash = await provider.request({
             method: "eth_sendTransaction",
             params: [
               {
-                to: toHex(stakingAddress),
+                to: toHex(tokenAddress),
                 from: toHex(currentAddress!),
-                data: stakeDataWithReferral,
+                data: sendDataWithReferral,
                 chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
               },
             ],

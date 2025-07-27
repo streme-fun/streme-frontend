@@ -1734,7 +1734,6 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                               />
                               <StakeAllButton
                                 tokenAddress={stake.tokenAddress}
-                                stakingAddress={stake.stakingAddress}
                                 stakingPoolAddress={stake.stakingPoolAddress}
                                 symbol={stake.membership.pool.token.symbol}
                                 tokenBalance={BigInt(
@@ -1923,7 +1922,6 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                               />
                               <StakeAllButton
                                 tokenAddress={token.tokenAddress}
-                                stakingAddress={token.stakingAddress}
                                 stakingPoolAddress="" // Not needed for unstaked tokens
                                 symbol={token.symbol}
                                 tokenBalance={BigInt(

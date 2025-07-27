@@ -627,6 +627,12 @@ export default function TokensPage() {
             // Process pool memberships (stakes) first
             let stakesData: StakeData[] = [];
             if (accountData.poolMemberships) {
+              // Debug: Check raw GraphQL data
+              const stremeMemberships = accountData.poolMemberships.filter((m: PoolMembership) => 
+                m.pool.token.symbol === "STREME"
+              );
+              console.log("Raw STREME memberships from GraphQL:", stremeMemberships.length, stremeMemberships);
+
               const activeMemberships = accountData.poolMemberships.filter(
                 (membership: PoolMembership) =>
                   membership.units &&
@@ -638,7 +644,18 @@ export default function TokensPage() {
                   )
               );
 
+              // Debug: Check filtered memberships
+              const activeStremeMemberships = activeMemberships.filter((m: PoolMembership) => 
+                m.pool.token.symbol === "STREME"
+              );
+              console.log("Active STREME memberships after filtering:", activeStremeMemberships.length, activeStremeMemberships);
+
               stakesData = await createInitialStakesData(activeMemberships);
+              
+              // Debug: Check for STREME in stakes
+              const stremeStakes = stakesData.filter(s => s.membership.pool.token.symbol === "STREME");
+              console.log("STREME stakes found:", stremeStakes.length, stremeStakes);
+              
               setStakes(stakesData);
               enhanceStakesWithApiData(stakesData);
             } else {
@@ -647,10 +664,21 @@ export default function TokensPage() {
 
             // Process SuperTokens
             if (accountData.accountTokenSnapshots) {
+              // Debug: Check raw SuperToken snapshots
+              const stremeSnapshots = accountData.accountTokenSnapshots.filter((s: AccountTokenSnapshot) => 
+                s.token.symbol === "STREME"
+              );
+              console.log("Raw STREME snapshots from GraphQL:", stremeSnapshots.length, stremeSnapshots);
+
               const initialSuperTokens = await createInitialSuperTokensData(
                 accountData.accountTokenSnapshots,
                 stakesData
               );
+              
+              // Debug: Check for STREME in SuperTokens
+              const stremeSuperTokens = initialSuperTokens.filter(t => t.symbol === "STREME");
+              console.log("STREME SuperTokens found:", stremeSuperTokens.length, stremeSuperTokens);
+              
               setOwnedSuperTokens(initialSuperTokens);
               enhanceSuperTokensWithApiData(initialSuperTokens);
             } else {
@@ -716,6 +744,16 @@ export default function TokensPage() {
           userFlowRate = totalFlowRate * (percentage / 100) * 86400;
         }
 
+        // Debug logging for STREME token
+        if (membership.pool.token.symbol === "STREME") {
+          console.log("Creating stake for STREME:", {
+            tokenAddress,
+            poolId: membership.pool.id,
+            units: membership.units,
+            formattedReceived
+          });
+        }
+
         stakesData.push({
           membership,
           tokenAddress,
@@ -734,7 +772,34 @@ export default function TokensPage() {
       }
     }
 
-    return stakesData;
+    // Final deduplication step to prevent any duplicate stakes
+    // Note: We keep the highest stake if there are multiple pools for the same token
+    const uniqueStakes = stakesData.filter((stake, index, self) => {
+      const tokenMatches = self.filter(s => 
+        safeToLowerCase(s.tokenAddress) === safeToLowerCase(stake.tokenAddress)
+      );
+      
+      if (tokenMatches.length === 1) {
+        return true; // Only one stake for this token
+      }
+      
+      // Multiple stakes for same token - keep the one with highest units
+      const maxUnitsStake = tokenMatches.reduce((max, current) => {
+        const maxUnits = parseFloat(max.membership.units || "0");
+        const currentUnits = parseFloat(current.membership.units || "0");
+        return currentUnits > maxUnits ? current : max;
+      });
+      
+      return stake === maxUnitsStake;
+    });
+
+    console.log("Stakes deduplication:", {
+      original: stakesData.length,
+      deduplicated: uniqueStakes.length,
+      removed: stakesData.length - uniqueStakes.length
+    });
+
+    return uniqueStakes;
   };
 
   // Enhance stakes with API data - optimized to reduce calls
@@ -971,6 +1036,24 @@ export default function TokensPage() {
               safeToLowerCase(tokenAddress)
         );
 
+        // Check if this token has significant unstaked balance (more than 0.01 tokens)
+        const hasSignificantBalance = formattedBalance > 0.01;
+
+        // Debug logging for STREME token
+        if (snapshot.token.symbol === "STREME") {
+          console.log("STREME token processing:", {
+            tokenAddress,
+            isAlreadyStaked,
+            hasSignificantBalance,
+            formattedBalance,
+            currentStakesCount: currentStakes.length,
+            stakesWithSTREME: currentStakes.filter(s => 
+              s.tokenAddress && 
+              safeToLowerCase(s.tokenAddress) === safeToLowerCase(tokenAddress)
+            ).length
+          });
+        }
+
         if (!isAlreadyStaked) {
           superTokensData.push({
             tokenAddress,
@@ -986,7 +1069,20 @@ export default function TokensPage() {
       }
     }
 
-    return superTokensData;
+    // Final deduplication step to prevent any duplicates
+    const uniqueSuperTokens = superTokensData.filter((token, index, self) => 
+      index === self.findIndex(t => 
+        safeToLowerCase(t.tokenAddress) === safeToLowerCase(token.tokenAddress)
+      )
+    );
+
+    console.log("SuperTokens deduplication:", {
+      original: superTokensData.length,
+      deduplicated: uniqueSuperTokens.length,
+      removed: superTokensData.length - uniqueSuperTokens.length
+    });
+
+    return uniqueSuperTokens;
   };
 
   // Enhance SuperTokens with API data - optimized to reduce unnecessary calls
@@ -1533,7 +1629,7 @@ export default function TokensPage() {
                     })
                     .map((stake, index) => (
                       <div
-                        key={`stake-${index}`}
+                        key={`stake-${stake.tokenAddress}-${index}`}
                         className="card bg-base-100 border border-gray-200"
                       >
                         <div className="card-body p-6">
@@ -1758,7 +1854,7 @@ export default function TokensPage() {
                     })
                     .map((token, index) => (
                       <div
-                        key={`token-${index}`}
+                        key={`supertoken-${token.tokenAddress}-${index}`}
                         className="card bg-base-100 border border-gray-200"
                       >
                         <div className="card-body p-6">
