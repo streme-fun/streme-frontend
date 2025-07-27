@@ -37,7 +37,8 @@ function App() {
   // Tutorial modal state
   const [showTutorialModal, setShowTutorialModal] = useState(false);
   const [hasSkippedTutorial, setHasSkippedTutorial] = useState(false);
-  const [hasShownTutorialThisSession, setHasShownTutorialThisSession] = useState(false);
+  const [hasShownTutorialThisSession, setHasShownTutorialThisSession] =
+    useState(false);
 
   // Load tutorial skip state from localStorage on mount
   useEffect(() => {
@@ -290,29 +291,29 @@ function App() {
   // Check checkin status when miniapp first opens
   useEffect(() => {
     const checkCheckinStatus = async () => {
-      if (
-        isMiniAppView &&
-        isSDKLoaded &&
-        farcasterContext &&
-        !hasCheckedIn
-      ) {
+      if (isMiniAppView && isSDKLoaded && farcasterContext && !hasCheckedIn) {
         try {
           // Try to get FID from different possible locations
-          const userFid = farcasterContext?.user?.fid || 
-                         (farcasterContext as unknown as { client?: { user?: { fid?: number } } })?.client?.user?.fid;
-          
+          const userFid =
+            farcasterContext?.user?.fid ||
+            (
+              farcasterContext as unknown as {
+                client?: { user?: { fid?: number } };
+              }
+            )?.client?.user?.fid;
+
           if (!userFid) {
             console.log("No FID found in farcasterContext");
             return;
           }
-          
+
           console.log(`Checking checkin status for FID: ${userFid}`);
-          
+
           const response = await fetch(`/api/checkin/${userFid}`);
           if (response.ok) {
             const data = await response.json();
             console.log("Checkin status:", data);
-            
+
             // Only show modal if user hasn't checked in today
             if (!data.checkedInToday) {
               console.log("User hasn't checked in today, showing modal");
@@ -376,7 +377,7 @@ function App() {
   if (isMiniAppView) {
     return (
       <div className="font-[family-name:var(--font-geist-sans)]">
-        <div className="flex flex-col gap-2 row-start-2 w-full p-4 pt-20">
+        <div className="flex flex-col gap-2 row-start-2 w-full p-4 py-20">
           <div className="fixed top-0 left-0 right-0 flex items-center justify-between p-4 z-10 bg-base-100/80 backdrop-blur-sm">
             <div className="flex-shrink-0">
               <Link href="/" className="flex items-center">
