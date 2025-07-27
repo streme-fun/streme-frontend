@@ -264,6 +264,13 @@ ${shareUrl}`;
     window.location.href = "/token/0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
   };
 
+  const handleConnectPoolSuccess = async () => {
+    // Update pool connection status immediately
+    setIsConnectedToPool(true);
+    // Then refresh balance data to get updated flow rate
+    await fetchBalanceData();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -350,9 +357,7 @@ ${shareUrl}`;
             </p>
             <ConnectPoolButton
               stakingPoolAddress={STREME_STAKING_POOL}
-              onSuccess={() => {
-                fetchBalanceData();
-              }}
+              onSuccess={handleConnectPoolSuccess}
               isMiniApp={isMiniAppView}
               farcasterAddress={effectiveAddress as string}
               farcasterIsConnected={effectiveIsConnected}
