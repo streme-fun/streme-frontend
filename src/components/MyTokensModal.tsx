@@ -1522,7 +1522,6 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {/* Staked Tokens */}
                 {stakes
-                  .slice()
                   .filter((stake) => {
                     if (!searchTerm.trim()) return true;
                     const searchLower = searchTerm.toLowerCase();
@@ -1532,6 +1531,14 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                         .includes(searchLower) ?? false
                     );
                   })
+                  .reduce((acc, stake) => {
+                    // Deduplicate by token address - keep the highest stake if multiple pools exist
+                    const existing = acc.find(s => s.tokenAddress.toLowerCase() === stake.tokenAddress.toLowerCase());
+                    if (!existing || calculateStakeUSDValue(stake) > calculateStakeUSDValue(existing)) {
+                      return [...acc.filter(s => s.tokenAddress.toLowerCase() !== stake.tokenAddress.toLowerCase()), stake];
+                    }
+                    return acc;
+                  }, [] as StakeData[])
                   .sort((a, b) => {
                     // First sort by liquidity status (normal liquidity tokens first)
                     const aIsLowLiquidity = isStakeLowLiquidity(a);
@@ -1548,7 +1555,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                   })
                   .map((stake, index) => (
                     <div
-                      key={`stake-${index}`}
+                      key={`stake-${stake.tokenAddress}-${index}`}
                       className="card bg-base-100 border border-base-300"
                     >
                       <div className="card-body p-4">
@@ -1790,7 +1797,6 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
                 {/* Owned SuperTokens (not staked) */}
                 {ownedSuperTokens
-                  .slice()
                   .filter((token) => {
                     if (!searchTerm.trim()) return true;
                     const searchLower = searchTerm.toLowerCase();
@@ -1798,6 +1804,14 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                       token.symbol?.toLowerCase().includes(searchLower) ?? false
                     );
                   })
+                  .reduce((acc, token) => {
+                    // Deduplicate by token address - keep the one with highest balance if duplicates exist
+                    const existing = acc.find(t => t.tokenAddress.toLowerCase() === token.tokenAddress.toLowerCase());
+                    if (!existing || token.balance > existing.balance) {
+                      return [...acc.filter(t => t.tokenAddress.toLowerCase() !== token.tokenAddress.toLowerCase()), token];
+                    }
+                    return acc;
+                  }, [] as SuperTokenData[])
                   .sort((a, b) => {
                     // First sort by liquidity status (normal liquidity tokens first)
                     const aIsLowLiquidity = isTokenLowLiquidity(a);
@@ -1814,7 +1828,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                   })
                   .map((token, index) => (
                     <div
-                      key={`token-${index}`}
+                      key={`supertoken-${token.tokenAddress}-${index}`}
                       className="card bg-base-100 border border-base-300"
                     >
                       <div className="card-body p-4">
