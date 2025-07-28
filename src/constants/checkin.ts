@@ -6,13 +6,22 @@ export const CHECKIN_CONFIG = {
 } as const;
 
 export const CHECKIN_MESSAGES = {
-  STAKED_USERS: [
-    "Compound those Stremes.\nClaim 1000 staked $STREME.",
+  STAKED_USERS_WITH_BALANCE: [
+    "Time for your daily dose of dopastreme.\nStake to claim 1000 staked $STREME.",
+    "It's Streme o'clock.\nStake to claim 1000 staked $STREME.",
+    "You know the drill.\nStake to claim 1000 staked $STREME.",
+    "Daily rewards time!\nStake to claim 1000 staked $STREME.",
+  ],
+  STAKED_USERS_NO_BALANCE: [
     "Time for your daily dose of dopastreme.\nClaim 1000 staked $STREME.",
     "It's Streme o'clock.\nClaim 1000 staked $STREME.",
     "You know the drill.\nClaim 1000 staked $STREME.",
+    "Daily rewards time!\nClaim 1000 staked $STREME.",
   ],
-  NEW_USER: "Claim 1000 staked $STREME to kick-start your streaming rewards",
+  NEED_TO_STAKE:
+    "Stake your $STREME to auto-claim 1000 staked $STREME.\nStaking triggers instant reward claim.",
+  NEW_USER:
+    "Welcome! Claim 1000 staked $STREME to get started with streaming rewards.",
   MODAL_TITLE: "Experimental Daily Staked Streme Drop",
 } as const;
 
@@ -20,4 +29,5 @@ export const BUTTON_TEXT = {
   CLAIMING: "Claiming...",
   ALREADY_CLAIMED: "Already Claimed",
   CLAIM: "CLAIM",
+  STAKE: "STAKE & CLAIM",
 } as const;

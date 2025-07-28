@@ -41,6 +41,7 @@ CheckinSuccessModalProps) {
 
   const [hasTriggeredEffects, setHasTriggeredEffects] = useState(false);
   const [isConnectedToPool, setIsConnectedToPool] = useState(false);
+  const [hasCheckedPoolConnection, setHasCheckedPoolConnection] = useState(false);
 
   // Get effective connection state and address
   const effectiveIsConnected = isMiniAppView ? fcIsConnected : wagmiIsConnected;
@@ -161,11 +162,16 @@ CheckinSuccessModalProps) {
       } else {
         setIsConnectedToPool(false);
       }
+      
+      // Mark that we've finished checking the pool connection
+      setHasCheckedPoolConnection(true);
     } catch (error) {
       console.error(
         "[CheckinSuccessModal] Error fetching balance data:",
         error
       );
+      // Mark that we've finished checking (even on error) to prevent infinite loading
+      setHasCheckedPoolConnection(true);
     }
   };
 
@@ -200,6 +206,7 @@ CheckinSuccessModalProps) {
   useEffect(() => {
     if (!isOpen) {
       setHasTriggeredEffects(false);
+      setHasCheckedPoolConnection(false);
     }
   }, [isOpen]);
 
@@ -346,8 +353,8 @@ ${shareUrl}`;
           )}
         </div>
 
-        {/* Connect Pool Button if not connected */}
-        {effectiveIsConnected && !isConnectedToPool && (
+        {/* Connect Pool Button if not connected (only show after we've checked) */}
+        {effectiveIsConnected && hasCheckedPoolConnection && !isConnectedToPool && (
           <div className="mb-6 p-4 bg-base-200 rounded-lg">
             <p className="text-sm text-base-content/70 mb-3">
               You&apos;re not connected to the STREME reward pool yet. Connect

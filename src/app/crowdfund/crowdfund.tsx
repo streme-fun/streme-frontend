@@ -1445,20 +1445,6 @@ export default function CrowdfundPage() {
             <div className="collapse collapse-arrow bg-base-200">
               <input type="radio" name="faq-accordion" />
               <div className="collapse-title font-semibold">
-                How long does the crowdfund last?
-              </div>
-              <div className="collapse-content">
-                <p className="text-sm text-base-content/70 pt-2">
-                  The crowdfund continues until we win the auction. $1000 is
-                  just a conservative target and we might not need to go all the
-                  the way there. Contributors can withdraw anytime and will get
-                  their staked STREME after the auction win regardless.
-                </p>
-              </div>
-            </div>
-            <div className="collapse collapse-arrow bg-base-200">
-              <input type="radio" name="faq-accordion" />
-              <div className="collapse-title font-semibold">
                 How do I know how much I&apos;m contributing?
               </div>
               <div className="collapse-content">

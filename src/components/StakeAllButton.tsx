@@ -42,6 +42,7 @@ interface StakeAllButtonProps {
   farcasterAddress?: string;
   farcasterIsConnected?: boolean;
   tokenBalance?: bigint;
+  buttonText?: string;
 }
 
 export function StakeAllButton({
@@ -56,6 +57,7 @@ export function StakeAllButton({
   farcasterAddress,
   farcasterIsConnected,
   tokenBalance = BigInt(0),
+  buttonText = "Stake All",
 }: StakeAllButtonProps) {
   const { wallets } = useWallets();
   const { address: wagmiAddress } = useAccount();
@@ -262,7 +264,7 @@ export function StakeAllButton({
       disabled={disabled || isLoading || balance === 0n}
       className={className}
     >
-      {isLoading ? "Processing..." : "Stake All"}
+      {isLoading ? "Processing..." : buttonText}
     </button>
   );
 }

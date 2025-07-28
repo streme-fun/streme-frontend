@@ -62,7 +62,6 @@ export function useCheckin() {
 
       const checkinData: CheckinData = await response.json();
 
-
       setState((prev) => ({
         ...prev,
         checkinData,
@@ -163,7 +162,7 @@ export function useCheckin() {
     }));
 
     // Show the toast
-    const toastMessage = `10 stStreme has been sent to your wallet.`;
+    const toastMessage = `1000 stStreme has been sent to your wallet.`;
 
     toast.success(toastMessage, {
       duration: 10000,
@@ -181,4 +180,3 @@ export function useCheckin() {
     showSuccessModalDebug,
   };
 }
-
