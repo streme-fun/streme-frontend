@@ -283,7 +283,20 @@ export function UnstakeButton({
             to: toHex(stakingAddress),
             data: unstakeDataWithReferral,
             account: toHex(currentAddress!),
-            chain: undefined,
+            chain: {
+              id: 8453,
+              name: 'Base',
+              network: 'base',
+              nativeCurrency: {
+                decimals: 18,
+                name: 'Ether',
+                symbol: 'ETH',
+              },
+              rpcUrls: {
+                public: { http: ['https://mainnet.base.org'] },
+                default: { http: ['https://mainnet.base.org'] },
+              },
+            },
           });
         } else {
           // Use Privy provider
