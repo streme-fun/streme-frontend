@@ -1,14 +1,14 @@
 "use client";
 
-interface StreamAnimationProps {
+interface MarketingFundAnimationProps {
   contributorCount: number;
   growthRate: number; // STREME per second
 }
 
-export const StreamAnimation = ({
+export const MarketingFundAnimation = ({
   contributorCount: _contributorCount, // eslint-disable-line @typescript-eslint/no-unused-vars
   growthRate,
-}: StreamAnimationProps) => {
+}: MarketingFundAnimationProps) => {
   // Generate stream paths - always use 20 lines
   const generateStreamPaths = () => {
     const streams = [];
@@ -20,8 +20,8 @@ export const StreamAnimation = ({
       const radius = 180; // Increased distance from center for longer streams
       const startX = 225 + Math.cos(angle) * radius; // Center at 225, 150
       const startY = 150 + Math.sin(angle) * radius;
-      const endX = 225; // Converge to QR center
-      const endY = 150; // QR is now in center
+      const endX = 225; // Converge to icon center
+      const endY = 150; // Icon is now in center
 
       // Create more complex curved paths with multiple control points
       const midX1 = startX + (endX - startX) * 0.2 + ((i % 5) - 2) * 40;
@@ -92,7 +92,7 @@ export const StreamAnimation = ({
               }
             }
 
-            @keyframes qrPulse {
+            @keyframes iconPulse {
               0% { 
                 transform: scale(1);
                 filter: drop-shadow(0 0 5px hsl(var(--p) / 0.3));
@@ -223,8 +223,8 @@ export const StreamAnimation = ({
               })
               .join("")}
 
-            .qr-pulse {
-              animation: qrPulse 6s ease-in-out infinite;
+            .icon-pulse {
+              animation: iconPulse 6s ease-in-out infinite;
             }
 
             .energy-ring {
@@ -287,24 +287,61 @@ export const StreamAnimation = ({
             </g>
           ))}
 
-          {/* QR Code Target - Centered */}
-          <g className="qr-container" transform="translate(225, 150)">
-            {/* QR Code Image - Larger, no background */}
-            <image
-              x="-50"
-              y="-50"
-              width="100"
-              height="100"
-              href="/qr.png"
-              opacity="0.95"
-              className="qr-pulse"
-            />
-
-            {/* Pulse circle around QR */}
+          {/* Streme Icon Target - Centered */}
+          <g className="icon-container" transform="translate(225, 150)">
+            {/* Circular background for icon */}
             <circle
               cx="0"
               cy="0"
-              r="70"
+              r="65"
+              fill="hsl(var(--b1))"
+              stroke="hsl(var(--p))"
+              strokeWidth="4"
+              opacity="0.95"
+              className="icon-pulse"
+            />
+            
+            {/* Icon border ring - outer */}
+            <circle
+              cx="0"
+              cy="0"
+              r="58"
+              fill="none"
+              stroke="hsl(var(--s))"
+              strokeWidth="4"
+              opacity="0.9"
+              className="icon-pulse"
+            />
+            
+            {/* Icon border ring - inner */}
+            <circle
+              cx="0"
+              cy="0"
+              r="52"
+              fill="none"
+              stroke="hsl(var(--a))"
+              strokeWidth="3"
+              opacity="0.7"
+              className="icon-pulse"
+            />
+            
+            {/* Streme Icon - Circular, centered and bigger */}
+            <image
+              x="-45"
+              y="-45"
+              width="90"
+              height="90"
+              href="/icon.png"
+              opacity="0.95"
+              className="icon-pulse"
+              clipPath="circle(45px at 45px 45px)"
+            />
+
+            {/* Pulse circle around icon */}
+            <circle
+              cx="0"
+              cy="0"
+              r="85"
               fill="none"
               stroke="hsl(var(--p))"
               strokeWidth="3"
@@ -312,11 +349,11 @@ export const StreamAnimation = ({
               className="pulse-circle"
             />
 
-            {/* Energy ring around QR */}
+            {/* Energy ring around icon */}
             <circle
               cx="0"
               cy="0"
-              r="60"
+              r="75"
               fill="none"
               stroke="hsl(var(--p))"
               strokeWidth="2"

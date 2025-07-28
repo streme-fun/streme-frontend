@@ -4,8 +4,8 @@ import { Metadata } from "next";
 import { APP_NAME, APP_URL } from "../../lib/constants";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const crowdfundTitle = "Fund a Streme QR Auction Win";
-  const crowdfundDescription = "Contribute your staking $STREME yield to earn SUP rewards and help Streme get discovered by 10,000+ quality users via QR Auction.";
+  const crowdfundTitle = "Streme Marketing Fund";
+  const crowdfundDescription = "Contribute your staking $STREME yield to help fund Streme marketing initiatives and earn SUP rewards.";
   const crowdfundOgImageUrl = `${APP_URL}/api/crowdfund/image`;
   const pageUrl = `${APP_URL}/crowdfund`;
 
@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
     version: "next",
     imageUrl: crowdfundOgImageUrl,
     button: {
-      title: "Join Stream QR Crowdfund",
+      title: "Join Streme Marketing Fund",
       action: {
         type: "launch_frame",
         name: APP_NAME,

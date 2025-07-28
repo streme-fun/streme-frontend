@@ -104,7 +104,7 @@ function App() {
 
     setLastLogoClickTime(now);
 
-    // Show debug button on 5th click for mini-app, navigate to crowdfund for web
+    // Show debug button on 5th click for mini-app, navigate to marketing fund for web
     if (logoClickCount + 1 >= 5) {
       if (isMiniAppView) {
         setShowDebugButton(true);
@@ -455,27 +455,27 @@ function App() {
             <Link href="/crowdfund">
               <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/30 transition-all duration-200">
                 <div className="relative h-24 bg-gradient-to-br from-primary/10 to-secondary/10 border-t border-base-300 flex items-center justify-center">
-                  {/* Add hero animation mini as a background inside the card but behind the qr image */}
+                  {/* Add hero animation mini as a background inside the card but behind the icon image */}
                   <div className="absolute inset-0 opacity-30">
                     <HeroAnimationMini />
                   </div>
                   <Image
-                    src="/qr.png"
-                    alt="QR Code"
+                    src="/icon.png"
+                    alt="Streme Icon"
                     width={60}
                     height={60}
-                    className="opacity-80 relative z-10"
+                    className="opacity-80 relative z-10 rounded-full"
                   />
                 </div>
 
                 <div className="p-4 pt-3 flex items-center justify-between gap-2">
                   <div className="flex flex-col gap-2">
                     <p className="text-sm text-base-content/70 font-semibold">
-                      Streme QR Crowdfund
+                      Streme Marketing Fund
                     </p>
                     <p className="text-sm text-base-content/70 mb-3 mr-3">
-                      Contribute your staking rewards to help Streme win a QR
-                      auction. Earn $SUP for your help!
+                      Contribute your staking rewards to help fund Streme marketing
+                      initiatives. Earn $SUP for your help!
                     </p>
                   </div>
                   <button className="btn btn-sm btn-primary">Join</button>
@@ -650,22 +650,22 @@ function App() {
                     <HeroAnimationMini />
                   </div>
                   <Image
-                    src="/qr.png"
-                    alt="QR Code"
+                    src="/icon.png"
+                    alt="Streme Icon"
                     width={80}
                     height={80}
-                    className="opacity-80 relative z-10"
+                    className="opacity-80 relative z-10 rounded-full"
                   />
                 </div>
 
                 <div className="p-6 flex items-center justify-between gap-4">
                   <div className="flex flex-col gap-2">
                     <p className="text-base text-base-content font-semibold">
-                      Streme QR Crowdfund
+                      Streme Marketing Fund
                     </p>
                     <p className="text-sm text-base-content/70 mb-3">
-                      Contribute your staking rewards to help Streme win a QR
-                      auction. Earn $SUP for your contribution.
+                      Contribute your staking rewards to help fund Streme marketing
+                      initiatives. Earn $SUP for your contribution.
                     </p>
                   </div>
                   <button className="btn btn-primary">Join</button>

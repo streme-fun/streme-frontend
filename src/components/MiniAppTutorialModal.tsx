@@ -3,7 +3,7 @@
 import { Modal } from "./Modal";
 import { useState } from "react";
 import { TutorialStreamingAnimation } from "./TutorialStreamingAnimation";
-import { StreamAnimation } from "./StreamAnimation";
+import { MarketingFundAnimation } from "./MarketingFundAnimation";
 
 interface MiniAppTutorialModalProps {
   isOpen: boolean;
@@ -42,7 +42,7 @@ export function MiniAppTutorialModal({
       title: "Stake to Earn Streaming Rewards",
       content: (
         <div className="space-y-4">
-          <StreamAnimation contributorCount={25} growthRate={2.5} />
+          <MarketingFundAnimation contributorCount={25} growthRate={2.5} />
 
           <p className="text-base text-base-content/80">
             Stake Streme coins to earn rewards streamed to your wallet every

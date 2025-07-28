@@ -524,14 +524,12 @@ export function StakerLeaderboardEmbed({
               {/* Profile */}
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 {/* Special handling for crowdfund address */}
-                {staker.account.id.toLowerCase() === "0xceacfbb5a17b6914051d12d8c91d3461382d503b" ? (
+                {staker.account.id.toLowerCase() ===
+                "0xceacfbb5a17b6914051d12d8c91d3461382d503b" ? (
                   <>
                     <div className="avatar">
                       <div className="mask mask-squircle w-6 h-6">
-                        <img
-                          src="/qr.png"
-                          alt="QR Crowdfund"
-                        />
+                        <img src="/icon.png" alt="Streme Crowdfund" />
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -540,7 +538,7 @@ export function StakerLeaderboardEmbed({
                           href="/crowdfund"
                           className="hover:underline text-secondary"
                         >
-                          QR Crowdfund
+                          Crowdfund
                         </a>
                       </div>
                     </div>

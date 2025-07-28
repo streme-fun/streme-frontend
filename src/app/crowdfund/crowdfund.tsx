@@ -6,7 +6,7 @@ import { formatUnits } from "viem";
 import { ERC20_ABI } from "@/src/lib/contracts/StremeStakingRewardsFunder";
 import { getPrices } from "@/src/lib/priceUtils";
 import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
-import { StreamAnimation } from "@/src/components/StreamAnimation";
+import { MarketingFundAnimation } from "@/src/components/MarketingFundAnimation";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useUnifiedWallet } from "@/src/hooks/useUnifiedWallet";
 import { HowCrowdfundWorksModal } from "@/src/components/HowCrowdfundWorksModal";
@@ -37,12 +37,20 @@ export default function CrowdfundPage() {
 
   // Fallback to direct wagmi connection for mini-app if unified wallet fails
   const { address: wagmiAddress, isConnected: wagmiIsConnected } = useAccount();
-  
+
   // For mini-app, prefer wagmi directly if unified wallet isn't working
-  const shouldUseWagmiFallback = unifiedIsMiniApp && (!unifiedIsConnected || !unifiedAddress) && (wagmiIsConnected && wagmiAddress);
-  
-  const effectiveIsConnected = shouldUseWagmiFallback ? wagmiIsConnected : unifiedIsConnected;
-  const effectiveAddress = shouldUseWagmiFallback ? wagmiAddress : unifiedAddress;
+  const shouldUseWagmiFallback =
+    unifiedIsMiniApp &&
+    (!unifiedIsConnected || !unifiedAddress) &&
+    wagmiIsConnected &&
+    wagmiAddress;
+
+  const effectiveIsConnected = shouldUseWagmiFallback
+    ? wagmiIsConnected
+    : unifiedIsConnected;
+  const effectiveAddress = shouldUseWagmiFallback
+    ? wagmiAddress
+    : unifiedAddress;
   const [price, setPrice] = useState<number | null>(null);
   const [baseUsdValue, setBaseUsdValue] = useState<number>(0);
   const [lastUsdUpdateTime, setLastUsdUpdateTime] = useState<number>(
@@ -79,7 +87,7 @@ export default function CrowdfundPage() {
 
   const STREME_TOKEN_ADDRESS = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
   const DEPOSIT_CONTRACT_ADDRESS = "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
-  const GOAL = 1000; // $1000 USD goal
+  // const GOAL = 1000; // $1000 USD goal
 
   // ABI for the staking contract to check deposit timestamps
   const stakingAbi = useMemo(
@@ -591,9 +599,9 @@ export default function CrowdfundPage() {
   // Calculate values
   const totalStremeAmount = animatedStremeBalance;
   const totalUsdValue = price ? animatedUsdValue : 0;
-  const progressPercentage = (totalUsdValue / GOAL) * 100;
-  const remainingUsd = Math.max(0, GOAL - totalUsdValue);
-  const isCompleted = totalUsdValue >= GOAL;
+  // const progressPercentage = (totalUsdValue / GOAL) * 100;
+  // const remainingUsd = Math.max(0, GOAL - totalUsdValue);
+  // const isCompleted = totalUsdValue >= GOAL;
 
   // Calculate estimated time to completion
   // const estimatedTimeToCompletion = useMemo(() => {
@@ -723,7 +731,7 @@ export default function CrowdfundPage() {
   // Handle sharing to Farcaster
   const handleShareToFarcaster = async () => {
     const shareUrl = `https://streme.fun/crowdfund`;
-    const shareText = `I just contributed ${successAmount} $streme to @streme's streaming QR crowdfund! Streme On 🎶 🚀`;
+    const shareText = `I just contributed ${successAmount} $streme to @streme's marketing fund! Streme On 🎶 🚀`;
 
     if (unifiedIsMiniApp && isSDKLoaded && sdk) {
       try {
@@ -805,7 +813,7 @@ export default function CrowdfundPage() {
             <div className="flex-1 flex flex-col gap-1">
               <div className="flex items-center gap-1 justify-between">
                 <h2 className="text-lg md:text-xl font-bold text-base-content">
-                  Win a QR Auction for Streme
+                  Streme Marketing Fund
                 </h2>
                 {/* Info button in top right */}
                 <div className="flex items-center gap-1 ml-2">
@@ -852,8 +860,8 @@ export default function CrowdfundPage() {
                 </div>
               </div>
               <p className="text-sm text-base-content/70 leading-snug">
-                Help Streme get discovered by 10,000+ quality users via QR
-                Auction. Deposit your staked $STREME to earn SUP rewards.
+                Support Streme&apos;s growth through marketing initiatives.
+                Deposit your staked $STREME to earn SUP rewards.
               </p>
             </div>
           </div>
@@ -865,9 +873,9 @@ export default function CrowdfundPage() {
         <div className="mb-3">
           {effectiveIsConnected ? (
             <div>
-              {/* Streaming Animation with Token Count - Hero Position */}
+              {/* Marketing Fund Animation with Token Count - Hero Position */}
               <div className="text-center mb-2">
-                <StreamAnimation
+                <MarketingFundAnimation
                   contributorCount={0}
                   growthRate={Math.max(stremeGrowthRate, 0.1)}
                 />
@@ -889,55 +897,27 @@ export default function CrowdfundPage() {
                 </div>
               </div>
 
-              {/* Ultra-Compact Goal and Progress Section */}
+              {/* Pool Summary Section */}
               <div className="bg-base-100 rounded-lg p-3 shadow-sm border border-base-200 mb-2">
-                {/* Enhanced Progress Bar */}
-                <div className="mb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-primary">
-                        {progressPercentage.toFixed(0)}%
-                      </div>
-                      <div className="text-xs text-base-content/60">
-                        complete
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold font-mono text-primary">
-                        {(totalStremeAmount / 1000000).toLocaleString("en-US", {
-                          minimumFractionDigits: 1,
-                          maximumFractionDigits: 1,
-                        })}
-                        M STREME
-                      </div>
-                      <div className="text-sm font-bold text-base-content">
-                        {price
-                          ? `($${totalUsdValue.toLocaleString("en-US", {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })} USD)`
-                          : "Loading..."}
-                      </div>
-                    </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold font-mono text-primary">
+                    {(totalStremeAmount / 1000000).toLocaleString("en-US", {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    })}
+                    M STREME
                   </div>
-                  <div className="w-full bg-base-300 rounded-full h-4 mb-2">
-                    <div
-                      className="h-4 rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500"
-                      style={{
-                        width: `${Math.min(progressPercentage, 100)}%`,
-                      }}
-                    ></div>
+                  <div className="text-sm font-bold text-base-content">
+                    {price
+                      ? `($${totalUsdValue.toLocaleString("en-US", {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0,
+                        })} USD)`
+                      : "Loading..."}
                   </div>
-                </div>
-
-                {/* Minimal Goal Status */}
-                <div className="text-center text-xs text-base-content/60">
-                  $
-                  {remainingUsd.toLocaleString("en-US", {
-                    maximumFractionDigits: 0,
-                  })}{" "}
-                  to $1,000 goal
-                  {isCompleted && <span className="text-success ml-1">✅</span>}
+                  <div className="text-xs text-base-content/60 mt-1">
+                    total marketing fund
+                  </div>
                 </div>
               </div>
 
@@ -1066,9 +1046,9 @@ export default function CrowdfundPage() {
             </div>
           ) : (
             <div>
-              {/* Streaming Animation with Token Count - Hero Position */}
+              {/* Marketing Fund Animation with Token Count - Hero Position */}
               <div className="text-center mb-3">
-                <StreamAnimation
+                <MarketingFundAnimation
                   contributorCount={0}
                   growthRate={Math.max(stremeGrowthRate, 0.1)}
                 />
@@ -1091,61 +1071,33 @@ export default function CrowdfundPage() {
                         : "Loading price..."}
                     </div>
                     <div className="text-xs text-base-content/60 mt-1">
-                      pooled for front page exposure
+                      pooled for marketing initiatives
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Ultra-Compact Goal and Progress Section */}
+              {/* Pool Summary Section */}
               <div className="bg-base-100 rounded-lg p-3 shadow-sm border border-base-200 mb-3">
-                {/* Enhanced Progress Bar */}
-                <div className="mb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-primary">
-                        {progressPercentage.toFixed(0)}%
-                      </div>
-                      <div className="text-xs text-base-content/60">
-                        complete
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold font-mono text-primary">
-                        {(totalStremeAmount / 1000000).toLocaleString("en-US", {
-                          minimumFractionDigits: 1,
-                          maximumFractionDigits: 1,
-                        })}
-                        M STREME
-                      </div>
-                      <div className="text-sm font-bold text-base-content">
-                        {price
-                          ? `($${totalUsdValue.toLocaleString("en-US", {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })} USD)`
-                          : "Loading..."}
-                      </div>
-                    </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold font-mono text-primary">
+                    {(totalStremeAmount / 1000000).toLocaleString("en-US", {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    })}
+                    M STREME
                   </div>
-                  <div className="w-full bg-base-300 rounded-full h-4 mb-2">
-                    <div
-                      className="h-4 rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500"
-                      style={{
-                        width: `${Math.min(progressPercentage, 100)}%`,
-                      }}
-                    ></div>
+                  <div className="text-sm font-bold text-base-content">
+                    {price
+                      ? `($${totalUsdValue.toLocaleString("en-US", {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0,
+                        })} USD)`
+                      : "Loading..."}
                   </div>
-                </div>
-
-                {/* Minimal Goal Status */}
-                <div className="text-center text-xs text-base-content/60">
-                  $
-                  {remainingUsd.toLocaleString("en-US", {
-                    maximumFractionDigits: 0,
-                  })}{" "}
-                  to $1,000 goal
-                  {isCompleted && <span className="text-success ml-1">✅</span>}
+                  <div className="text-xs text-base-content/60 mt-1">
+                    total marketing fund
+                  </div>
                 </div>
               </div>
 
@@ -1164,7 +1116,9 @@ export default function CrowdfundPage() {
                     />
                   </svg>
                   <span className="text-sm">
-                    {unifiedIsMiniApp ? "Connect your wallet to join the crowdfund" : "Connect your wallet to join the crowdfund"}
+                    {unifiedIsMiniApp
+                      ? "Connect your wallet to join the marketing fund"
+                      : "Connect your wallet to join the marketing fund"}
                   </span>
                 </div>
                 {unifiedIsMiniApp ? (
@@ -1433,37 +1387,6 @@ export default function CrowdfundPage() {
 
           <div className="space-y-4">
             <div className="collapse collapse-arrow bg-base-200">
-              <input type="radio" name="faq-accordion" defaultChecked />
-              <div className="collapse-title font-semibold">
-                What is a QR auction?
-              </div>
-              <div className="collapse-content">
-                <p className="text-sm text-base-content/70 pt-2">
-                  QR runs a daily auction, where the winner chooses the link the
-                  QR code will point to for a day. It&apos;s a great way to
-                  drive attention to anything on the internet. Around 10,000
-                  people check out our winners every day. Learn more at{" "}
-                  <a
-                    href="https://qrcoin.fun/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary"
-                  >
-                    QR Coin
-                  </a>{" "}
-                  or from{" "}
-                  <a
-                    href="https://farcaster.xyz/jake"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Jake on Farcaster
-                  </a>
-                </p>
-              </div>
-            </div>
-
-            <div className="collapse collapse-arrow bg-base-200">
               <input type="radio" name="faq-accordion" />
               <div className="collapse-title font-semibold">
                 How do Streme crowdfunds work?
@@ -1472,7 +1395,7 @@ export default function CrowdfundPage() {
                 <p className="text-sm text-base-content/70 pt-2">
                   When you stake STREME tokens, they generate yield aka rewards.
                   By staking your STREME in the crowdfund contract, you
-                  temporarily redirect that yield to the QR auction fund. There
+                  temporarily redirect that yield to the Marketing Fund. There
                   are no locks and you can withdraw your staked STREME anytime.
                 </p>
               </div>
