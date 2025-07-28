@@ -10,7 +10,7 @@ import { LaunchTokenModal } from "./LaunchTokenModal";
 import { LeaderboardModal } from "./LeaderboardModal";
 import { WalletProfileModal } from "./WalletProfileModal";
 import { MyTokensModal } from "./MyTokensModal";
-// import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
+import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import { useUnifiedWallet } from "../hooks/useUnifiedWallet";
@@ -57,7 +57,7 @@ export function Navbar() {
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [isWalletProfileOpen, setIsWalletProfileOpen] = useState(false);
   const [isMyStakesOpen, setIsMyStakesOpen] = useState(false);
-  // const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
   // Profile picture state for mini-app
   const [miniAppProfileImage, setMiniAppProfileImage] = useState<string>("");
@@ -404,6 +404,27 @@ Symbol: $[your ticker]
               How It Works
             </button>
 
+            <button
+              onClick={() => setIsTutorialOpen(true)}
+              className="btn btn-ghost btn-circle"
+              title="Tutorial"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </button>
+
             <ThemeSwitcher />
 
             {isConnected ? (
@@ -501,6 +522,16 @@ Symbol: $[your ticker]
               How It Works
             </button>
 
+            <button
+              onClick={() => {
+                setIsTutorialOpen(true);
+                setIsMenuOpen(false);
+              }}
+              className="btn btn-ghost w-full justify-start"
+            >
+              Tutorial
+            </button>
+
             <div className="flex items-center justify-between w-full px-4 py-2">
               <ThemeSwitcher className="w-full justify-start" />
             </div>
@@ -548,6 +579,11 @@ Symbol: $[your ticker]
       <LaunchTokenModal
         isOpen={isCreateTokenOpen}
         onClose={() => setIsCreateTokenOpen(false)}
+      />
+      <MiniAppTutorialModal
+        isOpen={isTutorialOpen}
+        onClose={() => setIsTutorialOpen(false)}
+        onSkip={() => setIsTutorialOpen(false)}
       />
     </>
   );

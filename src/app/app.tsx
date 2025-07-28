@@ -231,25 +231,41 @@ function App() {
     }
   }, [isMiniAppView, isSDKLoaded, hasPromptedToAdd, promptToAddMiniApp]);
 
-  // Show tutorial modal for mini-app users who haven't added the app
+  // Show tutorial modal for first-time visitors (both mini-app and desktop)
   useEffect(() => {
-    if (
-      isMiniAppView &&
-      isSDKLoaded &&
-      !hasAddedMiniApp &&
-      !hasSkippedTutorial &&
-      !hasShownTutorialThisSession
-    ) {
-      // Small delay to ensure everything is loaded
-      const timer = setTimeout(() => {
-        setShowTutorialModal(true);
-        setHasShownTutorialThisSession(true);
-        // Track tutorial modal shown
-        postHog?.capture("mini_app_tutorial_shown", {
-          context: "farcaster_mini_app",
-        });
-      }, 1000);
-      return () => clearTimeout(timer);
+    if (isMiniAppView) {
+      // Mini-app logic: show if user hasn't added the app
+      if (
+        isSDKLoaded &&
+        !hasAddedMiniApp &&
+        !hasSkippedTutorial &&
+        !hasShownTutorialThisSession
+      ) {
+        // Small delay to ensure everything is loaded
+        const timer = setTimeout(() => {
+          setShowTutorialModal(true);
+          setHasShownTutorialThisSession(true);
+          // Track tutorial modal shown
+          postHog?.capture("tutorial_shown", {
+            context: "farcaster_mini_app",
+          });
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      // Desktop logic: show for first-time visitors
+      if (!hasSkippedTutorial && !hasShownTutorialThisSession) {
+        // Small delay to ensure everything is loaded
+        const timer = setTimeout(() => {
+          setShowTutorialModal(true);
+          setHasShownTutorialThisSession(true);
+          // Track tutorial modal shown
+          postHog?.capture("tutorial_shown", {
+            context: "desktop_web",
+          });
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
     }
   }, [
     isMiniAppView,
@@ -352,8 +368,8 @@ function App() {
       localStorage.setItem("streme-tutorial-skipped", "true");
     }
     // Track tutorial completion
-    postHog?.capture("mini_app_tutorial_completed", {
-      context: "farcaster_mini_app",
+    postHog?.capture("tutorial_completed", {
+      context: isMiniAppView ? "farcaster_mini_app" : "desktop_web",
     });
   };
 
@@ -365,8 +381,8 @@ function App() {
       localStorage.setItem("streme-tutorial-skipped", "true");
     }
     // Track tutorial skip
-    postHog?.capture("mini_app_tutorial_skipped", {
-      context: "farcaster_mini_app",
+    postHog?.capture("tutorial_skipped", {
+      context: isMiniAppView ? "farcaster_mini_app" : "desktop_web",
     });
   };
 
@@ -395,7 +411,7 @@ function App() {
               <button
                 onClick={() => {
                   setShowTutorialModal(true);
-                  postHog?.capture("mini_app_tutorial_opened", {
+                  postHog?.capture("tutorial_opened", {
                     context: "farcaster_mini_app",
                     opened_by: "help_button",
                   });
@@ -638,6 +654,13 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* Tutorial Modal for Desktop */}
+      <MiniAppTutorialModal
+        isOpen={showTutorialModal}
+        onClose={handleCloseTutorial}
+        onSkip={handleSkipTutorial}
+      />
     </>
   );
 }
