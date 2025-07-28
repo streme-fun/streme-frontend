@@ -579,7 +579,7 @@ function App() {
         <CheckinSuccessModal
           isOpen={showSuccessModal}
           onClose={closeSuccessModal}
-          dropAmount={checkinData?.dropAmount}
+          // dropAmount={checkinData?.dropAmount}
           totalCheckins={checkinData?.totalCheckins}
           currentStreak={checkinData?.currentStreak}
         />

@@ -99,7 +99,7 @@ export function useStremeFlowRate() {
       console.log("[useStremeFlowRate] No account snapshot found, falling back to pool calculation");
       
       // STREME staking pool address
-      const stakingPool = "0xcbc2caf425f8cdca774128b3d14de37f2224b964";
+      const stakingPool = "0xa040a8564c433970d7919c441104b1d25b9eaa1c";
       console.log("[useStremeFlowRate] Using staking pool:", stakingPool);
 
       const query = `

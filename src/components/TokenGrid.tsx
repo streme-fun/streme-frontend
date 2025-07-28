@@ -139,13 +139,6 @@ const TokenCardComponent = ({
         symbol: token.symbol,
         address: token.contract_address,
       });
-    } else if (!token.creator.name) {
-      console.log("Missing creator name for token:", {
-        name: token.name,
-        symbol: token.symbol,
-        address: token.contract_address,
-        creator: token.creator,
-      });
     }
   }, [token]);
 
@@ -243,8 +236,10 @@ const TokenCardComponent = ({
                     <div className="rounded-full w-4 h-4">
                       <Image
                         src={
-                          token.creator?.profileImage ??
-                          `/avatars/${token.creator?.name ?? "streme"}.png`
+                          token.creator?.profileImage &&
+                          token.creator.profileImage.trim() !== ""
+                            ? token.creator.profileImage
+                            : `/avatars/${token.creator?.name ?? "streme"}.png`
                         }
                         alt={token.creator?.name ?? "Anon"}
                         width={16}

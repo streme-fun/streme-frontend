@@ -85,6 +85,7 @@ export function ConnectPoolButton({
             },
           ],
         });
+        
         if (!txHash) {
           throw new Error(
             "Pool connection transaction hash not received. User might have cancelled."
@@ -148,7 +149,10 @@ export function ConnectPoolButton({
 
       toast.loading("Confirming transaction...", { id: toastId });
 
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      await publicClient.waitForTransactionReceipt({ 
+        hash: txHash,
+        timeout: 60000 // 60 second timeout
+      });
 
       toast.success(
         <div className="flex flex-col gap-2">

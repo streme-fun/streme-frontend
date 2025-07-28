@@ -22,8 +22,8 @@ interface CheckinSuccessModalProps {
 export function CheckinSuccessModal({
   isOpen,
   onClose,
-  dropAmount,
-}: CheckinSuccessModalProps) {
+}: // dropAmount,
+CheckinSuccessModalProps) {
   const [showInfo, setShowInfo] = useState(false);
   const {
     isSDKLoaded,
@@ -48,12 +48,14 @@ export function CheckinSuccessModal({
 
   // STREME token address
   const STREME_TOKEN_ADDRESS = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
-  const STREME_STAKING_POOL = "0xcbc2caf425f8cdca774128b3d14de37f2224b964";
+  const STREME_STAKING_POOL = "0xa040a8564c433970d7919c441104b1d25b9eaa1c";
 
   // Use streaming number hook for animated balance
+  const flowRatePerSecond = Number(flowRate) / 86400; // Convert daily rate to per-second
+
   const currentBalance = useStreamingNumber({
     baseAmount,
-    flowRatePerSecond: Number(flowRate) / 86400, // Convert daily rate to per-second
+    flowRatePerSecond,
     lastUpdateTime,
     updateInterval: 50, // 50ms for smooth animation (matches StakedBalance)
     pauseWhenHidden: true,
@@ -99,9 +101,10 @@ export function CheckinSuccessModal({
       // Only update base amount and reset timer if the balance has actually changed
       // This prevents the streaming animation from restarting unnecessarily
       if (Math.abs(formattedBalance - baseAmount) > 0.0001) {
-        console.log(
-          `[CheckinSuccessModal] Balance changed from ${baseAmount} to ${formattedBalance}`
-        );
+        setBaseAmount(formattedBalance);
+        setLastUpdateTime(Date.now());
+      } else if (baseAmount === 0) {
+        // Force update on first load even if balance is 0 to initialize the animation
         setBaseAmount(formattedBalance);
         setLastUpdateTime(Date.now());
       }
@@ -129,6 +132,7 @@ export function CheckinSuccessModal({
       );
 
       const data = await response.json();
+
       if (data.data?.pool) {
         const poolData = data.data.pool;
         const member = poolData.poolMembers[0];
@@ -137,7 +141,7 @@ export function CheckinSuccessModal({
           const totalUnits = BigInt(poolData.totalUnits || "0");
           const memberUnits = BigInt(member.units || "0");
 
-          if (totalUnits > 0n) {
+          if (totalUnits > 0n && memberUnits > 0n) {
             const percentage = (Number(memberUnits) * 100) / Number(totalUnits);
             const totalFlowRate = Number(
               formatUnits(BigInt(poolData.flowRate), 18)
@@ -145,11 +149,6 @@ export function CheckinSuccessModal({
             const userFlowRate = totalFlowRate * (percentage / 100);
             const flowRatePerDay = userFlowRate * 86400;
 
-            console.log(
-              `[CheckinSuccessModal] Flow rate: ${flowRatePerDay.toFixed(
-                4
-              )} STREME/day`
-            );
             setFlowRate(flowRatePerDay.toFixed(4));
             setIsConnectedToPool(true);
           } else {
@@ -159,6 +158,8 @@ export function CheckinSuccessModal({
           // No member found, not connected to pool
           setIsConnectedToPool(false);
         }
+      } else {
+        setIsConnectedToPool(false);
       }
     } catch (error) {
       console.error(
@@ -170,7 +171,7 @@ export function CheckinSuccessModal({
 
   // Trigger confetti effect when modal opens (only once per open)
   useEffect(() => {
-    if (isOpen && dropAmount && !hasTriggeredEffects) {
+    if (isOpen && !hasTriggeredEffects) {
       setHasTriggeredEffects(true);
 
       // Fire confetti once
@@ -181,15 +182,12 @@ export function CheckinSuccessModal({
         colors: ["#8b5cf6", "#3b82f6", "#60a5fa"],
       });
 
-      console.log(
-        "[CheckinSuccessModal] Modal opened with drop amount:",
-        dropAmount
-      );
+      console.log("[CheckinSuccessModal] Modal opened with drop amount: 1000");
 
       // Trigger balance refresh to show the updated amount
       fetchBalanceData();
     }
-  }, [isOpen, dropAmount, hasTriggeredEffects]);
+  }, [isOpen, hasTriggeredEffects]);
 
   // Fetch balance data when modal opens or when address changes
   useEffect(() => {
@@ -306,38 +304,38 @@ ${shareUrl}`;
 
         <h2 className="text-xl font-bold mb-4">Success!</h2>
 
-        {dropAmount && (
-          <div className="rounded p-2 mb-6">
-            <p className="font-semibold text-primary"></p>
-            <p className="text-sm text-base-content/70">
-              {dropAmount}{" "}
-              <span
-                className="relative inline-block group"
-                onMouseEnter={() => setShowInfo(true)}
-                onMouseLeave={() => setShowInfo(false)}
-              >
-                <span className="underline decoration-dotted cursor-help">
-                  staked $STREME
+        <div className="rounded p-2 mb-6">
+          <p className="font-semibold text-primary"></p>
+          <p className="text-sm text-base-content/70">
+            1000{" "}
+            <span
+              className="relative inline-block group"
+              onMouseEnter={() => setShowInfo(true)}
+              onMouseLeave={() => setShowInfo(false)}
+            >
+              <span className="underline decoration-dotted cursor-help">
+                staked $STREME
+              </span>
+              {showInfo && (
+                <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-3 bg-base-300 border border-base-500 rounded-lg shadow-lg text-left text-sm z-10">
+                  Staked $STREME qualifies you for a rewards flow. Buy and stake
+                  more to increase your flow rate!
                 </span>
-                {showInfo && (
-                  <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-3 bg-base-300 border border-base-500 rounded-lg shadow-lg text-left text-sm z-10">
-                    Staked $STREME qualifies you for a rewards flow. Buy and
-                    stake more to increase your flow rate!
-                  </span>
-                )}
-              </span>{" "}
-              sent to your wallet!
-            </p>
-          </div>
-        )}
+              )}
+            </span>{" "}
+            sent to your wallet!
+          </p>
+        </div>
 
         {/* Balance Display */}
-        <div className="mb-6">
+        <div className="mb-10">
           <div className="text-xs text-base-content/60 mb-1">
             Your STREME Balance
           </div>
           <div className="text-2xl font-mono font-bold text-primary">
-            {currentBalance.toFixed(4)}
+            {Number(flowRate) > 0
+              ? currentBalance.toFixed(4)
+              : baseAmount.toFixed(4)}
           </div>
           {Number(flowRate) > 0 && (
             <div className="text-xs text-base-content/60 mt-1">
