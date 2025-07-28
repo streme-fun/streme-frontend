@@ -456,7 +456,7 @@ function App() {
               <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/30 transition-all duration-200">
                 <div className="relative h-24 bg-gradient-to-br from-primary/10 to-secondary/10 border-t border-base-300 flex items-center justify-center">
                   {/* Add hero animation mini as a background inside the card but behind the icon image */}
-                  <div className="absolute inset-0 opacity-30">
+                  <div className="absolute inset-0 opacity-50">
                     <HeroAnimationMini />
                   </div>
                   <Image
@@ -474,8 +474,8 @@ function App() {
                       Streme Marketing Fund
                     </p>
                     <p className="text-sm text-base-content/70 mb-3 mr-3">
-                      Contribute your staking rewards to help fund Streme marketing
-                      initiatives. Earn $SUP for your help!
+                      Contribute your staking rewards to help fund Streme
+                      marketing initiatives. Earn $SUP for your help!
                     </p>
                   </div>
                   <button className="btn btn-sm btn-primary">Join</button>
@@ -646,7 +646,7 @@ function App() {
             <Link href="/crowdfund">
               <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden max-w-md cursor-pointer hover:shadow-lg hover:border-primary/30 transition-all duration-200">
                 <div className="relative h-32 bg-gradient-to-br from-primary/10 to-secondary/10 border-t border-base-300 flex items-center justify-center">
-                  <div className="absolute inset-0 opacity-30">
+                  <div className="absolute inset-0 opacity-50">
                     <HeroAnimationMini />
                   </div>
                   <Image
@@ -664,8 +664,8 @@ function App() {
                       Streme Marketing Fund
                     </p>
                     <p className="text-sm text-base-content/70 mb-3">
-                      Contribute your staking rewards to help fund Streme marketing
-                      initiatives. Earn $SUP for your contribution.
+                      Contribute your staking rewards to help fund Streme
+                      marketing initiatives. Earn $SUP for your contribution.
                     </p>
                   </div>
                   <button className="btn btn-primary">Join</button>
