@@ -27,7 +27,6 @@ const gdaABI = [
   },
 ] as const;
 
-
 const toHex = (address: string) => address as `0x${string}`;
 
 interface StakeAllButtonProps {
@@ -115,7 +114,7 @@ export function StakeAllButton({
       }
 
       // Send all tokens directly to StakingHelper
-      toast.loading("Sending tokens to StakingHelper...", { id: toastId });
+      toast.loading("Staking tokens...", { id: toastId });
 
       const sendIface = new Interface([
         "function send(address recipient, uint256 amount, bytes userData) external",

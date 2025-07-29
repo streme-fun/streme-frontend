@@ -33,7 +33,6 @@ const gdaABI = [
 
 const toHex = (address: string) => address as `0x${string}`;
 
-
 interface StakeButtonProps {
   tokenAddress: string;
   stakingAddress: string;
@@ -68,10 +67,7 @@ export function StakeButton({
   const { address: wagmiAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
   const { wallets } = useWallets();
-  const {
-    address: fcAddress,
-    isConnected: fcIsConnected,
-  } = useAppFrameLogic();
+  const { address: fcAddress, isConnected: fcIsConnected } = useAppFrameLogic();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const postHog = usePostHog();
@@ -81,15 +77,14 @@ export function StakeButton({
 
   // Use explicit mini-app check with fallback to passed prop
   const isEffectivelyMiniApp = isMiniApp || false;
-  
-  const currentAddress = isEffectivelyMiniApp 
-    ? (farcasterAddress ?? fcAddress)
-    : wagmiAddress;
-  
-  const walletIsConnected = isEffectivelyMiniApp 
-    ? (farcasterIsConnected ?? fcIsConnected)
-    : !!wagmiAddress;
 
+  const currentAddress = isEffectivelyMiniApp
+    ? farcasterAddress ?? fcAddress
+    : wagmiAddress;
+
+  const walletIsConnected = isEffectivelyMiniApp
+    ? farcasterIsConnected ?? fcIsConnected
+    : !!wagmiAddress;
 
   const handleStake = async (amount: bigint) => {
     if (!currentAddress || !walletIsConnected) {
@@ -120,7 +115,7 @@ export function StakeButton({
         if (!ethProvider)
           throw new Error("Farcaster Ethereum provider not available.");
 
-        toast.loading("Sending tokens to StakingHelper...", { id: toastId });
+        toast.loading("Staking tokens...", { id: toastId });
         const sendIface = new Interface([
           "function send(address recipient, uint256 amount, bytes userData) external",
         ]);
@@ -154,10 +149,10 @@ export function StakeButton({
         });
         if (stakeReceipt.status !== "success")
           throw new Error("Stake transaction failed");
-        
+
         // Submit referral to Divvi
         await submitDivviReferral(stakeTxHash, 8453); // Base L2 chain ID
-        
+
         toast.success("Staking successful!", { id: toastId });
 
         if (
@@ -199,10 +194,10 @@ export function StakeButton({
             await publicClient.waitForTransactionReceipt({
               hash: connectTxHash,
             });
-            
+
             // Submit referral to Divvi
             await submitDivviReferral(connectTxHash, 8453); // Base L2 chain ID
-            
+
             toast.success("Connected to reward pool!", { id: toastId });
             onPoolConnect?.();
           }
@@ -231,34 +226,36 @@ export function StakeButton({
           });
         }
 
-        toast.loading("Sending tokens to StakingHelper...", { id: toastId });
-        
+        toast.loading("Staking tokens...", { id: toastId });
+
         if (walletClient) {
           // Use wagmi wallet client for sending
           const { encodeFunctionData } = await import("viem");
-          const abi = [{
-            inputs: [
-              { name: "recipient", type: "address" },
-              { name: "amount", type: "uint256" },
-              { name: "userData", type: "bytes" },
-            ],
-            name: "send",
-            outputs: [],
-            stateMutability: "nonpayable",
-            type: "function",
-          }] as const;
-          
+          const abi = [
+            {
+              inputs: [
+                { name: "recipient", type: "address" },
+                { name: "amount", type: "uint256" },
+                { name: "userData", type: "bytes" },
+              ],
+              name: "send",
+              outputs: [],
+              stateMutability: "nonpayable",
+              type: "function",
+            },
+          ] as const;
+
           const sendData = encodeFunctionData({
             abi,
             functionName: "send",
             args: [toHex(STAKING_HELPER), amount, "0x"],
           });
-          
+
           const sendDataWithReferral = await appendReferralTag(
             sendData,
             toHex(currentAddress!)
           );
-          
+
           stakeTxHash = await walletClient.sendTransaction({
             to: toHex(tokenAddress),
             data: sendDataWithReferral,
@@ -291,7 +288,7 @@ export function StakeButton({
             ],
           });
         }
-        
+
         if (!stakeTxHash)
           throw new Error(
             "Stake transaction hash not received. User might have cancelled."
@@ -302,10 +299,10 @@ export function StakeButton({
         });
         if (stakeReceipt.status !== "success")
           throw new Error("Stake transaction failed");
-        
+
         // Submit referral to Divvi
         await submitDivviReferral(stakeTxHash, 8453); // Base L2 chain ID
-        
+
         toast.success("Staking successful!", { id: toastId });
 
         if (
@@ -320,32 +317,34 @@ export function StakeButton({
           });
           if (!connected) {
             toast.loading("Connecting to reward pool...", { id: toastId });
-            
+
             if (walletClient) {
               // Use wagmi wallet client for pool connection
               const { encodeFunctionData } = await import("viem");
-              const abi = [{
-                inputs: [
-                  { name: "pool", type: "address" },
-                  { name: "userData", type: "bytes" },
-                ],
-                name: "connectPool",
-                outputs: [{ name: "", type: "bool" }],
-                stateMutability: "nonpayable",
-                type: "function",
-              }] as const;
-              
+              const abi = [
+                {
+                  inputs: [
+                    { name: "pool", type: "address" },
+                    { name: "userData", type: "bytes" },
+                  ],
+                  name: "connectPool",
+                  outputs: [{ name: "", type: "bool" }],
+                  stateMutability: "nonpayable",
+                  type: "function",
+                },
+              ] as const;
+
               const connectData = encodeFunctionData({
                 abi,
                 functionName: "connectPool",
                 args: [toHex(stakingPoolAddress), "0x"],
               });
-              
+
               const connectDataWithReferral = await appendReferralTag(
                 connectData,
                 toHex(currentAddress!)
               );
-              
+
               connectTxHash = await walletClient.sendTransaction({
                 to: toHex(GDA_FORWARDER),
                 data: connectDataWithReferral,
@@ -377,16 +376,16 @@ export function StakeButton({
                 ],
               });
             }
-            
+
             if (!connectTxHash)
               throw new Error("Pool connection transaction hash not received.");
             await publicClient.waitForTransactionReceipt({
               hash: connectTxHash,
             });
-            
+
             // Submit referral to Divvi
             await submitDivviReferral(connectTxHash, 8453); // Base L2 chain ID
-            
+
             toast.success("Connected to reward pool!", { id: toastId });
             onPoolConnect?.();
           }
@@ -409,7 +408,9 @@ export function StakeButton({
         [ANALYTICS_PROPERTIES.HAS_POOL_CONNECTION]:
           !!stakingPoolAddress &&
           stakingPoolAddress !== "0x0000000000000000000000000000000000000000",
-        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isEffectivelyMiniApp ? "farcaster" : "privy",
+        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isEffectivelyMiniApp
+          ? "farcaster"
+          : "privy",
       });
     } catch (error: unknown) {
       console.error("StakeButton caught error:", error);

@@ -39,7 +39,8 @@ src/
 - CFA V1 Forwarder: `0xcfA132E353cB4E398080B9700609bb008eceB125`
 - GDA V1 Forwarder: `0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08`
 - STREME Super Token: `0x3B3Cd21242BA44e9865B066e5EF5d1cC1030CC58`
-- STREME Staking Pool: `0xcbc2caf425f8cdca774128b3d14de37f2224b964`
+- STREME Staking Pool: `0xa040a8564c433970d7919c441104b1d25b9eaa1c`
+- STREME Staking Address: `0x93419f1c0f73b278c73085c17407794a6580deff`
 - STREME Staking Rewards Funder: (Address in useStremeStakingContract)
 - Staking Helper: `0x1738e0Fed480b04968A3B7b14086EAF4fDB685A3` (Direct send() for auto-staking)
 - Macro Forwarder: `0xFD0268E33111565dE546af2675351A4b1587F89F` (Deprecated)
@@ -67,8 +68,8 @@ src/
 - `useCFAFlowRate` - User's net CFA flow rate (incoming - outgoing)
 - `useStreamingNumber` - Animated number display for streaming values
 - `useDistributionPool` - GDA pool management
-- `useCheckin` - Daily check-in functionality
-- `useCheckinModal` - Check-in modal state management (includes `fetchBalanceData` for refreshing)
+- `useCheckin` - Daily check-in functionality (auto-claim after staking)
+- `useCheckinModal` - Check-in modal state management
 - `useStremeStakingContract` - STREME staking operations (deposit, withdraw, approve)
 - `useBestFriendsStreaming` - Farcaster best friends integration
 
@@ -249,6 +250,8 @@ Enable debug mode by clicking the floating button in development.
 - Mini-app transactions: ALWAYS include `chainId: "0x2105"` in `eth_sendTransaction` calls
 - CFA streams: Don't have automatic end dates - require manual termination or Flow Scheduler
 - Mini-app detection: Use `clientFid` presence and other robust checks to prevent browser wallet interference
+- Checkin flow: Users with STREME balance must stake before claiming daily rewards (enforced in CheckinModal)
+- STREME staking: Direct send to StakingHelper (0x1738e0Fed480b04968A3B7b14086EAF4fDB685A3) auto-stakes tokens
 
 # Troubleshooting
 
@@ -265,6 +268,7 @@ Enable debug mode by clicking the floating button in development.
 ## Balance Issues
 - **Streaming balance shows 0**: Use `balanceOf` instead of `realtimeBalanceOfNow` for actual balance
 - **Animation not updating**: Check `useStreamingNumber` configuration and flow rate calculations
+- **CheckinSuccessModal flow rate wrong**: Ensure STREME staking pool address matches token data (0xa040a8564c433970d7919c441104b1d25b9eaa1c)
 
 ## Token Display Issues
 - **Duplicate tokens in /tokens page**: 

@@ -78,6 +78,17 @@ export function CheckinModal({
   // Fetch STREME balance when modal opens
   useEffect(() => {
     const fetchStremeBalance = async () => {
+      console.log("CheckinModal: Checking balance fetch conditions", {
+        effectiveIsConnected,
+        effectiveAddress,
+        isOpen,
+        isMiniAppView,
+        fcIsConnected,
+        fcAddress,
+        wagmiIsConnected,
+        wagmiAddress
+      });
+      
       if (!effectiveIsConnected || !effectiveAddress || !isOpen) return;
 
       setIsCheckingBalance(true);
@@ -96,7 +107,13 @@ export function CheckinModal({
           functionName: "balanceOf",
           args: [effectiveAddress as `0x${string}`],
         });
-        setStremeBalance(balance as bigint);
+        const balanceResult = balance as bigint;
+        console.log("CheckinModal: STREME balance fetched", {
+          address: effectiveAddress,
+          balance: balanceResult.toString(),
+          balanceFormatted: (Number(balanceResult) / 1e18).toFixed(4)
+        });
+        setStremeBalance(balanceResult);
       } catch (error) {
         console.error("Error fetching STREME balance:", error);
         setStremeBalance(0n);
@@ -131,14 +148,17 @@ export function CheckinModal({
   };
 
   const handleStakeSuccess = async () => {
+    console.log("CheckinModal: Stake successful, starting auto-claim process");
     try {
       // Refresh balance after successful staking
       setStremeBalance(0n); // Reset since they just staked it all
       
       // Automatically trigger the claim after successful staking
+      console.log("CheckinModal: Triggering onCheckin for auto-claim");
       await onCheckin();
       
       // Close the modal - the success modal will show automatically
+      console.log("CheckinModal: Auto-claim successful, closing modal");
       onClose();
     } catch (error) {
       console.error("Auto-claim after staking failed:", error);

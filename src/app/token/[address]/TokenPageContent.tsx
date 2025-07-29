@@ -11,6 +11,7 @@ import sdk from "@farcaster/miniapp-sdk";
 import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
 import { StakerLeaderboard } from "@/src/components/StakerLeaderboard";
 import { StakerLeaderboardEmbed } from "@/src/components/StakerLeaderboardEmbed";
+import { ClaimFeesButton } from "@/src/components/ClaimFeesButton";
 
 // Interface for GeckoTerminal market data
 interface GeckoTerminalData {
@@ -334,6 +335,14 @@ ${shareUrl}`;
             farcasterIsConnected={isConnected}
             tokenPrice={token.price}
             userStakedBalance={userStakedBalance}
+          />
+
+          {/* Claim Fees Button */}
+          <ClaimFeesButton
+            tokenAddress={token.contract_address}
+            isMiniApp={isMiniAppView}
+            farcasterAddress={address}
+            farcasterIsConnected={isConnected}
           />
         </div>
 
