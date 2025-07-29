@@ -506,11 +506,21 @@ function AppContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function ClientLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// Mini-app specific layout (no Privy)
+function MiniAppLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <FrameProvider>
+      <WagmiProvider>
+        <TokenDataProvider>
+          <AppContent>{children}</AppContent>
+        </TokenDataProvider>
+      </WagmiProvider>
+    </FrameProvider>
+  );
+}
+
+// Browser layout (with Privy)
+function BrowserLayout({ children }: { children: React.ReactNode }) {
   return (
     <PrivyProviderWrapper>
       <FrameProvider>
@@ -522,4 +532,79 @@ export default function ClientLayout({
       </FrameProvider>
     </PrivyProviderWrapper>
   );
+}
+
+// Environment detection component
+function EnvironmentDetector({ children }: { children: React.ReactNode }) {
+  const [isMiniApp, setIsMiniApp] = useState<boolean | null>(null);
+  const [isDetecting, setIsDetecting] = useState(true);
+
+  useEffect(() => {
+    const detectEnvironment = async () => {
+      try {
+        console.log("🔍 Detecting environment...");
+
+        // Quick iframe detection
+        const quickDetection =
+          typeof window !== "undefined" &&
+          !window.location.hostname.includes("localhost") &&
+          !window.location.hostname.includes("127.0.0.1") &&
+          (window.parent !== window ||
+            window.location !== window.parent.location);
+
+        console.log("Quick detection result:", quickDetection);
+
+        if (quickDetection) {
+          // Try Farcaster SDK detection
+          try {
+            const sdk = await import("@farcaster/miniapp-sdk");
+            const isFarcasterMiniApp = await sdk.default.isInMiniApp();
+            console.log("Farcaster SDK detection result:", isFarcasterMiniApp);
+            setIsMiniApp(isFarcasterMiniApp);
+          } catch (error) {
+            console.warn(
+              "Farcaster SDK detection failed, using fallback:",
+              error
+            );
+            setIsMiniApp(quickDetection);
+          }
+        } else {
+          setIsMiniApp(false);
+        }
+      } catch (error) {
+        console.error("Environment detection error:", error);
+        setIsMiniApp(false);
+      } finally {
+        setIsDetecting(false);
+      }
+    };
+
+    detectEnvironment();
+  }, []);
+
+  // Show loading during detection
+  if (isDetecting || isMiniApp === null) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  console.log(`🎯 Environment detected: ${isMiniApp ? "Mini-app" : "Browser"}`);
+
+  // Render appropriate layout
+  return isMiniApp ? (
+    <MiniAppLayout>{children}</MiniAppLayout>
+  ) : (
+    <BrowserLayout>{children}</BrowserLayout>
+  );
+}
+
+export default function ClientLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <EnvironmentDetector>{children}</EnvironmentDetector>;
 }

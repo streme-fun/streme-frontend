@@ -28,6 +28,6 @@ export const CHECKIN_MESSAGES = {
 export const BUTTON_TEXT = {
   CLAIMING: "Claiming...",
   ALREADY_CLAIMED: "Already Claimed",
-  CLAIM: "CLAIM",
-  STAKE: "STAKE & CLAIM",
+  CLAIM: "Claim",
+  STAKE: "Stake & Claim",
 } as const;
