@@ -8,7 +8,7 @@ import type { Context as FarcasterContextType } from "@farcaster/miniapp-core";
 import sdk from "@farcaster/miniapp-sdk";
 
 // Global detection state to prevent multiple detection calls
-let globalDetectionState: {
+const globalDetectionState: {
   isDetecting: boolean;
   isComplete: boolean;
   result: boolean;

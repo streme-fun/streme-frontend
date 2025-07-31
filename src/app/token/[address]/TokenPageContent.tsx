@@ -340,9 +340,6 @@ ${shareUrl}`;
           {/* Claim Fees Button */}
           <ClaimFeesButton
             tokenAddress={token.contract_address}
-            isMiniApp={isMiniAppView}
-            farcasterAddress={address}
-            farcasterIsConnected={isConnected}
           />
         </div>
 
