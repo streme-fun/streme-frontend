@@ -12,9 +12,6 @@ interface SwapModalProps {
   onClose: () => void;
   token: Token;
   onSuccess?: () => void;
-  isMiniApp?: boolean;
-  farcasterAddress?: `0x${string}` | undefined;
-  farcasterIsConnected?: boolean;
 }
 
 export function SwapModal({
@@ -22,9 +19,6 @@ export function SwapModal({
   onClose,
   token,
   onSuccess,
-  isMiniApp,
-  farcasterAddress,
-  farcasterIsConnected,
 }: SwapModalProps) {
   // Trading interface state
   const [tradeDirection, setTradeDirection] = useState<"buy" | "sell">("buy");
@@ -326,9 +320,6 @@ export function SwapModal({
           quote={priceQuote}
           symbol={token.symbol}
           onSuccess={handleSuccess}
-          isMiniApp={isMiniApp}
-          farcasterAddress={farcasterAddress}
-          farcasterIsConnected={farcasterIsConnected}
           disabled={
             !tradeAmount ||
             parseFloat(tradeAmount) <= 0 ||

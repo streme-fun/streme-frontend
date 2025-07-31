@@ -316,9 +316,6 @@ ${shareUrl}`;
             stakingPool={token.staking_pool}
             symbol={token.symbol}
             tokenAddress={token.contract_address}
-            isMiniApp={isMiniAppView}
-            farcasterAddress={address}
-            farcasterIsConnected={isConnected}
             key={stakingUpdateTrigger}
           />
 
@@ -330,9 +327,6 @@ ${shareUrl}`;
             stakingAddress={token.staking_address}
             onViewAll={() => setIsStakerLeaderboardOpen(true)}
             onStakingChange={handleStakingChange}
-            isMiniApp={isMiniAppView}
-            farcasterAddress={address}
-            farcasterIsConnected={isConnected}
             tokenPrice={token.price}
             userStakedBalance={userStakedBalance}
           />

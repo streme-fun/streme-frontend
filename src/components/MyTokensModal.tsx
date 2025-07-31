@@ -1767,9 +1767,6 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                 !stake.stakingAddress
                               }
                               className="btn btn-outline btn-sm w-full"
-                              isMiniApp={isMiniAppView}
-                              farcasterAddress={effectiveAddress}
-                              farcasterIsConnected={effectiveIsConnected}
                             />
                           </div>
                         ) : stake.stakingAddress === "" ? (

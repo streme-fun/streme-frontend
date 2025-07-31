@@ -4,9 +4,9 @@ import { useState } from "react";
 import { parseEther } from "viem";
 import { toast } from "sonner";
 import { publicClient } from "@/src/lib/viemClient";
-import sdk from "@farcaster/miniapp-sdk";
-import { useAccount, useWalletClient } from "wagmi";
+import { useWalletClient } from "wagmi";
 import confetti from "canvas-confetti";
+import { useWallet } from "@/src/hooks/useWallet";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { Interface } from "@ethersproject/abi";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
@@ -22,9 +22,6 @@ interface SwapButtonProps {
   } | null;
   symbol: string;
   onSuccess?: () => void;
-  isMiniApp?: boolean;
-  farcasterAddress?: string;
-  farcasterIsConnected?: boolean;
   className?: string;
   disabled?: boolean;
 }
@@ -36,30 +33,13 @@ export function SwapButton({
   quote,
   symbol,
   onSuccess,
-  isMiniApp,
-  farcasterAddress,
-  farcasterIsConnected,
   className,
   disabled,
 }: SwapButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const { address, isConnected, isMiniApp } = useWallet();
   const { data: walletClient } = useWalletClient();
-  const { address: wagmiAddress } = useAccount();
-  const {
-    address: fcAddress,
-    isConnected: fcIsConnected,
-  } = useAppFrameLogic();
-
-  // Use explicit mini-app check with fallback to passed prop
-  const isEffectivelyMiniApp = isMiniApp || false;
-  
-  const currentAddress = isEffectivelyMiniApp 
-    ? (farcasterAddress ?? fcAddress)
-    : wagmiAddress;
-  
-  const walletIsConnected = isEffectivelyMiniApp 
-    ? (farcasterIsConnected ?? fcIsConnected)
-    : !!wagmiAddress;
+  const { getSafeEthereumProvider } = useAppFrameLogic();
 
   // Confetti function for celebrations
   const triggerConfetti = () => {
@@ -72,7 +52,7 @@ export function SwapButton({
   };
 
   const performSwap = async () => {
-    if (!currentAddress || !walletIsConnected || !amount || !quote) {
+    if (!address || !isConnected || !amount || !quote) {
       toast.error("Missing required data for swap");
       return;
     }
@@ -123,11 +103,11 @@ export function SwapButton({
     spenderAddress: string,
     requiredAmount: string
   ) => {
-    if (!currentAddress) {
+    if (!address) {
       throw new Error("Wallet not available");
     }
 
-    if (!walletClient && !isEffectivelyMiniApp) {
+    if (!walletClient && !isMiniApp) {
       throw new Error("Wallet client not available");
     }
 
@@ -148,7 +128,7 @@ export function SwapButton({
       ],
       functionName: "allowance",
       args: [
-        currentAddress as `0x${string}`,
+        address as `0x${string}`,
         spenderAddress as `0x${string}`,
       ],
     });
@@ -163,8 +143,8 @@ export function SwapButton({
     // Set approval for the required amount
     let approvalTxHash: `0x${string}`;
     
-    if (isEffectivelyMiniApp) {
-      const ethProvider = await sdk.wallet.getEthereumProvider();
+    if (isMiniApp) {
+      const ethProvider = await getSafeEthereumProvider();
       if (!ethProvider) {
         throw new Error("Farcaster Ethereum provider not available.");
       }
@@ -179,7 +159,7 @@ export function SwapButton({
       
       const approveDataWithReferral = await appendReferralTag(
         approveData as `0x${string}`,
-        currentAddress as `0x${string}`
+        address as `0x${string}`
       );
       
       approvalTxHash = await ethProvider.request({
@@ -187,7 +167,7 @@ export function SwapButton({
         params: [
           {
             to: tokenAddress as `0x${string}`,
-            from: currentAddress as `0x${string}`,
+            from: address as `0x${string}`,
             data: approveDataWithReferral,
             chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
           },
@@ -216,13 +196,13 @@ export function SwapButton({
       
       const approveDataWithReferral = await appendReferralTag(
         approveData,
-        currentAddress as `0x${string}`
+        address as `0x${string}`
       );
       
       approvalTxHash = await walletClient!.sendTransaction({
         to: tokenAddress as `0x${string}`,
         data: approveDataWithReferral,
-        account: currentAddress as `0x${string}`,
+        account: address as `0x${string}`,
         chain: undefined,
       });
     }
@@ -235,7 +215,7 @@ export function SwapButton({
   };
 
   const performRegularSwap = async (toastId: string | number) => {
-    if (!currentAddress) {
+    if (!address) {
       throw new Error("Wallet not available");
     }
 
@@ -269,7 +249,7 @@ export function SwapButton({
           },
         ],
         functionName: "balanceOf",
-        args: [currentAddress as `0x${string}`],
+        args: [address as `0x${string}`],
       });
 
       const parsedAmount = parseEther(amount);
@@ -295,7 +275,7 @@ export function SwapButton({
       sellToken,
       buyToken,
       sellAmount,
-      taker: currentAddress,
+      taker: address,
     });
 
     const quoteResponse = await fetch(`/api/quote?${quoteParams.toString()}`);
@@ -378,7 +358,7 @@ export function SwapButton({
     // Append Divvi referral tag to transaction data
     transactionData = await appendReferralTag(
       transactionData as `0x${string}`,
-      currentAddress as `0x${string}`
+      address as `0x${string}`
     );
 
     toast.loading(
@@ -397,8 +377,8 @@ export function SwapButton({
 
     let txHash: `0x${string}`;
 
-    if (isEffectivelyMiniApp) {
-      const ethProvider = await sdk.wallet.getEthereumProvider();
+    if (isMiniApp) {
+      const ethProvider = await getSafeEthereumProvider();
       if (!ethProvider)
         throw new Error("Farcaster Ethereum provider not available.");
 
@@ -407,7 +387,7 @@ export function SwapButton({
         params: [
           {
             to: quoteData.transaction.to,
-            from: currentAddress as `0x${string}`,
+            from: address as `0x${string}`,
             data: transactionData,
             value: `0x${BigInt(quoteData.transaction.value || "0").toString(
               16
@@ -483,11 +463,11 @@ export function SwapButton({
     !amount ||
     parseFloat(amount) <= 0 ||
     !quote?.liquidityAvailable ||
-    !walletIsConnected;
+    !isConnected;
 
   return (
     <button onClick={performSwap} disabled={isDisabled} className={className}>
-      {isLoading ? "Processing..." : !walletIsConnected ? "Wallet not available" : "Place Trade"}
+      {isLoading ? "Processing..." : !isConnected ? "Wallet not available" : "Place Trade"}
     </button>
   );
 }

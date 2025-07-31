@@ -1,19 +1,16 @@
 "use client";
 
-import { useAccount } from "wagmi";
 import { formatUnits } from "viem";
 import { useState, useEffect } from "react";
 import { publicClient } from "@/src/lib/viemClient"; // Import the centralized client
 import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
+import { useWallet } from "@/src/hooks/useWallet";
 
 interface StakedBalanceProps {
   stakingAddress: string;
   stakingPool: string;
   symbol: string;
   tokenAddress: string;
-  isMiniApp?: boolean;
-  farcasterAddress?: `0x${string}` | undefined;
-  farcasterIsConnected?: boolean;
 }
 
 interface PoolData {
@@ -29,11 +26,8 @@ export function StakedBalance({
   stakingPool,
   symbol,
   tokenAddress,
-  isMiniApp,
-  farcasterAddress,
-  farcasterIsConnected,
 }: StakedBalanceProps) {
-  const { address: wagmiAddress } = useAccount();
+  const { address, isConnected } = useWallet();
   const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
   const [poolPercentage, setPoolPercentage] = useState<string>("0");
   const [flowRate, setFlowRate] = useState<string>("0");
@@ -41,11 +35,6 @@ export function StakedBalance({
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
-
-  const effectiveIsConnected = isMiniApp
-    ? farcasterIsConnected
-    : !!wagmiAddress;
-  const effectiveAddress = isMiniApp ? farcasterAddress : wagmiAddress;
 
   // Use streaming number hook for animated balance
   const currentBalance = useStreamingNumber({
@@ -72,8 +61,8 @@ export function StakedBalance({
 
   useEffect(() => {
     if (
-      !effectiveIsConnected ||
-      !effectiveAddress ||
+      !isConnected ||
+      !address ||
       !stakingAddress ||
       !stakingPool
     )
@@ -90,7 +79,7 @@ export function StakedBalance({
       try {
         setLastFetchTime(now);
         console.log(
-          `[StakedBalance] Fetching balance for ${effectiveAddress} at ${new Date(
+          `[StakedBalance] Fetching balance for ${address} at ${new Date(
             now
           ).toLocaleTimeString()}`
         );
@@ -108,7 +97,7 @@ export function StakedBalance({
             },
           ],
           functionName: "balanceOf",
-          args: [effectiveAddress as `0x${string}`],
+          args: [address as `0x${string}`],
         });
         setStakedBalance(staked as bigint);
 
@@ -125,7 +114,7 @@ export function StakedBalance({
             },
           ],
           functionName: "balanceOf",
-          args: [effectiveAddress as `0x${string}`],
+          args: [address as `0x${string}`],
         });
 
         const formattedReceived = Number(formatUnits(received as bigint, 18));
@@ -144,7 +133,7 @@ export function StakedBalance({
               totalUnits
               flowRate
               poolMembers(where: {account_: {id: "${
-                effectiveAddress?.toLowerCase() || ""
+                address?.toLowerCase() || ""
               }"}}) {
                 units
               }
@@ -213,8 +202,8 @@ export function StakedBalance({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [
-    effectiveIsConnected,
-    effectiveAddress,
+    isConnected,
+    address,
     stakingAddress,
     stakingPool,
     tokenAddress,
@@ -231,7 +220,7 @@ export function StakedBalance({
   }, [refresh]);
 
   // Don't render anything if wallet is not connected or address is missing
-  if (!effectiveIsConnected || !effectiveAddress) return null;
+  if (!isConnected || !address) return null;
 
   const formattedBalance = Number(formatUnits(stakedBalance, 18)).toFixed(4);
   const formattedReceived = currentBalance.toFixed(4);

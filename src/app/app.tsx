@@ -20,6 +20,7 @@ import Image from "next/image";
 import { CheckinModal } from "../components/CheckinModal";
 import { CheckinSuccessModal } from "../components/CheckinSuccessModal";
 import { useCheckinModal } from "../hooks/useCheckinModal";
+import sdk from "@farcaster/miniapp-sdk";
 
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -275,6 +276,14 @@ function App() {
     hasShownTutorialThisSession,
     postHog,
   ]);
+
+  // Call ready when the mini-app is fully loaded and initialized
+  useEffect(() => {
+    if (isMiniAppView && isSDKLoaded && !loading) {
+      console.log("🟢 Mini-app fully loaded, calling sdk.actions.ready()");
+      sdk.actions.ready();
+    }
+  }, [isMiniAppView, isSDKLoaded, loading]);
 
   // Auto-connect to Farcaster wallet if not connected in mini app context
   useEffect(() => {

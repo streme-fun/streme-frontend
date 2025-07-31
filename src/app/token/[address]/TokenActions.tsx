@@ -699,9 +699,6 @@ export function TokenActions({
                 // Reset to appropriate default based on trade direction
                 setTradeAmount(tradeDirection === "buy" ? "0.001" : "");
               }}
-              isMiniApp={isEffectivelyMiniApp}
-              farcasterAddress={currentAddress}
-              farcasterIsConnected={!!walletIsConnected}
               disabled={!validation.isValid}
               className={`w-full btn ${
                 tradeDirection === "buy"
@@ -758,9 +755,6 @@ export function TokenActions({
           disabled={stakedBalance === 0n || !stakingAddress}
           symbol={token.symbol}
           className="btn btn-outline border-base-300 hover:border-base-400 text-base-content hover:text-base-content bg-base-100 hover:bg-base-200 w-full disabled:border-base-200 disabled:text-base-content/40 disabled:bg-base-100"
-          isMiniApp={isEffectivelyMiniApp}
-          farcasterAddress={currentAddress}
-          farcasterIsConnected={!!walletIsConnected}
         />
 
         {/* Pool Connection Status Indicator */}

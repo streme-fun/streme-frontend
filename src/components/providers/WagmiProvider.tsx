@@ -85,51 +85,115 @@ const queryClient = new QueryClient();
 // Inner provider that handles wallet management
 function WagmiProviderInner({ children, isMiniApp }: { children: React.ReactNode; isMiniApp: boolean }) {
   const hasDisconnectedRef = useRef(false);
+  const walletMonitorRef = useRef<NodeJS.Timeout | null>(null);
   const { disconnect } = useDisconnect();
   const { address, connector } = useAccount();
   const connections = useConnections();
 
-  // Disconnect non-Farcaster wallets when mini-app is first loaded
+  // Aggressive disconnect logic for mini-app context
   useEffect(() => {
     if (isMiniApp && !hasDisconnectedRef.current) {
-      console.log("🔌 Mini-app context, will disconnect browser wallets after delay...");
+      console.log("🔌 Mini-app context detected, implementing wallet isolation...");
       hasDisconnectedRef.current = true;
       
-      // Delay to ensure wagmi is fully initialized
-      const timeoutId = setTimeout(() => {
+      // Initial disconnect after delay
+      const initialTimeoutId = setTimeout(() => {
         const nonFarcasterConnections = connections.filter(
           connection => connection.connector.id !== 'farcasterMiniApp'
         );
         
         if (nonFarcasterConnections.length > 0) {
-          console.log(`Disconnecting ${nonFarcasterConnections.length} non-Farcaster wallets`);
+          console.log(`🔌 Disconnecting ${nonFarcasterConnections.length} browser wallets`);
           nonFarcasterConnections.forEach((connection) => {
-            console.log(`Disconnecting: ${connection.connector.id}`);
+            console.log(`🔌 Disconnecting: ${connection.connector.id}`);
             disconnect({ connector: connection.connector });
           });
         }
 
         // Also check current connector
         if (connector && connector.id !== 'farcasterMiniApp' && address) {
-          console.log(`Disconnecting current non-Farcaster connector: ${connector.id}`);
+          console.log(`🔌 Disconnecting current browser connector: ${connector.id}`);
           disconnect();
         }
-      }, 500); // Longer delay to ensure stability
+      }, 500);
+
+      // Set up continuous monitoring to prevent browser wallet reconnections
+      walletMonitorRef.current = setInterval(() => {
+        if (isMiniApp) {
+          const activeBrowserConnections = connections.filter(
+            connection => connection.connector.id !== 'farcasterMiniApp' && connection.accounts.length > 0
+          );
+          
+          if (activeBrowserConnections.length > 0) {
+            console.log(`🔌 Detected ${activeBrowserConnections.length} browser wallet reconnections, disconnecting...`);
+            activeBrowserConnections.forEach((connection) => {
+              console.log(`🔌 Auto-disconnecting: ${connection.connector.id}`);
+              disconnect({ connector: connection.connector });
+            });
+          }
+        }
+      }, 2000); // Check every 2 seconds
       
-      return () => clearTimeout(timeoutId);
+      return () => {
+        clearTimeout(initialTimeoutId);
+        if (walletMonitorRef.current) {
+          clearInterval(walletMonitorRef.current);
+        }
+      };
     }
-  }, [isMiniApp]); // Only run when isMiniApp changes
+    
+    // Clean up monitor when switching back to browser mode
+    if (!isMiniApp && walletMonitorRef.current) {
+      clearInterval(walletMonitorRef.current);
+      walletMonitorRef.current = null;
+    }
+  }, [isMiniApp, connections, disconnect, connector, address]);
 
   // Log connection state changes for debugging
   useEffect(() => {
-    console.log("🔄 Wallet connection state:", {
-      context: isMiniApp ? "Mini-App" : "Browser",
-      address: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "none",
-      connector: connector?.id || "none",
-      connectionsCount: connections.length,
-      connectionTypes: connections.map(c => c.connector.id),
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log("🔄 Wallet connection state:", {
+        context: isMiniApp ? "Mini-App" : "Browser",
+        address: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "none",
+        connector: connector?.id || "none",
+        connectionsCount: connections.length,
+        connectionTypes: connections.map(c => c.connector.id),
+        activeConnections: connections.filter(c => c.accounts.length > 0).map(c => c.connector.id),
+      });
+    }
   }, [isMiniApp, address, connector, connections]);
+
+  // Add global event listeners to prevent browser wallet auto-connections in mini-app
+  useEffect(() => {
+    if (isMiniApp) {
+      const preventBrowserWalletConnection = (event: Event) => {
+        // Try to prevent browser wallet injection events
+        if (event.type === 'ethereum#initialized' || event.type === 'eip6963:announceProvider') {
+          console.log("🔌 Preventing browser wallet initialization in mini-app context");
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      };
+
+      // Listen for common browser wallet events
+      window.addEventListener('ethereum#initialized', preventBrowserWalletConnection);
+      window.addEventListener('eip6963:announceProvider', preventBrowserWalletConnection);
+
+      return () => {
+        window.removeEventListener('ethereum#initialized', preventBrowserWalletConnection);
+        window.removeEventListener('eip6963:announceProvider', preventBrowserWalletConnection);
+      };
+    }
+  }, [isMiniApp]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (walletMonitorRef.current) {
+        clearInterval(walletMonitorRef.current);
+      }
+    };
+  }, []);
 
   // Provide mini-app context to children
   return (

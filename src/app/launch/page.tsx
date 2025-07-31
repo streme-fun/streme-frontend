@@ -4,9 +4,18 @@ import { CreateForm } from "./CreateForm";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import sdk from "@farcaster/miniapp-sdk";
 import Image from "next/image";
+import { useEffect } from "react";
 
 export default function LaunchPage() {
   const { isMiniAppView, isSDKLoaded } = useAppFrameLogic();
+
+  // Call ready when the component is fully loaded in mini app view
+  useEffect(() => {
+    if (isMiniAppView && isSDKLoaded) {
+      console.log("🟢 Launch page ready, calling sdk.actions.ready()");
+      sdk.actions.ready();
+    }
+  }, [isMiniAppView, isSDKLoaded]);
 
   const handleCreateWithCast = async () => {
     const castText = `@streme Launch a token for me

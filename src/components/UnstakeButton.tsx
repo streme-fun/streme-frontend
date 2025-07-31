@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useAccount, useWalletClient } from "wagmi";
+import { useWalletClient } from "wagmi";
 import { UnstakeModal } from "./UnstakeModal";
 import { publicClient } from "@/src/lib/viemClient";
 import { Interface } from "@ethersproject/abi";
-import sdk from "@farcaster/miniapp-sdk";
 import { toast } from "sonner";
 import { usePostHog } from "posthog-js/react";
+import { useWallet } from "@/src/hooks/useWallet";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { formatUnits } from "viem";
@@ -48,9 +48,6 @@ interface UnstakeButtonProps {
   className?: string;
   symbol: string;
   onSuccess?: () => void;
-  isMiniApp?: boolean;
-  farcasterAddress?: string;
-  farcasterIsConnected?: boolean;
 }
 
 export function UnstakeButton({
@@ -60,44 +57,27 @@ export function UnstakeButton({
   className,
   symbol,
   onSuccess,
-  isMiniApp,
-  farcasterAddress,
-  farcasterIsConnected,
 }: UnstakeButtonProps) {
-  const { address: wagmiAddress } = useAccount();
+  const { address, isConnected, isMiniApp } = useWallet();
   const { data: walletClient } = useWalletClient();
   const { wallets } = useWallets();
-  const {
-    address: fcAddress,
-    isConnected: fcIsConnected,
-  } = useAppFrameLogic();
+  const { getSafeEthereumProvider } = useAppFrameLogic();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unlockTime, setUnlockTime] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const postHog = usePostHog();
 
-  // Use explicit mini-app check with fallback to passed prop
-  const isEffectivelyMiniApp = isMiniApp || false;
-  
-  const currentAddress = isEffectivelyMiniApp 
-    ? (farcasterAddress ?? fcAddress)
-    : wagmiAddress;
-  
-  const walletIsConnected = isEffectivelyMiniApp 
-    ? (farcasterIsConnected ?? fcIsConnected)
-    : !!wagmiAddress;
-
   // Fetch unlock time when user has staked tokens
   const fetchUnlockTime = useCallback(async () => {
-    if (!walletIsConnected || !currentAddress) return;
+    if (!isConnected || !address) return;
 
     try {
       const timestamp = await publicClient.readContract({
         address: toHex(stakingAddress),
         abi: stakingAbiViem,
         functionName: "depositTimestamps",
-        args: [toHex(currentAddress)],
+        args: [toHex(address)],
       });
 
       const unlockTimeStamp = Number(timestamp) + 86400; // 24 hours in seconds
@@ -106,27 +86,27 @@ export function UnstakeButton({
       console.error("Error fetching unlock time:", error);
       // Don't show toast error for automatic fetching, only for manual clicks
     }
-  }, [currentAddress, walletIsConnected, stakingAddress]);
+  }, [address, isConnected, stakingAddress]);
 
   // Reset unlock time when address changes
   useEffect(() => {
     setUnlockTime(null);
-  }, [currentAddress, stakingAddress]);
+  }, [address, stakingAddress]);
 
   // Fetch unlock time automatically when user has staked tokens
   useEffect(() => {
     if (
       userStakedBalance > 0n &&
-      walletIsConnected &&
-      currentAddress &&
+      isConnected &&
+      address &&
       unlockTime === null
     ) {
       fetchUnlockTime();
     }
   }, [
     userStakedBalance,
-    walletIsConnected,
-    currentAddress,
+    isConnected,
+    address,
     unlockTime,
     fetchUnlockTime,
   ]);
@@ -182,7 +162,7 @@ export function UnstakeButton({
     : false;
 
   const handleUnstake = async (amount: bigint) => {
-    if (!currentAddress || !walletIsConnected) {
+    if (!address || !isConnected) {
       toast.error("Wallet not connected or address missing.");
       throw new Error("Wallet not connected or address missing.");
     }
@@ -192,8 +172,8 @@ export function UnstakeButton({
     try {
       let unstakeTxHash: `0x${string}` | undefined;
 
-      if (isEffectivelyMiniApp) {
-        const ethProvider = await sdk.wallet.getEthereumProvider();
+      if (isMiniApp) {
+        const ethProvider = await getSafeEthereumProvider();
         if (!ethProvider) {
           throw new Error("Farcaster Ethereum provider not available.");
         }
@@ -201,13 +181,13 @@ export function UnstakeButton({
         toast.info("Requesting unstake...", { id: toastId });
         const unstakeIface = new Interface(stakingAbiEthers);
         const unstakeData = unstakeIface.encodeFunctionData("unstake", [
-          toHex(currentAddress!),
+          toHex(address!),
           amount,
         ]);
         
         const unstakeDataWithReferral = await appendReferralTag(
           toHex(unstakeData),
-          toHex(currentAddress!)
+          toHex(address!)
         );
 
         unstakeTxHash = await ethProvider.request({
@@ -215,7 +195,7 @@ export function UnstakeButton({
           params: [
             {
               to: toHex(stakingAddress),
-              from: toHex(currentAddress!),
+              from: toHex(address!),
               data: unstakeDataWithReferral,
               chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
@@ -241,7 +221,7 @@ export function UnstakeButton({
         toast.success("Unstaking successful!", { id: toastId });
       } else {
         // Desktop/Mobile Path - use wagmi/privy for transaction
-        if (!currentAddress) {
+        if (!address) {
           throw new Error("Wallet not connected.");
         }
 
@@ -252,7 +232,7 @@ export function UnstakeButton({
           provider = walletClient;
         } else {
           // Fallback to Privy wallet
-          const wallet = wallets.find((w) => w.address === wagmiAddress);
+          const wallet = wallets.find((w) => w.address === address);
           if (!wallet) {
             throw new Error("Wallet not found");
           }
@@ -271,18 +251,18 @@ export function UnstakeButton({
           const unstakeData = encodeFunctionData({
             abi: stakingAbiViem,
             functionName: "unstake",
-            args: [toHex(currentAddress!), amount],
+            args: [toHex(address!), amount],
           });
           
           const unstakeDataWithReferral = await appendReferralTag(
             unstakeData,
-            toHex(currentAddress!)
+            toHex(address!)
           );
           
           unstakeTxHash = await walletClient.sendTransaction({
             to: toHex(stakingAddress),
             data: unstakeDataWithReferral,
-            account: toHex(currentAddress!),
+            account: toHex(address!),
             chain: {
               id: 8453,
               name: 'Base',
@@ -302,13 +282,13 @@ export function UnstakeButton({
           // Use Privy provider
           const unstakeIface = new Interface(stakingAbiEthers);
           const unstakeData = unstakeIface.encodeFunctionData("unstake", [
-            toHex(currentAddress!),
+            toHex(address!),
             amount,
           ]);
           
           const unstakeDataWithReferral = await appendReferralTag(
             toHex(unstakeData),
-            toHex(currentAddress!)
+            toHex(address!)
           );
           
           unstakeTxHash = await provider.request({
@@ -316,7 +296,7 @@ export function UnstakeButton({
             params: [
               {
                 to: toHex(stakingAddress),
-                from: toHex(currentAddress!),
+                from: toHex(address!),
                 data: unstakeDataWithReferral,
                 chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
               },
@@ -348,10 +328,10 @@ export function UnstakeButton({
         [ANALYTICS_PROPERTIES.STAKING_ADDRESS]: stakingAddress,
         [ANALYTICS_PROPERTIES.AMOUNT_WEI]: amount.toString(),
         [ANALYTICS_PROPERTIES.AMOUNT_FORMATTED]: formatUnits(amount, 18),
-        [ANALYTICS_PROPERTIES.USER_ADDRESS]: currentAddress,
-        [ANALYTICS_PROPERTIES.IS_MINI_APP]: isEffectivelyMiniApp || false,
+        [ANALYTICS_PROPERTIES.USER_ADDRESS]: address,
+        [ANALYTICS_PROPERTIES.IS_MINI_APP]: isMiniApp || false,
         [ANALYTICS_PROPERTIES.TRANSACTION_HASH]: unstakeTxHash,
-        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isEffectivelyMiniApp ? "farcaster" : "privy",
+        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isMiniApp ? "farcaster" : "privy",
       });
 
       onSuccess?.();
