@@ -1726,7 +1726,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                 stakingPoolAddress={stake.stakingPoolAddress}
                                 symbol={stake.membership.pool.token.symbol}
                                 tokenBalance={BigInt(
-                                  Math.floor(stake.baseAmount * 1e18)
+                                  Math.round(stake.baseAmount * 1e18)
                                 )}
                                 onSuccess={() =>
                                   handleStakeSuccess(
@@ -1744,7 +1744,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                 stakingPoolAddress={stake.stakingPoolAddress}
                                 symbol={stake.membership.pool.token.symbol}
                                 tokenBalance={BigInt(
-                                  Math.floor(stake.baseAmount * 1e18)
+                                  Math.round(stake.baseAmount * 1e18)
                                 )}
                                 onSuccess={() =>
                                   handleStakeSuccess(
@@ -1922,7 +1922,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                 stakingPoolAddress="" // Not needed for unstaked tokens
                                 symbol={token.symbol}
                                 tokenBalance={BigInt(
-                                  Math.floor(token.balance * 1e18)
+                                  Math.round(token.balance * 1e18)
                                 )}
                                 onSuccess={() =>
                                   handleSuperTokenStakeSuccess(
@@ -1939,7 +1939,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                 stakingPoolAddress="" // Not needed for unstaked tokens
                                 symbol={token.symbol}
                                 tokenBalance={BigInt(
-                                  Math.floor(token.balance * 1e18)
+                                  Math.round(token.balance * 1e18)
                                 )}
                                 onSuccess={() =>
                                   handleSuperTokenStakeSuccess(

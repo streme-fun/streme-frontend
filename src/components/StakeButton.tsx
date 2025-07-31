@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWalletClient } from "wagmi";
 import { StakeModal } from "./StakeModal";
 import { Interface } from "@ethersproject/abi";
@@ -62,10 +62,46 @@ export function StakeButton({
   const { getSafeEthereumProvider } = useAppFrameLogic();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [actualBalance, setActualBalance] = useState<bigint>(tokenBalance);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const postHog = usePostHog();
 
-  // Use passed balance instead of making additional API calls
-  const balance = tokenBalance;
+  // Fetch actual current balance from blockchain
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!address || !tokenAddress) return;
+      
+      setIsLoadingBalance(true);
+      try {
+        const balance = await publicClient.readContract({
+          address: tokenAddress as `0x${string}`,
+          abi: [
+            {
+              inputs: [{ name: "account", type: "address" }],
+              name: "balanceOf",
+              outputs: [{ name: "", type: "uint256" }],
+              stateMutability: "view",
+              type: "function",
+            },
+          ],
+          functionName: "balanceOf",
+          args: [address as `0x${string}`],
+        });
+        setActualBalance(balance);
+      } catch (error) {
+        console.warn("Failed to fetch token balance:", error);
+        // Fall back to passed balance if fetch fails
+        setActualBalance(tokenBalance);
+      } finally {
+        setIsLoadingBalance(false);
+      }
+    };
+
+    fetchBalance();
+  }, [address, tokenAddress, tokenBalance]);
+
+  // Use actual blockchain balance
+  const balance = actualBalance;
 
   const handleStake = async (amount: bigint) => {
     if (!address || !isConnected) {
@@ -305,6 +341,28 @@ export function StakeButton({
           }
         }
       }
+      
+      // Refresh balance after successful stake
+      try {
+        const newBalance = await publicClient.readContract({
+          address: tokenAddress as `0x${string}`,
+          abi: [
+            {
+              inputs: [{ name: "account", type: "address" }],
+              name: "balanceOf",
+              outputs: [{ name: "", type: "uint256" }],
+              stateMutability: "view",
+              type: "function",
+            },
+          ],
+          functionName: "balanceOf",
+          args: [address as `0x${string}`],
+        });
+        setActualBalance(newBalance);
+      } catch (error) {
+        console.warn("Failed to refresh balance after staking:", error);
+      }
+      
       // Common success path if all transactions succeeded
       onSuccess?.();
 
@@ -393,10 +451,10 @@ export function StakeButton({
     <>
       <button
         onClick={handleModalOpen}
-        disabled={disabled || isLoading} // Disable button when loading
+        disabled={disabled || isLoading || isLoadingBalance} // Disable button when loading
         className={className}
       >
-        {isLoading ? "Processing..." : "Stake"}
+        {isLoading ? "Processing..." : isLoadingBalance ? "Loading..." : "Stake"}
       </button>
 
       <StakeModal

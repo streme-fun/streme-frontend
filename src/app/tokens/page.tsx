@@ -1792,7 +1792,7 @@ export default function TokensPage() {
                                   stakingPoolAddress={stake.stakingPoolAddress}
                                   symbol={stake.membership.pool.token.symbol}
                                   tokenBalance={BigInt(
-                                    Math.floor(
+                                    Math.round(
                                       (stake.baseAmount +
                                         stake.streamedAmount) *
                                         1e18
@@ -1939,7 +1939,7 @@ export default function TokensPage() {
                                   stakingPoolAddress=""
                                   symbol={token.symbol}
                                   tokenBalance={BigInt(
-                                    Math.floor(token.balance * 1e18)
+                                    Math.round(token.balance * 1e18)
                                   )}
                                   onSuccess={() =>
                                     handleSuperTokenStakeSuccess(
