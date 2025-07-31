@@ -7,6 +7,19 @@ import { base } from "wagmi/chains";
 import type { Context as FarcasterContextType } from "@farcaster/miniapp-core";
 import sdk from "@farcaster/miniapp-sdk";
 
+// Global detection state to prevent multiple detection calls
+let globalDetectionState: {
+  isDetecting: boolean;
+  isComplete: boolean;
+  result: boolean;
+  callbacks: ((result: boolean) => void)[];
+} = {
+  isDetecting: false,
+  isComplete: false,
+  result: false,
+  callbacks: [],
+};
+
 export function useAppFrameLogic() {
   // Quick sync detection as initial fallback - be more conservative on localhost
   const quickDetection =
@@ -15,8 +28,10 @@ export function useAppFrameLogic() {
     !window.location.hostname.includes("127.0.0.1") &&
     (window.parent !== window || window.location !== window.parent.location);
 
-  const [isMiniAppView, setIsMiniAppView] = useState(quickDetection);
-  const [isDetectionComplete, setIsDetectionComplete] = useState(false);
+  const [isMiniAppView, setIsMiniAppView] = useState(
+    globalDetectionState.isComplete ? globalDetectionState.result : quickDetection
+  );
+  const [isDetectionComplete, setIsDetectionComplete] = useState(globalDetectionState.isComplete);
   const [hasPromptedToAdd, setHasPromptedToAdd] = useState(false);
   const [hasAddedMiniApp, setHasAddedMiniApp] = useState(false);
   const { context: farcasterContext, isSDKLoaded } = useFrame();
@@ -41,17 +56,9 @@ export function useAppFrameLogic() {
 
     const detectMiniApp = async () => {
       try {
-        console.log("Starting mini app detection...", {
-          hasContext: !!farcasterContext,
-          clientFid: farcasterContext?.client?.clientFid,
-        });
 
         // Check for clientFid first - this is the most reliable way to detect mini-app
         if (farcasterContext?.client?.clientFid) {
-          console.log(
-            "Mini app detected via clientFid:",
-            farcasterContext.client.clientFid
-          );
           setIsMiniAppView(true);
           setIsDetectionComplete(true);
           return;
@@ -60,7 +67,6 @@ export function useAppFrameLogic() {
         // Try detection even if SDK isn't "fully loaded" - it might still work
         const isMiniApp = await sdk.isInMiniApp();
 
-        console.log("Mini app detection result:", { isMiniApp });
 
         setIsMiniAppView(isMiniApp);
         setIsDetectionComplete(true);
@@ -75,7 +81,6 @@ export function useAppFrameLogic() {
           (window.parent !== window ||
             window.location !== window.parent.location);
 
-        console.log("Using fallback detection:", fallbackDetection);
         setIsMiniAppView(fallbackDetection);
         setIsDetectionComplete(true);
       }
@@ -92,7 +97,6 @@ export function useAppFrameLogic() {
       // Add a timeout to ensure detection always completes
       detectionTimeoutId = setTimeout(() => {
         if (!isDetectionComplete) {
-          console.log("Mini app detection timeout - using fallback");
           const fallbackDetection =
             typeof window !== "undefined" &&
             !window.location.hostname.includes("localhost") &&

@@ -54,13 +54,6 @@ const readContractWithDebug = async (
       (args.args?.[0] as string) || "unknown",
       component
     );
-
-    console.warn(
-      `🔍 ALCHEMY CALL: balanceOf(${args.args?.[0]}) on contract ${args.address} from ${component}`,
-      {
-        timestamp: new Date().toISOString(),
-      }
-    );
   }
 
   return originalPublicClient.readContract(args);

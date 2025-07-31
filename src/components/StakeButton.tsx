@@ -6,7 +6,6 @@ import { StakeModal } from "./StakeModal";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
-import sdk from "@farcaster/miniapp-sdk";
 import { usePostHog } from "posthog-js/react";
 import { useWallet } from "@/src/hooks/useWallet";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
@@ -66,7 +65,7 @@ export function StakeButton({
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const postHog = usePostHog();
 
-  // Fetch actual current balance from blockchain
+  // Fetch actual current balance from blockchain - only when address or token changes
   useEffect(() => {
     const fetchBalance = async () => {
       if (!address || !tokenAddress) return;
@@ -87,7 +86,7 @@ export function StakeButton({
           functionName: "balanceOf",
           args: [address as `0x${string}`],
         });
-        setActualBalance(balance);
+        setActualBalance(balance as bigint);
       } catch (error) {
         console.warn("Failed to fetch token balance:", error);
         // Fall back to passed balance if fetch fails
@@ -98,7 +97,14 @@ export function StakeButton({
     };
 
     fetchBalance();
-  }, [address, tokenAddress, tokenBalance]);
+  }, [address, tokenAddress]); // Removed tokenBalance dependency to prevent refresh loops
+
+  // Update actual balance when tokenBalance prop changes (but don't fetch)
+  useEffect(() => {
+    if (tokenBalance > 0n && !isLoadingBalance) {
+      setActualBalance(tokenBalance);
+    }
+  }, [tokenBalance, isLoadingBalance]);
 
   // Use actual blockchain balance
   const balance = actualBalance;
@@ -358,7 +364,7 @@ export function StakeButton({
           functionName: "balanceOf",
           args: [address as `0x${string}`],
         });
-        setActualBalance(newBalance);
+        setActualBalance(newBalance as bigint);
       } catch (error) {
         console.warn("Failed to refresh balance after staking:", error);
       }

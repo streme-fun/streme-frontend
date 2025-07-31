@@ -49,7 +49,7 @@ export function useWallet() {
   
   // Listen for account changes from the browser wallet
   useEffect(() => {
-    if (!isMiniApp && typeof window !== 'undefined' && (window as any).ethereum) {
+    if (!isMiniApp && typeof window !== 'undefined' && (window as Window & { ethereum?: unknown }).ethereum) {
       const handleAccountsChanged = (accounts: string[]) => {
         console.log('Wallet accounts changed:', accounts);
         
@@ -76,11 +76,17 @@ export function useWallet() {
       };
       
       // Add listener
-      (window as any).ethereum.on('accountsChanged', handleAccountsChanged);
+      const ethereum = (window as Window & { 
+        ethereum?: { 
+          on: (event: string, callback: (accounts: string[]) => void) => void; 
+          removeListener: (event: string, callback: (accounts: string[]) => void) => void;
+        } 
+      }).ethereum;
+      ethereum?.on('accountsChanged', handleAccountsChanged);
       
       // Cleanup
       return () => {
-        (window as any).ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        ethereum?.removeListener('accountsChanged', handleAccountsChanged);
       };
     }
   }, [isMiniApp, address, wallets, setActiveWallet, privyLogin, privyLogout]);

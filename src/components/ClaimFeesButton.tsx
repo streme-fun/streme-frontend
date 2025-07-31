@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useAccount, useWalletClient } from "wagmi";
+import { useState } from "react";
+import { useWalletClient } from "wagmi";
 import { toast } from "sonner";
 import { LP_FACTORY_ADDRESS } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
+import { useWallet } from "@/src/hooks/useWallet";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
-import sdk from "@farcaster/miniapp-sdk";
 import { useWallets } from "@privy-io/react-auth";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 
@@ -15,45 +15,23 @@ interface ClaimFeesButtonProps {
   tokenAddress: string;
   creatorAddress?: string;
   className?: string;
-  isMiniApp?: boolean;
-  farcasterAddress?: `0x${string}` | undefined;
-  farcasterIsConnected?: boolean;
 }
 
 export function ClaimFeesButton({
   tokenAddress,
   className = "btn btn-secondary w-full",
-  isMiniApp: isMiniAppProp,
-  farcasterAddress,
-  farcasterIsConnected,
 }: ClaimFeesButtonProps) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [isClaimingFees, setIsClaimingFees] = useState(false);
 
   const {
-    isSDKLoaded: fcSDKLoaded,
-    isMiniAppView: detectedMiniAppView,
-    address: fcAddress,
-    isConnected: fcIsConnected,
-    farcasterContext,
-  } = useAppFrameLogic();
-
-  const { address: wagmiAddress } = useAccount();
+    address: currentAddress,
+    isConnected: walletIsConnected,
+    isMiniApp,
+  } = useWallet();
+  const { getSafeEthereumProvider } = useAppFrameLogic();
   const { data: walletClient } = useWalletClient();
   const { wallets } = useWallets();
-
-  // More robust mini app detection
-  const isEffectivelyMiniApp =
-    isMiniAppProp ?? (detectedMiniAppView && fcSDKLoaded && !!farcasterContext);
-
-  // Simplified wallet connection logic - match MyTokensModal pattern
-  const currentAddress = isEffectivelyMiniApp 
-    ? (farcasterAddress ?? fcAddress)
-    : wagmiAddress;
-  
-  const walletIsConnected = isEffectivelyMiniApp 
-    ? (farcasterIsConnected ?? fcIsConnected)
-    : !!wagmiAddress;
 
   const handleClaimFees = async () => {
     if (!walletIsConnected || !currentAddress) {
@@ -67,8 +45,8 @@ export function ClaimFeesButton({
     try {
       let txHash: `0x${string}` | undefined;
 
-      if (isEffectivelyMiniApp) {
-        const ethProvider = await sdk.wallet.getEthereumProvider();
+      if (isMiniApp) {
+        const ethProvider = await getSafeEthereumProvider();
         if (!ethProvider) {
           throw new Error("Farcaster Ethereum provider not available.");
         }
@@ -79,7 +57,7 @@ export function ClaimFeesButton({
         const claimData = claimIface.encodeFunctionData("claimRewards", [
           tokenAddress as `0x${string}`,
         ]);
-        
+
         const claimDataWithReferral = await appendReferralTag(
           claimData as `0x${string}`,
           currentAddress as `0x${string}`
@@ -90,7 +68,7 @@ export function ClaimFeesButton({
           params: [
             {
               to: LP_FACTORY_ADDRESS,
-              from: currentAddress,
+              from: currentAddress as `0x${string}`,
               data: claimDataWithReferral,
               chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
@@ -106,25 +84,27 @@ export function ClaimFeesButton({
         if (walletClient) {
           // Use wagmi wallet client for claiming fees
           const { encodeFunctionData } = await import("viem");
-          const abi = [{
-            inputs: [{ name: "token", type: "address" }],
-            name: "claimRewards",
-            outputs: [],
-            stateMutability: "nonpayable",
-            type: "function",
-          }] as const;
-          
+          const abi = [
+            {
+              inputs: [{ name: "token", type: "address" }],
+              name: "claimRewards",
+              outputs: [],
+              stateMutability: "nonpayable",
+              type: "function",
+            },
+          ] as const;
+
           const claimData = encodeFunctionData({
             abi,
             functionName: "claimRewards",
             args: [tokenAddress as `0x${string}`],
           });
-          
+
           const claimDataWithReferral = await appendReferralTag(
             claimData,
             currentAddress as `0x${string}`
           );
-          
+
           txHash = await walletClient.sendTransaction({
             to: LP_FACTORY_ADDRESS,
             data: claimDataWithReferral,
@@ -133,7 +113,7 @@ export function ClaimFeesButton({
           });
         } else {
           // Fallback to Privy wallet
-          const wallet = wallets.find((w) => w.address === wagmiAddress);
+          const wallet = wallets.find((w) => w.address === currentAddress);
           if (!wallet) {
             throw new Error("Wallet not found");
           }
@@ -142,14 +122,14 @@ export function ClaimFeesButton({
             method: "wallet_switchEthereumChain",
             params: [{ chainId: "0x2105" }],
           });
-          
+
           const claimIface = new Interface([
             "function claimRewards(address token) external",
           ]);
           const claimData = claimIface.encodeFunctionData("claimRewards", [
             tokenAddress as `0x${string}`,
           ]);
-          
+
           const claimDataWithReferral = await appendReferralTag(
             claimData as `0x${string}`,
             currentAddress as `0x${string}`
@@ -184,7 +164,7 @@ export function ClaimFeesButton({
       if (receipt.status !== "success") {
         throw new Error("Transaction failed or reverted.");
       }
-      
+
       // Submit referral to Divvi
       await submitDivviReferral(txHash, 8453); // Base L2 chain ID
 
@@ -224,34 +204,13 @@ export function ClaimFeesButton({
     }
   };
 
-  // Debug logging
-  useEffect(() => {
-    console.log("ClaimFeesButton authentication state:", {
-      isEffectivelyMiniApp,
-      isMiniAppProp,
-      detectedMiniAppView,
-      fcSDKLoaded,
-      farcasterContext: !!farcasterContext,
-      currentAddress,
-      walletIsConnected,
-      fcAddress,
-      fcIsConnected,
-    });
-  }, [
-    isEffectivelyMiniApp,
-    isMiniAppProp,
-    detectedMiniAppView,
-    fcSDKLoaded,
-    farcasterContext,
-    currentAddress,
-    walletIsConnected,
-    fcAddress,
-    fcIsConnected,
-  ]);
-
-  // Don't render anything if wallet is not connected - let TokenActions handle the connect wallet UI
+  // Show disabled button if wallet is not connected
   if (!walletIsConnected || !currentAddress) {
-    return null;
+    return (
+      <button disabled className={`${className} btn-disabled`}>
+        Connect Wallet
+      </button>
+    );
   }
 
   return (

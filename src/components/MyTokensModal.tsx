@@ -1735,9 +1735,6 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                   )
                                 }
                                 className="btn btn-primary btn-sm"
-                                isMiniApp={isMiniAppView}
-                                farcasterAddress={effectiveAddress}
-                                farcasterIsConnected={effectiveIsConnected}
                               />
                               <StakeAllButton
                                 tokenAddress={stake.tokenAddress}
@@ -1753,9 +1750,6 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                   )
                                 }
                                 className="btn btn-secondary btn-sm"
-                                isMiniApp={isMiniAppView}
-                                farcasterAddress={effectiveAddress}
-                                farcasterIsConnected={effectiveIsConnected}
                               />
                             </div>
                             <UnstakeButton
@@ -1930,9 +1924,6 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                   )
                                 }
                                 className="btn btn-primary btn-sm"
-                                isMiniApp={isMiniAppView}
-                                farcasterAddress={effectiveAddress}
-                                farcasterIsConnected={effectiveIsConnected}
                               />
                               <StakeAllButton
                                 tokenAddress={token.tokenAddress}
@@ -1947,9 +1938,6 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                   )
                                 }
                                 className="btn btn-secondary btn-sm"
-                                isMiniApp={isMiniAppView}
-                                farcasterAddress={effectiveAddress}
-                                farcasterIsConnected={effectiveIsConnected}
                               />
                             </div>
                           </div>

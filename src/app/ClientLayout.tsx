@@ -591,7 +591,6 @@ function EnvironmentDetector({ children }: { children: React.ReactNode }) {
     );
   }
 
-  console.log(`🎯 Environment detected: ${isMiniApp ? "Mini-app" : "Browser"}`);
 
   // Render appropriate layout
   return isMiniApp ? (

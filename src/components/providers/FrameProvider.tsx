@@ -2,7 +2,10 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import sdk from "@farcaster/miniapp-sdk";
-import type { Context, MiniAppNotificationDetails } from "@farcaster/miniapp-core";
+import type {
+  Context,
+  MiniAppNotificationDetails,
+} from "@farcaster/miniapp-core";
 import { createStore } from "mipd";
 import React from "react";
 
@@ -47,14 +50,6 @@ export function useFrame() {
   const [lastEvent, setLastEvent] = useState("");
   const [addFrameResult, setAddFrameResult] = useState("");
   const initializationRef = useRef(false);
-
-  // Add hook instantiation logging for debugging
-  useEffect(() => {
-    console.log("🟡 useFrame hook INSTANTIATED");
-    return () => {
-      console.log("🟡 useFrame hook CLEANUP");
-    };
-  }, []);
 
   // SDK actions only work in mini app clients, so this pattern supports browser actions as well
   const openUrl = useCallback(
@@ -253,14 +248,6 @@ export function useFrame() {
 
 export function FrameProvider({ children }: { children: React.ReactNode }) {
   const frameContext = useFrame();
-
-  // Add mount/unmount logging for debugging
-  useEffect(() => {
-    console.log("🔴 FrameProvider MOUNTED");
-    return () => {
-      console.log("🔴 FrameProvider UNMOUNTED");
-    };
-  }, []);
 
   // Always render children - the app logic will handle frame vs non-frame UI
   return (

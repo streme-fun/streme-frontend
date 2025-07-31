@@ -744,9 +744,6 @@ export function TokenActions({
             disabled={balance === 0n || !stakingAddress}
             symbol={token.symbol}
             className="btn btn-outline border-base-300 hover:border-base-400 text-base-content hover:text-base-content bg-base-100 hover:bg-base-200 w-full disabled:border-base-200 disabled:text-base-content/40 disabled:bg-base-100"
-            isMiniApp={isEffectivelyMiniApp}
-            farcasterAddress={currentAddress}
-            farcasterIsConnected={!!walletIsConnected}
             tokenBalance={balance}
           />
         )}
@@ -806,9 +803,6 @@ export function TokenActions({
             onSuccess={() => {
               refreshBalances();
             }}
-            isMiniApp={isEffectivelyMiniApp}
-            farcasterAddress={currentAddress}
-            farcasterIsConnected={!!walletIsConnected}
           />
         )}
       </div>

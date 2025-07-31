@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { LaunchedToken } from "@/src/app/types";
 import { ClaimFeesButton } from "@/src/components/ClaimFeesButton";
-import { usePrivy } from "@privy-io/react-auth";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import { useAccount } from "wagmi";
+import { useWallet } from "@/src/hooks/useWallet";
 import { Modal } from "@/src/components/Modal";
 import { LaunchTokenModal } from "@/src/components/LaunchTokenModal";
 import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
@@ -78,41 +77,22 @@ export default function LaunchedTokensPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Wallet connection hooks
-  const { user: privyUser, authenticated } = usePrivy();
-  const { address: wagmiAddress } = useAccount();
+  const { isConnected: isWalletConnected, address: deployerAddress, isMiniApp } = useWallet();
   const {
     isMiniAppView,
-    address: fcAddress,
-    isConnected: fcIsConnected,
     isSDKLoaded,
   } = useAppFrameLogic();
-
-  // Get the correct wallet address for non-mini-app contexts  
-  // Temporarily prioritize wagmi over privy to fix address issue
-  const userAddress = wagmiAddress || privyUser?.wallet?.address;
-
-  // Simple wallet detection - just like the original working version
-  const isWalletConnected = isMiniAppView
-    ? fcIsConnected && !!fcAddress
-    : authenticated && !!userAddress;
-
-  const deployerAddress = isMiniAppView ? fcAddress : userAddress;
   
   // Debug logging for address changes
   useEffect(() => {
     console.log("📍 Address change debug:", {
       isMiniAppView,
-      fcAddress,
-      userAddress: userAddress,
-      privyAddress: privyUser?.wallet?.address,
-      wagmiAddress,
       deployerAddress,
-      fcIsConnected,
-      authenticated,
       isWalletConnected,
+      isMiniApp,
       timestamp: new Date().toISOString()
     });
-  }, [isMiniAppView, fcAddress, userAddress, privyUser?.wallet?.address, wagmiAddress, deployerAddress, fcIsConnected, authenticated, isWalletConnected]);
+  }, [isMiniAppView, deployerAddress, isWalletConnected, isMiniApp]);
   const [selectedTokenStakers, setSelectedTokenStakers] = useState<{
     token: EnrichedLaunchedToken;
     isOpen: boolean;
@@ -166,8 +146,13 @@ export default function LaunchedTokensPage() {
                 token0: data.token0,
                 token1: data.token1,
               };
+              console.log(`Claimable fees for ${token.contract_address}:`, claimableFees);
+            } else {
+              console.warn(`Claimable fees API returned ${res.status} for token ${token.contract_address}`);
             }
-          } catch {}
+          } catch (error) {
+            console.warn(`Failed to fetch claimable fees for token ${token.contract_address}:`, error);
+          }
 
           return {
             ...token,
@@ -609,14 +594,14 @@ export default function LaunchedTokensPage() {
 
                     {/* Claimable Fees Section */}
                     {token.claimableFees &&
-                      (token.claimableFees.amount0 > 0 ||
-                        token.claimableFees.amount1 > 0) && (
+                      (Number(token.claimableFees.amount0) > 0 ||
+                        Number(token.claimableFees.amount1) > 0) && (
                         <div className="mt-3 p-2 bg-base-200 rounded-lg">
                           <p className="text-xs opacity-70 mb-1">
                             Claimable Fees
                           </p>
                           <div className="flex flex-col gap-1">
-                            {token.claimableFees.amount0 > 0 && (
+                            {Number(token.claimableFees.amount0) > 0 && (
                               <div className="flex justify-between items-center">
                                 <span className="text-xs opacity-70">
                                   {token.symbol}:
@@ -626,7 +611,7 @@ export default function LaunchedTokensPage() {
                                 </span>
                               </div>
                             )}
-                            {token.claimableFees.amount1 > 0 && (
+                            {Number(token.claimableFees.amount1) > 0 && (
                               <div className="flex justify-between items-center">
                                 <span className="text-xs opacity-70">
                                   WETH:

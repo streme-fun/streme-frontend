@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount } from "wagmi";
 import { useAppFrameLogic } from "../../hooks/useAppFrameLogic";
+import { useWallet } from "../../hooks/useWallet";
 import { formatUnits } from "viem";
 import { StakeButton } from "../../components/StakeButton";
 import { UnstakeButton } from "../../components/UnstakeButton";
@@ -122,12 +122,8 @@ const BLACKLISTED_TOKENS = [
 ].map((addr) => addr?.toLowerCase() || "");
 
 export default function TokensPage() {
-  const { address: wagmiAddress } = useAccount();
-  const {
-    isMiniAppView,
-    address: fcAddress,
-    isConnected: fcIsConnected,
-  } = useAppFrameLogic();
+  const { address: effectiveAddress } = useWallet();
+  const { isMiniAppView } = useAppFrameLogic();
 
   const [stakes, setStakes] = useState<StakeData[]>([]);
   const [ownedSuperTokens, setOwnedSuperTokens] = useState<SuperTokenData[]>(
@@ -138,10 +134,6 @@ export default function TokensPage() {
   const [accountExists, setAccountExists] = useState<boolean | null>(null);
   const [mounted, setMounted] = useState(false);
   // const [showUnstakedModal, setShowUnstakedModal] = useState(true);
-
-  // Get effective address based on context
-  const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
-  const effectiveIsConnected = isMiniAppView ? fcIsConnected : !!wagmiAddress;
 
   // Use centralized token data hook
   const {
@@ -1613,9 +1605,6 @@ export default function TokensPage() {
                     ownedSuperTokens={ownedSuperTokens}
                     onSuccess={() => handleStakeSuccess()}
                     className="btn btn-primary"
-                    isMiniApp={isMiniAppView}
-                    farcasterAddress={effectiveAddress}
-                    farcasterIsConnected={effectiveIsConnected}
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1753,11 +1742,6 @@ export default function TokensPage() {
                                           stake.tokenAddress
                                         )
                                       }
-                                      isMiniApp={isMiniAppView}
-                                      farcasterAddress={effectiveAddress}
-                                      farcasterIsConnected={
-                                        effectiveIsConnected
-                                      }
                                     />
                                   )}
                               </div>
@@ -1805,9 +1789,6 @@ export default function TokensPage() {
                                     )
                                   }
                                   className="btn btn-primary btn-sm w-full"
-                                  isMiniApp={isMiniAppView}
-                                  farcasterAddress={effectiveAddress}
-                                  farcasterIsConnected={effectiveIsConnected}
                                 />
                               </div>
                               <UnstakeButton
@@ -1821,9 +1802,6 @@ export default function TokensPage() {
                                   )
                                 }
                                 className="btn btn-outline btn-sm w-full"
-                                isMiniApp={isMiniAppView}
-                                farcasterAddress={effectiveAddress}
-                                farcasterIsConnected={effectiveIsConnected}
                               />
                             </div>
                           ) : stake.stakingAddress === "" ? (
@@ -1947,9 +1925,6 @@ export default function TokensPage() {
                                     )
                                   }
                                   className="btn btn-primary btn-sm w-full"
-                                  isMiniApp={isMiniAppView}
-                                  farcasterAddress={effectiveAddress}
-                                  farcasterIsConnected={effectiveIsConnected}
                                 />
                               </div>
                             </div>
