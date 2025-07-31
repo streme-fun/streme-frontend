@@ -74,6 +74,27 @@ src/
 - `useStremeStakingContract` - STREME staking operations (deposit, withdraw, approve)
 - `useBestFriendsStreaming` - Farcaster best friends integration
 
+# Mini-App Detection
+
+The app uses a **centralized mini-app detection system** to ensure consistent behavior across all components:
+
+## Detection Utilities (`/src/lib/miniAppDetection.ts`)
+
+- `detectEnvironmentForProviders()` - Early detection for ClientLayout provider selection
+- `detectMiniAppWithContext()` - Enhanced detection with Farcaster context for app logic
+- `detectMiniApp()` - Core detection function with multiple fallback methods
+
+## Detection Methods (in priority order):
+1. **Base App clientFid** - Most reliable: checks for `clientFid === 309857`
+2. **Other Farcaster clientFid** - Any other valid Farcaster client
+3. **SDK isInMiniApp()** - Fallback SDK method
+4. **Iframe detection** - Last resort: basic parent window check
+
+## Usage Pattern:
+- **ClientLayout**: Uses `detectEnvironmentForProviders()` to choose provider stack
+- **useAppFrameLogic**: Uses `detectMiniAppWithContext()` with FrameProvider context
+- **Consistent logging**: All detection includes method and clientFid for debugging
+
 # Superfluid Integration
 
 ## Subgraph Queries
@@ -157,6 +178,27 @@ function ConnectWallet() {
 - Force auto-connection on page load
 - Override user's wallet choice
 - Skip the connect button for mini-app users
+
+## Provider Architecture
+
+The app uses a **dual provider architecture** that selects the appropriate stack based on environment detection:
+
+### Mini-App Stack:
+```tsx
+<FrameProvider>
+  <MiniAppWagmiProvider>  // QueryClient → Wagmi (Farcaster connector only)
+    <TokenDataProvider>
+```
+
+### Browser Stack:
+```tsx
+<PrivyProviderWrapper>
+  <FrameProvider>
+    <BrowserWagmiProvider>  // QueryClient → Wagmi (multiple connectors)
+      <TokenDataProvider>
+```
+
+**Critical**: QueryClientProvider must wrap WagmiProvider - this is the correct order despite some documentation showing it reversed.
 
 ## Mini-App Transaction Best Practices
 
