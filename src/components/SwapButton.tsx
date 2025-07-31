@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { parseEther } from "viem";
+import { parseEther, parseUnits } from "viem";
+
+// Base USDC contract address
+const USDC_BASE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 import { toast } from "sonner";
 import { publicClient } from "@/src/lib/viemClient";
 import { useWalletClient } from "wagmi";
@@ -21,6 +24,7 @@ interface SwapButtonProps {
     liquidityAvailable: boolean;
   } | null;
   symbol: string;
+  currency?: "ETH" | "USDC";
   onSuccess?: () => void;
   className?: string;
   disabled?: boolean;
@@ -32,6 +36,7 @@ export function SwapButton({
   amount,
   quote,
   symbol,
+  currency = "ETH",
   onSuccess,
   className,
   disabled,
@@ -111,9 +116,17 @@ export function SwapButton({
       throw new Error("Wallet client not available");
     }
 
+    // Determine which token needs approval
+    const tokenToApprove = 
+      direction === "sell" 
+        ? tokenAddress 
+        : currency === "USDC" 
+        ? USDC_BASE_ADDRESS
+        : tokenAddress;
+
     // Check current allowance
     const currentAllowance = await publicClient.readContract({
-      address: tokenAddress as `0x${string}`,
+      address: tokenToApprove as `0x${string}`,
       abi: [
         {
           inputs: [
@@ -166,7 +179,7 @@ export function SwapButton({
         method: "eth_sendTransaction",
         params: [
           {
-            to: tokenAddress as `0x${string}`,
+            to: tokenToApprove as `0x${string}`,
             from: address as `0x${string}`,
             data: approveDataWithReferral,
             chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
@@ -200,7 +213,7 @@ export function SwapButton({
       );
       
       approvalTxHash = await walletClient!.sendTransaction({
-        to: tokenAddress as `0x${string}`,
+        to: tokenToApprove as `0x${string}`,
         data: approveDataWithReferral,
         account: address as `0x${string}`,
         chain: undefined,
@@ -224,16 +237,26 @@ export function SwapButton({
     let sellAmount: string;
 
     if (direction === "buy") {
-      // ETH -> Token swap
-      const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-      sellToken = ETH_ADDRESS;
+      // Currency -> Token swap
+      if (currency === "ETH") {
+        const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+        sellToken = ETH_ADDRESS;
+        sellAmount = parseEther(amount).toString();
+      } else {
+        sellToken = USDC_BASE_ADDRESS;
+        sellAmount = parseUnits(amount, 6).toString(); // USDC has 6 decimals
+      }
       buyToken = tokenAddress;
-      sellAmount = parseEther(amount).toString();
     } else {
-      // Token -> ETH swap (using regular API instead of gasless)
-      const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+      // Token -> Currency swap
       sellToken = tokenAddress;
-      buyToken = ETH_ADDRESS;
+      
+      if (currency === "ETH") {
+        const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+        buyToken = ETH_ADDRESS;
+      } else {
+        buyToken = USDC_BASE_ADDRESS;
+      }
 
       // For selling, check if we're trying to sell the maximum amount
       // and use the actual balance to avoid rounding errors
@@ -291,8 +314,12 @@ export function SwapButton({
       throw new Error("Invalid quote response");
     }
 
-    // Check if we need to handle token allowance for selling
-    if (direction === "sell" && quoteData.issues?.allowance) {
+    // Check if we need to handle token allowance for selling or buying with USDC
+    const needsAllowance = 
+      (direction === "sell") || 
+      (direction === "buy" && currency === "USDC");
+      
+    if (needsAllowance && quoteData.issues?.allowance) {
       const allowanceIssue = quoteData.issues.allowance;
       const currentAllowance = BigInt(allowanceIssue.actual || "0");
       const requiredAllowance = BigInt(sellAmount);
@@ -467,7 +494,10 @@ export function SwapButton({
 
   return (
     <button onClick={performSwap} disabled={isDisabled} className={className}>
-      {isLoading ? "Processing..." : !isConnected ? "Wallet not available" : "Place Trade"}
+      {isLoading ? "Processing..." : !isConnected ? "Wallet not available" : 
+        direction === "buy" 
+          ? `Buy with ${currency}` 
+          : `Sell for ${currency}`}
     </button>
   );
 }

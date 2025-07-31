@@ -15,9 +15,12 @@ import { LP_FACTORY_ADDRESS, LP_FACTORY_ABI } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useUnifiedWallet } from "@/src/hooks/useUnifiedWallet";
 import { Button as UiButton } from "@/src/components/ui/button";
-import { parseEther } from "viem";
+import { parseEther, parseUnits } from "viem";
 import { getPrices, convertToUSD } from "@/src/lib/priceUtils";
 import { useTokenBalance } from "@/src/hooks/useTokenData";
+
+// Base USDC contract address
+const USDC_BASE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 interface TokenActionsProps {
   token: Token;
@@ -59,8 +62,16 @@ export function TokenActions({
     initialToken.staking_pool
   );
 
+  // USDC balance tracking
+  const { tokenBalance: usdcBalance } = useTokenBalance(
+    USDC_BASE_ADDRESS,
+    undefined,
+    undefined
+  );
+
   // Trading interface state
   const [tradeDirection, setTradeDirection] = useState<"buy" | "sell">("buy");
+  const [tradeCurrency, setTradeCurrency] = useState<"ETH" | "USDC">("ETH"); // Will be updated based on context
   const [tradeAmount, setTradeAmount] = useState(""); // Start empty, will be set by useEffect
   const [priceQuote, setPriceQuote] = useState<{
     buyAmount: string;
@@ -103,8 +114,9 @@ export function TokenActions({
     return initialToken.staking_address;
   }, [initialToken.staking_address]);
 
-  const {
+  const { 
     isSDKLoaded: fcSDKLoaded,
+    farcasterContext,
   } = useAppFrameLogic();
 
   const { ready: privyReady } = usePrivy();
@@ -124,6 +136,13 @@ export function TokenActions({
   const walletIsConnected = isConnectedProp ?? unifiedIsConnected;
   const effectiveLogin = unifiedConnect;
 
+  // Set USDC as default for Base mini-app (clientFid 309857)
+  useEffect(() => {
+    if (farcasterContext?.client?.clientFid === 309857) {
+      setTradeCurrency("USDC");
+    }
+  }, [farcasterContext?.client?.clientFid]);
+
   // Enhanced 0x API integration
   const getGaslessQuote = useCallback(
     async (amount: string, direction: "buy" | "sell") => {
@@ -133,20 +152,31 @@ export function TokenActions({
       try {
         let sellToken: string;
         let buyToken: string;
+        let sellAmount: string;
 
         if (direction === "buy") {
-          // ETH -> Token swap
-          const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-          sellToken = ETH_ADDRESS;
+          // Currency -> Token swap
+          if (tradeCurrency === "ETH") {
+            const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+            sellToken = ETH_ADDRESS;
+            sellAmount = parseEther(amount).toString();
+          } else {
+            sellToken = USDC_BASE_ADDRESS;
+            sellAmount = parseUnits(amount, 6).toString(); // USDC has 6 decimals
+          }
           buyToken = contractAddress;
         } else {
-          // Token -> ETH swap
-          const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+          // Token -> Currency swap
           sellToken = contractAddress;
-          buyToken = ETH_ADDRESS;
-        }
+          sellAmount = parseEther(amount).toString();
 
-        const sellAmount = parseEther(amount).toString();
+          if (tradeCurrency === "ETH") {
+            const ETH_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+            buyToken = ETH_ADDRESS;
+          } else {
+            buyToken = USDC_BASE_ADDRESS;
+          }
+        }
 
         const params = new URLSearchParams({
           chainId: "8453",
@@ -172,7 +202,7 @@ export function TokenActions({
         setIsPriceLoading(false);
       }
     },
-    [currentAddress, contractAddress]
+    [currentAddress, contractAddress, tradeCurrency]
   );
 
   // Debounced quote fetching
@@ -187,7 +217,7 @@ export function TokenActions({
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [tradeAmount, tradeDirection, getGaslessQuote]);
+  }, [tradeAmount, tradeDirection, tradeCurrency, getGaslessQuote]);
 
   // Validation for trade amount
   const getTradeValidation = useCallback(() => {
@@ -204,14 +234,26 @@ export function TokenActions({
     const PRECISION_TOLERANCE = 1e-8; // Small tolerance for floating point comparison
 
     if (tradeDirection === "buy") {
-      const availableEth = Number(ethBalance) / 1e18;
-      if (amount > availableEth + PRECISION_TOLERANCE) {
-        return {
-          isValid: false,
-          error: `Insufficient ETH balance. You have ${availableEth.toFixed(
-            4
-          )} ETH available.`,
-        };
+      if (tradeCurrency === "ETH") {
+        const availableEth = Number(ethBalance) / 1e18;
+        if (amount > availableEth + PRECISION_TOLERANCE) {
+          return {
+            isValid: false,
+            error: `Insufficient ETH balance. You have ${availableEth.toFixed(
+              4
+            )} ETH available.`,
+          };
+        }
+      } else {
+        const availableUsdc = Number(usdcBalance) / 1e6; // USDC has 6 decimals
+        if (amount > availableUsdc + PRECISION_TOLERANCE) {
+          return {
+            isValid: false,
+            error: `Insufficient USDC balance. You have ${availableUsdc.toFixed(
+              2
+            )} USDC available.`,
+          };
+        }
       }
     } else {
       const availableTokens = Number(balance) / 1e18;
@@ -231,7 +273,9 @@ export function TokenActions({
   }, [
     tradeAmount,
     tradeDirection,
+    tradeCurrency,
     ethBalance,
+    usdcBalance,
     balance,
     token.symbol,
     isRefreshingBalances,
@@ -371,9 +415,14 @@ export function TokenActions({
   const calculatePercentageAmount = useCallback(
     (percentage: number) => {
       if (tradeDirection === "buy") {
-        // For buying, use percentage of ETH balance
-        const ethAmount = Number(ethBalance) / 1e18;
-        return ((ethAmount * percentage) / 100).toFixed(6);
+        // For buying, use percentage of selected currency balance
+        if (tradeCurrency === "ETH") {
+          const ethAmount = Number(ethBalance) / 1e18;
+          return ((ethAmount * percentage) / 100).toFixed(6);
+        } else {
+          const usdcAmount = Number(usdcBalance) / 1e6;
+          return ((usdcAmount * percentage) / 100).toFixed(2);
+        }
       } else {
         // For selling, use percentage of token balance
         const tokenAmount = Number(balance) / 1e18;
@@ -387,7 +436,7 @@ export function TokenActions({
         return calculatedAmount.toFixed(6);
       }
     },
-    [tradeDirection, ethBalance, balance]
+    [tradeDirection, tradeCurrency, ethBalance, usdcBalance, balance]
   );
 
   // Handle percentage button clicks
@@ -404,21 +453,29 @@ export function TokenActions({
     setTradeAmount(amount.toString());
   }, []);
 
-  // Reset to default amount when switching trade direction
+  // Reset to default amount when switching trade direction or currency
   useEffect(() => {
     if (tradeDirection === "buy") {
-      setTradeAmount("0.001"); // Default to 0.001 ETH for buying
+      if (tradeCurrency === "ETH") {
+        setTradeAmount("0.001"); // Default to 0.001 ETH for buying
+      } else {
+        setTradeAmount("10"); // Default to 10 USDC for buying
+      }
     } else {
       setTradeAmount(""); // Clear amount for selling
     }
-  }, [tradeDirection]);
+  }, [tradeDirection, tradeCurrency]);
 
   // Initialize trade amount on component mount
   useEffect(() => {
     if (tradeDirection === "buy") {
-      setTradeAmount("0.001");
+      if (tradeCurrency === "ETH") {
+        setTradeAmount("0.001");
+      } else {
+        setTradeAmount("10");
+      }
     }
-  }, []); // Only run on mount
+  }, [tradeDirection, tradeCurrency]); // Only run on mount or when these change
 
   // Periodic balance refresh
   useEffect(() => {
@@ -458,13 +515,19 @@ export function TokenActions({
   }, [contractAddress, token.price]);
 
   // Show loading state if wallet is initializing
-  if (unifiedIsLoading || (isEffectivelyMiniApp && !fcSDKLoaded) || (!isEffectivelyMiniApp && !privyReady)) {
+  if (
+    unifiedIsLoading ||
+    (isEffectivelyMiniApp && !fcSDKLoaded) ||
+    (!isEffectivelyMiniApp && !privyReady)
+  ) {
     return (
       <div className="card bg-base-100 border border-black/[.1]1]">
         <div className="card-body items-center justify-center min-h-[100px]">
           <span className="loading loading-spinner loading-sm"></span>
           <p className="text-sm text-base-content/70">
-            {isEffectivelyMiniApp ? "Loading Farcaster SDK..." : "Initializing wallet..."}
+            {isEffectivelyMiniApp
+              ? "Loading Farcaster SDK..."
+              : "Initializing wallet..."}
           </p>
         </div>
       </div>
@@ -554,7 +617,11 @@ export function TokenActions({
               {!lastUpdated ? (
                 <span className="text-base-content/30">Loading...</span>
               ) : tradeDirection === "buy" ? (
-                `${(Number(ethBalance) / 1e18).toFixed(4)} ETH`
+                tradeCurrency === "ETH" ? (
+                  `${(Number(ethBalance) / 1e18).toFixed(4)} ETH`
+                ) : (
+                  `${(Number(usdcBalance) / 1e6).toFixed(2)} USDC`
+                )
               ) : (
                 `${(Number(balance) / 1e18).toFixed(4)} ${token.symbol}`
               )}
@@ -569,39 +636,87 @@ export function TokenActions({
                 type="number"
                 value={tradeAmount}
                 onChange={(e) => setTradeAmount(e.target.value)}
-                placeholder={tradeDirection === "buy" ? "0.001" : ""}
+                placeholder={
+                  tradeDirection === "buy"
+                    ? tradeCurrency === "ETH"
+                      ? "0.001"
+                      : "10"
+                    : ""
+                }
                 className="w-full p-5 bg-base-200 border border-base-300 rounded-lg text-base font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                step="0.001"
+                step={tradeCurrency === "USDC" ? "0.01" : "0.001"}
                 min="0"
               />
               {/* USD equivalent for trade amount */}
               {tradeAmount && (
                 <div className="absolute left-5 top-12 text-xs text-base-content/50">
-                  {tradeDirection === "buy" && usdPrices.eth
-                    ? `≈ ${convertToUSD(tradeAmount, usdPrices.eth)}`
+                  {tradeDirection === "buy"
+                    ? tradeCurrency === "ETH" && usdPrices.eth
+                      ? `≈ ${convertToUSD(tradeAmount, usdPrices.eth)}`
+                      : null // Don't show USD equivalent for USDC
                     : tradeDirection === "sell" && usdPrices.token
                     ? `≈ ${convertToUSD(tradeAmount, usdPrices.token)}`
                     : null}
                 </div>
               )}
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/70">
-                {tradeDirection === "buy" ? "ETH" : token.symbol}
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                {tradeDirection === "buy" ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() =>
+                        setTradeCurrency(
+                          tradeCurrency === "ETH" ? "USDC" : "ETH"
+                        )
+                      }
+                      className="px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-primary/20 transition-all text-primary flex items-center gap-1.5 group"
+                    >
+                      <span>{tradeCurrency}</span>
+                      <svg
+                        className="w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-base-content/70 font-medium">
+                    {token.symbol}
+                  </span>
+                )}
               </div>
             </div>
 
             {/* Percentage Buttons */}
             <div className="grid grid-cols-4 gap-2 mt-2">
               {tradeDirection === "buy"
-                ? // Fixed ETH amounts for buying
-                  [0.001, 0.01, 0.1, 1].map((amount) => (
-                    <button
-                      key={amount}
-                      onClick={() => handleFixedAmountClick(amount)}
-                      className="py-1 px-2 text-xs rounded-md border border-base-300 hover:border-base-400 hover:bg-base-200 transition-colors text-base-content/70 cursor-pointer"
-                    >
-                      {amount} eth
-                    </button>
-                  ))
+                ? // Fixed amounts for buying based on currency
+                  tradeCurrency === "ETH"
+                  ? [0.001, 0.01, 0.1, 1].map((amount) => (
+                      <button
+                        key={amount}
+                        onClick={() => handleFixedAmountClick(amount)}
+                        className="py-1 px-2 text-xs rounded-md border border-base-300 hover:border-base-400 hover:bg-base-200 transition-colors text-base-content/70 cursor-pointer"
+                      >
+                        {amount} ETH
+                      </button>
+                    ))
+                  : [10, 100, 1000, 10000].map((amount) => (
+                      <button
+                        key={amount}
+                        onClick={() => handleFixedAmountClick(amount)}
+                        className="py-1 px-2 text-xs rounded-md border border-base-300 hover:border-base-400 hover:bg-base-200 transition-colors text-base-content/70 cursor-pointer"
+                      >
+                        ${amount}
+                      </button>
+                    ))
                 : // Percentage buttons for selling
                   [25, 50, 75, 100].map((percentage) => (
                     <button
@@ -645,15 +760,24 @@ export function TokenActions({
                         return amount.toFixed(3);
                       }
                     })()}{" "}
-                    {tradeDirection === "buy" ? token.symbol : "ETH"}
+                    {tradeDirection === "buy" ? token.symbol : tradeCurrency}
                   </span>
                   {/* USD equivalent for receive amount */}
                   {(() => {
+                    // Don't show USD equivalent when:
+                    // 1. Receiving USDC (it's redundant)
+                    // 2. Buying with USDC (confusing to show lower USD value)
+                    if ((tradeDirection === "sell" && tradeCurrency === "USDC") ||
+                        (tradeDirection === "buy" && tradeCurrency === "USDC")) {
+                      return null;
+                    }
+
                     const amount = Number(priceQuote.buyAmount) / 1e18;
                     const price =
                       tradeDirection === "buy"
                         ? usdPrices.token
                         : usdPrices.eth;
+
                     return price ? (
                       <div className="text-xs text-base-content/50 mt-1">
                         ≈ {convertToUSD(amount, price)}
@@ -676,9 +800,13 @@ export function TokenActions({
           {tradeDirection === "buy" && (
             <LiquidityWarning
               tokenAddress={contractAddress}
-              tokenLaunchTime={token.timestamp ? 
-                new Date(token.timestamp._seconds * 1000 + token.timestamp._nanoseconds / 1000000) : 
-                token.created_at
+              tokenLaunchTime={
+                token.timestamp
+                  ? new Date(
+                      token.timestamp._seconds * 1000 +
+                        token.timestamp._nanoseconds / 1000000
+                    )
+                  : token.created_at
               }
               tokenSymbol={token.symbol}
               className="mb-4"
@@ -694,10 +822,15 @@ export function TokenActions({
               amount={tradeAmount}
               quote={priceQuote}
               symbol={token.symbol}
+              currency={tradeCurrency}
               onSuccess={() => {
                 refreshBalances();
-                // Reset to appropriate default based on trade direction
-                setTradeAmount(tradeDirection === "buy" ? "0.001" : "");
+                // Reset to appropriate default based on trade direction and currency
+                if (tradeDirection === "buy") {
+                  setTradeAmount(tradeCurrency === "ETH" ? "0.001" : "10");
+                } else {
+                  setTradeAmount("");
+                }
               }}
               disabled={!validation.isValid}
               className={`w-full btn ${
@@ -716,7 +849,7 @@ export function TokenActions({
               onSuccess={() => {
                 refreshBalances();
                 onStakingChange();
-                setTradeAmount("0.001"); // Reset to default ETH amount
+                setTradeAmount(tradeCurrency === "ETH" ? "0.001" : "10"); // Reset to default amount
               }}
               disabled={!stakingAddress || !validation.isValid}
               isMiniApp={isEffectivelyMiniApp}

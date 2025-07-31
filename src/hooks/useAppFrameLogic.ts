@@ -72,7 +72,7 @@ export function useAppFrameLogic() {
           console.log(`sdk.isInMiniApp() result: ${isMiniApp}`);
           setIsMiniAppView(isMiniApp);
           setIsDetectionComplete(true);
-        } catch (sdkError) {
+        } catch {
           console.warn("sdk.isInMiniApp() not supported, using fallback detection");
           // Use window-based fallback detection
           const fallbackDetection =
