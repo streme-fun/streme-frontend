@@ -6,6 +6,7 @@ import { useAccount, useConnect, useSwitchChain, useDisconnect } from "wagmi";
 import { base } from "wagmi/chains";
 import type { Context as FarcasterContextType } from "@farcaster/miniapp-core";
 import sdk from "@farcaster/miniapp-sdk";
+import { detectMiniAppWithContext } from "../lib/miniAppDetection";
 
 export function useAppFrameLogic() {
   const [isMiniAppView, setIsMiniAppView] = useState(false);
@@ -18,47 +19,23 @@ export function useAppFrameLogic() {
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { disconnect } = useDisconnect();
 
-  // Enhanced mini app detection with proper timeout and fallback
+  // Enhanced mini app detection using shared utility
   useEffect(() => {
     const detectMiniApp = async () => {
       try {
-        console.log("Starting mini-app detection...");
-        console.log("farcasterContext:", farcasterContext);
-        console.log("clientFid:", farcasterContext?.client?.clientFid);
+        console.log("🔍 useAppFrameLogic: Starting detection...");
+        const result = await detectMiniAppWithContext(farcasterContext);
+        
+        console.log("🔍 useAppFrameLogic: Detection result:", {
+          isMiniApp: result.isMiniApp,
+          clientFid: result.clientFid,
+          method: result.detectionMethod
+        });
 
-        // Check for Base App clientFid first (most reliable when available)
-        if (farcasterContext?.client?.clientFid === 309857) {
-          console.log("Base App detected via clientFid 309857");
-          setIsMiniAppView(true);
-          setIsDetectionComplete(true);
-          return;
-        }
-
-        // Check for any other Farcaster client context
-        if (farcasterContext?.client?.clientFid) {
-          console.log(
-            `Other Farcaster client detected with clientFid: ${farcasterContext.client.clientFid}`
-          );
-          setIsMiniAppView(true);
-          setIsDetectionComplete(true);
-          return;
-        }
-
-        // Try SDK detection for other Farcaster clients
-        try {
-          const isMiniApp = await sdk.isInMiniApp();
-          console.log(`sdk.isInMiniApp() result: ${isMiniApp}`);
-          setIsMiniAppView(isMiniApp);
-          setIsDetectionComplete(true);
-        } catch {
-          console.warn("sdk.isInMiniApp() not supported");
-          // Final fallback - assume not mini-app if nothing else worked
-          console.log("No mini-app detected, using desktop mode");
-          setIsMiniAppView(false);
-          setIsDetectionComplete(true);
-        }
+        setIsMiniAppView(result.isMiniApp);
+        setIsDetectionComplete(true);
       } catch (error) {
-        console.error("Error checking if in mini app:", error);
+        console.error("useAppFrameLogic: Detection error:", error);
         setIsMiniAppView(false);
         setIsDetectionComplete(true);
       }

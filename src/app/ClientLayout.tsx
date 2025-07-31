@@ -11,6 +11,7 @@ import { Toaster } from "sonner";
 import React, { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
+import { detectEnvironmentForProviders } from "../lib/miniAppDetection";
 // import { UnstakedTokensModal } from "../components/UnstakedTokensModal";
 import { formatUnits } from "viem";
 import { publicClient } from "../lib/viemClient";
@@ -543,37 +544,12 @@ function EnvironmentDetector({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const detectEnvironment = async () => {
       try {
-        console.log("🔍 Detecting environment...");
-
-        // Quick iframe detection
-        const quickDetection =
-          typeof window !== "undefined" &&
-          !window.location.hostname.includes("localhost") &&
-          !window.location.hostname.includes("127.0.0.1") &&
-          (window.parent !== window ||
-            window.location !== window.parent.location);
-
-        console.log("Quick detection result:", quickDetection);
-
-        if (quickDetection) {
-          // Try Farcaster SDK detection
-          try {
-            const sdk = await import("@farcaster/miniapp-sdk");
-            const isFarcasterMiniApp = await sdk.default.isInMiniApp();
-            console.log("Farcaster SDK detection result:", isFarcasterMiniApp);
-            setIsMiniApp(isFarcasterMiniApp);
-          } catch (error) {
-            console.warn(
-              "Farcaster SDK detection failed, using fallback:",
-              error
-            );
-            setIsMiniApp(quickDetection);
-          }
-        } else {
-          setIsMiniApp(false);
-        }
+        console.log("🔍 EnvironmentDetector: Starting detection...");
+        const isMiniApp = await detectEnvironmentForProviders();
+        console.log("🔍 EnvironmentDetector: Detection result:", isMiniApp);
+        setIsMiniApp(isMiniApp);
       } catch (error) {
-        console.error("Environment detection error:", error);
+        console.error("EnvironmentDetector: Detection error:", error);
         setIsMiniApp(false);
       } finally {
         setIsDetecting(false);
