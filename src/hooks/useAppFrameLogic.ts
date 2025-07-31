@@ -56,20 +56,36 @@ export function useAppFrameLogic() {
 
     const detectMiniApp = async () => {
       try {
-
-        // Check for clientFid first - this is the most reliable way to detect mini-app
+        // Check for any Farcaster client context (both Farcaster and Base App)
+        // clientFid presence indicates we're in a mini-app context
         if (farcasterContext?.client?.clientFid) {
+          console.log(`Mini-app detected with clientFid: ${farcasterContext.client.clientFid}`);
           setIsMiniAppView(true);
           setIsDetectionComplete(true);
           return;
         }
 
-        // Try detection even if SDK isn't "fully loaded" - it might still work
-        const isMiniApp = await sdk.isInMiniApp();
+        // Note: sdk.isInMiniApp() is not currently supported in Base App (clientFid 309857)
+        // but may work for other Farcaster clients, so try as fallback
+        try {
+          const isMiniApp = await sdk.isInMiniApp();
+          console.log(`sdk.isInMiniApp() result: ${isMiniApp}`);
+          setIsMiniAppView(isMiniApp);
+          setIsDetectionComplete(true);
+        } catch (sdkError) {
+          console.warn("sdk.isInMiniApp() not supported, using fallback detection");
+          // Use window-based fallback detection
+          const fallbackDetection =
+            typeof window !== "undefined" &&
+            !window.location.hostname.includes("localhost") &&
+            !window.location.hostname.includes("127.0.0.1") &&
+            (window.parent !== window ||
+              window.location !== window.parent.location);
 
-
-        setIsMiniAppView(isMiniApp);
-        setIsDetectionComplete(true);
+          console.log(`Fallback detection result: ${fallbackDetection}`);
+          setIsMiniAppView(fallbackDetection);
+          setIsDetectionComplete(true);
+        }
       } catch (error) {
         console.error("Error checking if in mini app:", error);
 
@@ -81,6 +97,7 @@ export function useAppFrameLogic() {
           (window.parent !== window ||
             window.location !== window.parent.location);
 
+        console.log(`Final fallback detection result: ${fallbackDetection}`);
         setIsMiniAppView(fallbackDetection);
         setIsDetectionComplete(true);
       }
