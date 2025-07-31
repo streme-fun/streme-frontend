@@ -62,6 +62,7 @@ src/
 # Key Hooks
 
 - `useTokenData` - Centralized token balance management
+- `useWallet` - **NEW**: Unified wallet connection hook for both browser and mini-app contexts
 - `useAppFrameLogic` - Farcaster mini-app detection and context
 - `useStremeBalance` - User's STREME token balance
 - `useStremeFlowRate` - User's STREME staking rewards flow rate
@@ -104,8 +105,13 @@ src/
 
 # Authentication / Wallet Connection
 
-- Privy handles desktop/mobile authentication, but wagmi is used for Farcaster mini-app
-- Mini-app wallet isolation: Connectors are conditionally configured to prevent browser wallet interference in mini-app context
+The app uses a **unified wallet architecture** that seamlessly handles both browser and mini-app contexts:
+
+- **Browser Mode**: Privy authentication + wagmi for blockchain operations
+- **Mini-App Mode**: Direct wagmi connection with Farcaster connector only
+- **Automatic Context Detection**: WagmiProvider detects environment and configures appropriate connectors
+- **Wallet Override Prevention**: Browser wallets are automatically disconnected in mini-app context
+- **Smart Wallet Switching**: Browser extension wallet changes are detected and synced with Privy
 
 ## Mini-App Wallet Connection Guidelines
 
@@ -120,12 +126,21 @@ src/
 ### Correct Connection Pattern:
 ```tsx
 function ConnectWallet() {
-  const { isConnected, address } = useAccount()
-  const { connect, connectors } = useConnect()
+  const { isConnected, address, connect } = useWallet()
 
   if (isConnected) {
     return <div>Connected: {address}</div>
   }
+
+  return <button onClick={connect}>Connect Wallet</button>
+}
+```
+
+### Legacy Pattern (deprecated):
+```tsx
+function ConnectWallet() {
+  const { isConnected, address } = useAccount()
+  const { connect, connectors } = useConnect()
 
   const handleConnect = () => {
     const farcasterConnector = connectors.find(c => c.id === 'farcasterMiniApp')
@@ -257,8 +272,14 @@ Enable debug mode by clicking the floating button in development.
 
 ## Network Issues
 - **Transactions on wrong network**: Check `chainId` parameter in `eth_sendTransaction` calls
-- **Mini-app wallet conflicts**: Verify conditional connector configuration in `WagmiProvider`
+- **Mini-app wallet conflicts**: Fixed with new unified WagmiProvider architecture
 - **Stream not starting**: Ensure all required Superfluid contract addresses are correct
+
+## Wallet Connection Issues
+- **Browser wallet not updating when switched**: Fixed with automatic sync in `useWallet` hook
+- **Mini-app stuck in connection loop**: Fixed with improved disconnect logic and single detection
+- **Wallet override in mini-app**: Browser wallets automatically disconnected in mini-app context
+- **Debug wallet state**: Use `/debug-wallet` page to monitor all wallet states in development
 
 ## Superfluid Issues  
 - **Active streams not showing**: Use token address directly in query, not as variable

@@ -1,18 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount, useWalletClient } from "wagmi";
-// import { base } from "viem/chains"; // Removed as it's no longer used
+import { useWalletClient } from "wagmi";
 import { StakeModal } from "./StakeModal";
 import { Interface } from "@ethersproject/abi";
-import { publicClient } from "@/src/lib/viemClient"; // Import the centralized client
-import { toast } from "sonner"; // Added for Mini App placeholder
-import sdk from "@farcaster/miniapp-sdk"; // Added Farcaster SDK
-import { usePostHog } from "posthog-js/react"; // Added PostHog hook
+import { publicClient } from "@/src/lib/viemClient";
+import { toast } from "sonner";
+import sdk from "@farcaster/miniapp-sdk";
+import { usePostHog } from "posthog-js/react";
+import { useWallet } from "@/src/hooks/useWallet";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics"; // Added analytics constants
-import { formatUnits } from "viem"; // Added for amount formatting
-import { useWallets } from "@privy-io/react-auth";
+import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
+import { formatUnits } from "viem";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
@@ -43,9 +42,6 @@ interface StakeButtonProps {
   totalStakers?: string;
   onSuccess?: () => void;
   onPoolConnect?: () => void;
-  isMiniApp?: boolean;
-  farcasterAddress?: string;
-  farcasterIsConnected?: boolean;
   tokenBalance?: bigint;
 }
 
@@ -59,15 +55,11 @@ export function StakeButton({
   totalStakers,
   onSuccess,
   onPoolConnect,
-  isMiniApp,
-  farcasterAddress,
-  farcasterIsConnected,
   tokenBalance = BigInt(0),
 }: StakeButtonProps) {
-  const { address: wagmiAddress } = useAccount();
+  const { address, isConnected, isMiniApp } = useWallet();
   const { data: walletClient } = useWalletClient();
-  const { wallets } = useWallets();
-  const { address: fcAddress, isConnected: fcIsConnected } = useAppFrameLogic();
+  const { getSafeEthereumProvider } = useAppFrameLogic();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const postHog = usePostHog();
@@ -75,19 +67,8 @@ export function StakeButton({
   // Use passed balance instead of making additional API calls
   const balance = tokenBalance;
 
-  // Use explicit mini-app check with fallback to passed prop
-  const isEffectivelyMiniApp = isMiniApp || false;
-
-  const currentAddress = isEffectivelyMiniApp
-    ? farcasterAddress ?? fcAddress
-    : wagmiAddress;
-
-  const walletIsConnected = isEffectivelyMiniApp
-    ? farcasterIsConnected ?? fcIsConnected
-    : !!wagmiAddress;
-
   const handleStake = async (amount: bigint) => {
-    if (!currentAddress || !walletIsConnected) {
+    if (!address || !isConnected) {
       toast.error("Wallet not connected or address missing");
       throw new Error("Wallet not connected or address missing");
     }
@@ -110,8 +91,8 @@ export function StakeButton({
       let stakeTxHash: `0x${string}` | undefined;
       let connectTxHash: `0x${string}` | undefined;
 
-      if (isEffectivelyMiniApp) {
-        const ethProvider = await sdk.wallet.getEthereumProvider();
+      if (isMiniApp) {
+        const ethProvider = await getSafeEthereumProvider();
         if (!ethProvider)
           throw new Error("Farcaster Ethereum provider not available.");
 
@@ -126,14 +107,14 @@ export function StakeButton({
         ]);
         const sendDataWithReferral = await appendReferralTag(
           toHex(sendData),
-          toHex(currentAddress!)
+          toHex(address!)
         );
         stakeTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
           params: [
             {
               to: toHex(tokenAddress),
-              from: toHex(currentAddress!),
+              from: toHex(address!),
               data: sendDataWithReferral,
               chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
             },
@@ -163,7 +144,7 @@ export function StakeButton({
             address: toHex(GDA_FORWARDER),
             abi: gdaABI,
             functionName: "isMemberConnected",
-            args: [toHex(stakingPoolAddress), toHex(currentAddress!)],
+            args: [toHex(stakingPoolAddress), toHex(address!)],
           });
           if (!connected) {
             toast.loading("Connecting to reward pool...", { id: toastId });
@@ -176,14 +157,14 @@ export function StakeButton({
             ]);
             const connectDataWithReferral = await appendReferralTag(
               toHex(connectData),
-              toHex(currentAddress!)
+              toHex(address!)
             );
             connectTxHash = await ethProvider.request({
               method: "eth_sendTransaction",
               params: [
                 {
                   to: toHex(GDA_FORWARDER),
-                  from: toHex(currentAddress!),
+                  from: toHex(address!),
                   data: connectDataWithReferral,
                   chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
                 },
@@ -203,91 +184,50 @@ export function StakeButton({
           }
         }
       } else {
-        // Desktop/Mobile Path - use wagmi/privy for transaction
-        if (!currentAddress) {
+        // Desktop/Mobile Path - use wagmi for transaction
+        if (!address) {
           throw new Error("Wallet not connected.");
         }
 
-        // Get provider from Privy wallets or wagmi
-        let provider: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-        if (walletClient) {
-          // If wagmi wallet client is available, use it
-          provider = walletClient;
-        } else {
-          // Fallback to Privy wallet
-          const wallet = wallets.find((w) => w.address === wagmiAddress);
-          if (!wallet) {
-            throw new Error("Wallet not found");
-          }
-          provider = await wallet.getEthereumProvider();
-          await provider.request({
-            method: "wallet_switchEthereumChain",
-            params: [{ chainId: "0x2105" }],
-          });
+        if (!walletClient) {
+          throw new Error("Wallet client not available");
         }
 
         toast.loading("Staking tokens...", { id: toastId });
 
-        if (walletClient) {
-          // Use wagmi wallet client for sending
-          const { encodeFunctionData } = await import("viem");
-          const abi = [
-            {
-              inputs: [
-                { name: "recipient", type: "address" },
-                { name: "amount", type: "uint256" },
-                { name: "userData", type: "bytes" },
-              ],
-              name: "send",
-              outputs: [],
-              stateMutability: "nonpayable",
-              type: "function",
-            },
-          ] as const;
-
-          const sendData = encodeFunctionData({
-            abi,
-            functionName: "send",
-            args: [toHex(STAKING_HELPER), amount, "0x"],
-          });
-
-          const sendDataWithReferral = await appendReferralTag(
-            sendData,
-            toHex(currentAddress!)
-          );
-
-          stakeTxHash = await walletClient.sendTransaction({
-            to: toHex(tokenAddress),
-            data: sendDataWithReferral,
-            account: toHex(currentAddress!),
-            chain: undefined,
-          });
-        } else {
-          // Use Privy provider
-          const sendIface = new Interface([
-            "function send(address recipient, uint256 amount, bytes userData) external",
-          ]);
-          const sendData = sendIface.encodeFunctionData("send", [
-            toHex(STAKING_HELPER),
-            amount,
-            "0x", // empty userData
-          ]);
-          const sendDataWithReferral = await appendReferralTag(
-            toHex(sendData),
-            toHex(currentAddress!)
-          );
-          stakeTxHash = await provider.request({
-            method: "eth_sendTransaction",
-            params: [
-              {
-                to: toHex(tokenAddress),
-                from: toHex(currentAddress!),
-                data: sendDataWithReferral,
-                chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
-              },
+        // Use wagmi wallet client for sending
+        const { encodeFunctionData } = await import("viem");
+        const abi = [
+          {
+            inputs: [
+              { name: "recipient", type: "address" },
+              { name: "amount", type: "uint256" },
+              { name: "userData", type: "bytes" },
             ],
-          });
-        }
+            name: "send",
+            outputs: [],
+            stateMutability: "nonpayable",
+            type: "function",
+          },
+        ] as const;
+
+        const sendData = encodeFunctionData({
+          abi,
+          functionName: "send",
+          args: [toHex(STAKING_HELPER), amount, "0x"],
+        });
+
+        const sendDataWithReferral = await appendReferralTag(
+          sendData,
+          toHex(address!)
+        );
+
+        stakeTxHash = await walletClient!.sendTransaction({
+          to: toHex(tokenAddress),
+          data: sendDataWithReferral,
+          account: toHex(address!),
+          chain: undefined,
+        });
 
         if (!stakeTxHash)
           throw new Error(
@@ -313,69 +253,43 @@ export function StakeButton({
             address: toHex(GDA_FORWARDER),
             abi: gdaABI,
             functionName: "isMemberConnected",
-            args: [toHex(stakingPoolAddress), toHex(currentAddress!)],
+            args: [toHex(stakingPoolAddress), toHex(address!)],
           });
           if (!connected) {
             toast.loading("Connecting to reward pool...", { id: toastId });
 
-            if (walletClient) {
-              // Use wagmi wallet client for pool connection
-              const { encodeFunctionData } = await import("viem");
-              const abi = [
-                {
-                  inputs: [
-                    { name: "pool", type: "address" },
-                    { name: "userData", type: "bytes" },
-                  ],
-                  name: "connectPool",
-                  outputs: [{ name: "", type: "bool" }],
-                  stateMutability: "nonpayable",
-                  type: "function",
-                },
-              ] as const;
-
-              const connectData = encodeFunctionData({
-                abi,
-                functionName: "connectPool",
-                args: [toHex(stakingPoolAddress), "0x"],
-              });
-
-              const connectDataWithReferral = await appendReferralTag(
-                connectData,
-                toHex(currentAddress!)
-              );
-
-              connectTxHash = await walletClient.sendTransaction({
-                to: toHex(GDA_FORWARDER),
-                data: connectDataWithReferral,
-                account: toHex(currentAddress!),
-                chain: undefined,
-              });
-            } else {
-              // Use Privy provider
-              const gdaIface = new Interface([
-                "function connectPool(address pool, bytes calldata userData) external returns (bool)",
-              ]);
-              const connectData = gdaIface.encodeFunctionData("connectPool", [
-                toHex(stakingPoolAddress),
-                "0x",
-              ]);
-              const connectDataWithReferral = await appendReferralTag(
-                toHex(connectData),
-                toHex(currentAddress!)
-              );
-              connectTxHash = await provider.request({
-                method: "eth_sendTransaction",
-                params: [
-                  {
-                    to: toHex(GDA_FORWARDER),
-                    from: toHex(currentAddress!),
-                    data: connectDataWithReferral,
-                    chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
-                  },
+            // Use wagmi wallet client for pool connection
+            const { encodeFunctionData } = await import("viem");
+            const abi = [
+              {
+                inputs: [
+                  { name: "pool", type: "address" },
+                  { name: "userData", type: "bytes" },
                 ],
-              });
-            }
+                name: "connectPool",
+                outputs: [{ name: "", type: "bool" }],
+                stateMutability: "nonpayable",
+                type: "function",
+              },
+            ] as const;
+
+            const connectData = encodeFunctionData({
+              abi,
+              functionName: "connectPool",
+              args: [toHex(stakingPoolAddress), "0x"],
+            });
+
+            const connectDataWithReferral = await appendReferralTag(
+              connectData,
+              toHex(address!)
+            );
+
+            connectTxHash = await walletClient!.sendTransaction({
+              to: toHex(GDA_FORWARDER),
+              data: connectDataWithReferral,
+              account: toHex(address!),
+              chain: undefined,
+            });
 
             if (!connectTxHash)
               throw new Error("Pool connection transaction hash not received.");
@@ -402,13 +316,13 @@ export function StakeButton({
         [ANALYTICS_PROPERTIES.TOKEN_SYMBOL]: symbol,
         [ANALYTICS_PROPERTIES.AMOUNT_WEI]: amount.toString(),
         [ANALYTICS_PROPERTIES.AMOUNT_FORMATTED]: formatUnits(amount, 18),
-        [ANALYTICS_PROPERTIES.USER_ADDRESS]: currentAddress,
-        [ANALYTICS_PROPERTIES.IS_MINI_APP]: isEffectivelyMiniApp || false,
+        [ANALYTICS_PROPERTIES.USER_ADDRESS]: address,
+        [ANALYTICS_PROPERTIES.IS_MINI_APP]: isMiniApp || false,
         [ANALYTICS_PROPERTIES.TRANSACTION_HASH]: stakeTxHash,
         [ANALYTICS_PROPERTIES.HAS_POOL_CONNECTION]:
           !!stakingPoolAddress &&
           stakingPoolAddress !== "0x0000000000000000000000000000000000000000",
-        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isEffectivelyMiniApp
+        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isMiniApp
           ? "farcaster"
           : "privy",
       });
@@ -495,7 +409,7 @@ export function StakeButton({
         totalStakers={totalStakers}
         onStake={handleStake}
         onSuccess={onSuccess} // Pass onSuccess to modal if it needs to trigger something on close after success
-        isMiniApp={isEffectivelyMiniApp}
+        isMiniApp={isMiniApp}
       />
     </>
   );

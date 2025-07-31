@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePrivy } from "@privy-io/react-auth";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -13,7 +12,7 @@ import { MyTokensModal } from "./MyTokensModal";
 import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
-import { useUnifiedWallet } from "../hooks/useUnifiedWallet";
+import { useWallet } from "../hooks/useWallet";
 import sdk from "@farcaster/miniapp-sdk";
 
 // Client-side function to fetch user data from our API
@@ -31,18 +30,15 @@ const fetchNeynarUser = async (fid: number) => {
 };
 
 export function Navbar() {
-  const {
-    logout: privyLogout,
-  } = usePrivy();
-
-  // Use unified wallet connection logic
+  // Use new simplified wallet hook
   const {
     isConnected,
     address,
     connect,
-    isEffectivelyMiniApp,
+    disconnect,
+    isMiniApp,
     isLoading,
-  } = useUnifiedWallet();
+  } = useWallet();
   const router = useRouter();
 
   const {
@@ -95,7 +91,7 @@ export function Navbar() {
   // Fetch profile picture for mini-app view
   useEffect(() => {
     const fetchMiniAppProfile = async () => {
-      if (!isEffectivelyMiniApp || !farcasterContext?.user?.fid) {
+      if (!isMiniApp || !farcasterContext?.user?.fid) {
         setMiniAppProfileImage("");
         return;
       }
@@ -112,7 +108,7 @@ export function Navbar() {
     };
 
     fetchMiniAppProfile();
-  }, [isEffectivelyMiniApp, farcasterContext?.user?.fid]);
+  }, [isMiniApp, farcasterContext?.user?.fid]);
 
   // const handleMiniAppConnect = () => {
   //   const fcConnector = wagmiConnectors.find((c) => c.id === "farcaster");
@@ -128,7 +124,7 @@ export function Navbar() {
   //   }
   // };
 
-  if (isEffectivelyMiniApp) {
+  if (isMiniApp) {
     return (
       <>
         <nav className="fixed bottom-0 left-0 right-0 z-50 pb-4 pt-2 bg-background/80 border-t border-black/[.1] bg-base-100 bg-opacity-80">
@@ -470,7 +466,7 @@ Symbol: $[your ticker]
                       </Link>
                       <button
                         onClick={() => {
-                          privyLogout();
+                          disconnect();
                           setIsAddressDropdownOpen(false);
                         }}
                         className="w-full px-4 py-2 text-left hover:bg-base-200 rounded-lg cursor-pointer"
@@ -549,7 +545,7 @@ Symbol: $[your ticker]
             {isConnected ? (
               <button
                 onClick={() => {
-                  privyLogout();
+                  disconnect();
                   setIsMenuOpen(false);
                 }}
                 className="btn btn-ghost w-full justify-start"
