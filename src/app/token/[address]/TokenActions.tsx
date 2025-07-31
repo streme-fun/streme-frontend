@@ -114,10 +114,7 @@ export function TokenActions({
     return initialToken.staking_address;
   }, [initialToken.staking_address]);
 
-  const { 
-    isSDKLoaded: fcSDKLoaded,
-    farcasterContext,
-  } = useAppFrameLogic();
+  const { isSDKLoaded: fcSDKLoaded, farcasterContext } = useAppFrameLogic();
 
   const { ready: privyReady } = usePrivy();
 
@@ -708,7 +705,7 @@ export function TokenActions({
                         {amount} ETH
                       </button>
                     ))
-                  : [10, 100, 1000, 10000].map((amount) => (
+                  : [5, 10, 100, 1000].map((amount) => (
                       <button
                         key={amount}
                         onClick={() => handleFixedAmountClick(amount)}
@@ -767,8 +764,10 @@ export function TokenActions({
                     // Don't show USD equivalent when:
                     // 1. Receiving USDC (it's redundant)
                     // 2. Buying with USDC (confusing to show lower USD value)
-                    if ((tradeDirection === "sell" && tradeCurrency === "USDC") ||
-                        (tradeDirection === "buy" && tradeCurrency === "USDC")) {
+                    if (
+                      (tradeDirection === "sell" && tradeCurrency === "USDC") ||
+                      (tradeDirection === "buy" && tradeCurrency === "USDC")
+                    ) {
                       return null;
                     }
 

@@ -396,7 +396,7 @@ function App() {
   };
 
   if (!isSDKLoaded) {
-    return <div className="text-center py-8">Loading SDK...</div>;
+    return <div className="text-center py-8"></div>;
   }
 
   if (isMiniAppView) {

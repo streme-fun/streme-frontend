@@ -3,7 +3,7 @@
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useSetActiveWallet } from "@privy-io/wagmi";
-import { useMiniAppContext } from "../components/providers/WagmiProvider";
+import { useMiniAppContext } from "../contexts/MiniAppContext";
 import { useCallback, useEffect } from "react";
 
 /**

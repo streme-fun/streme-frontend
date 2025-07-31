@@ -11,7 +11,7 @@ import {
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { readContract } from "wagmi/actions";
-import { config } from "@/src/components/providers/WagmiProvider";
+import { sharedConfig as config } from "@/src/lib/wagmiConfig";
 import { parseEther } from "viem";
 import { toast } from "sonner";
 import {

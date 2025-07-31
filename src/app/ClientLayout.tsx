@@ -4,7 +4,8 @@ import PrivyProviderWrapper from "../components/auth/PrivyProviderWrapper";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { FrameProvider } from "../components/providers/FrameProvider";
-import WagmiProvider from "../components/providers/WagmiProvider";
+import MiniAppWagmiProvider from "../components/providers/MiniAppWagmiProvider";
+import BrowserWagmiProvider from "../components/providers/BrowserWagmiProvider";
 import { TokenDataProvider } from "../hooks/useTokenData";
 import { Toaster } from "sonner";
 import React, { useEffect, useState } from "react";
@@ -510,11 +511,11 @@ function AppContent({ children }: { children: React.ReactNode }) {
 function MiniAppLayout({ children }: { children: React.ReactNode }) {
   return (
     <FrameProvider>
-      <WagmiProvider>
+      <MiniAppWagmiProvider>
         <TokenDataProvider>
           <AppContent>{children}</AppContent>
         </TokenDataProvider>
-      </WagmiProvider>
+      </MiniAppWagmiProvider>
     </FrameProvider>
   );
 }
@@ -524,11 +525,11 @@ function BrowserLayout({ children }: { children: React.ReactNode }) {
   return (
     <PrivyProviderWrapper>
       <FrameProvider>
-        <WagmiProvider>
+        <BrowserWagmiProvider>
           <TokenDataProvider>
             <AppContent>{children}</AppContent>
           </TokenDataProvider>
-        </WagmiProvider>
+        </BrowserWagmiProvider>
       </FrameProvider>
     </PrivyProviderWrapper>
   );
