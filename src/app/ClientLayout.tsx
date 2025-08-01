@@ -545,6 +545,14 @@ function EnvironmentDetector({ children }: { children: React.ReactNode }) {
     const detectEnvironment = async () => {
       try {
         console.log("🔍 EnvironmentDetector: Starting detection...");
+        
+        // For Coinbase Wallet, ethereum provider might not be immediately available
+        // Wait a bit if we're in an iframe context
+        if (typeof window !== "undefined" && window.parent !== window) {
+          console.log("🔍 EnvironmentDetector: Iframe detected, waiting for ethereum provider...");
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
         const isMiniApp = await detectEnvironmentForProviders();
         console.log("🔍 EnvironmentDetector: Detection result:", isMiniApp);
         setIsMiniApp(isMiniApp);

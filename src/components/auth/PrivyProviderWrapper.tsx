@@ -16,7 +16,7 @@ const PrivyProviderWrapper = ({ children }: { children: React.ReactNode }) => {
         },
         externalWallets: {
           coinbaseWallet: {
-            connectionOptions: "smartWalletOnly",
+            connectionOptions: "all", // Allow both EOA and smart wallet
           },
         },
         appearance: {

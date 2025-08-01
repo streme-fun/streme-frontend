@@ -20,6 +20,33 @@ export async function detectMiniApp(
   try {
     console.log("🔍 Starting mini-app detection...");
 
+    // First, check if we're in Coinbase Wallet browser - this should NEVER be treated as mini-app
+    if (typeof window !== "undefined") {
+      // Check for Coinbase Wallet in multiple ways
+      const hasCoinbaseWallet = window.ethereum && (
+        window.ethereum.isCoinbaseWallet || 
+        window.ethereum.isCoinbaseWalletExtension ||
+        window.ethereum.isCoinbaseWalletBrowser
+      );
+      
+      // Also check user agent for Coinbase Wallet
+      const userAgent = window.navigator?.userAgent || '';
+      const isCoinbaseUserAgent = userAgent.includes('CoinbaseWallet') || 
+                                   userAgent.includes('Coinbase');
+      
+      if (hasCoinbaseWallet || isCoinbaseUserAgent) {
+        console.log("Coinbase Wallet browser detected - forcing desktop mode", {
+          hasCoinbaseWallet,
+          isCoinbaseUserAgent,
+          userAgent: userAgent.substring(0, 100) // Log first 100 chars of user agent
+        });
+        return {
+          isMiniApp: false,
+          detectionMethod: 'none'
+        };
+      }
+    }
+
     // Method 1: Use provided Farcaster context (most reliable when available)
     if (farcasterContext?.client?.clientFid) {
       console.log("Using provided Farcaster context:", farcasterContext.client.clientFid);
