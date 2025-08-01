@@ -25,9 +25,8 @@ const PrivyProviderWrapper = ({ children }: { children: React.ReactNode }) => {
           logo: "https://streme.fun/android-chrome-512x512.png",
           showWalletLoginFirst: true,
           walletChainType: "ethereum-only",
-          walletList: ["coinbase_wallet", "metamask", "detected_wallets"],
         },
-        loginMethods: ["wallet"], // Only wallet login
+        loginMethods: ["wallet"],
         mfa: {
           noPromptOnMfaRequired: false,
         },
