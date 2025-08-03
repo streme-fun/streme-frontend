@@ -4,13 +4,13 @@ import type { Context } from "@farcaster/miniapp-core";
 export interface MiniAppDetectionResult {
   isMiniApp: boolean;
   clientFid?: number;
-  detectionMethod: 'clientFid' | 'sdk' | 'iframe' | 'none';
+  detectionMethod: "clientFid" | "sdk" | "iframe" | "none";
   context?: Context.MiniAppContext;
 }
 
 /**
  * Comprehensive mini-app detection that works at different app lifecycle stages
- * 
+ *
  * @param farcasterContext - Optional Farcaster context from FrameProvider (if available)
  * @returns Promise<MiniAppDetectionResult>
  */
@@ -20,55 +20,131 @@ export async function detectMiniApp(
   try {
     console.log("🔍 Starting mini-app detection...");
 
-    // First, check if we're in Coinbase Wallet browser - this should NEVER be treated as mini-app
+    // First, check if we're in any wallet browser - these should NEVER be treated as mini-app
     if (typeof window !== "undefined") {
-      // Check for Coinbase Wallet in multiple ways
-      const hasCoinbaseWallet = window.ethereum && (
-        window.ethereum.isCoinbaseWallet || 
-        window.ethereum.isCoinbaseWalletExtension ||
-        window.ethereum.isCoinbaseWalletBrowser
-      );
+      const userAgent = window.navigator?.userAgent || "";
       
-      // Also check user agent for Coinbase Wallet
-      const userAgent = window.navigator?.userAgent || '';
-      const isCoinbaseUserAgent = userAgent.includes('CoinbaseWallet') || 
-                                   userAgent.includes('Coinbase');
-      
-      if (hasCoinbaseWallet || isCoinbaseUserAgent) {
-        console.log("Coinbase Wallet browser detected - forcing desktop mode", {
-          hasCoinbaseWallet,
-          isCoinbaseUserAgent,
-          userAgent: userAgent.substring(0, 100) // Log first 100 chars of user agent
-        });
-        return {
-          isMiniApp: false,
-          detectionMethod: 'none'
-        };
+      // Check for various wallet browsers
+      const walletChecks = {
+        // Coinbase Wallet
+        coinbase: {
+          ethereum: window.ethereum &&
+            (window.ethereum.isCoinbaseWallet ||
+             window.ethereum.isCoinbaseWalletExtension ||
+             window.ethereum.isCoinbaseWalletBrowser),
+          userAgent: userAgent.includes("CoinbaseWallet") || userAgent.includes("Coinbase")
+        },
+        // Rainbow Wallet
+        rainbow: {
+          ethereum: window.ethereum && window.ethereum.isRainbow,
+          userAgent: userAgent.includes("Rainbow")
+        },
+        // MetaMask
+        metamask: {
+          ethereum: window.ethereum && window.ethereum.isMetaMask,
+          userAgent: userAgent.includes("MetaMask")
+        },
+        // Rabby Wallet
+        rabby: {
+          ethereum: window.ethereum && window.ethereum.isRabby,
+          userAgent: userAgent.includes("Rabby")
+        },
+        // Trust Wallet
+        trust: {
+          ethereum: window.ethereum && (window.ethereum.isTrust || window.ethereum.isTrustWallet),
+          userAgent: userAgent.includes("TrustWallet")  // More specific, removed generic "Trust"
+        },
+        // Brave Wallet
+        brave: {
+          ethereum: window.ethereum && window.ethereum.isBraveWallet,
+          userAgent: userAgent.includes("Brave/")  // More specific with slash
+        },
+        // Opera Crypto Browser
+        opera: {
+          ethereum: window.ethereum && window.ethereum.isOpera,
+          userAgent: userAgent.includes("OPR/") && userAgent.includes("Opera")  // Require both for Opera
+        },
+        // OKX Wallet (formerly OKEx)
+        okx: {
+          ethereum: window.ethereum && window.ethereum.isOkxWallet,
+          userAgent: userAgent.includes("OKApp") || userAgent.includes("OKX")
+        },
+        // Zerion Wallet
+        zerion: {
+          ethereum: window.ethereum && window.ethereum.isZerion,
+          userAgent: userAgent.includes("Zerion")
+        },
+        // 1inch Wallet
+        oneInch: {
+          ethereum: window.ethereum && window.ethereum.isOneInchIOSWallet,
+          userAgent: userAgent.includes("1inch")
+        }
+      };
+
+      // Check if any wallet browser is detected
+      for (const [walletName, checks] of Object.entries(walletChecks)) {
+        // For wallets that Farcaster might inject compatibility flags for,
+        // require BOTH ethereum and userAgent checks to avoid false positives
+        const requireBothChecks = ['metamask', 'rabby', 'brave', 'trust'];
+        
+        if (requireBothChecks.includes(walletName)) {
+          if (checks.ethereum && checks.userAgent) {
+            console.log(`${walletName} wallet browser detected - forcing desktop mode`, {
+              ethereumCheck: checks.ethereum,
+              userAgentCheck: checks.userAgent,
+              userAgent: userAgent.substring(0, 100),
+            });
+            return {
+              isMiniApp: false,
+              detectionMethod: "none",
+            };
+          }
+        } else {
+          // For other wallets, either check is sufficient
+          if (checks.ethereum || checks.userAgent) {
+            console.log(`${walletName} wallet browser detected - forcing desktop mode`, {
+              ethereumCheck: checks.ethereum,
+              userAgentCheck: checks.userAgent,
+              userAgent: userAgent.substring(0, 100),
+            });
+            return {
+              isMiniApp: false,
+              detectionMethod: "none",
+            };
+          }
+        }
       }
     }
 
     // Method 1: Use provided Farcaster context (most reliable when available)
     if (farcasterContext?.client?.clientFid) {
-      console.log("Using provided Farcaster context:", farcasterContext.client.clientFid);
-      
+      console.log(
+        "Using provided Farcaster context:",
+        farcasterContext.client.clientFid
+      );
+
       // Check for Base App specifically
       if (farcasterContext.client.clientFid === 309857) {
-        console.log("Base App detected via provided context (clientFid 309857)");
+        console.log(
+          "Base App detected via provided context (clientFid 309857)"
+        );
         return {
           isMiniApp: true,
           clientFid: 309857,
-          detectionMethod: 'clientFid',
-          context: farcasterContext
+          detectionMethod: "clientFid",
+          context: farcasterContext,
         };
       }
-      
+
       // Any other Farcaster client
-      console.log(`Other Farcaster client detected via provided context: ${farcasterContext.client.clientFid}`);
+      console.log(
+        `Other Farcaster client detected via provided context: ${farcasterContext.client.clientFid}`
+      );
       return {
         isMiniApp: true,
         clientFid: farcasterContext.client.clientFid,
-        detectionMethod: 'clientFid',
-        context: farcasterContext
+        detectionMethod: "clientFid",
+        context: farcasterContext,
       };
     }
 
@@ -76,71 +152,43 @@ export async function detectMiniApp(
     try {
       const context = await sdk.context;
       console.log("Retrieved SDK context:", context?.client?.clientFid);
-      
+
       if (context?.client?.clientFid === 309857) {
         console.log("Base App detected via SDK context (clientFid 309857)");
         return {
           isMiniApp: true,
           clientFid: 309857,
-          detectionMethod: 'clientFid',
-          context
+          detectionMethod: "clientFid",
+          context,
         };
       }
-      
+
       if (context?.client?.clientFid) {
-        console.log(`Other Farcaster client detected via SDK context: ${context.client.clientFid}`);
+        console.log(
+          `Other Farcaster client detected via SDK context: ${context.client.clientFid}`
+        );
         return {
           isMiniApp: true,
           clientFid: context.client.clientFid,
-          detectionMethod: 'clientFid',
-          context
+          detectionMethod: "clientFid",
+          context,
         };
       }
     } catch (contextError) {
       console.warn("Could not get SDK context:", contextError);
     }
 
-    // Method 3: Try SDK isInMiniApp method
-    try {
-      const isMiniApp = await sdk.isInMiniApp();
-      console.log(`sdk.isInMiniApp() result: ${isMiniApp}`);
-      
-      if (isMiniApp) {
-        return {
-          isMiniApp: true,
-          detectionMethod: 'sdk'
-        };
-      }
-    } catch (sdkError) {
-      console.warn("sdk.isInMiniApp() not supported:", sdkError);
-    }
-
-    // Method 4: Basic iframe detection (last resort)
-    const isInIframe = typeof window !== "undefined" && 
-      !window.location.hostname.includes("localhost") &&
-      !window.location.hostname.includes("127.0.0.1") &&
-      (window.parent !== window || window.location !== window.parent.location);
-
-    if (isInIframe) {
-      console.log("Iframe context detected (potential mini-app)");
-      return {
-        isMiniApp: true,
-        detectionMethod: 'iframe'
-      };
-    }
-
     // No mini-app detected
     console.log("No mini-app detected, using desktop mode");
     return {
       isMiniApp: false,
-      detectionMethod: 'none'
+      detectionMethod: "none",
     };
-
   } catch (error) {
     console.error("Error during mini-app detection:", error);
     return {
       isMiniApp: false,
-      detectionMethod: 'none'
+      detectionMethod: "none",
     };
   }
 }

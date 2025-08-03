@@ -51,7 +51,7 @@ export function Hero() {
   }, []);
 
   return (
-    <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-10 md:mt-14">
+    <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-14">
       {/* Hero Text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center z-10 text-center">
         {/* Transparent background container */}

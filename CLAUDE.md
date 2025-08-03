@@ -82,13 +82,26 @@ The app uses a **centralized mini-app detection system** to ensure consistent be
 
 - `detectEnvironmentForProviders()` - Early detection for ClientLayout provider selection
 - `detectMiniAppWithContext()` - Enhanced detection with Farcaster context for app logic
-- `detectMiniApp()` - Core detection function with multiple fallback methods
+- `detectMiniApp()` - Core detection function with wallet browser exclusion, then clientFid checks
 
 ## Detection Methods (in priority order):
-1. **Base App clientFid** - Most reliable: checks for `clientFid === 309857`
-2. **Other Farcaster clientFid** - Any other valid Farcaster client
-3. **SDK isInMiniApp()** - Fallback SDK method
-4. **Iframe detection** - Last resort: basic parent window check
+1. **Wallet Browser Exclusion** - Forces desktop mode for all wallet browsers:
+   - Coinbase Wallet
+   - Rainbow Wallet
+   - MetaMask
+   - Rabby Wallet
+   - Trust Wallet
+   - Brave Wallet
+   - Opera Crypto Browser
+   - OKX Wallet
+   - Zerion Wallet
+   - 1inch Wallet
+2. **Base App clientFid** - Checks for `clientFid === 309857`
+3. **Other Farcaster clientFid** - Any other valid Farcaster client
+
+Note: URL-based detection (checking for `/mini` path or `?miniApp=true`) is not used due to reliability concerns - these can be easily manipulated and are not consistently set across different Farcaster clients.
+
+**Important**: All wallet browsers are explicitly excluded from mini-app mode to ensure proper wallet functionality and prevent conflicts.
 
 ## Usage Pattern:
 - **ClientLayout**: Uses `detectEnvironmentForProviders()` to choose provider stack
@@ -306,7 +319,7 @@ Enable debug mode by clicking the floating button in development.
 - Flow rates: Can be negative (net outflow), handle UI accordingly
 - Mini-app transactions: ALWAYS include `chainId: "0x2105"` in `eth_sendTransaction` calls
 - CFA streams: Don't have automatic end dates - require manual termination or Flow Scheduler
-- Mini-app detection: Use `clientFid` presence and other robust checks to prevent browser wallet interference
+- Mini-app detection: Uses `clientFid` presence as the primary detection method for reliability
 - Checkin flow: Users with STREME balance must stake before claiming daily rewards (enforced in CheckinModal)
 - STREME staking: Direct send to StakingHelper (0x1738e0Fed480b04968A3B7b14086EAF4fDB685A3) auto-stakes tokens
 
