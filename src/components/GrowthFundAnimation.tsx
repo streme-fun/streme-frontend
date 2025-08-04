@@ -225,6 +225,8 @@ export const GrowthFundAnimation = ({
 
             .icon-pulse {
               animation: iconPulse 6s ease-in-out infinite;
+              transform-origin: center center;
+              transform-box: fill-box;
             }
 
             .energy-ring {
@@ -246,6 +248,8 @@ export const GrowthFundAnimation = ({
 
             .pulse-circle {
               animation: pulseCircle 4s ease-in-out infinite;
+              transform-origin: center center;
+              transform-box: fill-box;
             }
           `}
         </style>
@@ -289,53 +293,52 @@ export const GrowthFundAnimation = ({
 
           {/* Streme Icon Target - Centered */}
           <g className="icon-container" transform="translate(225, 150)">
-            {/* Circular background for icon */}
-            <circle
-              cx="0"
-              cy="0"
-              r="65"
-              fill="hsl(var(--b1))"
-              stroke="hsl(var(--p))"
-              strokeWidth="4"
-              opacity="0.95"
-              className="icon-pulse"
-            />
-            
-            {/* Icon border ring - outer */}
-            <circle
-              cx="0"
-              cy="0"
-              r="58"
-              fill="none"
-              stroke="hsl(var(--s))"
-              strokeWidth="4"
-              opacity="0.9"
-              className="icon-pulse"
-            />
-            
-            {/* Icon border ring - inner */}
-            <circle
-              cx="0"
-              cy="0"
-              r="52"
-              fill="none"
-              stroke="hsl(var(--a))"
-              strokeWidth="3"
-              opacity="0.7"
-              className="icon-pulse"
-            />
-            
-            {/* Streme Icon - Circular, centered and bigger */}
-            <image
-              x="-45"
-              y="-45"
-              width="90"
-              height="90"
-              href="/icon.png"
-              opacity="0.95"
-              className="icon-pulse"
-              clipPath="circle(45px at 45px 45px)"
-            />
+            {/* Apply pulse animation to this group instead of individual elements */}
+            <g className="icon-pulse">
+              {/* Circular background for icon */}
+              <circle
+                cx="0"
+                cy="0"
+                r="65"
+                fill="hsl(var(--b1))"
+                stroke="hsl(var(--p))"
+                strokeWidth="4"
+                opacity="0.95"
+              />
+              
+              {/* Icon border ring - outer */}
+              <circle
+                cx="0"
+                cy="0"
+                r="58"
+                fill="none"
+                stroke="hsl(var(--s))"
+                strokeWidth="4"
+                opacity="0.9"
+              />
+              
+              {/* Icon border ring - inner */}
+              <circle
+                cx="0"
+                cy="0"
+                r="52"
+                fill="none"
+                stroke="hsl(var(--a))"
+                strokeWidth="3"
+                opacity="0.7"
+              />
+              
+              {/* Streme Icon - Circular, centered and bigger */}
+              <image
+                x="-45"
+                y="-45"
+                width="90"
+                height="90"
+                href="/icon.png"
+                opacity="0.95"
+                clipPath="circle(45px at 45px 45px)"
+              />
+            </g>
 
             {/* Pulse circle around icon */}
             <circle
