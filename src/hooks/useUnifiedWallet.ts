@@ -6,6 +6,25 @@ import { useAppFrameLogic } from "./useAppFrameLogic";
 import { useState, useEffect } from "react";
 
 /**
+ * Safe Privy hooks wrapper that handles mini-app mode
+ */
+function useSafePrivy() {
+  try {
+    return usePrivy();
+  } catch {
+    return { authenticated: false, login: () => {}, user: null };
+  }
+}
+
+function useSafeWallets() {
+  try {
+    return useWallets();
+  } catch {
+    return { wallets: [] };
+  }
+}
+
+/**
  * Unified wallet connection hook that handles all environments:
  * - Desktop: Privy authentication + wagmi connection
  * - Mobile: Privy authentication (primary) + wagmi connection (secondary)
@@ -15,8 +34,6 @@ import { useState, useEffect } from "react";
  */
 export function useUnifiedWallet() {
   const { address: wagmiAddress, isConnected: wagmiIsConnected } = useAccount();
-  const { authenticated: privyAuthenticated, login: privyLogin, user: privyUser } = usePrivy();
-  const { wallets } = useWallets();
   
   const {
     isMiniAppView,
@@ -26,6 +43,13 @@ export function useUnifiedWallet() {
     connectors: farcasterConnectors,
     isSDKLoaded,
   } = useAppFrameLogic();
+
+  // Use safe Privy hooks that handle mini-app mode gracefully
+  const { authenticated: privyAuthenticatedRaw, login: privyLogin, user: privyUser } = useSafePrivy();
+  const { wallets } = useSafeWallets();
+  
+  // Only use Privy data when not in mini-app mode
+  const privyAuthenticated = isMiniAppView ? false : privyAuthenticatedRaw;
 
   // Stable address management to prevent flickering
   const [stableAddress, setStableAddress] = useState<string>("");

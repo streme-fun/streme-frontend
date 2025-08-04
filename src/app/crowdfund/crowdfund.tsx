@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useReadContract, useAccount } from "wagmi";
+import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
 import { ERC20_ABI } from "@/src/lib/contracts/StremeStakingRewardsFunder";
 import { getPrices } from "@/src/lib/priceUtils";
@@ -9,6 +9,8 @@ import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
 import { GrowthFundAnimation } from "@/src/components/GrowthFundAnimation";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useUnifiedWallet } from "@/src/hooks/useUnifiedWallet";
+import { usePrivy } from "@privy-io/react-auth";
+
 import { HowCrowdfundWorksModal } from "@/src/components/HowCrowdfundWorksModal";
 import { ContributionModal } from "@/src/components/ContributionModal";
 import {
@@ -24,33 +26,26 @@ import { publicClient } from "@/src/lib/viemClient";
 
 export default function CrowdfundPage() {
   const router = useRouter();
-  const { isSDKLoaded } = useAppFrameLogic();
+  const {
+    isSDKLoaded,
+  } = useAppFrameLogic();
 
-  // Use unified wallet connection logic
+  const { ready: privyReady } = usePrivy();
+
+  // Use unified wallet connection logic like TokenActions
   const {
     isConnected: unifiedIsConnected,
     address: unifiedAddress,
-    isEffectivelyMiniApp: unifiedIsMiniApp,
     connect: unifiedConnect,
+    isEffectivelyMiniApp: unifiedIsMiniApp,
     isLoading: unifiedIsLoading,
   } = useUnifiedWallet();
 
-  // Fallback to direct wagmi connection for mini-app if unified wallet fails
-  const { address: wagmiAddress, isConnected: wagmiIsConnected } = useAccount();
-
-  // For mini-app, prefer wagmi directly if unified wallet isn't working
-  const shouldUseWagmiFallback =
-    unifiedIsMiniApp &&
-    (!unifiedIsConnected || !unifiedAddress) &&
-    wagmiIsConnected &&
-    wagmiAddress;
-
-  const effectiveIsConnected = shouldUseWagmiFallback
-    ? wagmiIsConnected
-    : unifiedIsConnected;
-  const effectiveAddress = shouldUseWagmiFallback
-    ? wagmiAddress
-    : unifiedAddress;
+  // Use unified wallet state
+  const isMiniAppView = unifiedIsMiniApp;
+  const effectiveIsConnected = unifiedIsConnected;
+  const effectiveAddress = unifiedAddress;
+  const effectiveConnect = unifiedConnect;
   const [price, setPrice] = useState<number | null>(null);
   const [baseUsdValue, setBaseUsdValue] = useState<number>(0);
   const [lastUsdUpdateTime, setLastUsdUpdateTime] = useState<number>(
@@ -107,34 +102,47 @@ export default function CrowdfundPage() {
   // Use effective wallet state (unified or wagmi fallback)
   const effectiveAuthenticated = effectiveIsConnected;
 
+
   // Debug logging for connection issues on crowdfund page
   useEffect(() => {
-    if (unifiedIsMiniApp) {
-      console.log("[CrowdfundPage] Connection state:", {
-        unifiedIsConnected,
-        unifiedAddress,
-        wagmiIsConnected,
-        wagmiAddress,
-        shouldUseWagmiFallback,
-        effectiveIsConnected,
-        effectiveAddress,
-        unifiedIsLoading,
-      });
-    }
+    console.log("[CrowdfundPage] Connection state:", {
+      isMiniAppView,
+      isSDKLoaded,
+      unifiedIsConnected,
+      unifiedAddress,
+      effectiveIsConnected,
+      effectiveAddress,
+      unifiedIsLoading,
+    });
   }, [
+    isMiniAppView,
+    isSDKLoaded,
     unifiedIsConnected,
     unifiedAddress,
-    wagmiIsConnected,
-    wagmiAddress,
-    shouldUseWagmiFallback,
     effectiveIsConnected,
     effectiveAddress,
     unifiedIsLoading,
-    unifiedIsMiniApp,
   ]);
 
   // According to Farcaster docs, the mini-app connector should auto-connect
   // We should respect the user's choice and not force connections
+  
+  // Auto-connect to Farcaster wallet if not connected in mini app context (same as main app)
+  useEffect(() => {
+    if (isMiniAppView && isSDKLoaded && !effectiveIsConnected) {
+      console.log("[CrowdfundPage] Mini-app detected but not connected, attempting to connect...");
+      
+      // Try to connect using the unified wallet connect function
+      // This will use the Farcaster connector if available
+      try {
+        effectiveConnect();
+        console.log("[CrowdfundPage] Auto-connection attempt initiated");
+      } catch (error) {
+        console.log("[CrowdfundPage] Auto-connection failed:", error);
+        // User will need to manually connect
+      }
+    }
+  }, [isMiniAppView, isSDKLoaded, effectiveIsConnected, effectiveConnect]);
 
   // Read STREME token balance
   const { data: stremeBalance } = useReadContract({
@@ -399,7 +407,7 @@ export default function CrowdfundPage() {
       // Approval completed, now proceed to deposit
       console.log("Approval completed, proceeding to deposit");
       refetchAllowance(); // Refresh allowance
-      depositTokens(pendingDepositAmount, unifiedIsMiniApp, effectiveAddress);
+      depositTokens(pendingDepositAmount, isMiniAppView, effectiveAddress);
       setPendingDepositAmount(""); // Clear pending amount
     }
   }, [
@@ -409,7 +417,7 @@ export default function CrowdfundPage() {
     pendingDepositAmount,
     refetchAllowance,
     depositTokens,
-    unifiedIsMiniApp,
+    isMiniAppView,
     effectiveAddress,
   ]);
 
@@ -655,14 +663,14 @@ export default function CrowdfundPage() {
       if (!userAllowance || userAllowance < amountBigInt) {
         console.log("Need approval first");
         setPendingDepositAmount(amount); // Store amount for after approval
-        approveTokens(amount, unifiedIsMiniApp, effectiveAddress);
+        approveTokens(amount, isMiniAppView, effectiveAddress);
         // Don't close modal yet - wait for approval to complete
         return;
       }
 
       // Then deposit (if already approved)
       setLastTransactionType("contribution");
-      depositTokens(amount, unifiedIsMiniApp, effectiveAddress);
+      depositTokens(amount, isMiniAppView, effectiveAddress);
       // Don't close modal yet - wait for deposit to complete
     } catch (err) {
       console.error("Contribution error:", err);
@@ -681,11 +689,11 @@ export default function CrowdfundPage() {
       if (withdrawAll) {
         // For withdraw all, we'll use the current user deposit balance
         setLastWithdrawAmount(formatStakeAmount(userDepositBalance));
-        withdrawAllTokens(unifiedIsMiniApp, effectiveAddress);
+        withdrawAllTokens(isMiniAppView, effectiveAddress);
       } else {
         const amountToWithdraw = customAmount || amount;
         setLastWithdrawAmount(amountToWithdraw);
-        withdrawTokens(amountToWithdraw, unifiedIsMiniApp, effectiveAddress);
+        withdrawTokens(amountToWithdraw, isMiniAppView, effectiveAddress);
       }
       // Don't close modal yet - wait for withdrawal to complete
     } catch (err) {
@@ -733,7 +741,7 @@ export default function CrowdfundPage() {
     const shareUrl = `https://streme.fun/crowdfund`;
     const shareText = `I just contributed ${successAmount} $streme to @streme's growth fund! Streme On 🎶 🚀`;
 
-    if (unifiedIsMiniApp && isSDKLoaded && sdk) {
+    if (isMiniAppView && isSDKLoaded && sdk) {
       try {
         await sdk.actions.composeCast({
           text: shareText,
@@ -771,14 +779,38 @@ export default function CrowdfundPage() {
     return amount.toFixed(0);
   };
 
+  // Show loading state if wallet is initializing (like TokenActions)
+  if (
+    unifiedIsLoading ||
+    (isMiniAppView && !isSDKLoaded) ||
+    (!isMiniAppView && !privyReady)
+  ) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <img
+            src="/icon-transparent.png"
+            alt="Loading"
+            className="w-16 h-16 animate-pulse"
+          />
+          <div className="text-sm text-base-content/60">
+            {isMiniAppView
+              ? "Loading Farcaster SDK..."
+              : "Initializing wallet..."}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`min-h-screen sm:mt-24 sm:max-w-xl mx-auto ${
-        unifiedIsMiniApp ? "pb-24" : "pb-4"
+        isMiniAppView ? "pb-24" : "pb-4"
       }`}
     >
       {/* Back Button - Only show in mini app */}
-      {unifiedIsMiniApp && (
+      {isMiniAppView && (
         <div className="px-4 pt-4 pb-2">
           <button
             onClick={() => router.push("/")}
@@ -805,7 +837,7 @@ export default function CrowdfundPage() {
       {/* if not mini-app, add pt-24 */}
       <div
         className={`container mx-auto px-4 sm:pt-4 ${
-          unifiedIsMiniApp ? "pt-2" : "pt-24"
+          isMiniAppView ? "pt-2" : "pt-24"
         }`}
       >
         <div className="mb-1">
@@ -860,8 +892,8 @@ export default function CrowdfundPage() {
                 </div>
               </div>
               <p className="text-sm text-base-content/70 leading-snug">
-                Support Streme&apos;s growth through growth initiatives.
-                Deposit your staked $STREME to earn SUP rewards.
+                Help Streme grow through marketing and dev initiatives. Deposit
+                your staked $STREME to earn SUP rewards.
               </p>
             </div>
           </div>
@@ -893,30 +925,6 @@ export default function CrowdfundPage() {
                     <div className="text-xs text-base-content/60">
                       pooled so far
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pool Summary Section */}
-              <div className="bg-base-100 rounded-lg p-3 shadow-sm border border-base-200 mb-2">
-                <div className="text-center">
-                  <div className="text-lg font-bold font-mono text-primary">
-                    {(totalStremeAmount / 1000000).toLocaleString("en-US", {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    })}
-                    M STREME
-                  </div>
-                  <div className="text-sm font-bold text-base-content">
-                    {price
-                      ? `($${totalUsdValue.toLocaleString("en-US", {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })} USD)`
-                      : "Loading..."}
-                  </div>
-                  <div className="text-xs text-base-content/60 mt-1">
-                    total growth fund
                   </div>
                 </div>
               </div>
@@ -1077,30 +1085,6 @@ export default function CrowdfundPage() {
                 </div>
               </div>
 
-              {/* Pool Summary Section */}
-              <div className="bg-base-100 rounded-lg p-3 shadow-sm border border-base-200 mb-3">
-                <div className="text-center">
-                  <div className="text-lg font-bold font-mono text-primary">
-                    {(totalStremeAmount / 1000000).toLocaleString("en-US", {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    })}
-                    M STREME
-                  </div>
-                  <div className="text-sm font-bold text-base-content">
-                    {price
-                      ? `($${totalUsdValue.toLocaleString("en-US", {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })} USD)`
-                      : "Loading..."}
-                  </div>
-                  <div className="text-xs text-base-content/60 mt-1">
-                    total growth fund
-                  </div>
-                </div>
-              </div>
-
               {/* CTA Button - Above the fold */}
               <div className="mb-3">
                 <div className="alert mb-3 bg-base-200/50 border-base-300">
@@ -1116,14 +1100,14 @@ export default function CrowdfundPage() {
                     />
                   </svg>
                   <span className="text-sm">
-                    {unifiedIsMiniApp
+                    {isMiniAppView
                       ? "Connect your wallet to join the growth fund"
                       : "Connect your wallet to join the growth fund"}
                   </span>
                 </div>
-                {unifiedIsMiniApp ? (
+                {isMiniAppView ? (
                   <button
-                    onClick={unifiedConnect}
+                    onClick={effectiveConnect}
                     className="btn btn-primary btn-lg w-full h-11 text-base font-semibold"
                   >
                     <div className="flex items-center justify-center gap-2">
@@ -1368,7 +1352,7 @@ export default function CrowdfundPage() {
         onSliderChange={handleSliderChange}
         onContribute={handleContribute}
         onWithdraw={handleWithdraw}
-        isMiniApp={unifiedIsMiniApp}
+        isMiniApp={isMiniAppView}
         isSuccess={isTransactionSuccess}
         successAmount={successAmount}
         successPercentage={successPercentage}
@@ -1395,8 +1379,8 @@ export default function CrowdfundPage() {
                 <p className="text-sm text-base-content/70 pt-2">
                   When you stake STREME tokens, they generate yield aka rewards.
                   By staking your STREME in the crowdfund contract, you
-                  temporarily redirect that yield to the Growth Fund. There
-                  are no locks and you can withdraw your staked STREME anytime.
+                  temporarily redirect that yield to the Growth Fund. There are
+                  no locks and you can withdraw your staked STREME anytime.
                 </p>
               </div>
             </div>
@@ -1477,7 +1461,7 @@ export default function CrowdfundPage() {
       <HowCrowdfundWorksModal
         isOpen={showHowItWorks}
         onClose={() => setShowHowItWorks(false)}
-        isMiniApp={unifiedIsMiniApp}
+        isMiniApp={isMiniAppView}
       />
     </div>
   );

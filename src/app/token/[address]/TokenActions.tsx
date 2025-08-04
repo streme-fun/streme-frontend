@@ -140,6 +140,23 @@ export function TokenActions({
     }
   }, [farcasterContext?.client?.clientFid]);
 
+  // Auto-connect to Farcaster wallet if not connected in mini app context (same as main app)
+  useEffect(() => {
+    if (isEffectivelyMiniApp && fcSDKLoaded && !walletIsConnected) {
+      console.log("[TokenActions] Mini-app detected but not connected, attempting to connect...");
+      
+      // Try to connect using the unified wallet connect function
+      // This will use the Farcaster connector if available
+      try {
+        effectiveLogin();
+        console.log("[TokenActions] Auto-connection attempt initiated");
+      } catch (error) {
+        console.log("[TokenActions] Auto-connection failed:", error);
+        // User will need to manually connect
+      }
+    }
+  }, [isEffectivelyMiniApp, fcSDKLoaded, walletIsConnected, effectiveLogin]);
+
   // Enhanced 0x API integration
   const getGaslessQuote = useCallback(
     async (amount: string, direction: "buy" | "sell") => {
