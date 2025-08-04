@@ -6,7 +6,7 @@ import { formatUnits } from "viem";
 import { ERC20_ABI } from "@/src/lib/contracts/StremeStakingRewardsFunder";
 import { getPrices } from "@/src/lib/priceUtils";
 import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
-import { MarketingFundAnimation } from "@/src/components/MarketingFundAnimation";
+import { GrowthFundAnimation } from "@/src/components/GrowthFundAnimation";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useUnifiedWallet } from "@/src/hooks/useUnifiedWallet";
 import { HowCrowdfundWorksModal } from "@/src/components/HowCrowdfundWorksModal";
@@ -731,7 +731,7 @@ export default function CrowdfundPage() {
   // Handle sharing to Farcaster
   const handleShareToFarcaster = async () => {
     const shareUrl = `https://streme.fun/crowdfund`;
-    const shareText = `I just contributed ${successAmount} $streme to @streme's marketing fund! Streme On 🎶 🚀`;
+    const shareText = `I just contributed ${successAmount} $streme to @streme's growth fund! Streme On 🎶 🚀`;
 
     if (unifiedIsMiniApp && isSDKLoaded && sdk) {
       try {
@@ -813,7 +813,7 @@ export default function CrowdfundPage() {
             <div className="flex-1 flex flex-col gap-1">
               <div className="flex items-center gap-1 justify-between">
                 <h2 className="text-lg md:text-xl font-bold text-base-content">
-                  Streme Marketing Fund
+                  Streme Growth Fund
                 </h2>
                 {/* Info button in top right */}
                 <div className="flex items-center gap-1 ml-2">
@@ -860,7 +860,7 @@ export default function CrowdfundPage() {
                 </div>
               </div>
               <p className="text-sm text-base-content/70 leading-snug">
-                Support Streme&apos;s growth through marketing initiatives.
+                Support Streme&apos;s growth through growth initiatives.
                 Deposit your staked $STREME to earn SUP rewards.
               </p>
             </div>
@@ -873,9 +873,9 @@ export default function CrowdfundPage() {
         <div className="mb-3">
           {effectiveIsConnected ? (
             <div>
-              {/* Marketing Fund Animation with Token Count - Hero Position */}
+              {/* Growth Fund Animation with Token Count - Hero Position */}
               <div className="text-center mb-2">
-                <MarketingFundAnimation
+                <GrowthFundAnimation
                   contributorCount={0}
                   growthRate={Math.max(stremeGrowthRate, 0.1)}
                 />
@@ -916,7 +916,7 @@ export default function CrowdfundPage() {
                       : "Loading..."}
                   </div>
                   <div className="text-xs text-base-content/60 mt-1">
-                    total marketing fund
+                    total growth fund
                   </div>
                 </div>
               </div>
@@ -1046,9 +1046,9 @@ export default function CrowdfundPage() {
             </div>
           ) : (
             <div>
-              {/* Marketing Fund Animation with Token Count - Hero Position */}
+              {/* Growth Fund Animation with Token Count - Hero Position */}
               <div className="text-center mb-3">
-                <MarketingFundAnimation
+                <GrowthFundAnimation
                   contributorCount={0}
                   growthRate={Math.max(stremeGrowthRate, 0.1)}
                 />
@@ -1071,7 +1071,7 @@ export default function CrowdfundPage() {
                         : "Loading price..."}
                     </div>
                     <div className="text-xs text-base-content/60 mt-1">
-                      pooled for marketing initiatives
+                      pooled for growth initiatives
                     </div>
                   </div>
                 </div>
@@ -1096,7 +1096,7 @@ export default function CrowdfundPage() {
                       : "Loading..."}
                   </div>
                   <div className="text-xs text-base-content/60 mt-1">
-                    total marketing fund
+                    total growth fund
                   </div>
                 </div>
               </div>
@@ -1117,8 +1117,8 @@ export default function CrowdfundPage() {
                   </svg>
                   <span className="text-sm">
                     {unifiedIsMiniApp
-                      ? "Connect your wallet to join the marketing fund"
-                      : "Connect your wallet to join the marketing fund"}
+                      ? "Connect your wallet to join the growth fund"
+                      : "Connect your wallet to join the growth fund"}
                   </span>
                 </div>
                 {unifiedIsMiniApp ? (
@@ -1395,7 +1395,7 @@ export default function CrowdfundPage() {
                 <p className="text-sm text-base-content/70 pt-2">
                   When you stake STREME tokens, they generate yield aka rewards.
                   By staking your STREME in the crowdfund contract, you
-                  temporarily redirect that yield to the Marketing Fund. There
+                  temporarily redirect that yield to the Growth Fund. There
                   are no locks and you can withdraw your staked STREME anytime.
                 </p>
               </div>

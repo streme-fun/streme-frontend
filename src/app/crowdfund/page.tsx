@@ -4,8 +4,8 @@ import { Metadata } from "next";
 import { APP_NAME, APP_URL } from "../../lib/constants";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const crowdfundTitle = "Streme Marketing Fund";
-  const crowdfundDescription = "Contribute your staking $STREME yield to help fund Streme marketing initiatives and earn SUP rewards.";
+  const crowdfundTitle = "Streme Growth Fund";
+  const crowdfundDescription = "Contribute your staking $STREME yield to help fund Streme growth initiatives and earn SUP rewards.";
   const crowdfundOgImageUrl = `${APP_URL}/api/crowdfund/image`;
   const pageUrl = `${APP_URL}/crowdfund`;
 
@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
     version: "next",
     imageUrl: crowdfundOgImageUrl,
     button: {
-      title: "Join Streme Marketing Fund",
+      title: "Join Streme Growth Fund",
       action: {
         type: "launch_frame",
         name: APP_NAME,

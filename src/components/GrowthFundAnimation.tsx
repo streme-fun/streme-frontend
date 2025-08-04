@@ -1,14 +1,14 @@
 "use client";
 
-interface MarketingFundAnimationProps {
+interface GrowthFundAnimationProps {
   contributorCount: number;
   growthRate: number; // STREME per second
 }
 
-export const MarketingFundAnimation = ({
+export const GrowthFundAnimation = ({
   contributorCount: _contributorCount, // eslint-disable-line @typescript-eslint/no-unused-vars
   growthRate,
-}: MarketingFundAnimationProps) => {
+}: GrowthFundAnimationProps) => {
   // Generate stream paths - always use 20 lines
   const generateStreamPaths = () => {
     const streams = [];

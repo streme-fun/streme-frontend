@@ -105,7 +105,7 @@ function App() {
 
     setLastLogoClickTime(now);
 
-    // Show debug button on 5th click for mini-app, navigate to marketing fund for web
+    // Show debug button on 5th click for mini-app, navigate to growth fund for web
     if (logoClickCount + 1 >= 5) {
       if (isMiniAppView) {
         setShowDebugButton(true);
@@ -480,11 +480,11 @@ function App() {
                 <div className="p-4 pt-3 flex items-center justify-between gap-2">
                   <div className="flex flex-col gap-2">
                     <p className="text-sm text-base-content/70 font-semibold">
-                      Streme Marketing Fund
+                      Streme Growth Fund
                     </p>
                     <p className="text-sm text-base-content/70 mb-3 mr-3">
                       Contribute your staking rewards to help fund Streme
-                      marketing initiatives. Earn $SUP for your help!
+                      growth initiatives. Earn $SUP for your help!
                     </p>
                   </div>
                   <button className="btn btn-sm btn-primary">Join</button>
@@ -626,11 +626,11 @@ function App() {
                 <div className="p-6 flex items-center justify-between gap-4">
                   <div className="flex flex-col gap-2">
                     <p className="text-base text-base-content font-semibold">
-                      Streme Marketing Fund
+                      Streme Growth Fund
                     </p>
                     <p className="text-sm text-base-content/70 mb-3">
                       Contribute your staking rewards to help fund Streme
-                      marketing initiatives. Earn $SUP for your contribution.
+                      growth initiatives. Earn $SUP for your contribution.
                     </p>
                   </div>
                   <button className="btn btn-primary">Join</button>
