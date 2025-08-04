@@ -1,4 +1,4 @@
-Your goal is to check all the files in the project for errors.
+Check all the files in the project for errors.
 
 # Instructions
 

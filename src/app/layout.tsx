@@ -36,6 +36,23 @@ export default function RootLayout({
                             (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
                 document.documentElement.setAttribute('data-theme', theme);
               })();
+
+              // Initialize Eruda debugging console early if debug=true or in development
+              (function() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const isDebug = urlParams.get('debug') === 'true';
+                const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                
+                if (isDebug || isDev) {
+                  const script = document.createElement('script');
+                  script.src = 'https://cdn.jsdelivr.net/npm/eruda';
+                  script.onload = function() {
+                    window.eruda.init();
+                    console.log('🐛 Eruda debugging console initialized (early load)');
+                  };
+                  document.head.appendChild(script);
+                }
+              })();
             `,
           }}
         />

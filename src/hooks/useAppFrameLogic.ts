@@ -6,11 +6,10 @@ import { useAccount, useConnect, useSwitchChain, useDisconnect } from "wagmi";
 import { base } from "wagmi/chains";
 import type { Context as FarcasterContextType } from "@farcaster/miniapp-core";
 import sdk from "@farcaster/miniapp-sdk";
-import { detectMiniAppWithContext } from "../lib/miniAppDetection";
+import { useEnvironment } from "../components/providers/EnvironmentProvider";
 
 export function useAppFrameLogic() {
-  const [isMiniAppView, setIsMiniAppView] = useState(false);
-  const [isDetectionComplete, setIsDetectionComplete] = useState(false);
+  const { isMiniApp } = useEnvironment();
   const [hasPromptedToAdd, setHasPromptedToAdd] = useState(false);
   const [hasAddedMiniApp, setHasAddedMiniApp] = useState(false);
   const { context: farcasterContext, isSDKLoaded } = useFrame();
@@ -19,41 +18,9 @@ export function useAppFrameLogic() {
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { disconnect } = useDisconnect();
 
-  // Enhanced mini app detection using shared utility
-  useEffect(() => {
-    const detectMiniApp = async () => {
-      try {
-        console.log("🔍 useAppFrameLogic: Starting detection...");
-        const result = await detectMiniAppWithContext(farcasterContext);
-        
-        console.log("🔍 useAppFrameLogic: Detection result:", {
-          isMiniApp: result.isMiniApp,
-          clientFid: result.clientFid,
-          method: result.detectionMethod
-        });
-
-        setIsMiniAppView(result.isMiniApp);
-        setIsDetectionComplete(true);
-      } catch (error) {
-        console.error("useAppFrameLogic: Detection error:", error);
-        setIsMiniAppView(false);
-        setIsDetectionComplete(true);
-      }
-    };
-
-    // Start detection immediately when component mounts, don't wait for isSDKLoaded
-    // Also re-run when clientFid becomes available
-    if (!isDetectionComplete || farcasterContext?.client?.clientFid) {
-      detectMiniApp();
-    }
-
-    return () => {};
-  }, [
-    isDetectionComplete,
-    farcasterContext?.client?.clientFid,
-    farcasterContext,
-    isSDKLoaded,
-  ]);
+  // Use the environment detection from the top level
+  const isMiniAppView = isMiniApp;
+  const isDetectionComplete = true; // Always complete since we get it from context
 
   // Check if mini app is already added when context loads
   useEffect(() => {

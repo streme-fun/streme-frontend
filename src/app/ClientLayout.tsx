@@ -12,6 +12,7 @@ import React, { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import { detectEnvironmentForProviders } from "../lib/miniAppDetection";
+import { EnvironmentProvider } from "../components/providers/EnvironmentProvider";
 // import { UnstakedTokensModal } from "../components/UnstakedTokensModal";
 import { formatUnits } from "viem";
 import { publicClient } from "../lib/viemClient";
@@ -156,6 +157,22 @@ function AppContent({ children }: { children: React.ReactNode }) {
         document.documentElement.setAttribute("data-theme", savedTheme);
       }
     });
+
+    // Initialize Eruda for debugging in development or when debug=true query param
+    const shouldLoadEruda = 
+      process.env.NODE_ENV === "development" || 
+      (typeof window !== "undefined" && 
+       new URLSearchParams(window.location.search).get("debug") === "true");
+    
+    if (shouldLoadEruda && typeof window !== "undefined") {
+      import("eruda").then((eruda) => {
+        eruda.default.init();
+        console.log("🐛 Eruda debugging console initialized");
+      }).catch((error) => {
+        console.warn("Failed to load Eruda:", error);
+      });
+    }
+
     setMounted(true);
   }, []);
 
@@ -511,28 +528,32 @@ function AppContent({ children }: { children: React.ReactNode }) {
 // Mini-app specific layout (no Privy)
 function MiniAppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <FrameProvider>
-      <MiniAppWagmiProvider>
-        <TokenDataProvider>
-          <AppContent>{children}</AppContent>
-        </TokenDataProvider>
-      </MiniAppWagmiProvider>
-    </FrameProvider>
+    <EnvironmentProvider isMiniApp={true}>
+      <FrameProvider>
+        <MiniAppWagmiProvider>
+          <TokenDataProvider>
+            <AppContent>{children}</AppContent>
+          </TokenDataProvider>
+        </MiniAppWagmiProvider>
+      </FrameProvider>
+    </EnvironmentProvider>
   );
 }
 
 // Browser layout (with Privy)
 function BrowserLayout({ children }: { children: React.ReactNode }) {
   return (
-    <PrivyProviderWrapper>
-      <FrameProvider>
-        <BrowserWagmiProvider>
-          <TokenDataProvider>
-            <AppContent>{children}</AppContent>
-          </TokenDataProvider>
-        </BrowserWagmiProvider>
-      </FrameProvider>
-    </PrivyProviderWrapper>
+    <EnvironmentProvider isMiniApp={false}>
+      <PrivyProviderWrapper>
+        <FrameProvider>
+          <BrowserWagmiProvider>
+            <TokenDataProvider>
+              <AppContent>{children}</AppContent>
+            </TokenDataProvider>
+          </BrowserWagmiProvider>
+        </FrameProvider>
+      </PrivyProviderWrapper>
+    </EnvironmentProvider>
   );
 }
 
@@ -543,6 +564,7 @@ function EnvironmentDetector({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const detectEnvironment = async () => {
+      const startTime = Date.now();
       try {
         console.log("🔍 EnvironmentDetector: Starting detection...");
         
@@ -553,11 +575,41 @@ function EnvironmentDetector({ children }: { children: React.ReactNode }) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
         
-        const isMiniApp = await detectEnvironmentForProviders();
+        // Try detection with retries for SDK context
+        let isMiniApp = false;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (attempts < maxAttempts) {
+          console.log(`🔍 EnvironmentDetector: Detection attempt ${attempts + 1}/${maxAttempts}`);
+          
+          const detectionPromise = detectEnvironmentForProviders();
+          const result = await Promise.race([
+            detectionPromise,
+            new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1500))
+          ]);
+          
+          // If we detected as mini-app, we're done
+          if (result === true) {
+            isMiniApp = true;
+            break;
+          }
+          
+          // If not detected as mini-app, wait a bit and try again (SDK might not be ready)
+          if (attempts < maxAttempts - 1) {
+            console.log(`🔍 EnvironmentDetector: Not detected as mini-app, waiting before retry...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+          attempts++;
+        }
+        
         console.log("🔍 EnvironmentDetector: Detection result:", isMiniApp);
+        console.log("🔍 EnvironmentDetector: Detection took", Date.now() - startTime, "ms");
         setIsMiniApp(isMiniApp);
       } catch (error) {
         console.error("EnvironmentDetector: Detection error:", error);
+        // Default to browser mode on error
         setIsMiniApp(false);
       } finally {
         setIsDetecting(false);
@@ -571,7 +623,11 @@ function EnvironmentDetector({ children }: { children: React.ReactNode }) {
   if (isDetecting || isMiniApp === null) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading...</div>
+        <img 
+          src="/icon-transparent.png" 
+          alt="Loading" 
+          className="w-16 h-16 animate-pulse"
+        />
       </div>
     );
   }

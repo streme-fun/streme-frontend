@@ -18,164 +18,184 @@ export async function detectMiniApp(
   farcasterContext?: Context.MiniAppContext
 ): Promise<MiniAppDetectionResult> {
   try {
-    console.log("🔍 Starting mini-app detection...");
+    const callerId = Math.random().toString(36).substring(7);
+    console.log(`🔍 [${callerId}] Starting mini-app detection...`);
 
-    // First, check if we're in any wallet browser - these should NEVER be treated as mini-app
+    // Gather all detection signals first
+    const detectionData = {
+      userAgent: "",
+      hasEthereum: false,
+      walletProperties: {} as Record<string, boolean>,
+      farcasterClientFid: undefined as number | undefined,
+      farcasterContext: undefined as Context.MiniAppContext | undefined,
+    };
+
+    // Collect browser/wallet data
     if (typeof window !== "undefined") {
-      const userAgent = window.navigator?.userAgent || "";
+      detectionData.userAgent = window.navigator?.userAgent || "";
+      detectionData.hasEthereum = !!window.ethereum;
       
-      // Check for various wallet browsers
-      const walletChecks = {
-        // Coinbase Wallet
-        coinbase: {
-          ethereum: window.ethereum &&
-            (window.ethereum.isCoinbaseWallet ||
-             window.ethereum.isCoinbaseWalletExtension ||
-             window.ethereum.isCoinbaseWalletBrowser),
-          userAgent: userAgent.includes("CoinbaseWallet") || userAgent.includes("Coinbase")
-        },
-        // Rainbow Wallet
-        rainbow: {
-          ethereum: window.ethereum && window.ethereum.isRainbow,
-          userAgent: userAgent.includes("Rainbow")
-        },
-        // MetaMask
-        metamask: {
-          ethereum: window.ethereum && window.ethereum.isMetaMask,
-          userAgent: userAgent.includes("MetaMask")
-        },
-        // Rabby Wallet
-        rabby: {
-          ethereum: window.ethereum && window.ethereum.isRabby,
-          userAgent: userAgent.includes("Rabby")
-        },
-        // Trust Wallet
-        trust: {
-          ethereum: window.ethereum && (window.ethereum.isTrust || window.ethereum.isTrustWallet),
-          userAgent: userAgent.includes("TrustWallet")  // More specific, removed generic "Trust"
-        },
-        // Brave Wallet
-        brave: {
-          ethereum: window.ethereum && window.ethereum.isBraveWallet,
-          userAgent: userAgent.includes("Brave/")  // More specific with slash
-        },
-        // Opera Crypto Browser
-        opera: {
-          ethereum: window.ethereum && window.ethereum.isOpera,
-          userAgent: userAgent.includes("OPR/") && userAgent.includes("Opera")  // Require both for Opera
-        },
-        // OKX Wallet (formerly OKEx)
-        okx: {
-          ethereum: window.ethereum && window.ethereum.isOkxWallet,
-          userAgent: userAgent.includes("OKApp") || userAgent.includes("OKX")
-        },
-        // Zerion Wallet
-        zerion: {
-          ethereum: window.ethereum && window.ethereum.isZerion,
-          userAgent: userAgent.includes("Zerion")
-        },
-        // 1inch Wallet
-        oneInch: {
-          ethereum: window.ethereum && window.ethereum.isOneInchIOSWallet,
-          userAgent: userAgent.includes("1inch")
-        }
-      };
-
-      // Check if any wallet browser is detected
-      for (const [walletName, checks] of Object.entries(walletChecks)) {
-        // For wallets that Farcaster might inject compatibility flags for,
-        // require BOTH ethereum and userAgent checks to avoid false positives
-        const requireBothChecks = ['metamask', 'rabby', 'brave', 'trust'];
-        
-        if (requireBothChecks.includes(walletName)) {
-          if (checks.ethereum && checks.userAgent) {
-            console.log(`${walletName} wallet browser detected - forcing desktop mode`, {
-              ethereumCheck: checks.ethereum,
-              userAgentCheck: checks.userAgent,
-              userAgent: userAgent.substring(0, 100),
-            });
-            return {
-              isMiniApp: false,
-              detectionMethod: "none",
-            };
-          }
-        } else {
-          // For other wallets, either check is sufficient
-          if (checks.ethereum || checks.userAgent) {
-            console.log(`${walletName} wallet browser detected - forcing desktop mode`, {
-              ethereumCheck: checks.ethereum,
-              userAgentCheck: checks.userAgent,
-              userAgent: userAgent.substring(0, 100),
-            });
-            return {
-              isMiniApp: false,
-              detectionMethod: "none",
-            };
-          }
-        }
+      if (window.ethereum) {
+        detectionData.walletProperties = {
+          isCoinbaseWallet: !!(window.ethereum.isCoinbaseWallet ||
+                             window.ethereum.isCoinbaseWalletExtension ||
+                             window.ethereum.isCoinbaseWalletBrowser),
+          isRainbow: !!window.ethereum.isRainbow,
+          isMetaMask: !!window.ethereum.isMetaMask,
+          isRabby: !!window.ethereum.isRabby,
+          isTrust: !!(window.ethereum.isTrust || window.ethereum.isTrustWallet),
+          isBraveWallet: !!window.ethereum.isBraveWallet,
+          isOpera: !!window.ethereum.isOpera,
+          isOkxWallet: !!window.ethereum.isOkxWallet,
+          isZerion: !!window.ethereum.isZerion,
+          isOneInchIOSWallet: !!window.ethereum.isOneInchIOSWallet,
+        };
       }
     }
 
-    // Method 1: Use provided Farcaster context (most reliable when available)
+    // Collect Farcaster context data
+    console.log(`🔍 [${callerId}] Checking for Farcaster context...`);
+    console.log(`🔍 [${callerId}] Provided context:`, farcasterContext);
+    
     if (farcasterContext?.client?.clientFid) {
-      console.log(
-        "Using provided Farcaster context:",
-        farcasterContext.client.clientFid
-      );
+      console.log(`🔍 [${callerId}] Found clientFid in provided context:`, farcasterContext.client.clientFid);
+      detectionData.farcasterClientFid = farcasterContext.client.clientFid;
+      detectionData.farcasterContext = farcasterContext;
+    } else {
+      // Try SDK context if no provided context
+      console.log(`🔍 [${callerId}] No provided context, trying SDK...`);
+      try {
+        const context = await sdk.context;
+        console.log(`🔍 [${callerId}] SDK context result:`, context);
+        if (context?.client?.clientFid) {
+          console.log(`🔍 [${callerId}] Found clientFid in SDK context:`, context.client.clientFid);
+          detectionData.farcasterClientFid = context.client.clientFid;
+          detectionData.farcasterContext = context;
+        } else {
+          console.log(`🔍 [${callerId}] No clientFid in SDK context`);
+        }
+      } catch (contextError) {
+        console.warn(`🔍 [${callerId}] Could not get SDK context:`, contextError);
+      }
+    }
 
-      // Check for Base App specifically
-      if (farcasterContext.client.clientFid === 309857) {
-        console.log(
-          "Base App detected via provided context (clientFid 309857)"
-        );
+    // Now make decisions based on combinations of signals
+    console.log(`🔍 [${callerId}] Detection data:`, {
+      hasWalletProperties: Object.values(detectionData.walletProperties).some(Boolean),
+      walletProperties: detectionData.walletProperties,
+      farcasterClientFid: detectionData.farcasterClientFid,
+      userAgent: detectionData.userAgent.substring(0, 100),
+      hasEthereum: detectionData.hasEthereum,
+    });
+
+    // Special case: Base app with Coinbase wallet properties
+    if (detectionData.farcasterClientFid === 309857) {
+      console.log(`🔍 [${callerId}] Base App detected (clientFid 309857) - treating as mini-app regardless of wallet properties`);
+      return {
+        isMiniApp: true,
+        clientFid: 309857,
+        detectionMethod: "clientFid" as const,
+        context: detectionData.farcasterContext,
+      };
+    }
+
+    // Check for wallet browsers using the collected data
+    const walletChecks = [
+      {
+        name: "coinbase",
+        ethereumCheck: detectionData.walletProperties.isCoinbaseWallet,
+        userAgentCheck: detectionData.userAgent.includes("CoinbaseWallet") || 
+                        detectionData.userAgent.includes("Coinbase"),
+        requireBoth: false, // Already handled Base app case above
+      },
+      {
+        name: "rainbow",
+        ethereumCheck: detectionData.walletProperties.isRainbow,
+        userAgentCheck: detectionData.userAgent.includes("Rainbow"),
+        requireBoth: false,
+      },
+      {
+        name: "metamask",
+        ethereumCheck: detectionData.walletProperties.isMetaMask,
+        userAgentCheck: detectionData.userAgent.includes("MetaMask"),
+        requireBoth: true, // Require both to avoid false positives in Farcaster
+      },
+      {
+        name: "rabby",
+        ethereumCheck: detectionData.walletProperties.isRabby,
+        userAgentCheck: detectionData.userAgent.includes("Rabby"),
+        requireBoth: true, // Require both to avoid false positives in Farcaster
+      },
+      {
+        name: "trust",
+        ethereumCheck: detectionData.walletProperties.isTrust,
+        userAgentCheck: detectionData.userAgent.includes("TrustWallet"),
+        requireBoth: true, // Require both to avoid false positives in Farcaster
+      },
+      {
+        name: "brave",
+        ethereumCheck: detectionData.walletProperties.isBraveWallet,
+        userAgentCheck: detectionData.userAgent.includes("Brave/"),
+        requireBoth: true, // Require both to avoid false positives in Farcaster
+      },
+      {
+        name: "opera",
+        ethereumCheck: detectionData.walletProperties.isOpera,
+        userAgentCheck: detectionData.userAgent.includes("OPR/") && 
+                        detectionData.userAgent.includes("Opera"),
+        requireBoth: false,
+      },
+      {
+        name: "okx",
+        ethereumCheck: detectionData.walletProperties.isOkxWallet,
+        userAgentCheck: detectionData.userAgent.includes("OKApp") || 
+                        detectionData.userAgent.includes("OKX"),
+        requireBoth: false,
+      },
+      {
+        name: "zerion",
+        ethereumCheck: detectionData.walletProperties.isZerion,
+        userAgentCheck: detectionData.userAgent.includes("Zerion"),
+        requireBoth: false,
+      },
+      {
+        name: "oneInch",
+        ethereumCheck: detectionData.walletProperties.isOneInchIOSWallet,
+        userAgentCheck: detectionData.userAgent.includes("1inch"),
+        requireBoth: false,
+      },
+    ];
+
+    // Check each wallet
+    for (const wallet of walletChecks) {
+      const isDetected = wallet.requireBoth 
+        ? (wallet.ethereumCheck && wallet.userAgentCheck)
+        : (wallet.ethereumCheck || wallet.userAgentCheck);
+
+      if (isDetected) {
+        console.log(`🔍 [${callerId}] ${wallet.name} wallet browser detected - forcing desktop mode`, {
+          ethereumCheck: wallet.ethereumCheck,
+          userAgentCheck: wallet.userAgentCheck,
+          userAgent: detectionData.userAgent.substring(0, 100),
+        });
         return {
-          isMiniApp: true,
-          clientFid: 309857,
-          detectionMethod: "clientFid",
-          context: farcasterContext,
+          isMiniApp: false,
+          detectionMethod: "none" as const,
         };
       }
+    }
 
-      // Any other Farcaster client
+    // Check for other Farcaster clients (we already handled Base app above)
+    if (detectionData.farcasterClientFid && detectionData.farcasterClientFid !== 309857) {
       console.log(
-        `Other Farcaster client detected via provided context: ${farcasterContext.client.clientFid}`
+        `Other Farcaster client detected: ${detectionData.farcasterClientFid}`
       );
       return {
         isMiniApp: true,
-        clientFid: farcasterContext.client.clientFid,
+        clientFid: detectionData.farcasterClientFid,
         detectionMethod: "clientFid",
-        context: farcasterContext,
+        context: detectionData.farcasterContext,
       };
-    }
-
-    // Method 2: Try to get SDK context directly (fallback when no context provided)
-    try {
-      const context = await sdk.context;
-      console.log("Retrieved SDK context:", context?.client?.clientFid);
-
-      if (context?.client?.clientFid === 309857) {
-        console.log("Base App detected via SDK context (clientFid 309857)");
-        return {
-          isMiniApp: true,
-          clientFid: 309857,
-          detectionMethod: "clientFid",
-          context,
-        };
-      }
-
-      if (context?.client?.clientFid) {
-        console.log(
-          `Other Farcaster client detected via SDK context: ${context.client.clientFid}`
-        );
-        return {
-          isMiniApp: true,
-          clientFid: context.client.clientFid,
-          detectionMethod: "clientFid",
-          context,
-        };
-      }
-    } catch (contextError) {
-      console.warn("Could not get SDK context:", contextError);
     }
 
     // No mini-app detected
