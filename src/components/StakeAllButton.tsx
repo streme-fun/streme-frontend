@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useWallets } from "@privy-io/react-auth";
-import { useAccount } from "wagmi";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
@@ -10,6 +9,7 @@ import sdk from "@farcaster/miniapp-sdk";
 import { usePostHog } from "posthog-js/react";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { formatUnits } from "viem";
+import { useWallet } from "@/src/hooks/useWallet";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 const STAKING_HELPER = "0x1738e0Fed480b04968A3B7b14086EAF4fDB685A3";
@@ -59,16 +59,15 @@ export function StakeAllButton({
   buttonText = "Stake All",
 }: StakeAllButtonProps) {
   const { wallets } = useWallets();
-  const { address: wagmiAddress } = useAccount();
+  const { address: unifiedAddress, isConnected: unifiedIsConnected, isMiniApp: detectedMiniApp } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   const postHog = usePostHog();
 
   const balance = tokenBalance;
 
-  const effectiveIsConnected = isMiniApp
-    ? farcasterIsConnected
-    : !!wagmiAddress;
-  const effectiveAddress = isMiniApp ? farcasterAddress : wagmiAddress;
+  // Use unified wallet state, but fall back to props for compatibility
+  const effectiveIsConnected = unifiedIsConnected || (isMiniApp ? farcasterIsConnected : false);
+  const effectiveAddress = unifiedAddress || (isMiniApp ? farcasterAddress : undefined);
 
   const handleStakeAll = async () => {
     if (!effectiveAddress || !effectiveIsConnected) {
@@ -91,18 +90,18 @@ export function StakeAllButton({
       let provider: any; // eslint-disable-line @typescript-eslint/no-explicit-any
       let userAddress: string;
 
-      if (isMiniApp) {
+      if (detectedMiniApp || isMiniApp) {
         provider = await sdk.wallet.getEthereumProvider();
         if (!provider) {
           throw new Error("Farcaster Ethereum provider not available");
         }
         userAddress = effectiveAddress!;
       } else {
-        if (!wagmiAddress) {
-          throw new Error("Wagmi wallet not connected");
+        if (!effectiveAddress) {
+          throw new Error("Wallet not connected");
         }
-        userAddress = wagmiAddress;
-        const wallet = wallets.find((w) => w.address === wagmiAddress);
+        userAddress = effectiveAddress;
+        const wallet = wallets.find((w) => w.address?.toLowerCase() === effectiveAddress.toLowerCase());
         if (!wallet) {
           throw new Error("Wallet not found");
         }
@@ -212,12 +211,12 @@ export function StakeAllButton({
         [ANALYTICS_PROPERTIES.AMOUNT_WEI]: balance.toString(),
         [ANALYTICS_PROPERTIES.AMOUNT_FORMATTED]: formatUnits(balance, 18),
         [ANALYTICS_PROPERTIES.USER_ADDRESS]: effectiveAddress,
-        [ANALYTICS_PROPERTIES.IS_MINI_APP]: isMiniApp || false,
+        [ANALYTICS_PROPERTIES.IS_MINI_APP]: detectedMiniApp || isMiniApp || false,
         [ANALYTICS_PROPERTIES.TRANSACTION_HASH]: stakeTxHash,
         [ANALYTICS_PROPERTIES.HAS_POOL_CONNECTION]:
           !!stakingPoolAddress &&
           stakingPoolAddress !== "0x0000000000000000000000000000000000000000",
-        [ANALYTICS_PROPERTIES.WALLET_TYPE]: isMiniApp ? "farcaster" : "wagmi",
+        [ANALYTICS_PROPERTIES.WALLET_TYPE]: detectedMiniApp || isMiniApp ? "farcaster" : "wagmi",
       });
     } catch (error: unknown) {
       console.error("StakeAllButton caught error:", error);

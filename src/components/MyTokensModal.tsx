@@ -1749,6 +1749,9 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                     stake.stakingAddress
                                   )
                                 }
+                                isMiniApp={isMiniAppView}
+                                farcasterAddress={effectiveAddress}
+                                farcasterIsConnected={effectiveIsConnected}
                                 className="btn btn-secondary btn-sm"
                               />
                             </div>
@@ -1934,6 +1937,9 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                     token.tokenAddress
                                   )
                                 }
+                                isMiniApp={isMiniAppView}
+                                farcasterAddress={effectiveAddress}
+                                farcasterIsConnected={effectiveIsConnected}
                                 className="btn btn-secondary btn-sm"
                               />
                             </div>
