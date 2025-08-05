@@ -1,7 +1,6 @@
 "use client";
 
 import { useAccount, useConnect, useDisconnect } from "wagmi";
-import { useSetActiveWallet } from "@privy-io/wagmi";
 import { useMiniAppContext } from "../contexts/MiniAppContext";
 import { useCallback, useEffect } from "react";
 import {

@@ -26,7 +26,6 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
   const {
     address: effectiveAddress,
     isConnected,
-    isEffectivelyMiniApp: isMiniAppView,
   } = useUnifiedWallet();
 
   // State management (following StakedBalance pattern)

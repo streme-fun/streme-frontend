@@ -11,21 +11,18 @@ import { useEnvironment } from "../components/providers/EnvironmentProvider";
 
 export function useSafePrivy() {
   const { isMiniApp } = useEnvironment();
-
-  // Don't call Privy hooks at all in mini-app mode
-  if (isMiniApp) {
-    return {
-      authenticated: false,
-      login: () => {},
-      logout: () => {},
-      user: null,
-      ready: true,
-    };
-  }
-
+  
+  // Always call hooks to satisfy React rules
+  let privyResult;
   try {
-    return usePrivy();
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    privyResult = usePrivy();
   } catch {
+    privyResult = null;
+  }
+
+  // Return mock values for mini-app mode
+  if (isMiniApp || !privyResult) {
     return {
       authenticated: false,
       login: () => {},
@@ -34,34 +31,46 @@ export function useSafePrivy() {
       ready: true,
     };
   }
+
+  return privyResult;
 }
 
 export function useSafeWallets() {
   const { isMiniApp } = useEnvironment();
-
-  // Don't call Privy hooks at all in mini-app mode
-  if (isMiniApp) {
-    return { wallets: [] };
-  }
-
+  
+  // Always call hooks to satisfy React rules
+  let walletsResult;
   try {
-    return useWallets();
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    walletsResult = useWallets();
   } catch {
+    walletsResult = null;
+  }
+
+  // Return mock values for mini-app mode
+  if (isMiniApp || !walletsResult) {
     return { wallets: [] };
   }
+
+  return walletsResult;
 }
 
 export function useSafeSetActiveWallet() {
   const { isMiniApp } = useEnvironment();
-
-  // Don't call Privy hooks at all in mini-app mode
-  if (isMiniApp) {
-    return { setActiveWallet: () => {} };
-  }
-
+  
+  // Always call hooks to satisfy React rules
+  let setActiveWalletResult;
   try {
-    return useSetActiveWallet();
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    setActiveWalletResult = useSetActiveWallet();
   } catch {
+    setActiveWalletResult = null;
+  }
+
+  // Return mock values for mini-app mode
+  if (isMiniApp || !setActiveWalletResult) {
     return { setActiveWallet: () => {} };
   }
+
+  return setActiveWalletResult;
 }
