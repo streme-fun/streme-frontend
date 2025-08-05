@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef, memo, useMemo } from "react";
 import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
 import { getPrices } from "@/src/lib/priceUtils";
 import { useAccount } from "wagmi";
@@ -23,7 +23,7 @@ interface PoolData {
   }>;
 }
 
-export function StreamingBalance({ className = "" }: StreamingBalanceProps) {
+function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
   const { address: wagmiAddress } = useAccount();
   const { isMiniAppView, address: fcAddress } = useAppFrameLogic();
 
@@ -36,7 +36,9 @@ export function StreamingBalance({ className = "" }: StreamingBalanceProps) {
   const [flowRate, setFlowRate] = useState<string>("0");
   const [stremePrice, setStremePrice] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  
+  // Use ref to prevent effect dependency loops
+  const lastFetchTimeRef = useRef(0);
 
   // Use streaming number hook for animated balance (following StakedBalance pattern)
   const currentBalance = useStreamingNumber({
@@ -47,113 +49,116 @@ export function StreamingBalance({ className = "" }: StreamingBalanceProps) {
     pauseWhenHidden: true,
   });
 
-  // Main data fetching effect (following StakedBalance pattern)
-  useEffect(() => {
+  // Stable fetch function to prevent effect dependency loops
+  const fetchData = useCallback(async () => {
     if (!effectiveAddress) return;
 
-    const fetchData = async () => {
-      // Prevent calls if we just fetched data recently (within 30 seconds)
-      const now = Date.now();
-      if (now - lastFetchTime < 30000) {
+    // Prevent calls if we just fetched data recently (within 30 seconds)
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current < 30000) {
+      return;
+    }
+
+    try {
+      lastFetchTimeRef.current = now;
+      console.log(
+        `[StreamingBalance] Fetching balance for ${effectiveAddress} at ${new Date(
+          now
+        ).toLocaleTimeString()}`
+      );
+
+      // Get STREME balance
+      const balance = await publicClient.readContract({
+        address: STREME_TOKEN_ADDRESS as `0x${string}`,
+        abi: [
+          {
+            inputs: [{ name: "account", type: "address" }],
+            name: "balanceOf",
+            outputs: [{ name: "", type: "uint256" }],
+            stateMutability: "view",
+            type: "function",
+          },
+        ],
+        functionName: "balanceOf",
+        args: [effectiveAddress as `0x${string}`],
+      });
+
+      const formattedBalance = Number(formatUnits(balance as bigint, 18));
+
+      // Only update base amount and reset timer if the balance has actually changed
+      // This prevents the streaming animation from restarting unnecessarily
+      if (Math.abs(formattedBalance - baseAmount) > 0.0001) {
+        setBaseAmount(formattedBalance);
+        setLastUpdateTime(Date.now());
+      }
+
+      // Fetch pool data to get flow rate (following StakedBalance pattern)
+      const query = `
+        query PoolData {
+          pool(id: "${STREME_STAKING_POOL.toLowerCase()}") {
+            totalUnits
+            flowRate
+            poolMembers(where: {account_: {id: "${effectiveAddress.toLowerCase()}"}}) {
+              units
+            }
+          }
+        }
+      `;
+
+      const response = await fetch(
+        "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query }),
+        }
+      );
+
+      const data = await response.json();
+      if (!data.data?.pool) {
+        setFlowRate("0");
+        setIsLoading(false);
         return;
       }
 
-      try {
-        setLastFetchTime(now);
-        console.log(
-          `[StreamingBalance] Fetching balance for ${effectiveAddress} at ${new Date(
-            now
-          ).toLocaleTimeString()}`
-        );
+      const poolData = data.data.pool as PoolData;
+      const member = poolData.poolMembers[0];
 
-        // Get STREME balance
-        const balance = await publicClient.readContract({
-          address: STREME_TOKEN_ADDRESS as `0x${string}`,
-          abi: [
-            {
-              inputs: [{ name: "account", type: "address" }],
-              name: "balanceOf",
-              outputs: [{ name: "", type: "uint256" }],
-              stateMutability: "view",
-              type: "function",
-            },
-          ],
-          functionName: "balanceOf",
-          args: [effectiveAddress as `0x${string}`],
-        });
+      if (member) {
+        const totalUnits = BigInt(poolData.totalUnits || "0");
+        const memberUnits = BigInt(member.units || "0");
 
-        const formattedBalance = Number(formatUnits(balance as bigint, 18));
+        if (totalUnits > 0n) {
+          const percentage = (Number(memberUnits) * 100) / Number(totalUnits);
+          const totalFlowRate = Number(
+            formatUnits(BigInt(poolData.flowRate), 18)
+          );
+          const userFlowRate = totalFlowRate * (percentage / 100);
+          const flowRatePerMonth = userFlowRate * 86400 * 30; // 30 days per month
+          setFlowRate(flowRatePerMonth.toFixed(4));
 
-        // Only update base amount and reset timer if the balance has actually changed
-        // This prevents the streaming animation from restarting unnecessarily
-        if (Math.abs(formattedBalance - baseAmount) > 0.0001) {
-          setBaseAmount(formattedBalance);
-          setLastUpdateTime(Date.now());
-        }
-
-        // Fetch pool data to get flow rate (following StakedBalance pattern)
-        const query = `
-          query PoolData {
-            pool(id: "${STREME_STAKING_POOL.toLowerCase()}") {
-              totalUnits
-              flowRate
-              poolMembers(where: {account_: {id: "${effectiveAddress.toLowerCase()}"}}) {
-                units
-              }
-            }
-          }
-        `;
-
-        const response = await fetch(
-          "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query }),
-          }
-        );
-
-        const data = await response.json();
-        if (!data.data?.pool) {
-          setFlowRate("0");
-          setIsLoading(false);
-          return;
-        }
-
-        const poolData = data.data.pool as PoolData;
-        const member = poolData.poolMembers[0];
-
-        if (member) {
-          const totalUnits = BigInt(poolData.totalUnits || "0");
-          const memberUnits = BigInt(member.units || "0");
-
-          if (totalUnits > 0n) {
-            const percentage = (Number(memberUnits) * 100) / Number(totalUnits);
-            const totalFlowRate = Number(
-              formatUnits(BigInt(poolData.flowRate), 18)
-            );
-            const userFlowRate = totalFlowRate * (percentage / 100);
-            const flowRatePerMonth = userFlowRate * 86400 * 30; // 30 days per month
-            setFlowRate(flowRatePerMonth.toFixed(4));
-
-            console.log(
-              `[StreamingBalance] Flow rate calculated: ${flowRatePerMonth.toFixed(
-                4
-              )} STREME/month`
-            );
-          } else {
-            setFlowRate("0");
-          }
+          console.log(
+            `[StreamingBalance] Flow rate calculated: ${flowRatePerMonth.toFixed(
+              4
+            )} STREME/month`
+          );
         } else {
           setFlowRate("0");
         }
-
-        setIsLoading(false);
-      } catch (error) {
-        console.error("[StreamingBalance] Error fetching data:", error);
-        setIsLoading(false);
+      } else {
+        setFlowRate("0");
       }
-    };
+
+      setIsLoading(false);
+    } catch (error) {
+      console.error("[StreamingBalance] Error fetching data:", error);
+      setIsLoading(false);
+    }
+  }, [effectiveAddress, baseAmount]);
+
+  // Main data fetching effect (optimized to prevent dependency loops)
+  useEffect(() => {
+    if (!effectiveAddress) return;
 
     // Only fetch if page is visible to reduce API calls when tab is inactive
     const handleVisibilityChange = () => {
@@ -178,7 +183,7 @@ export function StreamingBalance({ className = "" }: StreamingBalanceProps) {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [effectiveAddress, baseAmount, lastFetchTime]);
+  }, [effectiveAddress, fetchData]); // Only depend on address and stable fetchData
 
   // Fetch STREME price
   useEffect(() => {
@@ -199,23 +204,32 @@ export function StreamingBalance({ className = "" }: StreamingBalanceProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate USD value
-  const usdValue = stremePrice ? currentBalance * stremePrice : 0;
-  const flowRatePerMonth = parseFloat(flowRate) || 0;
+  // Memoized calculations to prevent unnecessary rerenders
+  const usdValue = useMemo(() => 
+    stremePrice ? currentBalance * stremePrice : 0, 
+    [stremePrice, currentBalance]
+  );
+  
+  const flowRatePerMonth = useMemo(() => 
+    parseFloat(flowRate) || 0, 
+    [flowRate]
+  );
 
-  // Format number with appropriate decimals
-  const formatBalance = (value: number) => {
-    if (value === 0) return "0.0000";
-    if (value < 0.01) return value.toFixed(6);
-    if (value < 1) return value.toFixed(4);
-    if (value < 1000) return value.toFixed(4); // Show 4 decimals for STREME balance
-    if (value < 1000000)
-      return value.toLocaleString("en-US", {
-        minimumFractionDigits: 4,
-        maximumFractionDigits: 4,
-      });
-    return `${(value / 1000000).toFixed(4)}M`; // Show 4 decimals even for millions
-  };
+  // Memoized format function
+  const formatBalance = useMemo(() => 
+    (value: number) => {
+      if (value === 0) return "0.0000";
+      if (value < 0.01) return value.toFixed(6);
+      if (value < 1) return value.toFixed(4);
+      if (value < 1000) return value.toFixed(4); // Show 4 decimals for STREME balance
+      if (value < 1000000)
+        return value.toLocaleString("en-US", {
+          minimumFractionDigits: 4,
+          maximumFractionDigits: 4,
+        });
+      return `${(value / 1000000).toFixed(4)}M`; // Show 4 decimals even for millions
+    }, []
+  );
 
   // Don't render anything if wallet is not connected or address is missing (following StakedBalance pattern)
   if (!effectiveAddress || isLoading) return null;
@@ -244,3 +258,6 @@ export function StreamingBalance({ className = "" }: StreamingBalanceProps) {
     </div>
   );
 }
+
+// Export memoized component to prevent unnecessary rerenders
+export const StreamingBalance = memo(StreamingBalanceComponent);
