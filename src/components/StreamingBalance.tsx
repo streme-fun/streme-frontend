@@ -26,10 +26,10 @@ interface PoolData {
 export function StreamingBalance({ className = "" }: StreamingBalanceProps) {
   const { address: wagmiAddress } = useAccount();
   const { isMiniAppView, address: fcAddress } = useAppFrameLogic();
-  
+
   // Get effective address
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
-  
+
   // State management (following StakedBalance pattern)
   const [baseAmount, setBaseAmount] = useState<number>(0);
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
@@ -135,9 +135,11 @@ export function StreamingBalance({ className = "" }: StreamingBalanceProps) {
             const userFlowRate = totalFlowRate * (percentage / 100);
             const flowRatePerMonth = userFlowRate * 86400 * 30; // 30 days per month
             setFlowRate(flowRatePerMonth.toFixed(4));
-            
+
             console.log(
-              `[StreamingBalance] Flow rate calculated: ${flowRatePerMonth.toFixed(4)} STREME/month`
+              `[StreamingBalance] Flow rate calculated: ${flowRatePerMonth.toFixed(
+                4
+              )} STREME/month`
             );
           } else {
             setFlowRate("0");
@@ -207,7 +209,11 @@ export function StreamingBalance({ className = "" }: StreamingBalanceProps) {
     if (value < 0.01) return value.toFixed(6);
     if (value < 1) return value.toFixed(4);
     if (value < 1000) return value.toFixed(4); // Show 4 decimals for STREME balance
-    if (value < 1000000) return value.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+    if (value < 1000000)
+      return value.toLocaleString("en-US", {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4,
+      });
     return `${(value / 1000000).toFixed(4)}M`; // Show 4 decimals even for millions
   };
 
@@ -220,11 +226,6 @@ export function StreamingBalance({ className = "" }: StreamingBalanceProps) {
   return (
     <div className={`flex flex-col items-end ${className}`}>
       <div className="flex items-center gap-1">
-        {flowRatePerMonth > 0 && (
-          <div className="flex items-center">
-            <span className="text-xs text-success animate-pulse">↗</span>
-          </div>
-        )}
         <span className="text-sm font-mono font-semibold text-primary">
           {formatBalance(currentBalance)}
         </span>
