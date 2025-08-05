@@ -58,11 +58,13 @@ src/
 - Real-time animations use `useStreamingNumber` hook
 - Farcaster user data fetched via Neynar API
 - Safe image loading with fallback using `SafeImage` component
+- StreamingBalance component shows real-time STREME balance with 4 decimals, USD value, and monthly flow rates
 
 # Key Hooks
 
 - `useTokenData` - Centralized token balance management
 - `useWallet` - **NEW**: Unified wallet connection hook for both browser and mini-app contexts
+- `useUnifiedWallet` - **NEW**: Advanced unified wallet hook with stable address management and auto-connection
 - `useAppFrameLogic` - Farcaster mini-app detection and context
 - `useStremeBalance` - User's STREME token balance
 - `useStremeFlowRate` - User's STREME staking rewards flow rate
@@ -192,6 +194,30 @@ function ConnectWallet() {
 - Override user's wallet choice
 - Skip the connect button for mini-app users
 
+### useUnifiedWallet Pattern (Recommended):
+```tsx
+function ConnectWallet() {
+  const {
+    isConnected: unifiedIsConnected,
+    address: unifiedAddress,
+    connect: unifiedConnect,
+    isEffectivelyMiniApp: unifiedIsMiniApp,
+  } = useUnifiedWallet();
+
+  if (unifiedIsConnected) {
+    return <div>Connected: {unifiedAddress}</div>
+  }
+
+  return <button onClick={unifiedConnect}>Connect Wallet</button>
+}
+```
+
+**Benefits of useUnifiedWallet:**
+- Stable address management prevents flickering during navigation
+- Automatic environment detection (mini-app vs browser)
+- Built-in auto-connection logic for mini-apps
+- Consistent behavior across all pages
+
 ## Provider Architecture
 
 The app uses a **dual provider architecture** that selects the appropriate stack based on environment detection:
@@ -271,6 +297,16 @@ const txHash = await ethProvider.request({
 2. Add navigation link if needed
 3. Follow existing page patterns (loading states, error handling)
 4. Use proper TypeScript types
+5. Use `useUnifiedWallet` for consistent wallet connection behavior
+
+## Adding StreamingBalance Component
+The `StreamingBalance` component can be used to display real-time STREME balance:
+- Shows balance with 4 decimal precision
+- Displays USD value and monthly flow rate
+- Only renders when user has balance or active flow rate
+- Clickable to navigate to STREME token page
+- Uses `useStreamingNumber` for smooth real-time animation
+- Follows StakedBalance.tsx pattern for data fetching
 
 ## Working with Superfluid Streams
 1. Use existing hooks (`useCFAFlowRate`, `useDistributionPool`)
@@ -335,6 +371,8 @@ Enable debug mode by clicking the floating button in development.
 - **Mini-app stuck in connection loop**: Fixed with improved disconnect logic and single detection
 - **Wallet override in mini-app**: Browser wallets automatically disconnected in mini-app context
 - **Debug wallet state**: Use `/debug-wallet` page to monitor all wallet states in development
+- **Address flickering during navigation**: Use `useUnifiedWallet` for stable address management
+- **Inconsistent auto-connection**: Use `useUnifiedWallet` pattern across all pages for consistent behavior
 
 ## Superfluid Issues  
 - **Active streams not showing**: Use token address directly in query, not as variable
@@ -345,6 +383,8 @@ Enable debug mode by clicking the floating button in development.
 - **Streaming balance shows 0**: Use `balanceOf` instead of `realtimeBalanceOfNow` for actual balance
 - **Animation not updating**: Check `useStreamingNumber` configuration and flow rate calculations
 - **CheckinSuccessModal flow rate wrong**: Ensure STREME staking pool address matches token data (0xa040a8564c433970d7919c441104b1d25b9eaa1c)
+- **StreamingBalance not showing**: Component only renders when user has STREME balance or active flow rate
+- **StreamingBalance animation issues**: Follow StakedBalance.tsx pattern with proper flow rate conversion (monthly rate ÷ (86400 * 30) for per-second)
 
 ## Token Display Issues
 - **Duplicate tokens in /tokens page**: 
