@@ -13,6 +13,7 @@ import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import { useWallet } from "../hooks/useWallet";
+import { MiniAppTopNavbar } from "./MiniAppTopNavbar";
 import sdk from "@farcaster/miniapp-sdk";
 
 // Client-side function to fetch user data from our API
@@ -81,9 +82,14 @@ export function Navbar() {
 
     setLastLogoClickTime(now);
 
-    // Navigate to crowdfund page on 5th click
+    // Show debug button on 5th click for mini-app, navigate to growth fund for web
     if (logoClickCount + 1 >= 5) {
-      router.push("/crowdfund");
+      if (isMiniApp) {
+        // Dispatch custom event to notify app.tsx about debug mode activation
+        window.dispatchEvent(new CustomEvent('streme-debug-activated'));
+      } else {
+        router.push("/crowdfund");
+      }
       setLogoClickCount(0);
     }
   };
@@ -127,6 +133,14 @@ export function Navbar() {
   if (isMiniApp) {
     return (
       <>
+        {/* Top Navbar */}
+        <MiniAppTopNavbar 
+          isConnected={isConnected}
+          onLogoClick={handleLogoClick}
+          onTutorialClick={() => setIsTutorialOpen(true)}
+        />
+        
+        {/* Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 z-50 pb-4 pt-2 bg-background/80 border-t border-black/[.1] bg-base-100 bg-opacity-80">
           <div className="px-2 sm:px-4 py-2 flex items-center justify-around gap-1 sm:gap-2">
             {/* Explore Button */}
@@ -305,11 +319,11 @@ Symbol: $[your ticker]
           isOpen={isMyStakesOpen}
           onClose={() => setIsMyStakesOpen(false)}
         />
-        {/* <MiniAppTutorialModal
+        <MiniAppTutorialModal
           isOpen={isTutorialOpen}
           onClose={() => setIsTutorialOpen(false)}
           onSkip={() => setIsTutorialOpen(false)}
-        /> */}
+        />
       </>
     );
   }
