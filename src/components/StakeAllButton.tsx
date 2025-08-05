@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useWallets } from "@privy-io/react-auth";
+import { useSafeWallets } from "../hooks/useSafePrivy";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
@@ -58,7 +58,7 @@ export function StakeAllButton({
   tokenBalance = BigInt(0),
   buttonText = "Stake All",
 }: StakeAllButtonProps) {
-  const { wallets } = useWallets();
+  const { wallets } = useSafeWallets();
   const { address: unifiedAddress, isConnected: unifiedIsConnected, isMiniApp: detectedMiniApp } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   const postHog = usePostHog();

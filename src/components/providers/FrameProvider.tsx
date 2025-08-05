@@ -106,9 +106,16 @@ export function useFrame() {
       return;
     }
 
+    // Mark as initialized immediately to prevent re-entry
+    initializationRef.current = true;
+
     // Global check to prevent multiple SDK instances, but still load context
     if (typeof window !== "undefined" && window.__FARCASTER_SDK_INITIALIZED__) {
-      console.warn("SDK already initialized globally, loading context only...");
+      // Only log once when first detected, not on every re-render
+      if (!isSDKLoaded) {
+        console.log("SDK already initialized globally, loading context...");
+      }
+
       // Still need to load context even if SDK is already initialized
       const loadContextOnly = async () => {
         try {
@@ -123,8 +130,6 @@ export function useFrame() {
       loadContextOnly();
       return;
     }
-
-    initializationRef.current = true;
     let storeUnsubscribe: (() => void) | null = null;
 
     const load = async () => {

@@ -11,7 +11,7 @@ import { useWallet } from "@/src/hooks/useWallet";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { formatUnits } from "viem";
-import { useWallets } from "@privy-io/react-auth";
+import { useSafeWallets } from "../hooks/useSafePrivy";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 
 const stakingAbiEthers = [
@@ -60,7 +60,7 @@ export function UnstakeButton({
 }: UnstakeButtonProps) {
   const { address, isConnected, isMiniApp } = useWallet();
   const { data: walletClient } = useWalletClient();
-  const { wallets } = useWallets();
+  const { wallets } = useSafeWallets();
   const { getSafeEthereumProvider } = useAppFrameLogic();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unlockTime, setUnlockTime] = useState<number | null>(null);

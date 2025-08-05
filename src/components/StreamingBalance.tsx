@@ -3,8 +3,7 @@
 import { useEffect, useState, useCallback, useRef, memo, useMemo } from "react";
 import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
 import { getPrices } from "@/src/lib/priceUtils";
-import { useAccount } from "wagmi";
-import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
+import { useUnifiedWallet } from "@/src/hooks/useUnifiedWallet";
 import { publicClient } from "@/src/lib/viemClient";
 import { formatUnits } from "viem";
 
@@ -24,11 +23,11 @@ interface PoolData {
 }
 
 function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
-  const { address: wagmiAddress } = useAccount();
-  const { isMiniAppView, address: fcAddress } = useAppFrameLogic();
-
-  // Get effective address
-  const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
+  const {
+    address: effectiveAddress,
+    isConnected,
+    isEffectivelyMiniApp: isMiniAppView,
+  } = useUnifiedWallet();
 
   // State management (following StakedBalance pattern)
   const [baseAmount, setBaseAmount] = useState<number>(0);
@@ -36,7 +35,7 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
   const [flowRate, setFlowRate] = useState<string>("0");
   const [stremePrice, setStremePrice] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Use ref to prevent effect dependency loops
   const lastFetchTimeRef = useRef(0);
 
@@ -205,19 +204,16 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
   }, []);
 
   // Memoized calculations to prevent unnecessary rerenders
-  const usdValue = useMemo(() => 
-    stremePrice ? currentBalance * stremePrice : 0, 
+  const usdValue = useMemo(
+    () => (stremePrice ? currentBalance * stremePrice : 0),
     [stremePrice, currentBalance]
   );
-  
-  const flowRatePerMonth = useMemo(() => 
-    parseFloat(flowRate) || 0, 
-    [flowRate]
-  );
+
+  const flowRatePerMonth = useMemo(() => parseFloat(flowRate) || 0, [flowRate]);
 
   // Memoized format function
-  const formatBalance = useMemo(() => 
-    (value: number) => {
+  const formatBalance = useMemo(
+    () => (value: number) => {
       if (value === 0) return "0.0000";
       if (value < 0.01) return value.toFixed(6);
       if (value < 1) return value.toFixed(4);
@@ -228,14 +224,30 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
           maximumFractionDigits: 4,
         });
       return `${(value / 1000000).toFixed(4)}M`; // Show 4 decimals even for millions
-    }, []
+    },
+    []
   );
 
   // Don't render anything if wallet is not connected or address is missing (following StakedBalance pattern)
-  if (!effectiveAddress || isLoading) return null;
+  if (!isConnected || !effectiveAddress) {
+    return null;
+  }
 
-  // Don't show if no balance and no flow rate
-  if (baseAmount === 0 && flowRatePerMonth === 0) return null;
+  if (isLoading) {
+    return null;
+  }
+
+  // Show even with 0 balance for debugging - can be restored later
+  // if (baseAmount === 0 && flowRatePerMonth === 0) {
+  //   return null;
+  // }
+
+  console.log("[StreamingBalance] ✅ Rendering component with:", {
+    currentBalance,
+    flowRatePerMonth,
+    isConnected,
+    effectiveAddress,
+  });
 
   return (
     <div className={`flex flex-col items-end ${className}`}>

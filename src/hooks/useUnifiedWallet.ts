@@ -1,40 +1,21 @@
 "use client";
 
 import { useAccount } from "wagmi";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useAppFrameLogic } from "./useAppFrameLogic";
-import { useState, useEffect } from "react";
-
-/**
- * Safe Privy hooks wrapper that handles mini-app mode
- */
-function useSafePrivy() {
-  try {
-    return usePrivy();
-  } catch {
-    return { authenticated: false, login: () => {}, user: null };
-  }
-}
-
-function useSafeWallets() {
-  try {
-    return useWallets();
-  } catch {
-    return { wallets: [] };
-  }
-}
+import { useState, useEffect, useMemo } from "react";
+import { useSafePrivy, useSafeWallets } from "./useSafePrivy";
 
 /**
  * Unified wallet connection hook that handles all environments:
  * - Desktop: Privy authentication + wagmi connection
  * - Mobile: Privy authentication (primary) + wagmi connection (secondary)
  * - Mini-app: Farcaster wallet connection
- * 
+ *
  * Provides stable address management to prevent flickering during navigation
  */
 export function useUnifiedWallet() {
   const { address: wagmiAddress, isConnected: wagmiIsConnected } = useAccount();
-  
+
   const {
     isMiniAppView,
     address: farcasterAddress,
@@ -45,9 +26,13 @@ export function useUnifiedWallet() {
   } = useAppFrameLogic();
 
   // Use safe Privy hooks that handle mini-app mode gracefully
-  const { authenticated: privyAuthenticatedRaw, login: privyLogin, user: privyUser } = useSafePrivy();
+  const {
+    authenticated: privyAuthenticatedRaw,
+    login: privyLogin,
+    user: privyUser,
+  } = useSafePrivy();
   const { wallets } = useSafeWallets();
-  
+
   // Only use Privy data when not in mini-app mode
   const privyAuthenticated = isMiniAppView ? false : privyAuthenticatedRaw;
 
@@ -60,18 +45,36 @@ export function useUnifiedWallet() {
   const isEffectivelyMiniApp = isMiniAppView;
 
   // Get the connected wallet address from Privy
-  const connectedWallet = wallets.find(wallet => wallet.address) || wallets[0];
+  const connectedWallet =
+    wallets.find((wallet) => wallet.address) || wallets[0];
   const privyConnectedAddress = connectedWallet?.address;
 
+  // Debug logging for mini-app connection state (only when there's a mismatch)
+  if (
+    isEffectivelyMiniApp &&
+    !wagmiIsConnected &&
+    (wagmiAddress || farcasterAddress)
+  ) {
+    console.log(
+      "[useUnifiedWallet] Mini-app has address but wagmi not connected:",
+      {
+        wagmiIsConnected,
+        wagmiAddress,
+        farcasterAddress,
+        isSDKLoaded,
+      }
+    );
+  }
+
   // Simplified connection logic
-  // For mini-app: trust wagmi's useAccount() directly (uses farcasterMiniApp connector)
+  // For mini-app: In Farcaster mini-apps, wagmi might not report "connected" but still have an address
   // For regular apps: use Privy authentication + wagmi address
-  const finalIsConnected = isEffectivelyMiniApp 
-    ? wagmiIsConnected && Boolean(wagmiAddress)  // Ensure we have both connection and address
+  const finalIsConnected = isEffectivelyMiniApp
+    ? Boolean(wagmiAddress || farcasterAddress) && isSDKLoaded // Trust address presence in mini-app
     : privyAuthenticated && Boolean(wagmiAddress || privyConnectedAddress);
-    
-  const rawAddress = isEffectivelyMiniApp 
-    ? wagmiAddress
+
+  const rawAddress = isEffectivelyMiniApp
+    ? wagmiAddress || farcasterAddress
     : wagmiAddress || privyConnectedAddress;
 
   // Update stable address when we have a valid connection
@@ -80,7 +83,7 @@ export function useUnifiedWallet() {
       console.log("[useUnifiedWallet] Updating stable address:", {
         from: lastValidAddress,
         to: rawAddress,
-        isConnected: finalIsConnected
+        isConnected: finalIsConnected,
       });
       setStableAddress(rawAddress);
       setLastValidAddress(rawAddress);
@@ -102,8 +105,14 @@ export function useUnifiedWallet() {
   const connect = isEffectivelyMiniApp
     ? () => {
         // For mini-apps, use the standard wagmi connect pattern
-        if (farcasterConnect && farcasterConnectors && farcasterConnectors.length > 0) {
-          const farcasterConnector = farcasterConnectors.find(c => c.id === 'farcasterMiniApp') || farcasterConnectors[0];
+        if (
+          farcasterConnect &&
+          farcasterConnectors &&
+          farcasterConnectors.length > 0
+        ) {
+          const farcasterConnector =
+            farcasterConnectors.find((c) => c.id === "farcasterMiniApp") ||
+            farcasterConnectors[0];
           farcasterConnect({ connector: farcasterConnector });
         } else {
           console.warn("Farcaster connect function not available");
@@ -112,47 +121,14 @@ export function useUnifiedWallet() {
     : privyLogin;
 
   // Loading states
-  const isLoading = isEffectivelyMiniApp 
-    ? !isSDKLoaded
-    : false; // Privy doesn't have a loading state we need to wait for
+  const isLoading = isEffectivelyMiniApp ? !isSDKLoaded : false; // Privy doesn't have a loading state we need to wait for
 
   // The Farcaster mini-app connector should auto-connect if user has a wallet
   // We don't need to force connection - it should happen automatically
 
-  // Debug logging for connection issues
-  if (isEffectivelyMiniApp) {
-    console.log("[useUnifiedWallet] Mini-app state:", {
-      wagmiIsConnected,
-      wagmiAddress,
-      finalIsConnected,
-      finalAddress,
-      stableAddress,
-      isSDKLoaded,
-      farcasterIsConnected,
-      farcasterAddress,
-    });
-  }
-
-  return {
-    // Connection state
-    isConnected: finalIsConnected,
-    address: finalAddress,
-    
-    // Actions
-    connect,
-    
-    // Environment detection
-    isEffectivelyMiniApp,
-    
-    // Loading state
-    isLoading,
-    
-    // Stability indicators
-    isStable: Boolean(stableAddress), // True when we have a stable address cached
-    isInitialized,
-    
-    // Raw states for debugging/advanced usage
-    raw: {
+  // Memoize the raw object to prevent unnecessary re-renders
+  const rawStates = useMemo(
+    () => ({
       wagmiAddress,
       wagmiIsConnected,
       privyAuthenticated,
@@ -165,6 +141,42 @@ export function useUnifiedWallet() {
       stableAddress,
       lastValidAddress,
       rawAddress,
-    }
+    }),
+    [
+      wagmiAddress,
+      wagmiIsConnected,
+      privyAuthenticated,
+      privyUser?.wallet?.address,
+      privyConnectedAddress,
+      farcasterAddress,
+      farcasterIsConnected,
+      isMiniAppView,
+      isSDKLoaded,
+      stableAddress,
+      lastValidAddress,
+      rawAddress,
+    ]
+  );
+
+  return {
+    // Connection state
+    isConnected: finalIsConnected,
+    address: finalAddress,
+
+    // Actions
+    connect,
+
+    // Environment detection
+    isEffectivelyMiniApp,
+
+    // Loading state
+    isLoading,
+
+    // Stability indicators
+    isStable: Boolean(stableAddress), // True when we have a stable address cached
+    isInitialized,
+
+    // Raw states for debugging/advanced usage
+    raw: rawStates,
   };
 }

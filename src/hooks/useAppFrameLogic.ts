@@ -26,9 +26,9 @@ export function useAppFrameLogic() {
   useEffect(() => {
     if (farcasterContext?.client) {
       const isAdded = farcasterContext.client.added;
-      console.log("Mini app added status from context:", isAdded);
 
-      if (isAdded) {
+      if (isAdded && !hasAddedMiniApp) {
+        console.log("Mini app added status from context:", isAdded);
         setHasAddedMiniApp(true);
         // Also save to localStorage for consistency
         if (typeof window !== "undefined") {
@@ -36,7 +36,7 @@ export function useAppFrameLogic() {
         }
       }
     }
-  }, [farcasterContext]);
+  }, [farcasterContext, hasAddedMiniApp]);
 
   const isOnCorrectNetwork = isConnected && chain?.id === base.id;
 

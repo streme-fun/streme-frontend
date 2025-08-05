@@ -52,10 +52,10 @@ export function useSupEligibility() {
 
     try {
       const url = `/api/sup/eligibility?address=${address}`;
-      console.log("useSupEligibility: Making request to:", url);
+      // console.log("useSupEligibility: Making request to:", url);
 
       const response = await fetch(url);
-      console.log("useSupEligibility: Response status:", response.status);
+      // console.log("useSupEligibility: Response status:", response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -68,7 +68,7 @@ export function useSupEligibility() {
       }
 
       const eligibilityData: SupEligibilityResult = await response.json();
-      console.log("useSupEligibility: Received data:", eligibilityData);
+      // console.log("useSupEligibility: Received data:", eligibilityData);
 
       setState((prev) => ({
         ...prev,

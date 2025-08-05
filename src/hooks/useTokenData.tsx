@@ -11,7 +11,7 @@ import {
 import { publicClient, requestBatcher } from "@/src/lib/viemClient";
 import { useWalletAddressChange } from "./useWalletSync";
 import { useAppFrameLogic } from "./useAppFrameLogic";
-import { usePrivy } from "@privy-io/react-auth";
+import { useSafePrivy } from "./useSafePrivy";
 import { GDA_FORWARDER, GDA_ABI } from "@/src/lib/contracts";
 
 interface TokenBalanceData {
@@ -50,7 +50,7 @@ export function TokenDataProvider({ children }: TokenDataProviderProps) {
   const [activeTokens, setActiveTokens] = useState<Set<string>>(new Set());
 
   const { refreshTrigger, primaryAddress } = useWalletAddressChange();
-  const { user } = usePrivy();
+  const { user } = useSafePrivy();
   const {
     isMiniAppView,
     address: fcAddress,
@@ -403,7 +403,7 @@ export function useTokenBalance(
     isRefreshing,
   } = useTokenData();
   const { primaryAddress } = useWalletAddressChange();
-  const { user } = usePrivy();
+  const { user } = useSafePrivy();
   const { isMiniAppView, address: fcAddress } = useAppFrameLogic();
 
   const effectiveAddress = isMiniAppView

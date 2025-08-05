@@ -8,7 +8,7 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useWallet } from "@/src/hooks/useWallet";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
-import { useWallets } from "@privy-io/react-auth";
+import { useSafeWallets } from "../hooks/useSafePrivy";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 
 interface ClaimFeesButtonProps {
@@ -31,7 +31,7 @@ export function ClaimFeesButton({
   } = useWallet();
   const { getSafeEthereumProvider } = useAppFrameLogic();
   const { data: walletClient } = useWalletClient();
-  const { wallets } = useWallets();
+  const { wallets } = useSafeWallets();
 
   const handleClaimFees = async () => {
     if (!walletIsConnected || !currentAddress) {

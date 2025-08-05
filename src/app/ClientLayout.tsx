@@ -159,18 +159,20 @@ function AppContent({ children }: { children: React.ReactNode }) {
     });
 
     // Initialize Eruda for debugging in development or when debug=true query param
-    const shouldLoadEruda = 
-      process.env.NODE_ENV === "development" || 
-      (typeof window !== "undefined" && 
-       new URLSearchParams(window.location.search).get("debug") === "true");
-    
+    const shouldLoadEruda =
+      process.env.NODE_ENV === "development" ||
+      (typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("debug") === "true");
+
     if (shouldLoadEruda && typeof window !== "undefined") {
-      import("eruda").then((eruda) => {
-        eruda.default.init();
-        console.log("🐛 Eruda debugging console initialized");
-      }).catch((error) => {
-        console.warn("Failed to load Eruda:", error);
-      });
+      import("eruda")
+        .then((eruda) => {
+          eruda.default.init();
+          console.log("🐛 Eruda debugging console initialized");
+        })
+        .catch((error) => {
+          console.warn("Failed to load Eruda:", error);
+        });
     }
 
     setMounted(true);
@@ -293,10 +295,14 @@ function AppContent({ children }: { children: React.ReactNode }) {
         !stableConnectionState.address ||
         !stableConnectionState.isConnected
       ) {
-        console.log(
-          "Waiting for stable connection state...",
-          stableConnectionState
-        );
+        // Only log once when first waiting, not repeatedly
+        if (stableConnectionState.isStable === false) {
+          console.log("Waiting for stable connection state...", {
+            isStable: stableConnectionState.isStable,
+            hasAddress: !!stableConnectionState.address,
+            isConnected: stableConnectionState.isConnected,
+          });
+        }
         return;
       }
 
@@ -567,45 +573,59 @@ function EnvironmentDetector({ children }: { children: React.ReactNode }) {
       const startTime = Date.now();
       try {
         console.log("🔍 EnvironmentDetector: Starting detection...");
-        
+
         // For Coinbase Wallet, ethereum provider might not be immediately available
         // Wait a bit if we're in an iframe context
         if (typeof window !== "undefined" && window.parent !== window) {
-          console.log("🔍 EnvironmentDetector: Iframe detected, waiting for ethereum provider...");
-          await new Promise(resolve => setTimeout(resolve, 500));
+          console.log(
+            "🔍 EnvironmentDetector: Iframe detected, waiting for ethereum provider..."
+          );
+          await new Promise((resolve) => setTimeout(resolve, 500));
         }
-        
+
         // Try detection with retries for SDK context
         let isMiniApp = false;
         let attempts = 0;
         const maxAttempts = 3;
-        
+
         while (attempts < maxAttempts) {
-          console.log(`🔍 EnvironmentDetector: Detection attempt ${attempts + 1}/${maxAttempts}`);
-          
+          console.log(
+            `🔍 EnvironmentDetector: Detection attempt ${
+              attempts + 1
+            }/${maxAttempts}`
+          );
+
           const detectionPromise = detectEnvironmentForProviders();
           const result = await Promise.race([
             detectionPromise,
-            new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1500))
+            new Promise<boolean>((resolve) =>
+              setTimeout(() => resolve(false), 1500)
+            ),
           ]);
-          
+
           // If we detected as mini-app, we're done
           if (result === true) {
             isMiniApp = true;
             break;
           }
-          
+
           // If not detected as mini-app, wait a bit and try again (SDK might not be ready)
           if (attempts < maxAttempts - 1) {
-            console.log(`🔍 EnvironmentDetector: Not detected as mini-app, waiting before retry...`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            console.log(
+              `🔍 EnvironmentDetector: Not detected as mini-app, waiting before retry...`
+            );
+            await new Promise((resolve) => setTimeout(resolve, 1000));
           }
-          
+
           attempts++;
         }
-        
+
         console.log("🔍 EnvironmentDetector: Detection result:", isMiniApp);
-        console.log("🔍 EnvironmentDetector: Detection took", Date.now() - startTime, "ms");
+        console.log(
+          "🔍 EnvironmentDetector: Detection took",
+          Date.now() - startTime,
+          "ms"
+        );
         setIsMiniApp(isMiniApp);
       } catch (error) {
         console.error("EnvironmentDetector: Detection error:", error);
@@ -623,15 +643,14 @@ function EnvironmentDetector({ children }: { children: React.ReactNode }) {
   if (isDetecting || isMiniApp === null) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <img 
-          src="/icon-transparent.png" 
-          alt="Loading" 
+        <img
+          src="/icon-transparent.png"
+          alt="Loading"
           className="w-16 h-16 animate-pulse"
         />
       </div>
     );
   }
-
 
   // Render appropriate layout
   return isMiniApp ? (

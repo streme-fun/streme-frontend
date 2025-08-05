@@ -6,7 +6,7 @@ import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import sdk from "@farcaster/miniapp-sdk";
 import Image from "next/image";
 import FarcasterIcon from "@/public/farcaster.svg";
-import { useWallets } from "@privy-io/react-auth";
+import { useSafeWallets } from "../hooks/useSafePrivy";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "../lib/viemClient";
 import { toast } from "sonner";
@@ -53,7 +53,7 @@ export function UnstakedTokensModal({
   unstakedTokens,
   onDismiss,
 }: UnstakedTokensModalProps) {
-  const { wallets } = useWallets();
+  const { wallets } = useSafeWallets();
   const { address: wagmiAddress } = useAccount();
   const {
     isMiniAppView,

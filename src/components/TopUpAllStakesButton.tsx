@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useWallets } from "@privy-io/react-auth";
+import { useSafeWallets } from "../hooks/useSafePrivy";
 import { useAccount } from "wagmi";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
@@ -66,7 +66,7 @@ export function TopUpAllStakesButton({
   farcasterAddress,
   farcasterIsConnected,
 }: TopUpAllStakesButtonProps) {
-  const { wallets } = useWallets();
+  const { wallets } = useSafeWallets();
   const { address: wagmiAddress } = useAccount();
   const [isLoading, setIsLoading] = useState(false);
   const [currentProgress, setCurrentProgress] = useState({

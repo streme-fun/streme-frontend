@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useSafePrivy } from "../hooks/useSafePrivy";
 import { formatEther } from "viem";
 import { publicClient } from "@/src/lib/viemClient";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
@@ -48,7 +48,7 @@ export function WalletProfileModal({
   isOpen,
   onClose,
 }: WalletProfileModalProps) {
-  const { user: privyUser } = usePrivy();
+  const { user: privyUser } = useSafePrivy();
   const {
     farcasterContext,
     isMiniAppView,
@@ -67,28 +67,12 @@ export function WalletProfileModal({
   const effectiveAddress = isMiniAppView
     ? fcAddress
     : privyUser?.wallet?.address;
-  
-  // Debug Farcaster context structure
-  console.log("WalletProfile Debug:", {
-    isMiniAppView,
-    hasContext: !!farcasterContext,
-    contextKeys: farcasterContext ? Object.keys(farcasterContext) : [],
-    contextUser: farcasterContext?.user,
-    contextLocation: farcasterContext?.location,
-    fullContext: farcasterContext
-  });
-  
+
   // Try multiple possible paths for FID based on SDK documentation
-  const userFid = farcasterContext?.user?.fid || 
-                  (farcasterContext as unknown as { client?: { user?: { fid?: number } } })?.client?.user?.fid;
-                  
-  console.log("FID extraction attempt:", {
-    userFid,
-    contextUserFid: farcasterContext?.user?.fid,
-    clientUserFid: (farcasterContext as unknown as { client?: { user?: { fid?: number } } })?.client?.user?.fid,
-    hasUser: !!farcasterContext?.user,
-    hasClient: !!(farcasterContext as unknown as { client?: unknown })?.client
-  });
+  const userFid =
+    farcasterContext?.user?.fid ||
+    (farcasterContext as unknown as { client?: { user?: { fid?: number } } })
+      ?.client?.user?.fid;
 
   // Copy address to clipboard with visual feedback
   const copyAddress = async () => {

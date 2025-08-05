@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSafePrivy } from "@/src/hooks/useSafePrivy";
 import { Token } from "@/src/app/types/token";
 import { StakeButton } from "@/src/components/StakeButton";
 import { publicClient } from "@/src/lib/viemClient";
@@ -116,7 +116,7 @@ export function TokenActions({
 
   const { isSDKLoaded: fcSDKLoaded, farcasterContext } = useAppFrameLogic();
 
-  const { ready: privyReady } = usePrivy();
+  const { ready: privyReady } = useSafePrivy();
 
   // Use unified wallet connection logic
   const {
@@ -140,20 +140,31 @@ export function TokenActions({
     }
   }, [farcasterContext?.client?.clientFid]);
 
-  // Auto-connect to Farcaster wallet if not connected in mini app context (same as main app)
+  // Auto-connect to Farcaster wallet if not connected in mini app context
+  const autoConnectAttempted = useRef(false);
   useEffect(() => {
-    if (isEffectivelyMiniApp && fcSDKLoaded && !walletIsConnected) {
-      console.log("[TokenActions] Mini-app detected but not connected, attempting to connect...");
-      
-      // Try to connect using the unified wallet connect function
-      // This will use the Farcaster connector if available
+    if (
+      isEffectivelyMiniApp &&
+      fcSDKLoaded &&
+      !walletIsConnected &&
+      !autoConnectAttempted.current
+    ) {
+      autoConnectAttempted.current = true;
+      console.log(
+        "[TokenActions] Mini-app detected but not connected, attempting to connect..."
+      );
+
       try {
         effectiveLogin();
         console.log("[TokenActions] Auto-connection attempt initiated");
       } catch (error) {
         console.log("[TokenActions] Auto-connection failed:", error);
-        // User will need to manually connect
       }
+    }
+
+    // Reset if we become disconnected
+    if (!isEffectivelyMiniApp || !fcSDKLoaded) {
+      autoConnectAttempted.current = false;
     }
   }, [isEffectivelyMiniApp, fcSDKLoaded, walletIsConnected, effectiveLogin]);
 

@@ -32,7 +32,7 @@ export function useStremeFlowRate() {
 
   const fetchFlowRate = async () => {
     if (!effectiveAddress) {
-      console.log("[useStremeFlowRate] No address available");
+      // No need to log - this is a normal state when not connected
       return;
     }
     console.log(
@@ -43,7 +43,7 @@ export function useStremeFlowRate() {
     try {
       // STREME token address
       const stremeToken = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
-      
+
       // Query for total net flow rate from AccountTokenSnapshot
       const accountQuery = `
         query GetStremeFlowRate($accountId: ID!, $tokenId: String!) {
@@ -64,28 +64,32 @@ export function useStremeFlowRate() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             query: accountQuery,
             variables: {
               accountId: effectiveAddress.toLowerCase(),
-              tokenId: stremeToken.toLowerCase()
-            }
+              tokenId: stremeToken.toLowerCase(),
+            },
           }),
         }
       );
 
       const accountData = await accountResponse.json();
-      console.log("[useStremeFlowRate] Account token snapshot response:", accountData);
+      console.log(
+        "[useStremeFlowRate] Account token snapshot response:",
+        accountData
+      );
 
       if (accountData.data?.account?.accountTokenSnapshots?.[0]) {
-        const snapshot = accountData.data.account.accountTokenSnapshots[0] as AccountTokenSnapshot;
+        const snapshot = accountData.data.account
+          .accountTokenSnapshots[0] as AccountTokenSnapshot;
         const netFlowRate = BigInt(snapshot.totalNetFlowRate || "0");
-        
+
         // Convert from wei/second to tokens/day
         const flowRatePerSecond = Number(formatUnits(netFlowRate, 18));
         const flowRatePerDay = flowRatePerSecond * 86400;
         const formattedFlowRate = flowRatePerDay.toFixed(4);
-        
+
         console.log(
           "[useStremeFlowRate] Total net flow rate:",
           formattedFlowRate,
@@ -96,8 +100,10 @@ export function useStremeFlowRate() {
       }
 
       // Fallback to pool-based calculation if no account snapshot found
-      console.log("[useStremeFlowRate] No account snapshot found, falling back to pool calculation");
-      
+      console.log(
+        "[useStremeFlowRate] No account snapshot found, falling back to pool calculation"
+      );
+
       // STREME staking pool address
       const stakingPool = "0xa040a8564c433970d7919c441104b1d25b9eaa1c";
       console.log("[useStremeFlowRate] Using staking pool:", stakingPool);

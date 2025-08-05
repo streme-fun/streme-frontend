@@ -294,20 +294,32 @@ function App() {
     }
   }, [isMiniAppView, isSDKLoaded, loading]);
 
-  // Auto-connect to Farcaster wallet if not connected in mini app context (same as crowdfund page)
+  // Auto-connect to Farcaster wallet if not connected in mini app context
+  const autoConnectAttempted = useRef(false);
   useEffect(() => {
-    if (isMiniAppView && isSDKLoaded && !isConnected) {
-      console.log("[App] Mini-app detected but not connected, attempting to connect...");
-      
+    if (
+      isMiniAppView &&
+      isSDKLoaded &&
+      !isConnected &&
+      !autoConnectAttempted.current
+    ) {
+      autoConnectAttempted.current = true;
+      console.log(
+        "[App] Mini-app detected but not connected, attempting to connect..."
+      );
+
       // Try to connect using the unified wallet connect function
-      // This will use the Farcaster connector if available
       try {
         unifiedConnect();
         console.log("[App] Auto-connection attempt initiated");
       } catch (error) {
         console.log("[App] Auto-connection failed:", error);
-        // User will need to manually connect
       }
+    }
+
+    // Reset if we become disconnected
+    if (!isMiniAppView || !isSDKLoaded) {
+      autoConnectAttempted.current = false;
     }
   }, [isMiniAppView, isSDKLoaded, isConnected, unifiedConnect]);
 
@@ -335,7 +347,7 @@ function App() {
           const response = await fetch(`/api/checkin/${userFid}`);
           if (response.ok) {
             const data = await response.json();
-            console.log("Checkin status:", data);
+            // console.log("Checkin status:", data);
 
             // Only show modal if user hasn't checked in today
             if (!data.checkedInToday) {
@@ -488,8 +500,8 @@ function App() {
                       Streme Growth Fund
                     </p>
                     <p className="text-sm text-base-content/70 mb-3 mr-3">
-                      Contribute your staking rewards to help fund Streme
-                      growth initiatives. Earn $SUP for your help!
+                      Contribute your staking rewards to help fund Streme growth
+                      initiatives. Earn $SUP for your help!
                     </p>
                   </div>
                   <button className="btn btn-sm btn-primary">Join</button>
@@ -634,8 +646,8 @@ function App() {
                       Streme Growth Fund
                     </p>
                     <p className="text-sm text-base-content/70 mb-3">
-                      Contribute your staking rewards to help fund Streme
-                      growth initiatives. Earn $SUP for your contribution.
+                      Contribute your staking rewards to help fund Streme growth
+                      initiatives. Earn $SUP for your contribution.
                     </p>
                   </div>
                   <button className="btn btn-primary">Join</button>

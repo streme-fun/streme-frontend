@@ -53,43 +53,38 @@ export function CheckinModal({
 
   // Determine the user state
   const userState = useMemo(() => {
-    if (hasStakedBalance && hasStremeBalance) return 'stakedWithBalance';
-    if (hasStakedBalance && !hasStremeBalance) return 'stakedNoBalance';
-    if (!hasStakedBalance && hasStremeBalance) return 'needsToStake';
-    return 'new';
+    if (hasStakedBalance && hasStremeBalance) return "stakedWithBalance";
+    if (hasStakedBalance && !hasStremeBalance) return "stakedNoBalance";
+    if (!hasStakedBalance && hasStremeBalance) return "needsToStake";
+    return "new";
   }, [hasStakedBalance, hasStremeBalance]);
 
   // Select random message based on user state
   const selectedMessage = useMemo(() => {
-    if (userState === 'stakedWithBalance') {
+    if (userState === "stakedWithBalance") {
       const randomIndex = Math.floor(
         Math.random() * CHECKIN_MESSAGES.STAKED_USERS_WITH_BALANCE.length
       );
       return CHECKIN_MESSAGES.STAKED_USERS_WITH_BALANCE[randomIndex];
-    } else if (userState === 'stakedNoBalance') {
+    } else if (userState === "stakedNoBalance") {
       const randomIndex = Math.floor(
         Math.random() * CHECKIN_MESSAGES.STAKED_USERS_NO_BALANCE.length
       );
       return CHECKIN_MESSAGES.STAKED_USERS_NO_BALANCE[randomIndex];
     }
-    return '';
+    return "";
   }, [userState]);
 
   // Fetch STREME balance when modal opens
   useEffect(() => {
     const fetchStremeBalance = async () => {
-      console.log("CheckinModal: Checking balance fetch conditions", {
-        effectiveIsConnected,
-        effectiveAddress,
-        isOpen,
-        isMiniAppView,
-        fcIsConnected,
-        fcAddress,
-        wagmiIsConnected,
-        wagmiAddress
-      });
-      
+      // Only log when modal is actually open and we're about to fetch
       if (!effectiveIsConnected || !effectiveAddress || !isOpen) return;
+
+      console.log("CheckinModal: Fetching STREME balance", {
+        address: effectiveAddress,
+        isMiniApp: isMiniAppView,
+      });
 
       setIsCheckingBalance(true);
       try {
@@ -111,7 +106,7 @@ export function CheckinModal({
         console.log("CheckinModal: STREME balance fetched", {
           address: effectiveAddress,
           balance: balanceResult.toString(),
-          balanceFormatted: (Number(balanceResult) / 1e18).toFixed(4)
+          balanceFormatted: (Number(balanceResult) / 1e18).toFixed(4),
         });
         setStremeBalance(balanceResult);
       } catch (error) {
@@ -152,11 +147,11 @@ export function CheckinModal({
     try {
       // Refresh balance after successful staking
       setStremeBalance(0n); // Reset since they just staked it all
-      
+
       // Automatically trigger the claim after successful staking
       console.log("CheckinModal: Triggering onCheckin for auto-claim");
       await onCheckin();
-      
+
       // Close the modal - the success modal will show automatically
       console.log("CheckinModal: Auto-claim successful, closing modal");
       onClose();
@@ -169,13 +164,13 @@ export function CheckinModal({
 
   const getDisplayMessage = () => {
     switch (userState) {
-      case 'stakedWithBalance':
+      case "stakedWithBalance":
         return selectedMessage;
-      case 'stakedNoBalance':
+      case "stakedNoBalance":
         return selectedMessage;
-      case 'needsToStake':
+      case "needsToStake":
         return CHECKIN_MESSAGES.NEED_TO_STAKE;
-      case 'new':
+      case "new":
       default:
         return CHECKIN_MESSAGES.NEW_USER;
     }
@@ -189,9 +184,13 @@ export function CheckinModal({
   if (!isOpen) return null;
 
   const displayMessage = getDisplayMessage();
-  const showStakeButton = (userState === 'stakedWithBalance' || userState === 'needsToStake') && !hasCheckedIn;
-  const showClaimButton = (userState === 'stakedNoBalance' || userState === 'new') && !isCheckingBalance;
-  
+  const showStakeButton =
+    (userState === "stakedWithBalance" || userState === "needsToStake") &&
+    !hasCheckedIn;
+  const showClaimButton =
+    (userState === "stakedNoBalance" || userState === "new") &&
+    !isCheckingBalance;
+
   const isClaimButtonDisabled = isProcessing || isLoading || hasCheckedIn;
   const claimButtonText = getButtonText(isProcessing, isLoading, hasCheckedIn);
 
@@ -250,10 +249,7 @@ export function CheckinModal({
         )}
 
         {hasCheckedIn && !showStakeButton && !showClaimButton && (
-          <button
-            disabled
-            className="btn btn-lg btn-primary w-full"
-          >
+          <button disabled className="btn btn-lg btn-primary w-full">
             {BUTTON_TEXT.ALREADY_CLAIMED}
           </button>
         )}

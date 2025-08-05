@@ -8,7 +8,7 @@ import { publicClient } from "@/src/lib/viemClient";
 import { GDA_FORWARDER } from "@/src/lib/contracts";
 import sdk from "@farcaster/miniapp-sdk";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import { useWallets } from "@privy-io/react-auth";
+import { useSafeWallets } from "../hooks/useSafePrivy";
 
 const toHex = (address: string) => address as `0x${string}`;
 
@@ -28,24 +28,21 @@ export function ConnectPoolButton({
   farcasterIsConnected,
 }: ConnectPoolButtonProps) {
   const [isConnecting, setIsConnecting] = useState(false);
-  
+
   const { address: wagmiAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
-  const { wallets } = useWallets();
-  const {
-    address: fcAddress,
-    isConnected: fcIsConnected,
-  } = useAppFrameLogic();
+  const { wallets } = useSafeWallets();
+  const { address: fcAddress, isConnected: fcIsConnected } = useAppFrameLogic();
 
   // Use explicit mini-app check with fallback to passed prop
   const isEffectivelyMiniApp = isMiniApp || false;
-  
-  const currentAddress = isEffectivelyMiniApp 
-    ? (farcasterAddress ?? fcAddress)
+
+  const currentAddress = isEffectivelyMiniApp
+    ? farcasterAddress ?? fcAddress
     : wagmiAddress;
-  
-  const walletIsConnected = isEffectivelyMiniApp 
-    ? (farcasterIsConnected ?? fcIsConnected)
+
+  const walletIsConnected = isEffectivelyMiniApp
+    ? farcasterIsConnected ?? fcIsConnected
     : !!wagmiAddress;
 
   const handleConnectPool = async () => {
@@ -85,7 +82,7 @@ export function ConnectPoolButton({
             },
           ],
         });
-        
+
         if (!txHash) {
           throw new Error(
             "Pool connection transaction hash not received. User might have cancelled."
@@ -102,16 +99,18 @@ export function ConnectPoolButton({
           // Use wagmi wallet client for pool connection
           txHash = await walletClient.writeContract({
             address: toHex(GDA_FORWARDER),
-            abi: [{
-              inputs: [
-                { name: "pool", type: "address" },
-                { name: "userData", type: "bytes" },
-              ],
-              name: "connectPool",
-              outputs: [{ name: "", type: "bool" }],
-              stateMutability: "nonpayable",
-              type: "function",
-            }],
+            abi: [
+              {
+                inputs: [
+                  { name: "pool", type: "address" },
+                  { name: "userData", type: "bytes" },
+                ],
+                name: "connectPool",
+                outputs: [{ name: "", type: "bool" }],
+                stateMutability: "nonpayable",
+                type: "function",
+              },
+            ],
             functionName: "connectPool",
             args: [toHex(stakingPoolAddress), "0x"],
           });
@@ -126,7 +125,7 @@ export function ConnectPoolButton({
             method: "wallet_switchEthereumChain",
             params: [{ chainId: "0x2105" }],
           });
-          
+
           txHash = await provider.request({
             method: "eth_sendTransaction",
             params: [
@@ -139,7 +138,7 @@ export function ConnectPoolButton({
             ],
           });
         }
-        
+
         if (!txHash) {
           throw new Error(
             "Pool connection transaction hash not received. User might have cancelled."
@@ -149,9 +148,9 @@ export function ConnectPoolButton({
 
       toast.loading("Confirming transaction...", { id: toastId });
 
-      await publicClient.waitForTransactionReceipt({ 
+      await publicClient.waitForTransactionReceipt({
         hash: txHash,
-        timeout: 60000 // 60 second timeout
+        timeout: 60000, // 60 second timeout
       });
 
       toast.success(

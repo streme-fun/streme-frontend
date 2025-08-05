@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
 import { ERC20_ABI } from "@/src/lib/contracts/StremeStakingRewardsFunder";
@@ -9,7 +9,7 @@ import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
 import { GrowthFundAnimation } from "@/src/components/GrowthFundAnimation";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useUnifiedWallet } from "@/src/hooks/useUnifiedWallet";
-import { usePrivy } from "@privy-io/react-auth";
+import { useSafePrivy } from "@/src/hooks/useSafePrivy";
 
 import { HowCrowdfundWorksModal } from "@/src/components/HowCrowdfundWorksModal";
 import { ContributionModal } from "@/src/components/ContributionModal";
@@ -26,11 +26,9 @@ import { publicClient } from "@/src/lib/viemClient";
 
 export default function CrowdfundPage() {
   const router = useRouter();
-  const {
-    isSDKLoaded,
-  } = useAppFrameLogic();
+  const { isSDKLoaded } = useAppFrameLogic();
 
-  const { ready: privyReady } = usePrivy();
+  const { ready: privyReady } = useSafePrivy();
 
   // Use unified wallet connection logic like TokenActions
   const {
@@ -102,7 +100,6 @@ export default function CrowdfundPage() {
   // Use effective wallet state (unified or wagmi fallback)
   const effectiveAuthenticated = effectiveIsConnected;
 
-
   // Debug logging for connection issues on crowdfund page
   useEffect(() => {
     console.log("[CrowdfundPage] Connection state:", {
@@ -126,21 +123,32 @@ export default function CrowdfundPage() {
 
   // According to Farcaster docs, the mini-app connector should auto-connect
   // We should respect the user's choice and not force connections
-  
-  // Auto-connect to Farcaster wallet if not connected in mini app context (same as main app)
+
+  // Auto-connect to Farcaster wallet if not connected in mini app context
+  const autoConnectAttempted = useRef(false);
   useEffect(() => {
-    if (isMiniAppView && isSDKLoaded && !effectiveIsConnected) {
-      console.log("[CrowdfundPage] Mini-app detected but not connected, attempting to connect...");
-      
-      // Try to connect using the unified wallet connect function
-      // This will use the Farcaster connector if available
+    if (
+      isMiniAppView &&
+      isSDKLoaded &&
+      !effectiveIsConnected &&
+      !autoConnectAttempted.current
+    ) {
+      autoConnectAttempted.current = true;
+      console.log(
+        "[CrowdfundPage] Mini-app detected but not connected, attempting to connect..."
+      );
+
       try {
         effectiveConnect();
         console.log("[CrowdfundPage] Auto-connection attempt initiated");
       } catch (error) {
         console.log("[CrowdfundPage] Auto-connection failed:", error);
-        // User will need to manually connect
       }
+    }
+
+    // Reset if we become disconnected
+    if (!isMiniAppView || !isSDKLoaded) {
+      autoConnectAttempted.current = false;
     }
   }, [isMiniAppView, isSDKLoaded, effectiveIsConnected, effectiveConnect]);
 

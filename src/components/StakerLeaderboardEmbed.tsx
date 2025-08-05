@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useWallets, usePrivy } from "@privy-io/react-auth";
+import { useSafeWallets, useSafePrivy } from "../hooks/useSafePrivy";
 import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
@@ -58,8 +58,8 @@ export function StakerLeaderboardEmbed({
   const [error, setError] = useState<string | null>(null);
   const [isZapStaking, setIsZapStaking] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { wallets } = useWallets();
-  const { user } = usePrivy();
+  const { wallets } = useSafeWallets();
+  const { user } = useSafePrivy();
   const { primaryAddress } = useWalletAddressChange();
 
   // Constants for zap contract

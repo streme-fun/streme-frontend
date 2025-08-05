@@ -11,7 +11,7 @@ import { publicClient } from "@/src/lib/viemClient";
 import sdk from "@farcaster/miniapp-sdk";
 import { MyTokensModal } from "./MyTokensModal";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import { useWallets } from "@privy-io/react-auth";
+import { useSafeWallets } from "../hooks/useSafePrivy";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 import Link from "next/link";
 
@@ -49,7 +49,7 @@ export function ZapStakeButton({
 
   const { address: wagmiAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
-  const { wallets } = useWallets();
+  const { wallets } = useSafeWallets();
   const { address: fcAddress, isConnected: fcIsConnected } = useAppFrameLogic();
 
   // Use external amount if provided, otherwise default to "0.001"
