@@ -13,6 +13,11 @@ import { ThemeSwitcher } from "./ThemeSwitcher";
 interface WalletProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
+  preloadedUserData?: {
+    displayName: string;
+    username: string;
+    profileImage: string;
+  } | null;
 }
 
 // STREME token contract details from the provided data
@@ -47,6 +52,7 @@ const fetchNeynarUser = async (fid: number) => {
 export function WalletProfileModal({
   isOpen,
   onClose,
+  preloadedUserData,
 }: WalletProfileModalProps) {
   const { user: privyUser } = useSafePrivy();
   const {
@@ -88,9 +94,18 @@ export function WalletProfileModal({
     }
   };
 
-  // Fetch user profile from Neynar API
+  // Fetch user profile from Neynar API or use preloaded data
   useEffect(() => {
     const fetchUserProfile = async () => {
+      // Use preloaded data if available (mini-app mode optimization)
+      if (isMiniAppView && preloadedUserData) {
+        setDisplayName(preloadedUserData.displayName);
+        setUsername(preloadedUserData.username);
+        setProfileImage(preloadedUserData.profileImage);
+        return;
+      }
+
+      // Fallback to fetching if no preloaded data or not in mini-app
       if (!userFid) {
         setDisplayName("Anonymous User");
         setUsername("");
@@ -118,7 +133,7 @@ export function WalletProfileModal({
     if (isOpen) {
       fetchUserProfile();
     }
-  }, [userFid, isOpen]);
+  }, [userFid, isOpen, isMiniAppView, preloadedUserData]);
 
   // Fetch balances
   useEffect(() => {

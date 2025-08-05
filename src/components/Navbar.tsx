@@ -56,8 +56,13 @@ export function Navbar() {
   const [isMyStakesOpen, setIsMyStakesOpen] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
-  // Profile picture state for mini-app
+  // Profile picture and user data state for mini-app
   const [miniAppProfileImage, setMiniAppProfileImage] = useState<string>("");
+  const [miniAppUserData, setMiniAppUserData] = useState<{
+    displayName: string;
+    username: string;
+    profileImage: string;
+  } | null>(null);
 
   // Easter egg state for logo clicking
   const [logoClickCount, setLogoClickCount] = useState(0);
@@ -94,22 +99,33 @@ export function Navbar() {
     }
   };
 
-  // Fetch profile picture for mini-app view
+  // Fetch profile picture and user data for mini-app view
   useEffect(() => {
     const fetchMiniAppProfile = async () => {
       if (!isMiniApp || !farcasterContext?.user?.fid) {
         setMiniAppProfileImage("");
+        setMiniAppUserData(null);
         return;
       }
 
       try {
         const neynarUser = await fetchNeynarUser(farcasterContext.user.fid);
-        if (neynarUser?.pfp_url) {
-          setMiniAppProfileImage(neynarUser.pfp_url);
+        if (neynarUser) {
+          const profileImage = neynarUser.pfp_url || "";
+          const displayName = neynarUser.display_name || neynarUser.username || "Anonymous User";
+          const username = neynarUser.username || "";
+          
+          setMiniAppProfileImage(profileImage);
+          setMiniAppUserData({
+            displayName,
+            username,
+            profileImage,
+          });
         }
       } catch (error) {
         console.error("Error fetching mini-app profile:", error);
         setMiniAppProfileImage("");
+        setMiniAppUserData(null);
       }
     };
 
@@ -314,6 +330,7 @@ Symbol: $[your ticker]
         <WalletProfileModal
           isOpen={isWalletProfileOpen}
           onClose={() => setIsWalletProfileOpen(false)}
+          preloadedUserData={miniAppUserData}
         />
         <MyTokensModal
           isOpen={isMyStakesOpen}
