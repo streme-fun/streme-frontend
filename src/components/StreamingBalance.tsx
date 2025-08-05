@@ -23,10 +23,7 @@ interface PoolData {
 }
 
 function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
-  const {
-    address: effectiveAddress,
-    isConnected,
-  } = useUnifiedWallet();
+  const { address: effectiveAddress, isConnected } = useUnifiedWallet();
 
   // State management (following StakedBalance pattern)
   const [baseAmount, setBaseAmount] = useState<number>(0);
@@ -38,7 +35,7 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
   // Use refs to prevent effect dependency loops
   const lastFetchTimeRef = useRef(0);
   const baseAmountRef = useRef(baseAmount);
-  
+
   // Update ref when baseAmount changes
   useEffect(() => {
     baseAmountRef.current = baseAmount;
@@ -50,7 +47,8 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
   }, [flowRate]);
 
   // Only animate when there's an active flow rate and the component is meaningful to display
-  const shouldAnimate = flowRatePerSecond > 0 && (baseAmount > 0 || flowRatePerSecond > 0);
+  const shouldAnimate =
+    flowRatePerSecond > 0 && (baseAmount > 0 || flowRatePerSecond > 0);
 
   // Use streaming number hook for animated balance (following StakedBalance pattern)
   const currentBalance = useStreamingNumber({
@@ -256,29 +254,34 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
   }
 
   return (
-    <div className={`flex flex-col items-end ${className}`}>
-      <div className="flex items-center gap-1">
-        <span className="text-sm font-mono font-semibold text-primary">
-          {formatBalance(currentBalance)}
-        </span>
-        <span className="text-xs text-base-content/70">STREME</span>
-      </div>
-      {stremePrice && (
-        <div className="flex items-center gap-1 text-xs text-base-content/50">
-          <span>${formatBalance(usdValue)}</span>
-          {flowRatePerMonth > 0 && (
-            <span className="text-success">
-              (+${(flowRatePerMonth * stremePrice).toFixed(2)}/month)
-            </span>
-          )}
+    <div className="flex items-center gap-1">
+      <div className={`flex flex-col items-end ${className}`}>
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-mono font-semibold text-primary">
+            {formatBalance(currentBalance)}
+          </span>
+          <span className="text-xs text-base-content/70">STREME</span>
         </div>
-      )}
+        {stremePrice && (
+          <div className="flex items-center gap-1 text-xs text-base-content/50 font-mono">
+            <span>${formatBalance(usdValue)}</span>
+            {flowRatePerMonth > 0 && (
+              <span className="text-success">
+                (+${(flowRatePerMonth * stremePrice).toFixed(2)}/mo)
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 // Memoization comparison function - only re-render if props actually change
-const arePropsEqual = (prevProps: StreamingBalanceProps, nextProps: StreamingBalanceProps) => {
+const arePropsEqual = (
+  prevProps: StreamingBalanceProps,
+  nextProps: StreamingBalanceProps
+) => {
   return prevProps.className === nextProps.className;
 };
 

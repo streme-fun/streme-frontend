@@ -11,7 +11,11 @@ interface MiniAppTopNavbarProps {
   onTutorialClick: () => void;
 }
 
-function MiniAppTopNavbarComponent({ isConnected, onLogoClick, onTutorialClick }: MiniAppTopNavbarProps) {
+function MiniAppTopNavbarComponent({
+  isConnected,
+  onLogoClick,
+  onTutorialClick,
+}: MiniAppTopNavbarProps) {
   const postHog = usePostHog();
 
   // Memoize the tutorial button click handler to prevent unnecessary re-renders
@@ -24,7 +28,7 @@ function MiniAppTopNavbarComponent({ isConnected, onLogoClick, onTutorialClick }
   }, [onTutorialClick, postHog]);
 
   return (
-    <div className="fixed top-0 left-0 right-0 flex items-center justify-between p-4 z-10 bg-base-100/80 backdrop-blur-sm">
+    <div className="fixed top-0 left-0 right-0 flex items-center justify-between p-4 z-1000 bg-base-100/80 backdrop-blur-sm">
       <div className="flex-shrink-0">
         <Link href="/" className="flex items-center">
           <svg
@@ -50,7 +54,7 @@ function MiniAppTopNavbarComponent({ isConnected, onLogoClick, onTutorialClick }
       <div className="flex items-center gap-2">
         {isConnected && (
           <Link href="/token/0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58">
-            <div className="bg-base-100/90 backdrop-blur-sm rounded-lg px-3 py-2 cursor-pointer hover:bg-base-100 transition-colors">
+            <div className="px-3 py-2 cursor-pointer hover:bg-base-100 transition-colors">
               <StreamingBalance />
             </div>
           </Link>
@@ -81,7 +85,10 @@ function MiniAppTopNavbarComponent({ isConnected, onLogoClick, onTutorialClick }
 }
 
 // Memoization comparison function - only re-render if props actually change
-const arePropsEqual = (prevProps: MiniAppTopNavbarProps, nextProps: MiniAppTopNavbarProps) => {
+const arePropsEqual = (
+  prevProps: MiniAppTopNavbarProps,
+  nextProps: MiniAppTopNavbarProps
+) => {
   return (
     prevProps.isConnected === nextProps.isConnected &&
     prevProps.onLogoClick === nextProps.onLogoClick &&

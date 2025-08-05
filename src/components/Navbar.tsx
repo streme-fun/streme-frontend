@@ -1,34 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import Image from "next/image";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { HowItWorksModal } from "./HowItWorksModal";
-import { LaunchTokenModal } from "./LaunchTokenModal";
-import { LeaderboardModal } from "./LeaderboardModal";
-import { WalletProfileModal } from "./WalletProfileModal";
-import { MyTokensModal } from "./MyTokensModal";
 import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
 import { ThemeSwitcher } from "./ThemeSwitcher";
-import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import { useWallet } from "../hooks/useWallet";
-import { MiniAppTopNavbar } from "./MiniAppTopNavbar";
-import sdk from "@farcaster/miniapp-sdk";
-
-// Client-side function to fetch user data from our API
-const fetchNeynarUser = async (fid: number) => {
-  try {
-    const response = await fetch(`/api/neynar/user/${fid}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.error("Error fetching user from API:", error);
-    return null;
-  }
-};
 
 export function Navbar() {
   // Use new simplified wallet hook
@@ -42,95 +19,22 @@ export function Navbar() {
   } = useWallet();
   const router = useRouter();
 
-  const {
-    isSDKLoaded,
-    farcasterContext,
-  } = useAppFrameLogic();
-
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
-  const [isCreateTokenOpen, setIsCreateTokenOpen] = useState(false);
   const [isAddressDropdownOpen, setIsAddressDropdownOpen] = useState(false);
-  const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
-  const [isWalletProfileOpen, setIsWalletProfileOpen] = useState(false);
-  const [isMyStakesOpen, setIsMyStakesOpen] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
-
-  // Profile picture and user data state for mini-app
-  const [miniAppProfileImage, setMiniAppProfileImage] = useState<string>("");
-  const [miniAppUserData, setMiniAppUserData] = useState<{
-    displayName: string;
-    username: string;
-    profileImage: string;
-  } | null>(null);
-
-  // Easter egg state for logo clicking
-  const [logoClickCount, setLogoClickCount] = useState(0);
-  const [lastLogoClickTime, setLastLogoClickTime] = useState(0);
 
   const truncateAddress = (address: string) => {
     if (!address) return "";
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  // Easter egg function for logo clicking
+  // Easter egg function for logo clicking (desktop only - mini-app handling moved to app.tsx)
   const handleLogoClick = () => {
-    const now = Date.now();
-    const timeSinceLastClick = now - lastLogoClickTime;
-
-    // Reset count if too much time has passed (2 seconds)
-    if (timeSinceLastClick > 2000) {
-      setLogoClickCount(1);
-    } else {
-      setLogoClickCount((prev) => prev + 1);
-    }
-
-    setLastLogoClickTime(now);
-
-    // Show debug button on 5th click for mini-app, navigate to growth fund for web
-    if (logoClickCount + 1 >= 5) {
-      if (isMiniApp) {
-        // Dispatch custom event to notify app.tsx about debug mode activation
-        window.dispatchEvent(new CustomEvent('streme-debug-activated'));
-      } else {
-        router.push("/crowdfund");
-      }
-      setLogoClickCount(0);
+    if (!isMiniApp) {
+      router.push("/crowdfund");
     }
   };
 
-  // Fetch profile picture and user data for mini-app view
-  useEffect(() => {
-    const fetchMiniAppProfile = async () => {
-      if (!isMiniApp || !farcasterContext?.user?.fid) {
-        setMiniAppProfileImage("");
-        setMiniAppUserData(null);
-        return;
-      }
-
-      try {
-        const neynarUser = await fetchNeynarUser(farcasterContext.user.fid);
-        if (neynarUser) {
-          const profileImage = neynarUser.pfp_url || "";
-          const displayName = neynarUser.display_name || neynarUser.username || "Anonymous User";
-          const username = neynarUser.username || "";
-          
-          setMiniAppProfileImage(profileImage);
-          setMiniAppUserData({
-            displayName,
-            username,
-            profileImage,
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching mini-app profile:", error);
-        setMiniAppProfileImage("");
-        setMiniAppUserData(null);
-      }
-    };
-
-    fetchMiniAppProfile();
-  }, [isMiniApp, farcasterContext?.user?.fid]);
 
   // const handleMiniAppConnect = () => {
   //   const fcConnector = wagmiConnectors.find((c) => c.id === "farcaster");
@@ -146,203 +50,9 @@ export function Navbar() {
   //   }
   // };
 
+  // Mini-app navigation is now handled in app.tsx
   if (isMiniApp) {
-    return (
-      <>
-        {/* Top Navbar */}
-        <MiniAppTopNavbar 
-          isConnected={isConnected}
-          onLogoClick={handleLogoClick}
-          onTutorialClick={() => setIsTutorialOpen(true)}
-        />
-        
-        {/* Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 z-50 pb-4 pt-2 bg-background/80 border-t border-black/[.1] bg-base-100 bg-opacity-80">
-          <div className="px-2 sm:px-4 py-2 flex items-center justify-around gap-1 sm:gap-2">
-            {/* Explore Button */}
-            <Link
-              href="/"
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer"
-            >
-              {/* Placeholder for Home Icon */}
-              <svg
-                className="w-6 h-6 mb-0.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                ></path>
-              </svg>
-              Home
-            </Link>
-
-            {/* My Stakes Button */}
-            <button
-              onClick={() => setIsMyStakesOpen(true)}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer"
-            >
-              {/* Special E Icon in Circle */}
-              <div className="w-6 h-6 mb-0.5 rounded-full border-2 border-current flex items-center justify-center">
-                <svg
-                  className="w-2 h-3"
-                  viewBox="0 0 21 30"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M0.54794 30V25.071H20.4343V30H0.54794ZM2.97692 17.6847V12.9261H18.1048V17.6847H2.97692ZM1.08771 5.90909V0.90909H19.5252V5.90909H1.08771Z"
-                    fill="currentColor"
-                  />
-                </svg>
-              </div>
-              My Tokens
-            </button>
-
-            {/* Launch Button */}
-            <button
-              onClick={async () => {
-                if (isSDKLoaded && sdk) {
-                  try {
-                    const castText = `@streme Launch a token for me
-
-Name: [your token name]
-Symbol: $[your ticker]
-
-[Don't forget to attach an image!] 🎨`;
-                    await sdk.actions.composeCast({
-                      text: castText,
-                      embeds: [],
-                    });
-                  } catch (error) {
-                    console.error("Error composing cast:", error);
-                    setIsCreateTokenOpen(true);
-                  }
-                } else {
-                  console.warn(
-                    "Farcaster SDK not loaded or sdk not available. Opening CreateTokenModal as fallback."
-                  );
-                  setIsCreateTokenOpen(true);
-                }
-              }}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer"
-            >
-              {/* Placeholder for Launch Icon */}
-              <svg
-                className="w-6 h-6 mb-0.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                ></path>
-              </svg>
-              Launch
-            </button>
-
-            {/* Leaderboard Button */}
-            <button
-              onClick={() => {
-                setIsLeaderboardModalOpen(true);
-              }}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer"
-            >
-              {/* Placeholder for Leaderboard Icon */}
-              <svg
-                className="w-6 h-6 mb-0.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                ></path>
-              </svg>
-              SUP Claims
-            </button>
-
-            {/* Profile Button */}
-            <button
-              onClick={() => setIsWalletProfileOpen(true)}
-              className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer"
-            >
-              {/* Profile Picture or Default Icon */}
-              {miniAppProfileImage ? (
-                <div className="relative w-6 h-6 mb-0.5 rounded-full overflow-hidden">
-                  <Image
-                    src={miniAppProfileImage}
-                    alt="Profile"
-                    fill
-                    className="object-cover"
-                    unoptimized={
-                      miniAppProfileImage.includes(".gif") ||
-                      miniAppProfileImage.includes("imagedelivery.net")
-                    }
-                  />
-                </div>
-              ) : (
-                <svg
-                  className="w-6 h-6 mb-0.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  ></path>
-                </svg>
-              )}
-              Profile
-            </button>
-          </div>
-        </nav>
-
-        <HowItWorksModal
-          isOpen={isHowItWorksOpen}
-          onClose={() => setIsHowItWorksOpen(false)}
-        />
-        <LaunchTokenModal
-          isOpen={isCreateTokenOpen}
-          onClose={() => setIsCreateTokenOpen(false)}
-        />
-        <LeaderboardModal
-          isOpen={isLeaderboardModalOpen}
-          onClose={() => setIsLeaderboardModalOpen(false)}
-        />
-        <WalletProfileModal
-          isOpen={isWalletProfileOpen}
-          onClose={() => setIsWalletProfileOpen(false)}
-          preloadedUserData={miniAppUserData}
-        />
-        <MyTokensModal
-          isOpen={isMyStakesOpen}
-          onClose={() => setIsMyStakesOpen(false)}
-        />
-        <MiniAppTutorialModal
-          isOpen={isTutorialOpen}
-          onClose={() => setIsTutorialOpen(false)}
-          onSkip={() => setIsTutorialOpen(false)}
-        />
-      </>
-    );
+    return null;
   }
 
   return (
@@ -424,10 +134,7 @@ Symbol: $[your ticker]
               Launch a Token
             </Link>
 
-            <button
-              onClick={() => setIsHowItWorksOpen(true)}
-              className="btn btn-ghost"
-            >
+            <button className="btn btn-ghost" disabled>
               How It Works
             </button>
 
@@ -540,11 +247,8 @@ Symbol: $[your ticker]
             )}
 
             <button
-              onClick={() => {
-                setIsHowItWorksOpen(true);
-                setIsMenuOpen(false);
-              }}
               className="btn btn-ghost w-full justify-start"
+              disabled
             >
               How It Works
             </button>
@@ -599,14 +303,6 @@ Symbol: $[your ticker]
         </div>
       </nav>
 
-      <HowItWorksModal
-        isOpen={isHowItWorksOpen}
-        onClose={() => setIsHowItWorksOpen(false)}
-      />
-      <LaunchTokenModal
-        isOpen={isCreateTokenOpen}
-        onClose={() => setIsCreateTokenOpen(false)}
-      />
       <MiniAppTutorialModal
         isOpen={isTutorialOpen}
         onClose={() => setIsTutorialOpen(false)}
