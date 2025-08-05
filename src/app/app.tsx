@@ -9,6 +9,7 @@ import { SortOption } from "../components/TokenGrid";
 import { SearchBar } from "../components/SearchBar";
 import { SortButtons } from "../components/SortButtons";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
+import { useUnifiedWallet } from "../hooks/useUnifiedWallet";
 import { Button } from "../components/ui/button";
 import { base } from "wagmi/chains";
 import { usePostHog } from "posthog-js/react";
@@ -20,6 +21,7 @@ import Image from "next/image";
 import { CheckinModal } from "../components/CheckinModal";
 import { CheckinSuccessModal } from "../components/CheckinSuccessModal";
 import { useCheckinModal } from "../hooks/useCheckinModal";
+import { StreamingBalance } from "../components/StreamingBalance";
 import sdk from "@farcaster/miniapp-sdk";
 
 function App() {
@@ -53,20 +55,27 @@ function App() {
 
   const {
     isSDKLoaded,
-    isMiniAppView,
     farcasterContext,
-    address,
-    isConnected,
-    isOnCorrectNetwork,
-    connect,
-    connectors,
-    switchChain,
-    isSwitchingChain,
-    // disconnect,
     promptToAddMiniApp,
     hasPromptedToAdd,
     hasAddedMiniApp,
+    switchChain,
+    isSwitchingChain,
+    isOnCorrectNetwork,
   } = useAppFrameLogic();
+
+  // Use unified wallet connection logic like crowdfund page
+  const {
+    isConnected: unifiedIsConnected,
+    address: unifiedAddress,
+    connect: unifiedConnect,
+    isEffectivelyMiniApp: unifiedIsMiniApp,
+  } = useUnifiedWallet();
+
+  // Use unified wallet state
+  const isMiniAppView = unifiedIsMiniApp;
+  const isConnected = unifiedIsConnected;
+  const address = unifiedAddress;
 
   const postHog = usePostHog();
 
@@ -285,33 +294,22 @@ function App() {
     }
   }, [isMiniAppView, isSDKLoaded, loading]);
 
-  // Auto-connect to Farcaster wallet if not connected in mini app context
+  // Auto-connect to Farcaster wallet if not connected in mini app context (same as crowdfund page)
   useEffect(() => {
-    if (isMiniAppView && !isConnected && farcasterContext && isSDKLoaded) {
-      console.log(
-        "Miniapp detected but not connected, attempting to connect..."
-      );
-      console.log(
-        "Available connectors:",
-        connectors.map((c) => ({ id: c.id, name: c.name }))
-      );
-
-      // Use the farcasterFrame connector (should be at index 0)
-      const farcasterConnector =
-        connectors.find((c) => c.id === "farcaster") || connectors[0];
-      if (farcasterConnector) {
-        console.log("Connecting with connector:", farcasterConnector.id);
-        connect({ connector: farcasterConnector });
+    if (isMiniAppView && isSDKLoaded && !isConnected) {
+      console.log("[App] Mini-app detected but not connected, attempting to connect...");
+      
+      // Try to connect using the unified wallet connect function
+      // This will use the Farcaster connector if available
+      try {
+        unifiedConnect();
+        console.log("[App] Auto-connection attempt initiated");
+      } catch (error) {
+        console.log("[App] Auto-connection failed:", error);
+        // User will need to manually connect
       }
     }
-  }, [
-    isMiniAppView,
-    isConnected,
-    farcasterContext,
-    connectors,
-    connect,
-    isSDKLoaded,
-  ]);
+  }, [isMiniAppView, isSDKLoaded, isConnected, unifiedConnect]);
 
   // Check checkin status when miniapp first opens
   useEffect(() => {
@@ -426,7 +424,14 @@ function App() {
                 </svg>
               </Link>
             </div>
-            <div className="flex-shrink-0">
+            <div className="flex items-center gap-2">
+              {isConnected && (
+                <Link href="/token/0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58">
+                  <div className="bg-base-100/90 backdrop-blur-sm rounded-lg px-3 py-2 cursor-pointer hover:bg-base-100 transition-colors">
+                    <StreamingBalance />
+                  </div>
+                </Link>
+              )}
               <button
                 onClick={() => {
                   setShowTutorialModal(true);
@@ -435,7 +440,7 @@ function App() {
                     opened_by: "help_button",
                   });
                 }}
-                className="btn btn-ghost btn-circle btn-sm"
+                className="btn btn-ghost btn-circle btn-sm flex-shrink-0"
                 title="Tutorial"
               >
                 <svg

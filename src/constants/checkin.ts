@@ -10,13 +10,13 @@ export const CHECKIN_MESSAGES = {
     "Time for your daily dose of dopastreme.\nStake to claim 1000 staked $STREME.",
     "It's Streme o'clock.\nStake to claim 1000 staked $STREME.",
     "You know the drill.\nStake to claim 1000 staked $STREME.",
-    "Daily rewards time!\nStake to claim 1000 staked $STREME.",
+    "Must make number go up faster.\nStake to claim 1000 staked $STREME.",
   ],
   STAKED_USERS_NO_BALANCE: [
     "Time for your daily dose of dopastreme.\nClaim 1000 staked $STREME.",
     "It's Streme o'clock.\nClaim 1000 staked $STREME.",
     "You know the drill.\nClaim 1000 staked $STREME.",
-    "Daily rewards time!\nClaim 1000 staked $STREME.",
+    "Must make number go up faster.\nClaim 1000 staked $STREME.",
   ],
   NEED_TO_STAKE:
     "Stake your $STREME to auto-claim 1000 staked $STREME.\nStaking triggers instant reward claim.",

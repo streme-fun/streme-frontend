@@ -20,37 +20,35 @@ export function MiniAppTutorialModal({
 
   const steps = [
     {
-      title: "Launch tokens with streaming superpowers",
+      title: "Launch tokens with streaming superpowers. Earn fees.",
       content: (
         <div className="space-y-4">
           <TutorialStreamingAnimation />
 
           <p className="text-base text-base-content/80">
-            With Streme, launch Base tokens with built-in streaming superpowers
-            and streaming twists on staking, crowdfunding, and more.
+            Launch Base ERC-20 tokens on Uniswap with built-in streaming and
+            staking.
           </p>
 
           <p className="text-base text-base-content/80">
-            Earn from tokens you launch with 40% of LP fees, claimable as
-            frequently as you want.
+            Earn 40% of fees on every swap. Claimable anytime.
           </p>
         </div>
       ),
     },
 
     {
-      title: "Stake to Earn Streaming Rewards",
+      title: "Stake to earn rewards",
       content: (
         <div className="space-y-4">
           <GrowthFundAnimation contributorCount={25} growthRate={2.5} />
 
           <p className="text-base text-base-content/80">
-            Stake Streme coins to earn rewards streamed to your wallet every
-            second. The more you stake, the more you earn.
+            Stake any token launched on Streme to earn rewards in that token
+            streamed to your wallet every second.
           </p>
           <p className="text-base text-base-content/80">
-            For qualifying tokens, reroute your staking rewards to support
-            growth initiatives via streaming crowdfunds.
+            The more you stake, the more you earn.
           </p>
         </div>
       ),
@@ -75,8 +73,8 @@ export function MiniAppTutorialModal({
             of $SUP tokens.
           </p>
           <p className="text-base text-base-content/80">
-            There are lots of ways to earn — add the mini-app, stake or hodl
-            tokens, contribute to crowdfunds, or launch your own token!
+            To earn, just buy, stake, or hodl Streme tokens, contribute to
+            crowdfunds, or launch your own token!
           </p>
         </div>
       ),
