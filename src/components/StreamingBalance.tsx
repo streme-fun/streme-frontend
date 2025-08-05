@@ -35,15 +35,29 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
   const [stremePrice, setStremePrice] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Use ref to prevent effect dependency loops
+  // Use refs to prevent effect dependency loops
   const lastFetchTimeRef = useRef(0);
+  const baseAmountRef = useRef(baseAmount);
+  
+  // Update ref when baseAmount changes
+  useEffect(() => {
+    baseAmountRef.current = baseAmount;
+  }, [baseAmount]);
+
+  // Memoize flow rate calculation to prevent unnecessary recalculations
+  const flowRatePerSecond = useMemo(() => {
+    return Number(flowRate) / (86400 * 30); // Convert monthly rate to per-second
+  }, [flowRate]);
+
+  // Only animate when there's an active flow rate and the component is meaningful to display
+  const shouldAnimate = flowRatePerSecond > 0 && (baseAmount > 0 || flowRatePerSecond > 0);
 
   // Use streaming number hook for animated balance (following StakedBalance pattern)
   const currentBalance = useStreamingNumber({
     baseAmount,
-    flowRatePerSecond: Number(flowRate) / (86400 * 30), // Convert monthly rate to per-second
+    flowRatePerSecond: shouldAnimate ? flowRatePerSecond : 0, // Pause animation when no flow
     lastUpdateTime,
-    updateInterval: 50, // Match StakedBalance for consistency
+    updateInterval: 100, // Optimized for better performance while maintaining smoothness
     pauseWhenHidden: true,
   });
 
@@ -85,7 +99,7 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
 
       // Only update base amount and reset timer if the balance has actually changed
       // This prevents the streaming animation from restarting unnecessarily
-      if (Math.abs(formattedBalance - baseAmount) > 0.0001) {
+      if (Math.abs(formattedBalance - baseAmountRef.current) > 0.0001) {
         setBaseAmount(formattedBalance);
         setLastUpdateTime(Date.now());
       }
@@ -152,7 +166,7 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
       console.error("[StreamingBalance] Error fetching data:", error);
       setIsLoading(false);
     }
-  }, [effectiveAddress, baseAmount]);
+  }, [effectiveAddress]);
 
   // Main data fetching effect (optimized to prevent dependency loops)
   useEffect(() => {
@@ -236,17 +250,10 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
     return null;
   }
 
-  // Show even with 0 balance for debugging - can be restored later
-  // if (baseAmount === 0 && flowRatePerMonth === 0) {
-  //   return null;
-  // }
-
-  console.log("[StreamingBalance] ✅ Rendering component with:", {
-    currentBalance,
-    flowRatePerMonth,
-    isConnected,
-    effectiveAddress,
-  });
+  // Only render if user has meaningful STREME data to display
+  if (baseAmount === 0 && flowRatePerMonth === 0) {
+    return null;
+  }
 
   return (
     <div className={`flex flex-col items-end ${className}`}>
@@ -270,5 +277,10 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
   );
 }
 
+// Memoization comparison function - only re-render if props actually change
+const arePropsEqual = (prevProps: StreamingBalanceProps, nextProps: StreamingBalanceProps) => {
+  return prevProps.className === nextProps.className;
+};
+
 // Export memoized component to prevent unnecessary rerenders
-export const StreamingBalance = memo(StreamingBalanceComponent);
+export const StreamingBalance = memo(StreamingBalanceComponent, arePropsEqual);

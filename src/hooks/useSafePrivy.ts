@@ -12,17 +12,8 @@ import { useEnvironment } from "../components/providers/EnvironmentProvider";
 export function useSafePrivy() {
   const { isMiniApp } = useEnvironment();
   
-  // Always call hooks to satisfy React rules
-  let privyResult;
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    privyResult = usePrivy();
-  } catch {
-    privyResult = null;
-  }
-
-  // Return mock values for mini-app mode
-  if (isMiniApp || !privyResult) {
+  // Don't call Privy hooks at all in mini-app mode to avoid provider warnings
+  if (isMiniApp) {
     return {
       authenticated: false,
       login: () => {},
@@ -32,45 +23,51 @@ export function useSafePrivy() {
     };
   }
 
-  return privyResult;
+  // Only call Privy hooks in browser mode when PrivyProvider is available
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return usePrivy();
+  } catch {
+    return {
+      authenticated: false,
+      login: () => {},
+      logout: () => {},
+      user: null,
+      ready: true,
+    };
+  }
 }
 
 export function useSafeWallets() {
   const { isMiniApp } = useEnvironment();
   
-  // Always call hooks to satisfy React rules
-  let walletsResult;
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    walletsResult = useWallets();
-  } catch {
-    walletsResult = null;
-  }
-
-  // Return mock values for mini-app mode
-  if (isMiniApp || !walletsResult) {
+  // Don't call Privy hooks at all in mini-app mode to avoid provider warnings
+  if (isMiniApp) {
     return { wallets: [] };
   }
 
-  return walletsResult;
+  // Only call Privy hooks in browser mode when PrivyProvider is available
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useWallets();
+  } catch {
+    return { wallets: [] };
+  }
 }
 
 export function useSafeSetActiveWallet() {
   const { isMiniApp } = useEnvironment();
   
-  // Always call hooks to satisfy React rules
-  let setActiveWalletResult;
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    setActiveWalletResult = useSetActiveWallet();
-  } catch {
-    setActiveWalletResult = null;
-  }
-
-  // Return mock values for mini-app mode
-  if (isMiniApp || !setActiveWalletResult) {
+  // Don't call Privy hooks at all in mini-app mode to avoid provider warnings
+  if (isMiniApp) {
     return { setActiveWallet: () => {} };
   }
 
-  return setActiveWalletResult;
+  // Only call Privy hooks in browser mode when PrivyProvider is available
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useSetActiveWallet();
+  } catch {
+    return { setActiveWallet: () => {} };
+  }
 }

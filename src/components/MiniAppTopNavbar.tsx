@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { StreamingBalance } from "./StreamingBalance";
 import { usePostHog } from "posthog-js/react";
+import { memo, useCallback } from "react";
 
 interface MiniAppTopNavbarProps {
   isConnected: boolean;
@@ -10,8 +11,17 @@ interface MiniAppTopNavbarProps {
   onTutorialClick: () => void;
 }
 
-export function MiniAppTopNavbar({ isConnected, onLogoClick, onTutorialClick }: MiniAppTopNavbarProps) {
+function MiniAppTopNavbarComponent({ isConnected, onLogoClick, onTutorialClick }: MiniAppTopNavbarProps) {
   const postHog = usePostHog();
+
+  // Memoize the tutorial button click handler to prevent unnecessary re-renders
+  const handleTutorialClick = useCallback(() => {
+    onTutorialClick();
+    postHog?.capture("tutorial_opened", {
+      context: "farcaster_mini_app",
+      opened_by: "help_button",
+    });
+  }, [onTutorialClick, postHog]);
 
   return (
     <div className="fixed top-0 left-0 right-0 flex items-center justify-between p-4 z-10 bg-base-100/80 backdrop-blur-sm">
@@ -46,13 +56,7 @@ export function MiniAppTopNavbar({ isConnected, onLogoClick, onTutorialClick }: 
           </Link>
         )}
         <button
-          onClick={() => {
-            onTutorialClick();
-            postHog?.capture("tutorial_opened", {
-              context: "farcaster_mini_app",
-              opened_by: "help_button",
-            });
-          }}
+          onClick={handleTutorialClick}
           className="btn btn-ghost btn-circle btn-sm flex-shrink-0"
           title="Tutorial"
         >
@@ -75,3 +79,15 @@ export function MiniAppTopNavbar({ isConnected, onLogoClick, onTutorialClick }: 
     </div>
   );
 }
+
+// Memoization comparison function - only re-render if props actually change
+const arePropsEqual = (prevProps: MiniAppTopNavbarProps, nextProps: MiniAppTopNavbarProps) => {
+  return (
+    prevProps.isConnected === nextProps.isConnected &&
+    prevProps.onLogoClick === nextProps.onLogoClick &&
+    prevProps.onTutorialClick === nextProps.onTutorialClick
+  );
+};
+
+// Export memoized component to prevent unnecessary re-renders
+export const MiniAppTopNavbar = memo(MiniAppTopNavbarComponent, arePropsEqual);

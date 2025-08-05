@@ -49,22 +49,22 @@ export function useUnifiedWallet() {
     wallets.find((wallet) => wallet.address) || wallets[0];
   const privyConnectedAddress = connectedWallet?.address;
 
-  // Debug logging for mini-app connection state (only when there's a mismatch)
-  if (
-    isEffectivelyMiniApp &&
-    !wagmiIsConnected &&
-    (wagmiAddress || farcasterAddress)
-  ) {
-    console.log(
-      "[useUnifiedWallet] Mini-app has address but wagmi not connected:",
-      {
-        wagmiIsConnected,
-        wagmiAddress,
-        farcasterAddress,
-        isSDKLoaded,
-      }
-    );
-  }
+  // Debug logging for mini-app connection state (only when there's a mismatch) - disabled to reduce re-render noise
+  // if (
+  //   isEffectivelyMiniApp &&
+  //   !wagmiIsConnected &&
+  //   (wagmiAddress || farcasterAddress)
+  // ) {
+  //   console.log(
+  //     "[useUnifiedWallet] Mini-app has address but wagmi not connected:",
+  //     {
+  //       wagmiIsConnected,
+  //       wagmiAddress,
+  //       farcasterAddress,
+  //       isSDKLoaded,
+  //     }
+  //   );
+  // }
 
   // Simplified connection logic
   // For mini-app: In Farcaster mini-apps, wagmi might not report "connected" but still have an address
@@ -80,17 +80,17 @@ export function useUnifiedWallet() {
   // Update stable address when we have a valid connection
   useEffect(() => {
     if (finalIsConnected && rawAddress && rawAddress !== lastValidAddress) {
-      console.log("[useUnifiedWallet] Updating stable address:", {
-        from: lastValidAddress,
-        to: rawAddress,
-        isConnected: finalIsConnected,
-      });
+      // console.log("[useUnifiedWallet] Updating stable address:", {
+      //   from: lastValidAddress,
+      //   to: rawAddress,
+      //   isConnected: finalIsConnected,
+      // });
       setStableAddress(rawAddress);
       setLastValidAddress(rawAddress);
       setIsInitialized(true);
     } else if (!finalIsConnected && isInitialized) {
       // Only clear if we were previously connected (avoid initial empty state)
-      console.log("[useUnifiedWallet] Clearing stable address - disconnected");
+      // console.log("[useUnifiedWallet] Clearing stable address - disconnected");
       setStableAddress("");
       setLastValidAddress("");
     } else if (!isInitialized && !finalIsConnected) {
