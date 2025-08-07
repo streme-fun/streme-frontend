@@ -15,6 +15,9 @@ import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 const STAKING_MACRO_V2 = "0x5c4b8561363E80EE458D3F0f4F14eC671e1F54Af";
 const MACRO_FORWARDER = "0xFD0268E33111565dE546af2675351A4b1587F89F";
 
+// Batch processing configuration
+const MAX_TOKENS_PER_BATCH = 30; // Conservative limit to ensure transactions succeed
+
 // ABIs for the new contracts
 const stakingMacroABI = [
   {
@@ -110,8 +113,17 @@ export function TopUpAllStakesButton({
     }
 
     setIsLoading(true);
-    setCurrentProgress({ current: 0, total: 1 }); // Just 1 step: execute macro
-    const toastId = toast.loading("Preparing batch operation...");
+    
+    // Calculate number of batches needed
+    const totalBatches = Math.ceil(selectedStakes.length / MAX_TOKENS_PER_BATCH);
+    const needsBatching = totalBatches > 1;
+    
+    setCurrentProgress({ current: 0, total: totalBatches });
+    const toastId = toast.loading(
+      needsBatching 
+        ? `Processing ${selectedStakes.length} tokens in ${totalBatches} batches...`
+        : "Preparing batch operation..."
+    );
 
     try {
       // Get provider
@@ -140,97 +152,142 @@ export function TopUpAllStakesButton({
         });
       }
 
-      // Execute batch operation using MacroForwarder
-      // The macro executes "in first person" and handles everything:
-      // - Checking user balances
-      // - Transferring tokens directly from user
-      // - Staking tokens
-      // - Connecting to reward pools
-      setCurrentProgress({ current: 1, total: 1 });
-      toast.loading("Executing batch staking operation...", { id: toastId });
+      // Process in batches if needed
+      const successfulBatches: string[] = [];
+      const failedBatches: Array<{ batch: number; error: string }> = [];
 
-      const tokenAddresses = selectedStakes.map((stake) => stake.tokenAddress);
-      const uniqueTokens = [...new Set(tokenAddresses)];
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const startIdx = batchIndex * MAX_TOKENS_PER_BATCH;
+        const endIdx = Math.min(startIdx + MAX_TOKENS_PER_BATCH, selectedStakes.length);
+        const batchStakes = selectedStakes.slice(startIdx, endIdx);
+        
+        setCurrentProgress({ current: batchIndex + 1, total: totalBatches });
+        
+        if (needsBatching) {
+          toast.loading(
+            `Processing batch ${batchIndex + 1}/${totalBatches} (${batchStakes.length} tokens)...`,
+            { id: toastId }
+          );
+        }
 
-      // Get encoded parameters from StakingMacroV2
-      const encodedAddresses = await publicClient.readContract({
-        address: toHex(STAKING_MACRO_V2),
-        abi: stakingMacroABI,
-        functionName: "getParams",
-        args: [uniqueTokens.map((addr) => toHex(addr))],
-      });
-
-      // Execute the macro via MacroForwarder
-      // This handles everything in batch "in first person" by the user
-      const macroIface = new Interface([
-        "function runMacro(address macro, bytes calldata params) external",
-      ]);
-      const macroData = macroIface.encodeFunctionData("runMacro", [
-        toHex(STAKING_MACRO_V2),
-        encodedAddresses,
-      ]);
-
-      const macroTxParams: Record<string, unknown> = {
-        to: toHex(MACRO_FORWARDER),
-        from: toHex(userAddress),
-        data: toHex(macroData),
-        chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
-      };
-
-      // Add gas estimation for non-miniApp
-      if (!isMiniApp) {
         try {
-          const estimatedGas = await publicClient.estimateGas({
-            account: userAddress as `0x${string}`,
-            to: toHex(MACRO_FORWARDER),
-            data: macroData as `0x${string}`,
+          const tokenAddresses = batchStakes.map((stake) => stake.tokenAddress);
+          const uniqueTokens = [...new Set(tokenAddresses)];
+
+          // Get encoded parameters from StakingMacroV2
+          const encodedAddresses = await publicClient.readContract({
+            address: toHex(STAKING_MACRO_V2),
+            abi: stakingMacroABI,
+            functionName: "getParams",
+            args: [uniqueTokens.map((addr) => toHex(addr))],
           });
-          const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.5));
-          macroTxParams.gas = `0x${gasLimit.toString(16)}`;
-        } catch {
-          console.warn("Gas estimation failed, proceeding without limit");
+
+          // Execute the macro via MacroForwarder
+          const macroIface = new Interface([
+            "function runMacro(address macro, bytes calldata params) external",
+          ]);
+          const macroData = macroIface.encodeFunctionData("runMacro", [
+            toHex(STAKING_MACRO_V2),
+            encodedAddresses,
+          ]);
+
+          const macroTxParams: Record<string, unknown> = {
+            to: toHex(MACRO_FORWARDER),
+            from: toHex(userAddress),
+            data: toHex(macroData),
+            chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
+          };
+
+          // Add gas estimation for non-miniApp
+          if (!isMiniApp) {
+            try {
+              const estimatedGas = await publicClient.estimateGas({
+                account: userAddress as `0x${string}`,
+                to: toHex(MACRO_FORWARDER),
+                data: macroData as `0x${string}`,
+              });
+              const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.5));
+              macroTxParams.gas = `0x${gasLimit.toString(16)}`;
+            } catch {
+              console.warn("Gas estimation failed for batch, proceeding without limit");
+            }
+          }
+
+          const macroTxHash = await provider.request({
+            method: "eth_sendTransaction",
+            params: [macroTxParams],
+          });
+
+          if (!macroTxHash) {
+            throw new Error("Batch staking operation was cancelled");
+          }
+
+          const macroReceipt = await publicClient.waitForTransactionReceipt({
+            hash: macroTxHash as `0x${string}`,
+          });
+
+          if (macroReceipt.status !== "success") {
+            throw new Error("Batch staking operation failed");
+          }
+
+          successfulBatches.push(macroTxHash);
+          
+          // Small delay between batches to avoid overwhelming the network
+          if (batchIndex < totalBatches - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } catch (error) {
+          console.error(`Batch ${batchIndex + 1} failed:`, error);
+          failedBatches.push({
+            batch: batchIndex + 1,
+            error: error instanceof Error ? error.message : "Unknown error"
+          });
+          
+          // Ask user if they want to continue with remaining batches
+          if (batchIndex < totalBatches - 1) {
+            const shouldContinue = confirm(
+              `Batch ${batchIndex + 1} failed. Continue with remaining batches?`
+            );
+            if (!shouldContinue) {
+              break;
+            }
+          }
         }
       }
 
-      const macroTxHash = await provider.request({
-        method: "eth_sendTransaction",
-        params: [macroTxParams],
-      });
-
-      if (!macroTxHash) {
-        throw new Error("Batch staking operation was cancelled");
+      // Handle results
+      if (successfulBatches.length === 0) {
+        throw new Error("All batches failed");
       }
 
-      const macroReceipt = await publicClient.waitForTransactionReceipt({
-        hash: macroTxHash as `0x${string}`,
-      });
+      const successMessage = failedBatches.length > 0
+        ? `Partially completed: ${successfulBatches.length}/${totalBatches} batches succeeded`
+        : `Successfully completed batch staking for ${selectedStakes.length} ${
+            selectedStakes.length === 1 ? "token" : "tokens"
+          }!`;
 
-      if (macroReceipt.status !== "success") {
-        throw new Error("Batch staking operation failed");
-      }
-
-      // Success!
-      toast.success(
-        `Successfully completed batch staking for ${selectedStakes.length} ${
-          selectedStakes.length === 1 ? "token" : "tokens"
-        }!`,
-        { id: toastId }
-      );
+      toast.success(successMessage, { id: toastId });
 
       // Auto-dismiss the success toast after 4 seconds
       setTimeout(() => {
         toast.dismiss(toastId);
       }, 4000);
 
-      onSuccess?.();
+      if (failedBatches.length === 0) {
+        onSuccess?.();
+      }
 
       // PostHog event tracking
       postHog.capture(POSTHOG_EVENTS.TOP_UP_ALL_STAKES_SUCCESS, {
         [ANALYTICS_PROPERTIES.TOTAL_TOKENS_COUNT]: selectedStakes.length,
         [ANALYTICS_PROPERTIES.USER_ADDRESS]: effectiveAddress,
         [ANALYTICS_PROPERTIES.IS_MINI_APP]: isMiniApp || false,
-        [ANALYTICS_PROPERTIES.TRANSACTION_HASH]: macroTxHash,
+        [ANALYTICS_PROPERTIES.TRANSACTION_HASH]: successfulBatches.join(","),
         [ANALYTICS_PROPERTIES.WALLET_TYPE]: isMiniApp ? "farcaster" : "wagmi",
+        successful_batches: successfulBatches.length,
+        failed_batches: failedBatches.length,
+        total_batches: totalBatches,
+        batch_size: MAX_TOKENS_PER_BATCH,
         token_addresses: selectedStakes
           .map((stake) => stake.tokenAddress)
           .join(","),
@@ -397,7 +454,13 @@ export function TopUpAllStakesButton({
         {isLoading ? (
           <>
             <span className="loading loading-spinner loading-sm"></span>
-            {currentProgress.total > 0 ? <>Processing</> : "Processing..."}
+            {currentProgress.total > 1 ? (
+              <>
+                Processing batch {currentProgress.current}/{currentProgress.total}
+              </>
+            ) : (
+              "Processing..."
+            )}
           </>
         ) : (
           <>

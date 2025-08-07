@@ -261,21 +261,28 @@ export function TopUpStakeSelectionModal({
               </div>
 
               <div className="mt-2">
-                <div className="flex gap-3">
-                  <button onClick={onClose} className="btn btn-outline flex-1">
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleProceed}
-                    disabled={selectedCount === 0}
-                    className="btn btn-primary flex-1"
-                  >
-                    {selectedCount === 0
-                      ? "Select tokens"
-                      : `Stake ${selectedCount} token${
-                          selectedCount === 1 ? "" : "s"
-                        }`}
-                  </button>
+                <div className="flex flex-col gap-2">
+                  {selectedCount > 30 && (
+                    <div className="text-xs text-base-content/70 text-center">
+                      Note: Large selections will be processed in multiple batches for reliability
+                    </div>
+                  )}
+                  <div className="flex gap-3">
+                    <button onClick={onClose} className="btn btn-outline flex-1">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleProceed}
+                      disabled={selectedCount === 0}
+                      className="btn btn-primary flex-1"
+                    >
+                      {selectedCount === 0
+                        ? "Select tokens"
+                        : `Stake ${selectedCount} token${
+                            selectedCount === 1 ? "" : "s"
+                          }`}
+                    </button>
+                  </div>
                 </div>
               </div>
             </>

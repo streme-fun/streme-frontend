@@ -28,7 +28,7 @@ function MiniAppTopNavbarComponent({
   }, [onTutorialClick, postHog]);
 
   return (
-    <div className="fixed top-0 left-0 right-0 flex items-center justify-between p-4 z-1000 bg-base-100/80 backdrop-blur-sm">
+    <div className="fixed top-0 left-0 right-0 flex items-center justify-between p-4 z-10 bg-base-100/80 backdrop-blur-sm">
       <div className="flex-shrink-0">
         <Link href="/" className="flex items-center">
           <svg
