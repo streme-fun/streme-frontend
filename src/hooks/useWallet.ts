@@ -24,6 +24,7 @@ export function useWallet() {
     authenticated,
     login: privyLogin,
     logout: privyLogout,
+    ready: privyReady,
   } = useSafePrivy();
   const { wallets } = useSafeWallets();
   const { setActiveWallet } = useSafeSetActiveWallet();
@@ -121,11 +122,11 @@ export function useWallet() {
   }, [isMiniApp, address, wallets, setActiveWallet, privyLogin, privyLogout]);
 
   // Determine connection state based on context
-  // For browser mode, if user is authenticated with Privy and we have an address,
-  // consider them connected even if wagmi is still syncing
+  // For browser mode, we need BOTH authentication AND a connected wallet
+  // This prevents showing "connected" when user is logged in but wallet is disconnected
   const isConnected = isMiniApp
     ? wagmiIsConnected
-    : authenticated && (wagmiIsConnected || (wallets.length > 0 && activeWallet?.address));
+    : authenticated && wagmiIsConnected && !!address;
 
   // In browser mode, prefer wagmi's address (which should be synced with Privy)
   // Only fall back to Privy's wallet if wagmi doesn't have an address
@@ -145,14 +146,29 @@ export function useWallet() {
         console.error("Farcaster connector not found");
       }
     } else {
-      // In browser, only login if not already authenticated
-      if (!authenticated) {
+      // In browser mode with Privy
+      if (!privyReady) {
+        console.log("Privy not ready yet");
+        return;
+      }
+
+      // If authenticated but no wallet is connected, we need to reconnect the wallet
+      // This handles the case where user is logged in but wallet got disconnected
+      if (authenticated && wallets.length > 0 && !wagmiIsConnected) {
+        console.log("User authenticated but wallet disconnected, attempting to reconnect...");
+        // The wallet should auto-reconnect through Privy's internal mechanisms
+        // If it doesn't, the user might need to manually reconnect through Privy's UI
+        const primaryWallet = wallets[0];
+        if (primaryWallet && 'connect' in primaryWallet && typeof primaryWallet.connect === 'function') {
+          primaryWallet.connect();
+        }
+      } else if (!authenticated) {
+        // Not authenticated at all, do normal login
         privyLogin();
       }
-      // If already authenticated, the UI should already show connected state
-      // No need to call any additional functions
+      // If authenticated AND connected, nothing to do
     }
-  }, [isMiniApp, connectors, wagmiConnect, privyLogin, authenticated]);
+  }, [isMiniApp, connectors, wagmiConnect, privyLogin, authenticated, privyReady, wallets, wagmiIsConnected]);
 
   // Disconnect function that handles both contexts
   const disconnect = useCallback(() => {
@@ -163,8 +179,8 @@ export function useWallet() {
     }
   }, [isMiniApp, wagmiDisconnect, privyLogout]);
 
-  // Loading state - mini-app context being null means still detecting
-  const isLoading = isMiniApp === null;
+  // Loading state - mini-app context being null means still detecting, or Privy not ready
+  const isLoading = isMiniApp === null || (!isMiniApp && !privyReady);
 
   // Debug info for troubleshooting
   const debug = {
@@ -172,6 +188,7 @@ export function useWallet() {
     wagmiIsConnected,
     wagmiAddress: address,
     authenticated,
+    privyReady,
     privyWallets: wallets.map((w) => w.address),
     activePrivyWallet: activeWallet?.address,
     effectiveAddress,
