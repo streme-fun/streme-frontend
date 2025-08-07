@@ -390,10 +390,10 @@ function App() {
     }
   }, [isMiniAppView, isSDKLoaded, isConnected, unifiedConnect]);
 
-  // Check checkin status when miniapp first opens
+  // Check checkin status when miniapp first opens (only after wallet is connected)
   useEffect(() => {
     const checkCheckinStatus = async () => {
-      if (isMiniAppView && isSDKLoaded && farcasterContext && !hasCheckedIn) {
+      if (isMiniAppView && isSDKLoaded && farcasterContext && isConnected && !hasCheckedIn) {
         try {
           // Try to get FID from different possible locations
           const userFid =
@@ -419,10 +419,8 @@ function App() {
             // Only show modal if user hasn't checked in today
             if (!data.checkedInToday) {
               console.log("User hasn't checked in today, showing modal");
-              // Add another delay to ensure wallet is connected
-              setTimeout(() => {
-                setShowCheckinModal();
-              }, 2000);
+              // Show modal immediately since wallet is already connected
+              setShowCheckinModal();
             } else {
               console.log("User has already checked in today");
             }
@@ -435,13 +433,14 @@ function App() {
       }
     };
 
-    // Add a small delay to ensure everything is properly initialized
-    const timer = setTimeout(checkCheckinStatus, 2000);
+    // Add a small delay to ensure everything is properly initialized, but only after wallet is connected
+    const timer = setTimeout(checkCheckinStatus, 1000);
     return () => clearTimeout(timer);
   }, [
     isMiniAppView,
     isSDKLoaded,
     farcasterContext,
+    isConnected,
     hasCheckedIn,
     setShowCheckinModal,
   ]);
