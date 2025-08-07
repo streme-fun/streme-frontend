@@ -239,7 +239,7 @@ export function ContributionModal({
                 <h2 className="text-xl font-bold">
                   {hasActiveContribution
                     ? "Manage Deposit"
-                    : "Deposit to Streme QR Fund"}
+                    : "Deposit to Streme Growth Fund"}
                 </h2>
               </div>
               <button

@@ -72,7 +72,7 @@ export function HowCrowdfundWorksModal({
           <div>
             <h3 className="font-semibold text-base mb-2">🎯 The Goal</h3>
             <p className="text-sm text-base-content/70">
-              Bring massive attention to Streme by winning a QR auction.
+              Grow Streme by funding initiatives.
             </p>
           </div>
 

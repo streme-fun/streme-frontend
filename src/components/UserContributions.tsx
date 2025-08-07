@@ -144,7 +144,7 @@ export const UserContributions = () => {
               <p className="text-sm">
                 You&apos;re contributing{" "}
                 <span className="font-bold">{userContribution} STREME</span> (
-                {formatUsd(userDepositBalance)}) to the QR auction fund -
+                {formatUsd(userDepositBalance)}) to the Streme Growth Fund -
                 that&apos;s {userPercentage}% of the total pool!
               </p>
             </div>
@@ -160,7 +160,7 @@ export const UserContributions = () => {
       ) : (
         <div className="text-center py-6 px-4 bg-base-200 rounded-lg">
           <p className="text-base-content/70 mb-2">
-            Join the mission to help Streme win daily QR auctions!
+            Join the mission to help Streme grow!
           </p>
           <p className="text-sm text-base-content/60">
             Your tokens remain yours • Withdraw anytime • No lock-up
