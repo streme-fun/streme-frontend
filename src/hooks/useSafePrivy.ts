@@ -26,7 +26,11 @@ export function useSafePrivy() {
   // Only call Privy hooks in browser mode when PrivyProvider is available
   try {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    return usePrivy();
+    const privyResult = usePrivy();
+    
+    return {
+      ...privyResult,
+    };
   } catch {
     return {
       authenticated: false,

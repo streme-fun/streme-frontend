@@ -145,10 +145,14 @@ export function useWallet() {
         console.error("Farcaster connector not found");
       }
     } else {
-      // In browser, use Privy login
-      privyLogin();
+      // In browser, only login if not already authenticated
+      if (!authenticated) {
+        privyLogin();
+      }
+      // If already authenticated, the UI should already show connected state
+      // No need to call any additional functions
     }
-  }, [isMiniApp, connectors, wagmiConnect, privyLogin]);
+  }, [isMiniApp, connectors, wagmiConnect, privyLogin, authenticated]);
 
   // Disconnect function that handles both contexts
   const disconnect = useCallback(() => {
