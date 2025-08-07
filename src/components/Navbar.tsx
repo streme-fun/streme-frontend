@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
 import { ThemeSwitcher } from "./ThemeSwitcher";
+import { HowItWorksModal } from "./HowItWorksModal";
 import { useWallet } from "../hooks/useWallet";
 
 export function Navbar() {
@@ -22,6 +23,7 @@ export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAddressDropdownOpen, setIsAddressDropdownOpen] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
 
   const truncateAddress = (address: string) => {
     if (!address) return "";
@@ -134,7 +136,10 @@ export function Navbar() {
               Launch a Token
             </Link>
 
-            <button className="btn btn-ghost" disabled>
+            <button
+              onClick={() => setIsHowItWorksOpen(true)}
+              className="btn btn-ghost"
+            >
               How It Works
             </button>
 
@@ -247,8 +252,11 @@ export function Navbar() {
             )}
 
             <button
+              onClick={() => {
+                setIsHowItWorksOpen(true);
+                setIsMenuOpen(false);
+              }}
               className="btn btn-ghost w-full justify-start"
-              disabled
             >
               How It Works
             </button>
@@ -303,6 +311,10 @@ export function Navbar() {
         </div>
       </nav>
 
+      <HowItWorksModal
+        isOpen={isHowItWorksOpen}
+        onClose={() => setIsHowItWorksOpen(false)}
+      />
       <MiniAppTutorialModal
         isOpen={isTutorialOpen}
         onClose={() => setIsTutorialOpen(false)}
