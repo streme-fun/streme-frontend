@@ -121,9 +121,11 @@ export function useWallet() {
   }, [isMiniApp, address, wallets, setActiveWallet, privyLogin, privyLogout]);
 
   // Determine connection state based on context
+  // For browser mode, if user is authenticated with Privy and we have an address,
+  // consider them connected even if wagmi is still syncing
   const isConnected = isMiniApp
     ? wagmiIsConnected
-    : authenticated && wagmiIsConnected;
+    : authenticated && (wagmiIsConnected || (wallets.length > 0 && activeWallet?.address));
 
   // In browser mode, prefer wagmi's address (which should be synced with Privy)
   // Only fall back to Privy's wallet if wagmi doesn't have an address
