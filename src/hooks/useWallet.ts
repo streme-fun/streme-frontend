@@ -7,6 +7,7 @@ import {
   useSafePrivy,
   useSafeWallets,
   useSafeSetActiveWallet,
+  useSafeLinkAccount,
 } from "./useSafePrivy";
 
 /**
@@ -28,6 +29,7 @@ export function useWallet() {
   } = useSafePrivy();
   const { wallets } = useSafeWallets();
   const { setActiveWallet } = useSafeSetActiveWallet();
+  const { linkWallet } = useSafeLinkAccount();
   const isMiniApp = useMiniAppContext();
 
   // Get the active wallet from Privy
@@ -152,23 +154,20 @@ export function useWallet() {
         return;
       }
 
-      // If authenticated but no wallet is connected, we need to reconnect the wallet
+      // If authenticated but no wallet is connected, use linkWallet
       // This handles the case where user is logged in but wallet got disconnected
-      if (authenticated && wallets.length > 0 && !wagmiIsConnected) {
-        console.log("User authenticated but wallet disconnected, attempting to reconnect...");
-        // The wallet should auto-reconnect through Privy's internal mechanisms
-        // If it doesn't, the user might need to manually reconnect through Privy's UI
-        const primaryWallet = wallets[0];
-        if (primaryWallet && 'connect' in primaryWallet && typeof primaryWallet.connect === 'function') {
-          primaryWallet.connect();
+      if (authenticated) {
+        if (!wagmiIsConnected || !address) {
+          console.log("User authenticated but wallet not connected, using linkWallet...");
+          linkWallet();
         }
-      } else if (!authenticated) {
+        // If authenticated AND connected, nothing to do
+      } else {
         // Not authenticated at all, do normal login
         privyLogin();
       }
-      // If authenticated AND connected, nothing to do
     }
-  }, [isMiniApp, connectors, wagmiConnect, privyLogin, authenticated, privyReady, wallets, wagmiIsConnected]);
+  }, [isMiniApp, connectors, wagmiConnect, privyLogin, authenticated, privyReady, linkWallet, wagmiIsConnected, address]);
 
   // Disconnect function that handles both contexts
   const disconnect = useCallback(() => {
