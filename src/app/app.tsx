@@ -217,9 +217,10 @@ function App() {
         const neynarUser = await fetchNeynarUser(farcasterContext.user.fid);
         if (neynarUser) {
           const profileImage = neynarUser.pfp_url || "";
-          const displayName = neynarUser.display_name || neynarUser.username || "Anonymous User";
+          const displayName =
+            neynarUser.display_name || neynarUser.username || "Anonymous User";
           const username = neynarUser.username || "";
-          
+
           setMiniAppProfileImage(profileImage);
           setMiniAppUserData({
             displayName,
@@ -393,7 +394,13 @@ function App() {
   // Check checkin status when miniapp first opens (only after wallet is connected)
   useEffect(() => {
     const checkCheckinStatus = async () => {
-      if (isMiniAppView && isSDKLoaded && farcasterContext && isConnected && !hasCheckedIn) {
+      if (
+        isMiniAppView &&
+        isSDKLoaded &&
+        farcasterContext &&
+        isConnected &&
+        !hasCheckedIn
+      ) {
         try {
           // Try to get FID from different possible locations
           const userFid =
@@ -479,12 +486,12 @@ function App() {
     return (
       <div className="font-[family-name:var(--font-geist-sans)]">
         {/* Top Navbar */}
-        <MiniAppTopNavbar 
+        <MiniAppTopNavbar
           isConnected={isConnected}
           onLogoClick={handleLogoClick}
           onTutorialClick={() => setShowTutorialModal(true)}
         />
-        
+
         <div className="flex flex-col gap-2 row-start-2 w-full p-4 pt-20 pb-24">
           {/* Streaming Experiments Section */}
           <div className="w-full max-w-md mb-4">
@@ -503,7 +510,7 @@ function App() {
                     alt="Streme Icon"
                     width={60}
                     height={60}
-                    className="opacity-80 relative z-10 rounded-full"
+                    className="opacity-80 relative z-5 rounded-full"
                   />
                 </div>
 
@@ -845,7 +852,7 @@ Symbol: $[your ticker]
                     alt="Streme Icon"
                     width={80}
                     height={80}
-                    className="opacity-80 relative z-10 rounded-full"
+                    className="opacity-80 relative z-5 rounded-full"
                   />
                 </div>
 
