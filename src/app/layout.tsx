@@ -27,6 +27,8 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="light">
       <head>
+        {/* Performance hint for Farcaster Quick Auth server, per docs */}
+        <link rel="preconnect" href="https://auth.farcaster.xyz" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

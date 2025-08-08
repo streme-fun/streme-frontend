@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient, Errors } from "@farcaster/quick-auth";
 
 interface ExternalApiResponse {
   amount: number;
@@ -48,14 +49,24 @@ export async function GET(request: NextRequest) {
       token.includes(".") ? "JWT-like" : "Simple string"
     );
 
-    // Extract FID from JWT token (fallback only)
+    // Verify Quick Auth JWT per Farcaster docs
     let fid = 0;
     try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      fid = payload.fid || payload.sub || 0;
-      console.log("- Extracted FID from JWT:", fid);
-    } catch (error) {
-      console.log("- Could not extract FID from JWT:", error);
+      const client = createClient();
+      const payload = await client.verifyJwt({
+        token,
+        domain: request.headers.get("host") || "streme.fun",
+      });
+      const sub = Number(payload.sub);
+      if (!Number.isFinite(sub)) {
+        return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      }
+      fid = sub;
+    } catch (e) {
+      if (e instanceof Errors.InvalidTokenError) {
+        return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      }
+      throw e;
     }
 
     // Make the request to the external API

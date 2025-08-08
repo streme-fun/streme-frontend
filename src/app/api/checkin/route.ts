@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient, Errors } from "@farcaster/quick-auth";
 
 interface CheckinResponse {
   success: boolean;
@@ -38,11 +39,25 @@ export async function GET(request: NextRequest) {
 
     const token = authHeader.substring(7); // Remove "Bearer " prefix
 
+    // Verify Quick Auth JWT per Farcaster docs
+    try {
+      const client = createClient();
+      await client.verifyJwt({
+        token,
+        domain: request.headers.get("host") || "streme.fun",
+      });
+    } catch (e) {
+      if (e instanceof Errors.InvalidTokenError) {
+        return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      }
+      throw e;
+    }
+
     // Forward the request to the external API
     const response = await fetch("https://api.streme.fun/api/checkin", {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     });
@@ -89,17 +104,18 @@ export async function POST(request: NextRequest) {
       token.includes(".") ? "JWT-like" : "Simple string"
     );
 
-    // Debug: Try to parse the JWT payload to see what's in it
+    // Verify Quick Auth JWT per Farcaster docs
     try {
-      const parts = token.split(".");
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1]));
-        console.log("- JWT payload structure:", JSON.stringify(payload, null, 2));
-      } else {
-        console.log("- Token is not a standard JWT (doesn't have 3 parts)");
+      const client = createClient();
+      await client.verifyJwt({
+        token,
+        domain: request.headers.get("host") || "streme.fun",
+      });
+    } catch (e) {
+      if (e instanceof Errors.InvalidTokenError) {
+        return NextResponse.json({ error: "Invalid token" }, { status: 401 });
       }
-    } catch (error) {
-      console.log("- Could not parse JWT payload:", error);
+      throw e;
     }
 
     // Make the request to the external API
@@ -151,10 +167,13 @@ export async function POST(request: NextRequest) {
     let checkinData: CheckinResponse;
     try {
       checkinData = JSON.parse(responseText);
-      
+
       // Debug: Log the actual response structure
-      console.log("Raw checkin response:", JSON.stringify(checkinData, null, 2));
-      
+      console.log(
+        "Raw checkin response:",
+        JSON.stringify(checkinData, null, 2)
+      );
+
       console.log("Checkin successful:", {
         fid: checkinData.fid,
         totalCheckins: checkinData.totalCheckins,

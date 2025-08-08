@@ -20,7 +20,6 @@ export function useAppFrameLogic() {
 
   // Use the environment detection from the top level
   const isMiniAppView = isMiniApp;
-  const isDetectionComplete = true; // Always complete since we get it from context
 
   // Check if mini app is already added when context loads
   useEffect(() => {
@@ -112,7 +111,8 @@ export function useAppFrameLogic() {
   };
 
   return {
-    isSDKLoaded: isDetectionComplete, // Only require detection to complete, not SDK loading
+    // Surface the actual Farcaster SDK load state so UI can wait correctly
+    isSDKLoaded,
     isMiniAppView,
     farcasterContext: farcasterContext as
       | FarcasterContextType.MiniAppContext
