@@ -1,16 +1,22 @@
 "use client";
 
 import { formatUnits } from "viem";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { publicClient } from "@/src/lib/viemClient"; // Import the centralized client
 import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
 import { useWallet } from "@/src/hooks/useWallet";
+import { getPrices } from "@/src/lib/priceUtils";
+import {
+  useTokenLiquidity,
+  isLiquidityLow,
+} from "@/src/hooks/useTokenLiquidity";
 
 interface StakedBalanceProps {
   stakingAddress: string;
   stakingPool: string;
   symbol: string;
   tokenAddress: string;
+  tokenLaunchTime: string | number | Date;
 }
 
 interface PoolData {
@@ -26,6 +32,7 @@ export function StakedBalance({
   stakingPool,
   symbol,
   tokenAddress,
+  tokenLaunchTime,
 }: StakedBalanceProps) {
   const { address, isConnected } = useWallet();
   const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
@@ -35,6 +42,7 @@ export function StakedBalance({
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const [tokenPrice, setTokenPrice] = useState<number | null>(null);
 
   // Use streaming number hook for animated balance
   const currentBalance = useStreamingNumber({
@@ -60,13 +68,7 @@ export function StakedBalance({
   // Main data fetching effect
 
   useEffect(() => {
-    if (
-      !isConnected ||
-      !address ||
-      !stakingAddress ||
-      !stakingPool
-    )
-      return;
+    if (!isConnected || !address || !stakingAddress || !stakingPool) return;
 
     const fetchData = async () => {
       // Prevent calls if we just fetched data recently (within 30 seconds)
@@ -219,11 +221,73 @@ export function StakedBalance({
     }
   }, [refresh]);
 
+  // Fetch USD price
+  useEffect(() => {
+    let cancelled = false;
+    const fetchPrice = async () => {
+      try {
+        const prices = await getPrices([tokenAddress]);
+        if (!cancelled && prices?.[tokenAddress.toLowerCase()]) {
+          setTokenPrice(prices[tokenAddress.toLowerCase()]);
+        }
+      } catch (e) {
+        // ignore price errors for UI
+      }
+    };
+
+    fetchPrice();
+    const interval = setInterval(fetchPrice, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [tokenAddress]);
+
+  // Use shared liquidity check (Uniswap V3 WETH reserves)
+  const { wethBalance } = useTokenLiquidity(tokenAddress);
+  const lowLiquidity = isLiquidityLow(wethBalance, tokenLaunchTime);
+
   // Don't render anything if wallet is not connected or address is missing
   if (!isConnected || !address) return null;
 
   const formattedBalance = Number(formatUnits(stakedBalance, 18)).toFixed(4);
   const formattedReceived = currentBalance.toFixed(4);
+
+  const receivedUsdValue = useMemo(() => {
+    if (!tokenPrice) return 0;
+    return currentBalance * tokenPrice;
+  }, [currentBalance, tokenPrice]);
+
+  const formatUsd = useMemo(
+    () => (value: number) => {
+      if (value === 0) return "0.00";
+      if (value < 1) return value.toFixed(4);
+      if (value < 1000)
+        return value.toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+      return value.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    },
+    []
+  );
+
+  const stakedAmountTokens = useMemo(
+    () => Number(formatUnits(stakedBalance, 18)),
+    [stakedBalance]
+  );
+  const flowRatePerDayNum = useMemo(
+    () => parseFloat(flowRate) || 0,
+    [flowRate]
+  );
+  const apyPercent = useMemo(() => {
+    if (stakedAmountTokens <= 0 || flowRatePerDayNum <= 0) return 0;
+    const yearlyRewards = flowRatePerDayNum * 365;
+    return (yearlyRewards / stakedAmountTokens) * 100;
+  }, [stakedAmountTokens, flowRatePerDayNum]);
 
   return (
     <div
@@ -241,6 +305,11 @@ export function StakedBalance({
         <div className="font-mono">
           {formattedReceived} {symbol}
         </div>
+        {!lowLiquidity && tokenPrice && (
+          <div className="text-xs text-base-content/50 font-mono mt-1">
+            ${formatUsd(receivedUsdValue)}
+          </div>
+        )}
       </div>
       <div>
         <div className="text-sm opacity-60 mb-1">My Pool Share</div>
@@ -252,6 +321,12 @@ export function StakedBalance({
           {flowRate} {symbol}/day
         </div>
       </div>
+      {apyPercent > 0 && isFinite(apyPercent) && (
+        <div>
+          <div className="text-sm opacity-60 mb-1">Est. APY</div>
+          <div className="font-mono">{apyPercent.toFixed(2)}%</div>
+        </div>
+      )}
     </div>
   );
 }

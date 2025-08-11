@@ -316,6 +316,14 @@ ${shareUrl}`;
             stakingPool={token.staking_pool}
             symbol={token.symbol}
             tokenAddress={token.contract_address}
+            tokenLaunchTime={
+              token.timestamp
+                ? new Date(
+                    token.timestamp._seconds * 1000 +
+                      token.timestamp._nanoseconds / 1000000
+                  )
+                : token.created_at
+            }
             key={stakingUpdateTrigger}
           />
 
@@ -332,9 +340,7 @@ ${shareUrl}`;
           />
 
           {/* Claim Fees Button */}
-          <ClaimFeesButton
-            tokenAddress={token.contract_address}
-          />
+          <ClaimFeesButton tokenAddress={token.contract_address} />
         </div>
 
         <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit">
