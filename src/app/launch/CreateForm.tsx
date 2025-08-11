@@ -329,7 +329,10 @@ export function CreateForm() {
             value={formData.symbol}
             onChange={(e) => {
               const rawValue = e.target.value;
-              const sanitizedValue = rawValue.replace(/\$/g, "");
+              // Only remove $ if it's the first character
+              const sanitizedValue = rawValue.startsWith("$") 
+                ? rawValue.substring(1) 
+                : rawValue;
               setFormData({ ...formData, symbol: sanitizedValue });
             }}
             className="input input-bordered w-full bg-base-200 pl-8"
