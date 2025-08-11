@@ -230,7 +230,7 @@ export function StakedBalance({
         if (!cancelled && prices?.[tokenAddress.toLowerCase()]) {
           setTokenPrice(prices[tokenAddress.toLowerCase()]);
         }
-      } catch (e) {
+      } catch {
         // ignore price errors for UI
       }
     };
@@ -247,12 +247,7 @@ export function StakedBalance({
   const { wethBalance } = useTokenLiquidity(tokenAddress);
   const lowLiquidity = isLiquidityLow(wethBalance, tokenLaunchTime);
 
-  // Don't render anything if wallet is not connected or address is missing
-  if (!isConnected || !address) return null;
-
-  const formattedBalance = Number(formatUnits(stakedBalance, 18)).toFixed(4);
-  const formattedReceived = currentBalance.toFixed(4);
-
+  // Calculate memoized values before early return
   const receivedUsdValue = useMemo(() => {
     if (!tokenPrice) return 0;
     return currentBalance * tokenPrice;
@@ -288,6 +283,12 @@ export function StakedBalance({
     const yearlyRewards = flowRatePerDayNum * 365;
     return (yearlyRewards / stakedAmountTokens) * 100;
   }, [stakedAmountTokens, flowRatePerDayNum]);
+
+  // Don't render anything if wallet is not connected or address is missing
+  if (!isConnected || !address) return null;
+
+  const formattedBalance = Number(formatUnits(stakedBalance, 18)).toFixed(4);
+  const formattedReceived = currentBalance.toFixed(4);
 
   return (
     <div

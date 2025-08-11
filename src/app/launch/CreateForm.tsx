@@ -160,7 +160,8 @@ export function CreateForm() {
       return;
     }
 
-    if (!formData.symbol.trim()) {
+    const sanitizedSymbol = formData.symbol.replace(/\$/g, "").trim();
+    if (!sanitizedSymbol) {
       toast.error("Token symbol is required");
       return;
     }
@@ -170,7 +171,7 @@ export function CreateForm() {
     try {
       console.log(
         "Preparing token deployment for:",
-        formData.symbol,
+        sanitizedSymbol,
         userAddress
       );
 
@@ -204,7 +205,7 @@ export function CreateForm() {
           ],
           functionName: "generateSalt",
           args: [
-            formData.symbol,
+            sanitizedSymbol,
             userAddress as `0x${string}`,
             TOKEN_FACTORY_ADDRESS, // Use the correct tokenFactory address
             WETH_ADDRESS,
@@ -231,7 +232,7 @@ export function CreateForm() {
       // Prepare token config (matching server implementation)
       const tokenConfig = {
         _name: formData.name,
-        _symbol: formData.symbol,
+        _symbol: sanitizedSymbol,
         _supply: TOKEN_SUPPLY,
         _fee: CREATOR_FEE,
         _salt: salt, // Use the generated salt (or default if generation failed)
@@ -326,9 +327,11 @@ export function CreateForm() {
             type="text"
             placeholder="Enter token symbol"
             value={formData.symbol}
-            onChange={(e) =>
-              setFormData({ ...formData, symbol: e.target.value })
-            }
+            onChange={(e) => {
+              const rawValue = e.target.value;
+              const sanitizedValue = rawValue.replace(/\$/g, "");
+              setFormData({ ...formData, symbol: sanitizedValue });
+            }}
             className="input input-bordered w-full bg-base-200"
             required
           />
