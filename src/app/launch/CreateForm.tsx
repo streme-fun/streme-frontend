@@ -320,7 +320,7 @@ export function CreateForm() {
           <span className="text-error ml-1">*</span>
         </label>
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content text-lg font-medium z-10 pointer-events-none">
             $
           </span>
           <input
@@ -332,7 +332,7 @@ export function CreateForm() {
               const sanitizedValue = rawValue.replace(/\$/g, "");
               setFormData({ ...formData, symbol: sanitizedValue });
             }}
-            className="input input-bordered w-full bg-base-200"
+            className="input input-bordered w-full bg-base-200 pl-8"
             required
           />
         </div>
