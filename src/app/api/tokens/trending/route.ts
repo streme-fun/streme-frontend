@@ -29,24 +29,26 @@ export async function GET() {
 
     const trendingData: TrendingToken[] = await response.json();
 
-    // Filter out blacklisted tokens and tokens with $ in name/symbol
-    const filteredData = trendingData.filter((token) => {
-      if (token.username) {
-        const username = token.username.toLowerCase();
-        const isBlacklisted = SPAMMER_BLACKLIST.includes(username);
-        if (isBlacklisted) return false;
-      }
-      
-      // Filter out tokens with $ in name or symbol
-      if (token.name && token.name.includes('$')) {
-        return false;
-      }
-      if (token.symbol && token.symbol.includes('$')) {
-        return false;
-      }
-      
-      return true;
-    });
+    // Filter out blacklisted tokens and clean up symbols
+    const filteredData = trendingData
+      .filter((token) => {
+        if (token.username) {
+          const username = token.username.toLowerCase();
+          const isBlacklisted = SPAMMER_BLACKLIST.includes(username);
+          if (isBlacklisted) return false;
+        }
+        return true;
+      })
+      .map((token) => {
+        // Remove leading $ from symbol if present
+        if (token.symbol && typeof token.symbol === 'string' && token.symbol.startsWith('$')) {
+          return {
+            ...token,
+            symbol: token.symbol.substring(1)
+          };
+        }
+        return token;
+      });
 
     return Response.json(filteredData, { headers });
   } catch (error) {
