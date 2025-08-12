@@ -135,7 +135,9 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
         <div className="flex-1 min-w-0">
           <h2 className="text-xl font-bold">{token.name}</h2>
           <div className="flex items-center gap-2">
-            <span className="text-sm opacity-60">${token.symbol}</span>
+            <span className="text-sm opacity-60">
+              ${token.symbol?.startsWith("$") ? token.symbol.substring(1) : token.symbol}
+            </span>
           </div>
         </div>
       </div>
