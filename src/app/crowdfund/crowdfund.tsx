@@ -908,7 +908,7 @@ export default function CrowdfundPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto">
         {/* Combined Animation and Contribution Section */}
         <div className="mb-3">
           {effectiveIsConnected ? (
@@ -1212,7 +1212,7 @@ export default function CrowdfundPage() {
 
       {/* Contributors Leaderboard */}
       {(contributors.length > 0 || isLoadingContributors) && (
-        <div className="container mx-auto px-4 mt-6 mb-8">
+        <div className="container mx-auto mt-6 mb-8">
           <div className="">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold">Contributors</h3>
@@ -1371,7 +1371,7 @@ export default function CrowdfundPage() {
       />
 
       {/* FAQ Section */}
-      <div className="container mx-auto px-4 mt-8 mb-8">
+      <div className="container mx-auto mt-8 mb-8">
         <div className="bg-base-100 ">
           <h2 className="text-xl font-bold mb-6 text-center">
             Frequently Asked Questions

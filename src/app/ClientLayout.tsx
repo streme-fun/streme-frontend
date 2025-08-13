@@ -597,7 +597,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
               onTutorialClick={handleTutorialClick}
             />
           )}
-          <main className={isHomePage ? "pt-16 pb-20" : "pb-20"}>{children}</main>
+          <main className={`px-4 ${isHomePage ? "pt-16 pb-20" : "pb-20"}`}>{children}</main>
           <MiniAppBottomNavbar 
             profileImage={miniAppProfileImage}
             userData={miniAppUserData}

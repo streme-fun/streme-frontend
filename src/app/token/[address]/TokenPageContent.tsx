@@ -269,7 +269,7 @@ ${shareUrl}`;
     <div className="max-w-[1440px] mx-auto sm:px-6 md:px-8 md:mt-20 pt-8 pb-12">
       {/* Back Arrow Button - Only show in mini app */}
       {isMiniAppView && (
-        <div className="mb-4 px-4 sm:px-0">
+        <div className="mb-4">
           <button
             onClick={() => router.push("/")}
             className="flex items-center gap-2 text-sm text-base-content/70 hover:text-base-content transition-colors cursor-pointer"
