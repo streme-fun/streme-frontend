@@ -41,7 +41,8 @@ CheckinSuccessModalProps) {
 
   const [hasTriggeredEffects, setHasTriggeredEffects] = useState(false);
   const [isConnectedToPool, setIsConnectedToPool] = useState(false);
-  const [hasCheckedPoolConnection, setHasCheckedPoolConnection] = useState(false);
+  const [hasCheckedPoolConnection, setHasCheckedPoolConnection] =
+    useState(false);
 
   // Get effective connection state and address
   const effectiveIsConnected = isMiniAppView ? fcIsConnected : wagmiIsConnected;
@@ -162,7 +163,7 @@ CheckinSuccessModalProps) {
       } else {
         setIsConnectedToPool(false);
       }
-      
+
       // Mark that we've finished checking the pool connection
       setHasCheckedPoolConnection(true);
     } catch (error) {
@@ -233,7 +234,7 @@ CheckinSuccessModalProps) {
     const shareUrl = "https://streme.fun";
     const castText = `${randomQuote}
 
-Just claimed my daily drop of 1000 staked STREME just for opening the app!
+Just claimed my daily drop of 1000 staked $STREME just for opening the app!
 
 ${shareUrl}`;
 
@@ -280,7 +281,7 @@ ${shareUrl}`;
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-0"
+      className="fixed inset-0 bg-black/50 flex items-end justify-center z-[100] p-0"
       onClick={onClose}
     >
       <div
@@ -354,21 +355,23 @@ ${shareUrl}`;
         </div>
 
         {/* Connect Pool Button if not connected (only show after we've checked) */}
-        {effectiveIsConnected && hasCheckedPoolConnection && !isConnectedToPool && (
-          <div className="mb-6 p-4 bg-base-200 rounded-lg">
-            <p className="text-sm text-base-content/70 mb-3">
-              You&apos;re not connected to the STREME reward pool yet. Connect
-              to start earning rewards on your staked STREME!
-            </p>
-            <ConnectPoolButton
-              stakingPoolAddress={STREME_STAKING_POOL}
-              onSuccess={handleConnectPoolSuccess}
-              isMiniApp={isMiniAppView}
-              farcasterAddress={effectiveAddress as string}
-              farcasterIsConnected={effectiveIsConnected}
-            />
-          </div>
-        )}
+        {effectiveIsConnected &&
+          hasCheckedPoolConnection &&
+          !isConnectedToPool && (
+            <div className="mb-6 p-4 bg-base-200 rounded-lg">
+              <p className="text-sm text-base-content/70 mb-3">
+                You&apos;re not connected to the STREME reward pool yet. Connect
+                to start earning rewards on your staked STREME!
+              </p>
+              <ConnectPoolButton
+                stakingPoolAddress={STREME_STAKING_POOL}
+                onSuccess={handleConnectPoolSuccess}
+                isMiniApp={isMiniAppView}
+                farcasterAddress={effectiveAddress as string}
+                farcasterIsConnected={effectiveIsConnected}
+              />
+            </div>
+          )}
 
         {/* Actions */}
         <div className="flex gap-2">

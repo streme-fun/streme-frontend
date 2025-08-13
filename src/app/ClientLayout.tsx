@@ -3,6 +3,10 @@
 import PrivyProviderWrapper from "../components/auth/PrivyProviderWrapper";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
+import { MiniAppTopNavbar } from "../components/MiniAppTopNavbar";
+import { MiniAppBottomNavbar } from "../components/MiniAppBottomNavbar";
+import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal";
+import { usePathname } from "next/navigation";
 import { FrameProvider } from "../components/providers/FrameProvider";
 import MiniAppWagmiProvider from "../components/providers/MiniAppWagmiProvider";
 import BrowserWagmiProvider from "../components/providers/BrowserWagmiProvider";
@@ -125,6 +129,20 @@ interface UnstakedToken {
   };
 }
 
+// Client-side function to fetch user data from our API
+const fetchNeynarUser = async (fid: number) => {
+  try {
+    const response = await fetch(`/api/neynar/user/${fid}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching user from API:", error);
+    return null;
+  }
+};
+
 function AppContent({ children }: { children: React.ReactNode }) {
   const { address: wagmiAddress } = useAccount();
   const {
@@ -132,6 +150,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
     address: fcAddress,
     isConnected: fcIsConnected,
     isSDKLoaded: isDetectionComplete,
+    farcasterContext,
   } = useAppFrameLogic();
 
   // const [unstakedTokens, setUnstakedTokens] = useState<UnstakedToken[]>([]);
@@ -141,6 +160,17 @@ function AppContent({ children }: { children: React.ReactNode }) {
     address: string | undefined;
     isConnected: boolean;
   }>({ isStable: false, address: undefined, isConnected: false });
+  
+  // Profile picture and user data state for mini-app
+  const [miniAppProfileImage, setMiniAppProfileImage] = useState<string>("");
+  const [miniAppUserData, setMiniAppUserData] = useState<{
+    displayName: string;
+    username: string;
+    profileImage: string;
+  } | null>(null);
+  
+  // Tutorial modal state for mini-app
+  const [showTutorialModal, setShowTutorialModal] = useState(false);
 
   // Get effective address based on context
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
@@ -496,12 +526,95 @@ function AppContent({ children }: { children: React.ReactNode }) {
     checkForUnstakedTokens();
   }, [stableConnectionState, isMiniAppView, safeToLowerCase, fetchTokenData]);
 
+  // Fetch profile picture and user data for mini-app view
+  useEffect(() => {
+    const fetchMiniAppProfile = async () => {
+      if (!isMiniAppView || !farcasterContext?.user?.fid) {
+        setMiniAppProfileImage("");
+        setMiniAppUserData(null);
+        return;
+      }
+
+      try {
+        const neynarUser = await fetchNeynarUser(farcasterContext.user.fid);
+        if (neynarUser) {
+          const profileImage = neynarUser.pfp_url || "";
+          const displayName =
+            neynarUser.display_name || neynarUser.username || "Anonymous User";
+          const username = neynarUser.username || "";
+
+          setMiniAppProfileImage(profileImage);
+          setMiniAppUserData({
+            displayName,
+            username,
+            profileImage,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching mini-app profile:", error);
+        setMiniAppProfileImage("");
+        setMiniAppUserData(null);
+      }
+    };
+
+    fetchMiniAppProfile();
+  }, [isMiniAppView, farcasterContext?.user?.fid]);
+
+  // Check if we're on the home page for conditional top navbar rendering
+  const pathname = usePathname();
+  const isHomePage = pathname === '/';
+
+  // Tutorial handlers for mini-app
+  const handleTutorialClick = () => {
+    setShowTutorialModal(true);
+  };
+
+  const handleCloseTutorial = () => {
+    setShowTutorialModal(false);
+    // Save completion state so user doesn't see tutorial again
+    if (typeof window !== "undefined") {
+      localStorage.setItem("streme-tutorial-skipped", "true");
+    }
+  };
+
+  const handleSkipTutorial = () => {
+    setShowTutorialModal(false);
+    // Save to localStorage so user doesn't see tutorial again
+    if (typeof window !== "undefined") {
+      localStorage.setItem("streme-tutorial-skipped", "true");
+    }
+  };
+
   return (
     <>
       <WalletProviderErrorHandler />
-      <Navbar />
-      <main className="px-4">{children}</main>
-      <Footer />
+      {isMiniAppView ? (
+        <>
+          {isHomePage && (
+            <MiniAppTopNavbar 
+              isConnected={effectiveIsConnected}
+              onLogoClick={() => {}} 
+              onTutorialClick={handleTutorialClick}
+            />
+          )}
+          <main className={isHomePage ? "pt-16 pb-20" : "pb-20"}>{children}</main>
+          <MiniAppBottomNavbar 
+            profileImage={miniAppProfileImage}
+            userData={miniAppUserData}
+          />
+          <MiniAppTutorialModal
+            isOpen={showTutorialModal}
+            onClose={handleCloseTutorial}
+            onSkip={handleSkipTutorial}
+          />
+        </>
+      ) : (
+        <>
+          <Navbar />
+          <main className="px-4">{children}</main>
+          <Footer />
+        </>
+      )}
       <Toaster
         position="top-right"
         richColors

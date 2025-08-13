@@ -196,7 +196,7 @@ export function CheckinModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-0"
+      className="fixed inset-0 bg-black/50 flex items-end justify-center z-[100] p-0"
       onClick={handleClose}
     >
       <div
