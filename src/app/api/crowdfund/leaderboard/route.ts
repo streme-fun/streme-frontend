@@ -8,52 +8,198 @@ interface Contributor {
   percentage?: number;
 }
 
-export async function GET() {
+// In-memory cache for leaderboard data
+let cache: {
+  data: Contributor[] | null;
+  timestamp: number;
+  isRefreshing: boolean;
+} = {
+  data: null,
+  timestamp: 0,
+  isRefreshing: false,
+};
+
+// Cache duration: 5 minutes (significantly reduce external API calls)
+const CACHE_DURATION = 5 * 60 * 1000;
+// External API timeout: 5 seconds (fail fast to avoid gateway timeouts)
+const API_TIMEOUT = 5 * 1000;
+// Background refresh: Try to refresh cache before it expires
+const CACHE_REFRESH_THRESHOLD = 4 * 60 * 1000; // Start trying to refresh at 4 minutes
+
+// Background refresh function
+async function refreshCacheInBackground() {
+  // Don't refresh if already refreshing
+  if (cache.isRefreshing) {
+    console.log("Already refreshing in background, skipping...");
+    return;
+  }
+  
+  cache.isRefreshing = true;
+  
   try {
-    console.log("Fetching contributors from external API...");
-    // Add cache busting timestamp to external API call
-    const timestamp = Date.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+    
     const apiResponse = await fetch(
-      `https://api.streme.fun/api/qr/members?t=${timestamp}`,
+      `https://api.streme.fun/api/qr/members`,
       {
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-cache",
-        },
+        signal: controller.signal,
+        next: { revalidate: 30 }
       }
     );
-    console.log("Contributors API response status:", apiResponse.status);
-
+    
+    clearTimeout(timeoutId);
+    
     if (apiResponse.ok) {
       const data: Contributor[] = await apiResponse.json();
-      // console.log('Contributors data:', data);
-
-      // Merge contributors with the same username
       const mergedContributors = mergeContributorsByUsername(data);
+      const contributorsWithPercentages = calculatePercentages(mergedContributors);
+      
+      cache = {
+        data: contributorsWithPercentages,
+        timestamp: Date.now(),
+        isRefreshing: false,
+      };
+      
+      console.log("Background refresh successful");
+    }
+  } catch (error) {
+    console.log("Background refresh failed (will use existing cache):", error);
+  } finally {
+    cache.isRefreshing = false;
+  }
+}
 
-      // Calculate percentages
-      const contributorsWithPercentages =
-        calculatePercentages(mergedContributors);
+export async function GET(request: Request) {
+  try {
+    // Check if we have a force refresh parameter
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.get("force") === "true";
+    
+    const now = Date.now();
+    const cacheAge = now - cache.timestamp;
+    
+    // Return cached data immediately if available and not forcing refresh
+    if (!forceRefresh && cache.data) {
+      if (cacheAge < CACHE_DURATION) {
+        console.log(`Returning cached data (age: ${Math.round(cacheAge/1000)}s)`);
+        
+        // Try background refresh if cache is getting old
+        if (cacheAge > CACHE_REFRESH_THRESHOLD) {
+          console.log("Cache is old, attempting background refresh...");
+          // Fire and forget background refresh (don't await)
+          refreshCacheInBackground();
+        }
+        
+        const response = NextResponse.json(cache.data);
+        response.headers.set(
+          "Cache-Control",
+          "public, max-age=60, stale-while-revalidate=240"
+        );
+        return response;
+      }
+    }
 
-      const response = NextResponse.json(contributorsWithPercentages);
-      // Add cache-busting headers to prevent browser caching
-      response.headers.set(
-        "Cache-Control",
-        "no-store, no-cache, must-revalidate, proxy-revalidate"
+    console.log("Fetching fresh contributors from external API...");
+    
+    // Create an AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+    
+    try {
+      const apiResponse = await fetch(
+        `https://api.streme.fun/api/qr/members`,
+        {
+          signal: controller.signal,
+          // Allow Next.js to cache for 30 seconds
+          next: { revalidate: 30 }
+        }
       );
-      response.headers.set("Pragma", "no-cache");
-      response.headers.set("Expires", "0");
+      
+      clearTimeout(timeoutId);
+      console.log("Contributors API response status:", apiResponse.status);
 
-      return response;
-    } else {
-      console.error("Contributors API failed with status:", apiResponse.status);
-      return NextResponse.json(
-        { error: "Failed to fetch contributors" },
-        { status: apiResponse.status }
-      );
+      if (apiResponse.ok) {
+        const data: Contributor[] = await apiResponse.json();
+        
+        // Merge contributors with the same username
+        const mergedContributors = mergeContributorsByUsername(data);
+        
+        // Calculate percentages
+        const contributorsWithPercentages = calculatePercentages(mergedContributors);
+        
+        // Update cache
+        cache = {
+          data: contributorsWithPercentages,
+          timestamp: now,
+          isRefreshing: false,
+        };
+        
+        const response = NextResponse.json(contributorsWithPercentages);
+        // Set cache headers to allow browser caching
+        response.headers.set(
+          "Cache-Control",
+          "public, max-age=30, stale-while-revalidate=60"
+        );
+        
+        return response;
+      } else {
+        console.error("Contributors API failed with status:", apiResponse.status);
+        
+        // If we have cached data, return it even if stale (better than error)
+        if (cache.data) {
+          console.log("Returning stale cache due to API error");
+          const response = NextResponse.json(cache.data);
+          response.headers.set(
+            "Cache-Control",
+            "public, max-age=10, stale-while-revalidate=30"
+          );
+          return response;
+        }
+        
+        return NextResponse.json(
+          { error: "Failed to fetch contributors" },
+          { status: apiResponse.status }
+        );
+      }
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        console.error(`External API timeout after ${API_TIMEOUT/1000} seconds`);
+        
+        // Always return cached data if available on timeout (even if stale)
+        if (cache.data) {
+          console.log("Returning stale cache due to timeout");
+          const response = NextResponse.json(cache.data);
+          response.headers.set(
+            "Cache-Control",
+            "public, max-age=60, stale-while-revalidate=240"
+          );
+          return response;
+        }
+        
+        // Return empty array instead of error if no cache
+        console.log("No cache available, returning empty array");
+        return NextResponse.json([]);
+      }
+      
+      throw error;
     }
   } catch (error) {
     console.error("Error fetching contributors:", error);
+    
+    // Last resort: return cached data if available
+    if (cache.data) {
+      console.log("Returning stale cache due to error");
+      const response = NextResponse.json(cache.data);
+      response.headers.set(
+        "Cache-Control",
+        "public, max-age=10, stale-while-revalidate=30"
+      );
+      return response;
+    }
+    
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

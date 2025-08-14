@@ -348,22 +348,22 @@ export default function CrowdfundPage() {
   }, [baseStremeAmount]);
 
   // Fetch contributors leaderboard
-  const fetchContributors = useCallback(async (bustCache = false) => {
+  const fetchContributors = useCallback(async (forceRefresh = false) => {
     try {
       console.log(
         "Fetching contributors from API...",
-        bustCache ? "(cache busting)" : ""
+        forceRefresh ? "(force refresh)" : ""
       );
       setIsLoadingContributors(true);
 
-      // Add cache busting when explicitly requested
-      const url = bustCache
-        ? `/api/crowdfund/leaderboard?t=${Date.now()}`
+      // Use force parameter for explicit refreshes (e.g., after transactions)
+      const url = forceRefresh
+        ? `/api/crowdfund/leaderboard?force=true`
         : "/api/crowdfund/leaderboard";
 
       const response = await fetch(url, {
-        cache: bustCache ? "no-store" : "default",
-        headers: bustCache ? { "Cache-Control": "no-cache" } : {},
+        // Allow browser caching when not forcing refresh
+        cache: forceRefresh ? "reload" : "default",
       });
 
       console.log("Contributors API response status:", response.status);
@@ -383,29 +383,26 @@ export default function CrowdfundPage() {
 
   // Fetch contributors with retry logic for transaction updates
   const fetchContributorsWithRetry = useCallback(async () => {
-    console.log("Fetching contributors after transaction with retry logic...");
+    console.log("Fetching contributors after transaction...");
     setIsRefreshingAfterTransaction(true);
 
-    // First attempt - immediate refresh with cache busting
+    // First attempt - immediate refresh with force refresh
     await fetchContributors(true);
 
-    // If external API is slow to update, retry with delays
+    // Single retry after 3 seconds if external API needs time to update
     setTimeout(() => {
-      console.log("Retry 1: Fetching contributors after 2 seconds...");
+      console.log("Final refresh after 3 seconds...");
       fetchContributors(true);
-    }, 2000);
-
-    setTimeout(() => {
-      console.log("Retry 2: Fetching contributors after 5 seconds...");
-      fetchContributors(true);
-      setIsRefreshingAfterTransaction(false); // Stop showing refresh indicator after final retry
-    }, 5000);
+      setIsRefreshingAfterTransaction(false); // Stop showing refresh indicator
+    }, 3000);
   }, [fetchContributors]);
 
   useEffect(() => {
     fetchContributors();
-    // Refresh contributors every 20 seconds
-    const interval = setInterval(fetchContributors, 20000);
+    // Refresh contributors every 2 minutes
+    // The API has a 5-minute cache, so this ensures reasonably fresh data
+    // while dramatically reducing API calls
+    const interval = setInterval(fetchContributors, 120000);
     return () => clearInterval(interval);
   }, [fetchContributors]);
 
