@@ -116,6 +116,98 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
         isMiniAppView ? "mt-0" : "mt-16 md:mt-0"
       }`}
     >
+      {/* Share Dropdown - Top Right Corner */}
+      {onShare && (
+        <div className="dropdown dropdown-end absolute -top-2 -right-2 z-20">
+          <div
+            tabIndex={0}
+            role="button"
+            className="btn btn-outline btn-sm border-primary/10 hover:bg-primary/10 bg-base-100"
+            title="Share options"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"
+              />
+            </svg>
+            Share
+          </div>
+          <ul
+            tabIndex={0}
+            className="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow border border-base-300"
+          >
+            <li>
+              <button onClick={onShare} className="flex items-center gap-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    fill="#845FC9"
+                    d="M18.24.24H5.76A5.76 5.76 0 0 0 0 6v12a5.76 5.76 0 0 0 5.76 5.76h12.48A5.76 5.76 0 0 0 24 18V6A5.76 5.76 0 0 0 18.24.24m.816 17.166v.504a.49.49 0 0 1 .543.48v.568h-5.143v-.569A.49.49 0 0 1 15 17.91v-.504c0-.22.153-.402.358-.458l-.01-4.364c-.158-1.737-1.64-3.098-3.443-3.098s-3.285 1.361-3.443 3.098l-.01 4.358c.228.042.532.208.54.464v.504a.49.49 0 0 1 .543.48v.568H4.392v-.569a.49.49 0 0 1 .543-.479v-.504c0-.253.201-.454.454-.472V9.039h-.49l-.61-2.031H6.93V5.042h9.95v1.966h2.822l-.61 2.03h-.49v7.896c.252.017.453.22.453.472"
+                  />
+                </svg>
+                Share on Farcaster
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={handleShareLink}
+                className={`flex items-center gap-2 ${
+                  shareSuccess ? "text-success" : ""
+                }`}
+              >
+                {shareSuccess ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"
+                    />
+                  </svg>
+                )}
+                {shareSuccess ? "Copied!" : "Copy Link"}
+              </button>
+            </li>
+          </ul>
+        </div>
+      )}
       {/* Token Header */}
       <div className="flex items-center gap-4 flex-wrap">
         {token.img_url ? (
@@ -136,7 +228,10 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
           <h2 className="text-xl font-bold">{token.name}</h2>
           <div className="flex items-center gap-2">
             <span className="text-sm opacity-60">
-              ${token.symbol?.startsWith("$") ? token.symbol.substring(1) : token.symbol}
+              $
+              {token.symbol?.startsWith("$")
+                ? token.symbol.substring(1)
+                : token.symbol}
             </span>
           </div>
         </div>
@@ -154,7 +249,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
                 <div className="w-4 h-4 rounded-full">
                   <Image
                     src={
-                      token.creator.profileImage?.trim() 
+                      token.creator.profileImage?.trim()
                         ? token.creator.profileImage
                         : token.img_url || `/avatars/${token.creator.name}.avif`
                     }
@@ -168,9 +263,9 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
             </ExternalLink>
             {token.cast_hash && (
               <ExternalLink
-                href={`https://farcaster.xyz/${token.creator.name}/${shortenHash(
-                  token.cast_hash
-                )}`}
+                href={`https://farcaster.xyz/${
+                  token.creator.name
+                }/${shortenHash(token.cast_hash)}`}
                 className="hover:text-primary inline-flex items-center"
                 title="View original cast"
               >
@@ -197,7 +292,10 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
               </div>
             </div>
             <span className="text-sm">
-              {`${token.contract_address.slice(0, 6)}...${token.contract_address.slice(-4)}`}
+              {`${token.contract_address.slice(
+                0,
+                6
+              )}...${token.contract_address.slice(-4)}`}
             </span>
           </div>
         )}
@@ -260,70 +358,51 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
           </div>
         </div>
       </div>
-      {/* Share Buttons */}
-      {onShare && (
+
+      {/* Website Link for BUTTHOLE token */}
+      {token.contract_address.toLowerCase() ===
+        "0x1c4f69f14cf754333c302246d25a48a13224118a" && (
         <div className="flex mt-2 -ml-1 gap-2 flex-wrap">
           <button
-            onClick={onShare}
+            onClick={() => openExternalUrl("https://butthole.stream")}
             className="btn btn-outline btn-sm border-primary/10 flex items-center gap-2 hover:bg-primary/10"
+            title="Visit official website"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"
               height="16"
+              fill="none"
               viewBox="0 0 24 24"
+              stroke="currentColor"
             >
               <path
-                fill="#845FC9"
-                d="M18.24.24H5.76A5.76 5.76 0 0 0 0 6v12a5.76 5.76 0 0 0 5.76 5.76h12.48A5.76 5.76 0 0 0 24 18V6A5.76 5.76 0 0 0 18.24.24m.816 17.166v.504a.49.49 0 0 1 .543.48v.568h-5.143v-.569A.49.49 0 0 1 15 17.91v-.504c0-.22.153-.402.358-.458l-.01-4.364c-.158-1.737-1.64-3.098-3.443-3.098s-3.285 1.361-3.443 3.098l-.01 4.358c.228.042.532.208.54.464v.504a.49.49 0 0 1 .543.48v.568H4.392v-.569a.49.49 0 0 1 .543-.479v-.504c0-.253.201-.454.454-.472V9.039h-.49l-.61-2.031H6.93V5.042h9.95v1.966h2.822l-.61 2.03h-.49v7.896c.252.017.453.22.453.472"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 9c-5 0-9-4-9-9s4-9 9-9"
               />
             </svg>
-            Share on Farcaster
+            Website
           </button>
 
           <button
-            onClick={handleShareLink}
-            className={`btn btn-outline btn-sm border-primary/10 flex items-center gap-2 transition-all duration-200 ${
-              shareSuccess
-                ? "border-success text-success hover:bg-success/10"
-                : "hover:bg-primary/10"
-            }`}
-            title={shareSuccess ? "Link copied!" : "Copy page link"}
+            onClick={() => openExternalUrl("https://x.com/BUTTHOLE_HQ")}
+            className="btn btn-outline btn-sm border-primary/10 flex items-center gap-2 hover:bg-primary/10"
+            title="Follow on X (Twitter)"
           >
-            {shareSuccess ? (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            ) : (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"
-                />
-              </svg>
-            )}
-            {shareSuccess ? "Copied!" : "Share Link"}
+            <svg
+              stroke="currentColor"
+              fill="currentColor"
+              strokeWidth="0"
+              role="img"
+              viewBox="0 0 24 24"
+              className="w-2 h-2"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"></path>
+            </svg>
+            @BUTTHOLE_HQ
           </button>
         </div>
       )}

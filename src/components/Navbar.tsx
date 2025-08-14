@@ -103,8 +103,8 @@ export function Navbar() {
               {isDark ? (
                 <Image
                   src="/streme-text-white.svg"
-                  width={180}
-                  height={26}
+                  width={160}
+                  height={23}
                   alt="Streme"
                   onClick={handleLogoClick}
                   className="cursor-pointer"
@@ -113,8 +113,8 @@ export function Navbar() {
               ) : (
                 <Image
                   src="/streme-text-black.svg"
-                  width={180}
-                  height={26}
+                  width={160}
+                  height={23}
                   alt="Streme"
                   onClick={handleLogoClick}
                   className="cursor-pointer"
