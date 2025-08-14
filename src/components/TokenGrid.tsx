@@ -239,9 +239,9 @@ const TokenCardComponent = ({
                           token.creator?.profileImage &&
                           token.creator.profileImage.trim() !== ""
                             ? token.creator.profileImage
-                            : `/avatars/${token.creator?.name ?? "streme"}.png`
+                            : token.img_url || `/avatars/${token.creator?.name?.trim() || "streme"}.png`
                         }
-                        alt={token.creator?.name ?? "Anon"}
+                        alt={token.creator?.name || `${token.contract_address.slice(0, 6)}...${token.contract_address.slice(-4)}`}
                         width={16}
                         height={16}
                         sizes="16px"
@@ -249,7 +249,9 @@ const TokenCardComponent = ({
                           (token.creator?.profileImage?.includes(".gif") ||
                             token.creator?.profileImage?.includes(
                               "imagedelivery.net"
-                            )) ??
+                            ) ||
+                            token.img_url?.includes(".gif") ||
+                            token.img_url?.includes("imagedelivery.net")) ??
                           false
                         }
                       />
@@ -258,11 +260,11 @@ const TokenCardComponent = ({
                   <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2 max-w-[120px]">
                     <span
                       className="truncate"
-                      title={token.creator?.name ?? "Anon"}
+                      title={token.creator?.name?.trim() || `${token.contract_address.slice(0, 6)}...${token.contract_address.slice(-4)}`}
                     >
-                      {token.creator?.name ?? "Anon"}
+                      {token.creator?.name?.trim() || `${token.contract_address.slice(0, 6)}...${token.contract_address.slice(-4)}`}
                     </span>
-                    {token.cast_hash && token.creator?.name && (
+                    {token.cast_hash && token.creator?.name?.trim() && (
                       <button
                         onClick={handleFarcasterClick}
                         className="hover:text-primary inline-flex items-center ml-auto cursor-pointer"

@@ -143,46 +143,65 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
       </div>
 
       {/* Creator Information */}
-      {token.creator && (
-        <div className="flex items-center gap-2 ml-1">
-          <ExternalLink
-            href={`https://farcaster.xyz/${token.creator.name}`}
-            className="text-base opacity-60 hover:opacity-100 hover:underline flex gap-2 items-center"
-          >
+      <div className="flex items-center gap-2 ml-1">
+        {token.creator?.name?.trim() ? (
+          <>
+            <ExternalLink
+              href={`https://farcaster.xyz/${token.creator.name}`}
+              className="text-base opacity-60 hover:opacity-100 hover:underline flex gap-2 items-center"
+            >
+              <div className="avatar">
+                <div className="w-4 h-4 rounded-full">
+                  <Image
+                    src={
+                      token.creator.profileImage?.trim() 
+                        ? token.creator.profileImage
+                        : token.img_url || `/avatars/${token.creator.name}.avif`
+                    }
+                    alt={token.creator.name}
+                    width={24}
+                    height={24}
+                  />
+                </div>
+              </div>
+              {token.creator.name}
+            </ExternalLink>
+            {token.cast_hash && (
+              <ExternalLink
+                href={`https://farcaster.xyz/${token.creator.name}/${shortenHash(
+                  token.cast_hash
+                )}`}
+                className="hover:text-primary inline-flex items-center"
+                title="View original cast"
+              >
+                <Image
+                  src={FarcasterIcon}
+                  alt="View on Farcaster"
+                  width={14}
+                  height={14}
+                  className="opacity-60 hover:opacity-100"
+                />
+              </ExternalLink>
+            )}
+          </>
+        ) : (
+          <div className="text-base opacity-60 flex gap-2 items-center">
             <div className="avatar">
               <div className="w-4 h-4 rounded-full">
                 <Image
-                  src={
-                    token.creator.profileImage ??
-                    `/avatars/${token.creator.name}.avif`
-                  }
-                  alt={token.creator.name}
+                  src={token.img_url || `/avatars/streme.png`}
+                  alt="Creator"
                   width={24}
                   height={24}
                 />
               </div>
             </div>
-            {token.creator.name}
-          </ExternalLink>
-          {token.cast_hash && (
-            <ExternalLink
-              href={`https://farcaster.xyz/${token.creator.name}/${shortenHash(
-                token.cast_hash
-              )}`}
-              className="hover:text-primary inline-flex items-center"
-              title="View original cast"
-            >
-              <Image
-                src={FarcasterIcon}
-                alt="View on Farcaster"
-                width={14}
-                height={14}
-                className="opacity-60 hover:opacity-100"
-              />
-            </ExternalLink>
-          )}
-        </div>
-      )}
+            <span className="text-sm">
+              {`${token.contract_address.slice(0, 6)}...${token.contract_address.slice(-4)}`}
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* Price Row */}
       <div className="flex items-end justify-between px-1">
