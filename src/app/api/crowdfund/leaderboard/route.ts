@@ -162,10 +162,10 @@ export async function GET(request: Request) {
           { status: apiResponse.status }
         );
       }
-    } catch (error: any) {
+    } catch (error) {
       clearTimeout(timeoutId);
       
-      if (error.name === 'AbortError') {
+      if ((error as Error).name === 'AbortError') {
         console.error(`External API timeout after ${API_TIMEOUT/1000} seconds`);
         
         // Always return cached data if available on timeout (even if stale)
