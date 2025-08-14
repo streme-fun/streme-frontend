@@ -110,7 +110,7 @@ export async function GET(
             backgroundImage: backgroundDataUrl
               ? `url(${backgroundDataUrl})`
               : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            backgroundSize: "cover",
+            backgroundSize: "100% 100%",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
             gap: "20px",
@@ -129,10 +129,10 @@ export async function GET(
               <img
                 src={token.img_url}
                 alt={token.name}
-                width="700"
-                height="700"
+                width="500"
+                height="500"
                 style={{
-                  borderRadius: "50%",
+                  borderRadius: "10%",
                   objectFit: "cover",
                   backgroundColor: "white",
                   border: "4px solid rgba(255, 255, 255, 0.9)",
