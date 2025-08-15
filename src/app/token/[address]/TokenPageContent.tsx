@@ -266,7 +266,7 @@ ${shareUrl}`;
       : `https://www.geckoterminal.com/base/pools/${token.pool_address}?embed=1&info=0&swaps=0&grayscale=0&light_chart=0`;
 
   return (
-    <div className="max-w-[1440px] mx-auto sm:px-6 md:px-8 md:mt-20 pt-8 pb-12">
+    <div className="max-w-[1440px] mx-auto sm:px-6 md:px-8 md:mt-0 pt-28 pb-12">
       {/* Back Arrow Button - Only show in mini app */}
       {isMiniAppView && (
         <div className="mb-4">
@@ -343,7 +343,7 @@ ${shareUrl}`;
           <ClaimFeesButton tokenAddress={token.contract_address} />
         </div>
 
-        <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit">
+        <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit lg:sticky lg:top-28">
           <div className="card-body p-0 md:p-4 pb-12">
             <iframe
               data-privy-ignore
