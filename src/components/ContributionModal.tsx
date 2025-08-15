@@ -112,9 +112,10 @@ export function ContributionModal({
 
   return (
     <div
-      className={`fixed inset-0 z-50 ${
+      className={`fixed inset-0 ${
         isMiniApp ? "flex items-end" : "flex items-center justify-center"
       }`}
+      style={{ zIndex: 10000 }}
     >
       {/* Subtle backdrop for click-to-close */}
       <div
