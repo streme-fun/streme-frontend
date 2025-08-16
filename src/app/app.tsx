@@ -22,7 +22,6 @@ import { CheckinSuccessModal } from "../components/CheckinSuccessModal";
 import { useCheckinModal } from "../hooks/useCheckinModal";
 import sdk from "@farcaster/miniapp-sdk";
 
-
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,8 +37,6 @@ function App() {
   const [hasSkippedTutorial, setHasSkippedTutorial] = useState(false);
   const [hasShownTutorialThisSession, setHasShownTutorialThisSession] =
     useState(false);
-
-
 
   // Load tutorial skip state from localStorage on mount
   useEffect(() => {
@@ -81,9 +78,9 @@ function App() {
   // This is now handled through the global navigation in ClientLayout
   useEffect(() => {
     // Set up debug mode if needed for testing
-    if (isMiniAppView && typeof window !== 'undefined') {
+    if (isMiniAppView && typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('debug') === 'true') {
+      if (urlParams.get("debug") === "true") {
         setShowDebugButton(true);
       }
     }
@@ -155,7 +152,6 @@ function App() {
   }, [checkinData, checkinError]);
 
   // Debug mode activation is now handled directly via handleLogoClick
-
 
   // Fixed iterative pagination instead of recursive
   const fetchTokens = useCallback(async () => {
@@ -404,12 +400,11 @@ function App() {
   if (isMiniAppView) {
     return (
       <div className="font-[family-name:var(--font-geist-sans)]">
-
         <div className="flex flex-col gap-2 row-start-2 w-full p-4">
-          {/* Streaming Experiments Section */}
+          {/* Featured Crowdfunds Section */}
           <div className="w-full max-w-md mb-4">
             <h3 className="font-semibold text-base-content mb-2">
-              Streme Experiments
+              Featured Crowdfunds
             </h3>
             <Link href="/crowdfund">
               <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/30 transition-all duration-200">
@@ -531,7 +526,6 @@ function App() {
           <HeroAnimationMini />
         </div> */}
 
-
         {/* Tutorial Modal */}
         <MiniAppTutorialModal
           isOpen={showTutorialModal}
@@ -557,7 +551,6 @@ function App() {
           totalCheckins={checkinData?.totalCheckins}
           currentStreak={checkinData?.currentStreak}
         />
-
       </div>
     );
   }
@@ -569,10 +562,10 @@ function App() {
         <div className="flex flex-col row-start-2 w-full items-center">
           <Hero />
 
-          {/* Streaming Experiments Section */}
+          {/* Featured Crowdfunds Section */}
           <div className="w-full max-w-[1200px] px-4 my-12 mx-auto">
             <h3 className="font-semibold text-base-content mb-4 text-xl">
-              Streme Experiments
+              Featured Crowdfunds
             </h3>
             <Link href="/crowdfund">
               <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden max-w-md cursor-pointer hover:shadow-lg hover:border-primary/30 transition-all duration-200">
@@ -646,7 +639,6 @@ function App() {
         onClose={handleCloseTutorial}
         onSkip={handleSkipTutorial}
       />
-
     </>
   );
 }
