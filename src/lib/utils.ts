@@ -73,6 +73,15 @@ export async function getFarcasterMetadata(): Promise<FrameManifest> {
     try {
       const metadata = JSON.parse(process.env.FRAME_METADATA);
       console.log('Using pre-signed frame metadata from environment. Keys:', Object.keys(metadata));
+      
+      // Add baseBuilder if BASE_BUILDER_ADDRESS is set and not already in metadata
+      if (process.env.BASE_BUILDER_ADDRESS && !metadata.baseBuilder) {
+        metadata.baseBuilder = {
+          allowedAddresses: [process.env.BASE_BUILDER_ADDRESS]
+        };
+        console.log('Added baseBuilder to existing metadata with address:', process.env.BASE_BUILDER_ADDRESS);
+      }
+      
       return metadata;
     } catch (error) {
       console.error('Failed to parse FRAME_METADATA from environment. Raw value length:', process.env.FRAME_METADATA.length);
