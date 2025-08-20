@@ -26,6 +26,9 @@ interface FrameManifest {
     signature: string;
   };
   frame: FrameMetadata;
+  baseBuilder?: {
+    allowedAddresses: string[];
+  };
 }
 
 export function cn(...inputs: ClassValue[]) {
@@ -69,11 +72,14 @@ export async function getFarcasterMetadata(): Promise<FrameManifest> {
   if (process.env.FRAME_METADATA) {
     try {
       const metadata = JSON.parse(process.env.FRAME_METADATA);
-      console.log('Using pre-signed frame metadata from environment');
+      console.log('Using pre-signed frame metadata from environment. Keys:', Object.keys(metadata));
       return metadata;
     } catch (error) {
-      console.warn('Failed to parse FRAME_METADATA from environment:', error);
+      console.error('Failed to parse FRAME_METADATA from environment. Raw value length:', process.env.FRAME_METADATA.length);
+      console.error('Parse error:', error);
     }
+  } else {
+    console.log('No FRAME_METADATA env var found, generating manifest dynamically');
   }
 
   if (!APP_URL) {
@@ -119,7 +125,7 @@ export async function getFarcasterMetadata(): Promise<FrameManifest> {
     };
   }
 
-  return {
+  const manifest: FrameManifest = {
     accountAssociation,
     frame: {
       version: "1",
@@ -136,4 +142,14 @@ export async function getFarcasterMetadata(): Promise<FrameManifest> {
       tags: APP_TAGS,
     },
   };
+
+  // Add baseBuilder info if BASE_BUILDER_ADDRESS is set
+  if (process.env.BASE_BUILDER_ADDRESS) {
+    manifest.baseBuilder = {
+      allowedAddresses: [process.env.BASE_BUILDER_ADDRESS]
+    };
+    console.log('Added baseBuilder with address:', process.env.BASE_BUILDER_ADDRESS);
+  }
+
+  return manifest;
 }
