@@ -3,7 +3,7 @@
 import { Modal } from "./Modal";
 import { useState } from "react";
 import { TutorialStreamingAnimation } from "./TutorialStreamingAnimation";
-import { CrowdfundAnimation } from "./CrowdfundAnimation";
+import { GrowthFundAnimation } from "./GrowthFundAnimation";
 
 interface MiniAppTutorialModalProps {
   isOpen: boolean;
@@ -45,7 +45,7 @@ export function MiniAppTutorialModal({
       title: "Stake to earn rewards",
       content: (
         <div className="space-y-4">
-          <CrowdfundAnimation contributorCount={25} growthRate={2.5} />
+          <GrowthFundAnimation contributorCount={25} growthRate={2.5} />
 
           <p className="text-base text-base-content/80">
             20% of each token&apos;s total supply is allocated to the rewards
