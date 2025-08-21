@@ -3,7 +3,7 @@
 import { Modal } from "./Modal";
 import { useState } from "react";
 import { TutorialStreamingAnimation } from "./TutorialStreamingAnimation";
-import { GrowthFundAnimation } from "./GrowthFundAnimation";
+import { CrowdfundAnimation } from "./CrowdfundAnimation";
 
 interface MiniAppTutorialModalProps {
   isOpen: boolean;
@@ -26,12 +26,16 @@ export function MiniAppTutorialModal({
           <TutorialStreamingAnimation />
 
           <p className="text-base text-base-content/80">
-            Launch Base ERC-20 tokens on Uniswap with built-in streaming and
-            staking.
+            🚀 Launch a Base ERC-20 token with built-in staking and Superfluid
+            streaming.
           </p>
 
           <p className="text-base text-base-content/80">
-            Earn 40% of fees on every swap. Claimable anytime.
+            🌊 20% of the total supply is streamed to stakers over 365 days.
+          </p>
+
+          <p className="text-base text-base-content/80">
+            💰 Earn 40% of fees on every swap.
           </p>
         </div>
       ),
@@ -41,14 +45,16 @@ export function MiniAppTutorialModal({
       title: "Stake to earn rewards",
       content: (
         <div className="space-y-4">
-          <GrowthFundAnimation contributorCount={25} growthRate={2.5} />
+          <CrowdfundAnimation contributorCount={25} growthRate={2.5} />
 
+          <p className="text-base text-base-content/80">
+            20% of each token&apos;s total supply is allocated to the rewards
+            pool, distributed over 365 days proportionally to stakers (24h lock
+            after staking).
+          </p>
           <p className="text-base text-base-content/80">
             Stake any token launched on Streme to earn rewards in that token
             streamed to your wallet every second.
-          </p>
-          <p className="text-base text-base-content/80">
-            The more you stake, the more you earn.
           </p>
         </div>
       ),
