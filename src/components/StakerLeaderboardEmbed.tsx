@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useSafeWallets, useSafePrivy } from "../hooks/useSafePrivy";
 import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
@@ -534,12 +535,12 @@ export function StakerLeaderboardEmbed({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium">
-                        <a
+                        <Link
                           href="/crowdfund"
                           className="hover:underline text-secondary"
                         >
                           Crowdfund
-                        </a>
+                        </Link>
                       </div>
                     </div>
                   </>
