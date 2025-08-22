@@ -8,16 +8,24 @@ interface Contributor {
   percentage?: number;
 }
 
-// In-memory cache for leaderboard data
-let cache: {
+// In-memory cache for leaderboard data (per contract)
+const caches: Map<string, {
   data: Contributor[] | null;
   timestamp: number;
   isRefreshing: boolean;
-} = {
-  data: null,
-  timestamp: 0,
-  isRefreshing: false,
-};
+}> = new Map();
+
+// Get or create cache for a specific contract
+function getCache(contractAddress: string = 'default') {
+  if (!caches.has(contractAddress)) {
+    caches.set(contractAddress, {
+      data: null,
+      timestamp: 0,
+      isRefreshing: false,
+    });
+  }
+  return caches.get(contractAddress)!;
+}
 
 // Cache duration: 5 minutes (significantly reduce external API calls)
 const CACHE_DURATION = 5 * 60 * 1000;
@@ -27,7 +35,9 @@ const API_TIMEOUT = 5 * 1000;
 const CACHE_REFRESH_THRESHOLD = 4 * 60 * 1000; // Start trying to refresh at 4 minutes
 
 // Background refresh function
-async function refreshCacheInBackground() {
+async function refreshCacheInBackground(apiUrl: string, contractAddress: string = 'default') {
+  const cache = getCache(contractAddress);
+  
   // Don't refresh if already refreshing
   if (cache.isRefreshing) {
     console.log("Already refreshing in background, skipping...");
@@ -41,7 +51,7 @@ async function refreshCacheInBackground() {
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
     
     const apiResponse = await fetch(
-      `https://api.streme.fun/api/qr/members`,
+      apiUrl,
       {
         signal: controller.signal,
         next: { revalidate: 30 }
@@ -55,11 +65,8 @@ async function refreshCacheInBackground() {
       const mergedContributors = mergeContributorsByUsername(data);
       const contributorsWithPercentages = calculatePercentages(mergedContributors);
       
-      cache = {
-        data: contributorsWithPercentages,
-        timestamp: Date.now(),
-        isRefreshing: false,
-      };
+      cache.data = contributorsWithPercentages;
+      cache.timestamp = Date.now();
       
       console.log("Background refresh successful");
     }
@@ -71,11 +78,33 @@ async function refreshCacheInBackground() {
 }
 
 export async function GET(request: Request) {
+  // Check parameters at function level
+  const { searchParams } = new URL(request.url);
+  const forceRefresh = searchParams.get("force") === "true";
+  const contractAddress = searchParams.get("contract");
+  
   try {
-    // Check if we have a force refresh parameter
-    const { searchParams } = new URL(request.url);
-    const forceRefresh = searchParams.get("force") === "true";
     
+    // Determine API endpoint based on contract address
+    const getApiUrl = (contract?: string | null) => {
+      // BUTTHOLE contract
+      if (contract === "0xff252Cf5BeB25ab533f2969A447D6b3b00CF052f") {
+        // For now, return empty array for BUTTHOLE as there's no specific API yet
+        return null;
+      }
+      // Default to STREME API
+      return "https://api.streme.fun/api/qr/members";
+    };
+    
+    const apiUrl = getApiUrl(contractAddress);
+    
+    // If no API URL, return empty array
+    if (!apiUrl) {
+      console.log(`No API available for contract: ${contractAddress}`);
+      return NextResponse.json([]);
+    }
+    
+    const cache = getCache(contractAddress || 'default');
     const now = Date.now();
     const cacheAge = now - cache.timestamp;
     
@@ -88,7 +117,7 @@ export async function GET(request: Request) {
         if (cacheAge > CACHE_REFRESH_THRESHOLD) {
           console.log("Cache is old, attempting background refresh...");
           // Fire and forget background refresh (don't await)
-          refreshCacheInBackground();
+          refreshCacheInBackground(apiUrl, contractAddress || 'default');
         }
         
         const response = NextResponse.json(cache.data);
@@ -108,7 +137,7 @@ export async function GET(request: Request) {
     
     try {
       const apiResponse = await fetch(
-        `https://api.streme.fun/api/qr/members`,
+        apiUrl,
         {
           signal: controller.signal,
           // Allow Next.js to cache for 30 seconds
@@ -129,11 +158,9 @@ export async function GET(request: Request) {
         const contributorsWithPercentages = calculatePercentages(mergedContributors);
         
         // Update cache
-        cache = {
-          data: contributorsWithPercentages,
-          timestamp: now,
-          isRefreshing: false,
-        };
+        cache.data = contributorsWithPercentages;
+        cache.timestamp = now;
+        cache.isRefreshing = false;
         
         const response = NextResponse.json(contributorsWithPercentages);
         // Set cache headers to allow browser caching
@@ -169,9 +196,10 @@ export async function GET(request: Request) {
         console.error(`External API timeout after ${API_TIMEOUT/1000} seconds`);
         
         // Always return cached data if available on timeout (even if stale)
-        if (cache.data) {
+        const timeoutCache = getCache(contractAddress || 'default');
+        if (timeoutCache.data) {
           console.log("Returning stale cache due to timeout");
-          const response = NextResponse.json(cache.data);
+          const response = NextResponse.json(timeoutCache.data);
           response.headers.set(
             "Cache-Control",
             "public, max-age=60, stale-while-revalidate=240"
@@ -190,9 +218,10 @@ export async function GET(request: Request) {
     console.error("Error fetching contributors:", error);
     
     // Last resort: return cached data if available
-    if (cache.data) {
+    const errorCache = getCache(contractAddress || 'default');
+    if (errorCache.data) {
       console.log("Returning stale cache due to error");
-      const response = NextResponse.json(cache.data);
+      const response = NextResponse.json(errorCache.data);
       response.headers.set(
         "Cache-Control",
         "public, max-age=10, stale-while-revalidate=30"

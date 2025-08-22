@@ -9,6 +9,7 @@ import FarcasterIcon from "@/public/farcaster.svg";
 import { Token } from "../app/types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
+import { CROWDFUND_TOKEN_ADDRESSES } from "@/src/lib/crowdfundTokens";
 
 interface TokenGridProps {
   tokens: Token[];
@@ -17,7 +18,12 @@ interface TokenGridProps {
   isMiniApp?: boolean;
 }
 
-export type SortOption = "stakers" | "newest" | "oldest" | "trending";
+export type SortOption =
+  | "stakers"
+  | "newest"
+  | "oldest"
+  | "trending"
+  | "crowdfunds";
 
 // Interface for the streme.fun API response
 interface StremeTokenResponse {
@@ -63,8 +69,8 @@ interface StremeTokenResponse {
   lastTraded?: { _seconds: number; _nanoseconds: number };
 }
 
-// Function to fetch trending tokens from the streme.fun API
-const fetchTrendingTokens = async (): Promise<Token[]> => {
+// Function to fetch trending tokens from the streme.fun API (exported for carousel)
+export const fetchTrendingTokens = async (): Promise<Token[]> => {
   try {
     const response = await fetch("/api/tokens/trending");
     if (!response.ok) {
@@ -114,6 +120,331 @@ const fetchTrendingTokens = async (): Promise<Token[]> => {
     console.error("Error fetching trending tokens:", error);
     return [];
   }
+};
+
+// Trending Token Carousel Card Component (exported for carousel)
+export const TrendingTokenCard = ({
+  token,
+}: {
+  token: Token & { rewards?: number; totalStakers?: number };
+}) => {
+  const formatMarketCap = (marketCap: number | undefined) => {
+    if (!marketCap) return "-";
+    if (marketCap >= 1000000) return `${(marketCap / 1000000).toFixed(1)}M`;
+    if (marketCap >= 1000) return `${(marketCap / 1000).toFixed(1)}K`;
+    return marketCap.toFixed(0);
+  };
+
+  const formatVolume = (volume: number | undefined) => {
+    if (!volume) return "-";
+    if (volume >= 1000) return `${(volume / 1000).toFixed(1)}k`;
+    return volume.toFixed(0);
+  };
+
+  return (
+    <Link href={`/token/${token.contract_address}`}>
+      <div className="relative bg-base-100 rounded-xl border border-base-300 overflow-hidden ease-out transition-all duration-300 cursor-pointer group">
+        {/* Token Image */}
+        <div className="relative aspect-square bg-gradient-to-br from-primary/10 to-secondary/10">
+          {token.img_url ? (
+            <Image
+              src={token.img_url}
+              alt={token.name}
+              fill
+              className="object-cover"
+              unoptimized={
+                token.img_url.includes(".gif") ||
+                token.img_url.includes("imagedelivery.net")
+              }
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-primary">
+              ${token.symbol}
+            </div>
+          )}
+
+          {/* Semi-transparent gradient overlay - darker at bottom - only for images */}
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-black/5 to-transparent" />
+
+          {/* Verified badge */}
+          {(token.contract_address.toLowerCase() ===
+            "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58" ||
+            token.contract_address.toLowerCase() ===
+              "0x1c4f69f14cf754333c302246d25a48a13224118a" ||
+            token.contract_address.toLowerCase() ===
+              "0x063eda1b84ceaf79b8cc4a41658b449e8e1f9eeb") && (
+            <div
+              className="absolute top-2 left-2 bg-blue-500/90 backdrop-blur-sm rounded-full p-1 flex items-center justify-center z-10"
+              title="Verified Token"
+            >
+              <svg
+                className="w-4 h-4 text-white"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+          )}
+
+          {/* Creator avatar overlay */}
+          {token.creator &&
+            token.creator.name &&
+            token.creator.name.trim() &&
+            token.creator.name.toLowerCase() !== "anon" && (
+              <div className="absolute bottom-2 left-2 flex items-center gap-2 z-10">
+                <div className="avatar">
+                  <div className="w-6 h-6 rounded-full">
+                    <Image
+                      src={
+                        token.creator.profileImage?.trim()
+                          ? token.creator.profileImage
+                          : token.img_url ||
+                            `/avatars/${token.creator.name.trim()}.png`
+                      }
+                      alt={token.creator.name}
+                      width={24}
+                      height={24}
+                    />
+                  </div>
+                </div>
+                <span className="text-xs font-medium text-white drop-shadow-lg">
+                  @{token.creator.name}
+                </span>
+              </div>
+            )}
+        </div>
+
+        {/* Token Info */}
+        <div className="p-3 space-y-2">
+          {/* Token Name and Symbol on same line */}
+          <div className="flex items-baseline gap-2">
+            <h3 className="font-bold text-base truncate">{token.name}</h3>
+            <p className="text-xs opacity-60 uppercase flex-shrink-0">
+              {token.symbol}
+            </p>
+          </div>
+
+          {/* Stats in one row */}
+          <div className="flex items-center justify-between gap-3">
+            {/* Market Cap */}
+            <div className="flex flex-col">
+              <p className="text-[10px] opacity-60 uppercase">MCAP</p>
+              <p className="font-mono font-bold text-sm">
+                ${formatMarketCap(token.marketCap)}
+              </p>
+            </div>
+
+            {/* 24h Volume */}
+            <div className="flex flex-col">
+              <p className="text-[10px] opacity-60 uppercase">24H</p>
+              <p className="font-mono text-sm">
+                ${formatVolume(token.volume24h)}
+              </p>
+            </div>
+
+            {/* 24h Change */}
+            <div className="flex flex-col">
+              <p className="text-[10px] opacity-60 uppercase">24H Δ</p>
+              <p
+                className={`font-mono font-bold text-sm ${
+                  token.change24h && token.change24h >= 0
+                    ? "text-green-500"
+                    : "text-red-500"
+                }`}
+              >
+                {token.change24h
+                  ? `${
+                      token.change24h >= 0 ? "+" : ""
+                    }${token.change24h.toFixed(1)}%`
+                  : "-"}
+              </p>
+            </div>
+          </div>
+
+          {/* Trade Button and Crowdfund link */}
+          <div className="flex gap-2 pt-2">
+            {/* Show Crowdfund button for STREME and BUTTHOLE tokens */}
+            {token.contract_address.toLowerCase() ===
+              "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58" ||
+            token.contract_address.toLowerCase() ===
+              "0x1c4f69f14cf754333c302246d25a48a13224118a" ? (
+              <>
+                <button className="btn btn-sm btn-outline btn-primary flex-1">
+                  Trade
+                </button>
+                <Link
+                  href={
+                    token.contract_address.toLowerCase() ===
+                    "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58"
+                      ? "/crowdfund/0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58"
+                      : "/crowdfund/0x1c4f69f14cf754333c302246d25a48a13224118a"
+                  }
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1"
+                >
+                  <button className="btn btn-sm btn-outline w-full relative btn-accent">
+                    Crowdfund
+                  </button>
+                </Link>
+              </>
+            ) : (
+              <button className="btn btn-primary btn-outline btn-sm w-full">
+                Trade
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+};
+
+// Trending Tokens Carousel Component (exported for use in app.tsx)
+export const TrendingTokensCarousel = ({
+  tokens,
+  isMiniApp = false,
+}: {
+  tokens: Array<Token & { rewards?: number; totalStakers?: number }>;
+  isMiniApp?: boolean;
+}) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const checkScrollButtons = () => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } =
+        scrollContainerRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  useEffect(() => {
+    checkScrollButtons();
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.addEventListener("scroll", checkScrollButtons);
+      window.addEventListener("resize", checkScrollButtons);
+
+      return () => {
+        container.removeEventListener("scroll", checkScrollButtons);
+        window.removeEventListener("resize", checkScrollButtons);
+      };
+    }
+  }, [tokens]);
+
+  const scroll = (direction: "left" | "right") => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = isMiniApp ? 335 : 400;
+      const currentScroll = scrollContainerRef.current.scrollLeft;
+      const targetScroll =
+        direction === "left"
+          ? currentScroll - scrollAmount
+          : currentScroll + scrollAmount;
+
+      scrollContainerRef.current.scrollTo({
+        left: targetScroll,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  if (!tokens || tokens.length === 0) return null;
+
+  return (
+    <div className="mb-2 sm:mb-6">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-xl font-bold">Trending</h2>
+        <div className="flex gap-2 z-10 relative">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log("Left scroll clicked");
+              scroll("left");
+            }}
+            disabled={!canScrollLeft}
+            className={`btn btn-circle btn-sm hover:btn-primary ${
+              !canScrollLeft ? "btn-disabled opacity-50" : "btn-ghost"
+            }`}
+            aria-label="Scroll left"
+            type="button"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log("Right scroll clicked");
+              scroll("right");
+            }}
+            disabled={!canScrollRight}
+            className={`btn btn-circle btn-sm hover:btn-primary ${
+              !canScrollRight ? "btn-disabled opacity-50" : "btn-ghost"
+            }`}
+            aria-label="Scroll right"
+            type="button"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="relative">
+        <div
+          ref={scrollContainerRef}
+          className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 [&::-webkit-scrollbar]:hidden"
+          style={{
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
+        >
+          {tokens.slice(0, 10).map((token) => (
+            <div
+              key={token.contract_address}
+              className={`flex-none ${isMiniApp ? "w-full" : "w-56"}`}
+            >
+              <TrendingTokenCard token={token} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const TokenCardComponent = ({
@@ -239,9 +570,18 @@ const TokenCardComponent = ({
                           token.creator?.profileImage &&
                           token.creator.profileImage.trim() !== ""
                             ? token.creator.profileImage
-                            : token.img_url || `/avatars/${token.creator?.name?.trim() || "streme"}.png`
+                            : token.img_url ||
+                              `/avatars/${
+                                token.creator?.name?.trim() || "streme"
+                              }.png`
                         }
-                        alt={token.creator?.name || `${token.contract_address.slice(0, 6)}...${token.contract_address.slice(-4)}`}
+                        alt={
+                          token.creator?.name ||
+                          `${token.contract_address.slice(
+                            0,
+                            6
+                          )}...${token.contract_address.slice(-4)}`
+                        }
                         width={16}
                         height={16}
                         sizes="16px"
@@ -260,9 +600,19 @@ const TokenCardComponent = ({
                   <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2 max-w-[120px]">
                     <span
                       className="truncate"
-                      title={token.creator?.name?.trim() || `${token.contract_address.slice(0, 6)}...${token.contract_address.slice(-4)}`}
+                      title={
+                        token.creator?.name?.trim() ||
+                        `${token.contract_address.slice(
+                          0,
+                          6
+                        )}...${token.contract_address.slice(-4)}`
+                      }
                     >
-                      {token.creator?.name?.trim() || `${token.contract_address.slice(0, 6)}...${token.contract_address.slice(-4)}`}
+                      {token.creator?.name?.trim() ||
+                        `${token.contract_address.slice(
+                          0,
+                          6
+                        )}...${token.contract_address.slice(-4)}`}
                     </span>
                     {token.cast_hash && token.creator?.name?.trim() && (
                       <button
@@ -284,7 +634,7 @@ const TokenCardComponent = ({
               </div>
               <div className="flex flex-col items-end text-right">
                 <div className="text-right text-xs uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
-                  MKT CAP
+                  MCAP
                 </div>
                 <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
                   {token.marketCap
@@ -359,6 +709,7 @@ export function TokenGrid({
   const trendingCacheRef = useRef<
     Array<Token & { rewards: number; totalStakers: number }>
   >([]);
+
   const TOKENS_PER_PAGE = 36;
 
   // Fetch trending tokens when sortBy is "trending"
@@ -578,8 +929,19 @@ export function TokenGrid({
 
     const fetchDataAndProcess = async () => {
       // Determine which tokens to use based on sortBy
-      const sourceTokens =
-        sortBy === "trending" ? trendingTokensRef.current : tokens;
+      let sourceTokens: Token[];
+      if (sortBy === "trending") {
+        sourceTokens = trendingTokensRef.current;
+      } else if (sortBy === "crowdfunds") {
+        // Filter to only show crowdfund tokens
+        sourceTokens = tokens.filter((token) =>
+          CROWDFUND_TOKEN_ADDRESSES.includes(
+            token.contract_address.toLowerCase()
+          )
+        );
+      } else {
+        sourceTokens = tokens;
+      }
 
       if (!sourceTokens || sourceTokens.length === 0) {
         // Only clear state if we're not in a loading state and this isn't the initial render
@@ -658,6 +1020,19 @@ export function TokenGrid({
         const enrichedTrending = await enrichTokenBatch(searchedTokensResult);
         sortedTokens = enrichedTrending;
         // Clear staker cache if we switch to trending
+        if (stakersSortedAllTokensCache.length > 0)
+          setStakersSortedAllTokensCache([]);
+      } else if (sortBy === "crowdfunds") {
+        // For crowdfunds, sort by newest first and enrich
+        const sortedCrowdfunds = sortTokensByDate(
+          searchedTokensResult as Array<
+            Token & { rewards?: number; totalStakers?: number }
+          >,
+          "newest"
+        );
+        const enrichedCrowdfunds = await enrichTokenBatch(sortedCrowdfunds);
+        sortedTokens = enrichedCrowdfunds;
+        // Clear staker cache if we switch to crowdfunds
         if (stakersSortedAllTokensCache.length > 0)
           setStakersSortedAllTokensCache([]);
       } else {

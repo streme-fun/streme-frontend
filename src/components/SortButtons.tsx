@@ -10,7 +10,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "trending", label: "Trending" },
   { value: "newest", label: "Newest" },
   { value: "oldest", label: "Oldest" },
-  { value: "stakers", label: "Stakers" },
+  // { value: "crowdfunds", label: "Crowdfunds" },
 ];
 
 const SORT_OPTIONS_STANDARD: { value: SortOption; label: string }[] = [
@@ -18,6 +18,7 @@ const SORT_OPTIONS_STANDARD: { value: SortOption; label: string }[] = [
   { value: "newest", label: "Newest" },
   { value: "oldest", label: "Oldest" },
   { value: "stakers", label: "Most Stakers" },
+  // { value: "crowdfunds", label: "Crowdfunds" },
 ];
 
 export function SortButtons({

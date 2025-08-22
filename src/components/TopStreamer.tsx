@@ -205,7 +205,7 @@ export function TopStreamer() {
                   </div>
                   <div className="flex flex-col items-end text-right">
                     <div className="text-right text-xs uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
-                      MKT CAP
+                      MCAP
                     </div>
                     <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
                       {formatMarketCap(token.marketCap)}

@@ -29,6 +29,10 @@ interface ContributionModalProps {
   successPercentage?: string;
   onShareToFarcaster?: () => void;
   isWithdrawal?: boolean;
+  // Dynamic token properties
+  tokenSymbol?: string;
+  tokenName?: string;
+  fundTitle?: string;
 }
 
 export function ContributionModal({
@@ -55,6 +59,8 @@ export function ContributionModal({
   successPercentage,
   onShareToFarcaster,
   isWithdrawal = false,
+  tokenSymbol = "STREME",
+  fundTitle = "Streme Growth Fund",
 }: ContributionModalProps) {
   const [activeTab, setActiveTab] = useState<"add" | "withdraw">("add");
   const [withdrawPercentage, setWithdrawPercentage] = useState(0);
@@ -177,7 +183,7 @@ export function ContributionModal({
                   {isWithdrawal ? "Amount Withdrawn" : "Amount Deposited"}
                 </span>
                 <span className="font-mono font-bold">
-                  {successAmount} STREME
+                  {successAmount} {tokenSymbol}
                 </span>
               </div>
               {!isWithdrawal && (
@@ -190,11 +196,6 @@ export function ContributionModal({
                       {successPercentage}%
                     </span>
                   </div>
-                  <div className="divider my-2"></div>
-                  <div className="text-sm text-base-content/70">
-                    <p>🎯 Helping Streme reach 10,000+ quality users</p>
-                    <p>💎 Earning SUP rewards streamed to your wallet</p>
-                  </div>
                 </>
               )}
               {isWithdrawal && (
@@ -202,7 +203,8 @@ export function ContributionModal({
                   <div className="divider my-2"></div>
                   <div className="text-sm text-base-content/70">
                     <p>
-                      ✅ Your staked STREME has been returned to your wallet
+                      ✅ Your staked {tokenSymbol} has been returned to your
+                      wallet
                     </p>
                     <p>📊 You can still re-deposit to the crowdfund anytime</p>
                   </div>
@@ -240,7 +242,7 @@ export function ContributionModal({
                 <h2 className="text-xl font-bold">
                   {hasActiveContribution
                     ? "Manage Deposit"
-                    : "Deposit to Streme Growth Fund"}
+                    : `Deposit to ${fundTitle}`}
                 </h2>
               </div>
               <button
@@ -306,7 +308,7 @@ export function ContributionModal({
                   {/* Add More Amount Input */}
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Amount (stSTREME)
+                      Amount (st{tokenSymbol})
                     </label>
 
                     {/* Add More Slider - right above input */}
@@ -352,7 +354,7 @@ export function ContributionModal({
                     {userStakedTokenBalance && userStakedTokenBalance > 0n && (
                       <p className="text-xs text-base-content/60 mt-1">
                         Available: {formatStakeAmount(userStakedTokenBalance)}{" "}
-                        stSTREME
+                        st{tokenSymbol}
                       </p>
                     )}
                   </div>
@@ -391,7 +393,7 @@ export function ContributionModal({
                   {/* Withdraw Amount Input */}
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Amount to Withdraw (stSTREME)
+                      Amount to Withdraw (st{tokenSymbol})
                     </label>
 
                     {/* Withdraw Slider - right above input */}
@@ -435,7 +437,7 @@ export function ContributionModal({
                       disabled={isWithdrawing || isConfirming}
                     />
                     <p className="text-xs text-base-content/60 mt-1">
-                      Current Deposit: {userContribution} stSTREME
+                      Current Deposit: {userContribution} st{tokenSymbol}
                     </p>
                   </div>
 

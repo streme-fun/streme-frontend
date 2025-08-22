@@ -1,9 +1,12 @@
 "use client";
 
-import { TokenGrid } from "../components/TokenGrid";
+import {
+  TokenGrid,
+  TrendingTokensCarousel,
+  fetchTrendingTokens,
+} from "../components/TokenGrid";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Hero } from "../components/Hero";
-import { HeroAnimationMini } from "../components/HeroAnimationMini";
 import { Token, TokensResponse } from "./types/token";
 import { SortOption } from "../components/TokenGrid";
 import { SearchBar } from "../components/SearchBar";
@@ -16,7 +19,6 @@ import { usePostHog } from "posthog-js/react";
 import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal";
 import { SPAMMER_BLACKLIST } from "../lib/blacklist";
 import Link from "next/link";
-import Image from "next/image";
 import { CheckinModal } from "../components/CheckinModal";
 import { CheckinSuccessModal } from "../components/CheckinSuccessModal";
 import { useCheckinModal } from "../hooks/useCheckinModal";
@@ -28,6 +30,12 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("trending");
   const hasInitiallyFetched = useRef(false);
+
+  // Trending carousel state
+  const [trendingCarouselTokens, setTrendingCarouselTokens] = useState<Token[]>(
+    []
+  );
+  // const [isFetchingCarousel, setIsFetchingCarousel] = useState(false);
 
   // Debug button state (controlled by Navbar easter egg)
   const [showDebugButton, setShowDebugButton] = useState(false);
@@ -212,6 +220,28 @@ function App() {
       fetchTokens();
     }
   }, [fetchTokens, isMiniAppView, isOnCorrectNetwork]);
+
+  // Fetch trending tokens for carousel
+  useEffect(() => {
+    const fetchCarouselTokens = async () => {
+      // setIsFetchingCarousel(true);
+      try {
+        const trending = await fetchTrendingTokens();
+        // Only show top 10 tokens in carousel
+        setTrendingCarouselTokens(trending.slice(0, 10));
+      } catch (error) {
+        console.error("Error fetching carousel tokens:", error);
+      } finally {
+        // setIsFetchingCarousel(false);
+      }
+    };
+
+    fetchCarouselTokens();
+    // Refresh carousel every 2 minutes
+    const interval = setInterval(fetchCarouselTokens, 2 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (
@@ -401,43 +431,6 @@ function App() {
     return (
       <div className="font-[family-name:var(--font-geist-sans)]">
         <div className="flex flex-col gap-2 row-start-2 w-full p-4">
-          {/* Featured Crowdfunds Section */}
-          <div className="w-full max-w-md mb-4">
-            <h3 className="font-semibold text-base-content mb-2">
-              Featured Crowdfunds
-            </h3>
-            <Link href="/crowdfund">
-              <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/30 transition-all duration-200">
-                <div className="relative h-24 bg-gradient-to-br from-primary/10 to-secondary/10 border-t border-base-300 flex items-center justify-center">
-                  {/* Add hero animation mini as a background inside the card but behind the icon image */}
-                  <div className="absolute inset-0 opacity-50">
-                    <HeroAnimationMini />
-                  </div>
-                  <Image
-                    src="/icon.png"
-                    alt="Streme Icon"
-                    width={60}
-                    height={60}
-                    className="opacity-80 relative z-5 rounded-full"
-                  />
-                </div>
-
-                <div className="p-4 pt-3 flex items-center justify-between gap-2">
-                  <div className="flex flex-col gap-2">
-                    <p className="text-sm text-base-content/70 font-semibold">
-                      Streme Growth Fund
-                    </p>
-                    <p className="text-sm text-base-content/70 mb-3 mr-3">
-                      Contribute your staking rewards to fund Streme growth
-                      initiatives. Earn $SUP for your help!
-                    </p>
-                  </div>
-                  <button className="btn btn-sm btn-primary">Join</button>
-                </div>
-              </div>
-            </Link>
-          </div>
-
           {/* Your Balance Section */}
           {/* {isConnected && (
             <div className="w-full max-w-md mb-4">
@@ -480,17 +473,16 @@ function App() {
               </div>
             )}
 
-          <div className="flex items-center">
-            <h3 className="font-semibold text-base-content text-left">
-              Streme Tokens
-            </h3>
-            <div className="flex-1 ml-3 max-w-xs">
-              <SearchBar
-                value={searchQuery}
-                onChange={(value) => setSearchQuery(value)}
-              />
-            </div>
-          </div>
+          {/* Trending Carousel - Above filters */}
+          {trendingCarouselTokens.length > 0 && !searchQuery && (
+            <TrendingTokensCarousel
+              tokens={trendingCarouselTokens}
+              isMiniApp={true}
+            />
+          )}
+          <h3 className="font-semibold text-base-content text-lg">
+            All Streme Tokens
+          </h3>
 
           <div className="w-full max-w-md">
             <div className="flex items-center gap-4 my-2">
@@ -503,7 +495,14 @@ function App() {
               </div>
             </div>
           </div>
-
+          <div className="flex items-center">
+            <div className="flex-1 max-w-xs">
+              <SearchBar
+                value={searchQuery}
+                onChange={(value) => setSearchQuery(value)}
+              />
+            </div>
+          </div>
           <TokenGrid
             tokens={tokens}
             searchQuery={searchQuery}
@@ -560,50 +559,24 @@ function App() {
     <>
       <div className="font-[family-name:var(--font-geist-sans)]">
         <div className="flex flex-col row-start-2 w-full items-center">
-          <Hero />
-
-          {/* Featured Crowdfunds Section */}
-          <div className="w-full max-w-[1200px] px-4 my-12 mx-auto">
-            <h3 className="font-semibold text-base-content mb-4 text-xl">
-              Featured Crowdfunds
-            </h3>
-            <Link href="/crowdfund">
-              <div className="bg-base-100 rounded-lg shadow-md border border-base-300 overflow-hidden max-w-md cursor-pointer hover:shadow-lg hover:border-primary/30 transition-all duration-200">
-                <div className="relative h-32 bg-gradient-to-br from-primary/10 to-secondary/10 border-t border-base-300 flex items-center justify-center">
-                  <div className="absolute inset-0 opacity-50">
-                    <HeroAnimationMini />
-                  </div>
-                  <Image
-                    src="/icon.png"
-                    alt="Streme Icon"
-                    width={80}
-                    height={80}
-                    className="opacity-80 relative z-5 rounded-full"
-                  />
-                </div>
-
-                <div className="p-6 flex items-center justify-between gap-4">
-                  <div className="flex flex-col gap-2">
-                    <p className="text-base text-base-content font-semibold">
-                      Streme Growth Fund
-                    </p>
-                    <p className="text-sm text-base-content/70 mb-3">
-                      Contribute your staking rewards to help fund Streme growth
-                      initiatives. Earn $SUP for your contribution.
-                    </p>
-                  </div>
-                  <button className="btn btn-primary">Join</button>
-                </div>
-              </div>
-            </Link>
+          <div className="block w-full">
+            <Hero />
           </div>
 
-          {/* Streme Tokens */}
-          <h3 className="font-semibold text-base-content text-xl w-full max-w-[1200px] px-4 mx-auto">
-            Streme Tokens
-          </h3>
+          {/* Trending Carousel - Above filters */}
+          <div className="w-full max-w-[1200px] px-4 mx-auto">
+            {trendingCarouselTokens.length > 0 && !searchQuery && (
+              <TrendingTokensCarousel
+                tokens={trendingCarouselTokens}
+                isMiniApp={false}
+              />
+            )}
+          </div>
 
           <div className="w-full max-w-[1200px] px-4 mx-auto">
+            <h3 className="font-semibold text-base-content mb-2">
+              All Streme Tokens
+            </h3>
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 my-4">
               <div className="flex-none">
                 <SortButtons

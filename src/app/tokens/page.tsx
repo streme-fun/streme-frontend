@@ -289,7 +289,7 @@ export default function TokensPage() {
         });
 
         const batchResults = await Promise.all(batchPromises);
-        
+
         // Process results
         batchResults.forEach(({ batch, tokens }) => {
           batch.forEach((address, index) => {
@@ -300,7 +300,7 @@ export default function TokensPage() {
                 logo: tokenData.img_url || tokenData.logo || tokenData.image,
                 marketData: tokenData.marketData,
               };
-              
+
               // Cache the result
               tokenDataCache.set(address, processedData);
               results.set(address, processedData);
@@ -620,10 +620,14 @@ export default function TokensPage() {
             let stakesData: StakeData[] = [];
             if (accountData.poolMemberships) {
               // Debug: Check raw GraphQL data
-              const stremeMemberships = accountData.poolMemberships.filter((m: PoolMembership) => 
-                m.pool.token.symbol === "STREME"
+              const stremeMemberships = accountData.poolMemberships.filter(
+                (m: PoolMembership) => m.pool.token.symbol === "STREME"
               );
-              console.log("Raw STREME memberships from GraphQL:", stremeMemberships.length, stremeMemberships);
+              console.log(
+                "Raw STREME memberships from GraphQL:",
+                stremeMemberships.length,
+                stremeMemberships
+              );
 
               const activeMemberships = accountData.poolMemberships.filter(
                 (membership: PoolMembership) =>
@@ -637,17 +641,27 @@ export default function TokensPage() {
               );
 
               // Debug: Check filtered memberships
-              const activeStremeMemberships = activeMemberships.filter((m: PoolMembership) => 
-                m.pool.token.symbol === "STREME"
+              const activeStremeMemberships = activeMemberships.filter(
+                (m: PoolMembership) => m.pool.token.symbol === "STREME"
               );
-              console.log("Active STREME memberships after filtering:", activeStremeMemberships.length, activeStremeMemberships);
+              console.log(
+                "Active STREME memberships after filtering:",
+                activeStremeMemberships.length,
+                activeStremeMemberships
+              );
 
               stakesData = await createInitialStakesData(activeMemberships);
-              
+
               // Debug: Check for STREME in stakes
-              const stremeStakes = stakesData.filter(s => s.membership.pool.token.symbol === "STREME");
-              console.log("STREME stakes found:", stremeStakes.length, stremeStakes);
-              
+              const stremeStakes = stakesData.filter(
+                (s) => s.membership.pool.token.symbol === "STREME"
+              );
+              console.log(
+                "STREME stakes found:",
+                stremeStakes.length,
+                stremeStakes
+              );
+
               setStakes(stakesData);
               enhanceStakesWithApiData(stakesData);
             } else {
@@ -657,20 +671,30 @@ export default function TokensPage() {
             // Process SuperTokens
             if (accountData.accountTokenSnapshots) {
               // Debug: Check raw SuperToken snapshots
-              const stremeSnapshots = accountData.accountTokenSnapshots.filter((s: AccountTokenSnapshot) => 
-                s.token.symbol === "STREME"
+              const stremeSnapshots = accountData.accountTokenSnapshots.filter(
+                (s: AccountTokenSnapshot) => s.token.symbol === "STREME"
               );
-              console.log("Raw STREME snapshots from GraphQL:", stremeSnapshots.length, stremeSnapshots);
+              console.log(
+                "Raw STREME snapshots from GraphQL:",
+                stremeSnapshots.length,
+                stremeSnapshots
+              );
 
               const initialSuperTokens = await createInitialSuperTokensData(
                 accountData.accountTokenSnapshots,
                 stakesData
               );
-              
+
               // Debug: Check for STREME in SuperTokens
-              const stremeSuperTokens = initialSuperTokens.filter(t => t.symbol === "STREME");
-              console.log("STREME SuperTokens found:", stremeSuperTokens.length, stremeSuperTokens);
-              
+              const stremeSuperTokens = initialSuperTokens.filter(
+                (t) => t.symbol === "STREME"
+              );
+              console.log(
+                "STREME SuperTokens found:",
+                stremeSuperTokens.length,
+                stremeSuperTokens
+              );
+
               setOwnedSuperTokens(initialSuperTokens);
               enhanceSuperTokensWithApiData(initialSuperTokens);
             } else {
@@ -742,7 +766,7 @@ export default function TokensPage() {
             tokenAddress,
             poolId: membership.pool.id,
             units: membership.units,
-            formattedReceived
+            formattedReceived,
           });
         }
 
@@ -767,28 +791,30 @@ export default function TokensPage() {
     // Final deduplication step to prevent any duplicate stakes
     // Note: We keep the highest stake if there are multiple pools for the same token
     const uniqueStakes = stakesData.filter((stake, index, self) => {
-      const tokenMatches = self.filter(s => 
-        safeToLowerCase(s.tokenAddress) === safeToLowerCase(stake.tokenAddress)
+      const tokenMatches = self.filter(
+        (s) =>
+          safeToLowerCase(s.tokenAddress) ===
+          safeToLowerCase(stake.tokenAddress)
       );
-      
+
       if (tokenMatches.length === 1) {
         return true; // Only one stake for this token
       }
-      
+
       // Multiple stakes for same token - keep the one with highest units
       const maxUnitsStake = tokenMatches.reduce((max, current) => {
         const maxUnits = parseFloat(max.membership.units || "0");
         const currentUnits = parseFloat(current.membership.units || "0");
         return currentUnits > maxUnits ? current : max;
       });
-      
+
       return stake === maxUnitsStake;
     });
 
     console.log("Stakes deduplication:", {
       original: stakesData.length,
       deduplicated: uniqueStakes.length,
-      removed: stakesData.length - uniqueStakes.length
+      removed: stakesData.length - uniqueStakes.length,
     });
 
     return uniqueStakes;
@@ -800,9 +826,11 @@ export default function TokensPage() {
     const stakesToEnhance = initialStakes.slice(0, 5);
 
     // Use batch fetch for token data
-    const tokenAddresses = stakesToEnhance.map(stake => stake.tokenAddress);
+    const tokenAddresses = stakesToEnhance.map((stake) => stake.tokenAddress);
     const tokenDataMap = await fetchTokenDataBatch(tokenAddresses);
-    const tokenDataResults = tokenAddresses.map(addr => tokenDataMap.get(addr));
+    const tokenDataResults = tokenAddresses.map((addr) =>
+      tokenDataMap.get(addr)
+    );
 
     // Batch all the staked balance calls together
     const stakedBalancePromises = stakesToEnhance.map(async (stake, index) => {
@@ -905,9 +933,11 @@ export default function TokensPage() {
 
     try {
       // Use batch fetch for token data
-      const tokenAddresses = batch.map(stake => stake.tokenAddress);
+      const tokenAddresses = batch.map((stake) => stake.tokenAddress);
       const tokenDataMap = await fetchTokenDataBatch(tokenAddresses);
-      const tokenDataResults = tokenAddresses.map(addr => tokenDataMap.get(addr));
+      const tokenDataResults = tokenAddresses.map((addr) =>
+        tokenDataMap.get(addr)
+      );
 
       const stakedBalancePromises = batch.map(async (stake, index) => {
         const tokenData = tokenDataResults[index];
@@ -1039,10 +1069,12 @@ export default function TokensPage() {
             hasSignificantBalance,
             formattedBalance,
             currentStakesCount: currentStakes.length,
-            stakesWithSTREME: currentStakes.filter(s => 
-              s.tokenAddress && 
-              safeToLowerCase(s.tokenAddress) === safeToLowerCase(tokenAddress)
-            ).length
+            stakesWithSTREME: currentStakes.filter(
+              (s) =>
+                s.tokenAddress &&
+                safeToLowerCase(s.tokenAddress) ===
+                  safeToLowerCase(tokenAddress)
+            ).length,
           });
         }
 
@@ -1062,16 +1094,20 @@ export default function TokensPage() {
     }
 
     // Final deduplication step to prevent any duplicates
-    const uniqueSuperTokens = superTokensData.filter((token, index, self) => 
-      index === self.findIndex(t => 
-        safeToLowerCase(t.tokenAddress) === safeToLowerCase(token.tokenAddress)
-      )
+    const uniqueSuperTokens = superTokensData.filter(
+      (token, index, self) =>
+        index ===
+        self.findIndex(
+          (t) =>
+            safeToLowerCase(t.tokenAddress) ===
+            safeToLowerCase(token.tokenAddress)
+        )
     );
 
     console.log("SuperTokens deduplication:", {
       original: superTokensData.length,
       deduplicated: uniqueSuperTokens.length,
-      removed: superTokensData.length - uniqueSuperTokens.length
+      removed: superTokensData.length - uniqueSuperTokens.length,
     });
 
     return uniqueSuperTokens;
@@ -1093,9 +1129,11 @@ export default function TokensPage() {
     const limitedTokens = tokensToEnhance.slice(0, 8);
 
     // Use batch fetch for token data
-    const tokenAddresses = limitedTokens.map(token => token.tokenAddress);
+    const tokenAddresses = limitedTokens.map((token) => token.tokenAddress);
     const tokenDataMap = await fetchTokenDataBatch(tokenAddresses);
-    const tokenDataResults = tokenAddresses.map(addr => tokenDataMap.get(addr));
+    const tokenDataResults = tokenAddresses.map((addr) =>
+      tokenDataMap.get(addr)
+    );
 
     // Only check pool connections for tokens that actually have staking addresses
     const poolConnectionPromises = limitedTokens.map(async (token, index) => {
@@ -1173,9 +1211,11 @@ export default function TokensPage() {
 
     try {
       // Use batch fetch for token data
-      const tokenAddresses = batch.map(token => token.tokenAddress);
+      const tokenAddresses = batch.map((token) => token.tokenAddress);
       const tokenDataMap = await fetchTokenDataBatch(tokenAddresses);
-      const tokenDataResults = tokenAddresses.map(addr => tokenDataMap.get(addr));
+      const tokenDataResults = tokenAddresses.map((addr) =>
+        tokenDataMap.get(addr)
+      );
 
       const poolConnectionPromises = batch.map(async (token, index) => {
         const tokenData = tokenDataResults[index];
@@ -1667,7 +1707,7 @@ export default function TokensPage() {
                             </div>
                             <div className="flex flex-col items-end text-right">
                               <div className="text-xs uppercase tracking-wider opacity-50">
-                                MKT CAP
+                                MCAP
                               </div>
                               <div className="flex gap-2 items-baseline">
                                 <div className="font-mono text-sm font-bold">
@@ -1880,7 +1920,7 @@ export default function TokensPage() {
                             </div>
                             <div className="flex flex-col items-end text-right">
                               <div className="text-xs uppercase tracking-wider opacity-50">
-                                MKT CAP
+                                MCAP
                               </div>
                               <div className="flex gap-2 items-baseline">
                                 <div className="font-mono text-sm font-bold">

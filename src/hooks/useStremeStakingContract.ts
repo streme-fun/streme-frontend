@@ -9,21 +9,23 @@ import {
   ERC20_ABI 
 } from "@/src/lib/contracts/StremeStakingRewardsFunder";
 
-export const useStremeStakingContract = (overrideAddress?: string) => {
+export const useStremeStakingContract = (overrideAddress?: string, contractAddress?: string) => {
   const { address: wagmiAddress } = useAccount();
   const address = overrideAddress || wagmiAddress;
+  const contractAddr = contractAddress || STREME_STAKING_REWARDS_FUNDER_ADDRESS;
+  const stakingContract = contractAddr as `0x${string}`;
   const [stakedStremeCoinAddress, setStakedStremeCoinAddress] = useState<string>("");
   const [stremeCoinAddress, setStremeCoinAddress] = useState<string>("");
 
   // Get contract addresses
   const { data: stakedStremeAddress } = useReadContract({
-    address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+    address: stakingContract,
     abi: STREME_STAKING_REWARDS_FUNDER_ABI,
     functionName: "stakedStremeCoin",
   });
 
   const { data: stremeAddress } = useReadContract({
-    address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+    address: stakingContract,
     abi: STREME_STAKING_REWARDS_FUNDER_ABI,
     functionName: "stremeCoin",
   });
@@ -39,7 +41,7 @@ export const useStremeStakingContract = (overrideAddress?: string) => {
 
   // Read user's deposit balance
   const { data: userDepositBalance, refetch: refetchUserBalance } = useReadContract({
-    address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+    address: stakingContract,
     abi: STREME_STAKING_REWARDS_FUNDER_ABI,
     functionName: "balanceOf",
     args: address ? [address as `0x${string}`] : undefined,
@@ -51,14 +53,14 @@ export const useStremeStakingContract = (overrideAddress?: string) => {
 
   // Read total balance in contract
   const { data: totalBalance, refetch: refetchTotalBalance } = useReadContract({
-    address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+    address: stakingContract,
     abi: STREME_STAKING_REWARDS_FUNDER_ABI,
     functionName: "totalBalance",
   });
 
   // Read accumulated rewards
   const { data: rewardsBalance } = useReadContract({
-    address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+    address: stakingContract,
     abi: STREME_STAKING_REWARDS_FUNDER_ABI,
     functionName: "stremeCoinBalance",
   });
@@ -79,7 +81,7 @@ export const useStremeStakingContract = (overrideAddress?: string) => {
     address: stakedStremeCoinAddress as `0x${string}`,
     abi: ERC20_ABI,
     functionName: "allowance",
-    args: address ? [address as `0x${string}`, STREME_STAKING_REWARDS_FUNDER_ADDRESS] : undefined,
+    args: address ? [address as `0x${string}`, stakingContract] : undefined,
     query: {
       enabled: !!stakedStremeCoinAddress && !!address,
     },
@@ -87,14 +89,14 @@ export const useStremeStakingContract = (overrideAddress?: string) => {
 
   // Check if contract is paused
   const { data: isPaused } = useReadContract({
-    address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+    address: stakingContract,
     abi: STREME_STAKING_REWARDS_FUNDER_ABI,
     functionName: "paused",
   });
 
   return {
     // Contract addresses
-    contractAddress: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+    contractAddress: stakingContract,
     stakedStremeCoinAddress,
     stremeCoinAddress,
     
@@ -116,7 +118,7 @@ export const useStremeStakingContract = (overrideAddress?: string) => {
   };
 };
 
-export const useStakingContractActions = (overrideAddress?: string) => {
+export const useStakingContractActions = (overrideAddress?: string, contractAddress?: string) => {
   const { writeContract, data: hash, error, isPending } = useWriteContract();
   const [isApproving, setIsApproving] = useState(false);
   const [isDepositing, setIsDepositing] = useState(false);
@@ -136,7 +138,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
     refetchTotalBalance, 
     refetchAllowance,
     refetchUserStakedTokenBalance
-  } = useStremeStakingContract(overrideAddress);
+  } = useStremeStakingContract(overrideAddress, contractAddress);
 
   // Combined error from wagmi or custom transactions
   const effectiveError = error || customError;
@@ -147,8 +149,9 @@ export const useStakingContractActions = (overrideAddress?: string) => {
 
   // Approve tokens for the contract
   const approveTokens = async (amount: string, isMiniApp?: boolean, address?: string) => {
+    const currentContract = (contractAddress || STREME_STAKING_REWARDS_FUNDER_ADDRESS) as `0x${string}`;
     if (!stakedStremeCoinAddress) {
-      throw new Error("Staked STREME token address not loaded");
+      throw new Error("Staked token address not loaded");
     }
 
     setIsApproving(true);
@@ -173,7 +176,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
         const { Interface } = await import("@ethersproject/abi");
         const iface = new Interface(ERC20_ABI);
         const data = iface.encodeFunctionData("approve", [
-          STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+          currentContract,
           amountBigInt,
         ]);
 
@@ -200,7 +203,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
           address: stakedStremeCoinAddress as `0x${string}`,
           abi: ERC20_ABI,
           functionName: "approve",
-          args: [STREME_STAKING_REWARDS_FUNDER_ADDRESS, amountBigInt],
+          args: [currentContract, amountBigInt],
         });
       }
     } catch (err) {
@@ -212,8 +215,9 @@ export const useStakingContractActions = (overrideAddress?: string) => {
     }
   };
 
-  // Deposit staked STREME tokens
+  // Deposit staked tokens
   const depositTokens = async (amount: string, isMiniApp?: boolean, address?: string) => {
+    const currentContract = (contractAddress || STREME_STAKING_REWARDS_FUNDER_ADDRESS) as `0x${string}`;
     setIsDepositing(true);
     setCustomError(null);
     
@@ -242,7 +246,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
           method: "eth_sendTransaction",
           params: [
             {
-              to: toHex(STREME_STAKING_REWARDS_FUNDER_ADDRESS),
+              to: toHex(currentContract),
               from: toHex(address),
               data: toHex(data),
               chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
@@ -258,7 +262,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
       } else {
         // Handle wagmi transaction
         writeContract({
-          address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+          address: currentContract,
           abi: STREME_STAKING_REWARDS_FUNDER_ABI,
           functionName: "deposit",
           args: [amountBigInt],
@@ -275,6 +279,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
 
   // Withdraw specific amount
   const withdrawTokens = async (amount: string, isMiniApp?: boolean, address?: string) => {
+    const currentContract = (contractAddress || STREME_STAKING_REWARDS_FUNDER_ADDRESS) as `0x${string}`;
     setIsWithdrawing(true);
     setCustomError(null);
     
@@ -303,7 +308,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
           method: "eth_sendTransaction",
           params: [
             {
-              to: toHex(STREME_STAKING_REWARDS_FUNDER_ADDRESS),
+              to: toHex(currentContract),
               from: toHex(address),
               data: toHex(data),
               chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
@@ -319,7 +324,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
       } else {
         // Handle wagmi transaction
         writeContract({
-          address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+          address: currentContract,
           abi: STREME_STAKING_REWARDS_FUNDER_ABI,
           functionName: "withdraw",
           args: [amountBigInt],
@@ -336,6 +341,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
 
   // Withdraw all tokens
   const withdrawAllTokens = async (isMiniApp?: boolean, address?: string) => {
+    const currentContract = (contractAddress || STREME_STAKING_REWARDS_FUNDER_ADDRESS) as `0x${string}`;
     setIsWithdrawing(true);
     setCustomError(null);
     
@@ -356,7 +362,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
           method: "eth_sendTransaction",
           params: [
             {
-              to: toHex(STREME_STAKING_REWARDS_FUNDER_ADDRESS),
+              to: toHex(currentContract),
               from: toHex(address),
               data: toHex(data),
               chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
@@ -372,7 +378,7 @@ export const useStakingContractActions = (overrideAddress?: string) => {
       } else {
         // Handle wagmi transaction
         writeContract({
-          address: STREME_STAKING_REWARDS_FUNDER_ADDRESS,
+          address: currentContract,
           abi: STREME_STAKING_REWARDS_FUNDER_ABI,
           functionName: "withdrawAll",
         });

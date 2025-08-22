@@ -30,7 +30,7 @@ export function Navbar() {
   // Easter egg function for logo clicking (desktop only - mini-app handling moved to app.tsx)
   const handleLogoClick = () => {
     if (!isMiniApp) {
-      router.push("/crowdfund");
+      router.push("/crowdfund/0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58");
     }
   };
 
@@ -97,13 +97,13 @@ export function Navbar() {
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 border-b border-black/[.1] dark:border-white/[.1]  bg-opacity-80 bg-base-100 ">
-        <div className="px-4 sm:px-8 lg:px-20 h-20 flex items-center justify-between">
+        <div className="px-4 sm:px-8 lg:px-20 h-18 flex items-center justify-between">
           <div className="flex items-center">
             <Link href="/" className="flex items-center">
               {isDark ? (
                 <Image
                   src="/streme-text-white.svg"
-                  width={160}
+                  width={120}
                   height={23}
                   alt="Streme"
                   onClick={handleLogoClick}
@@ -124,32 +124,54 @@ export function Navbar() {
             </Link>
           </div>
 
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="lg:hidden btn btn-ghost btn-sm"
-            aria-label="Toggle menu"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              className="w-6 h-6"
+          <div className="md:hidden flex items-center gap-2">
+            <button
+              onClick={() => setIsTutorialOpen(true)}
+              className="btn btn-ghost btn-sm btn-circle"
+              title="Tutorial"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d={
-                  isMenuOpen
-                    ? "M6 18L18 6M6 6l12 12"
-                    : "M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"
-                }
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="btn btn-ghost btn-sm"
+              aria-label="Toggle menu"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-6 h-6"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d={
+                    isMenuOpen
+                      ? "M6 18L18 6M6 6l12 12"
+                      : "M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"
+                  }
+                />
+              </svg>
+            </button>
+          </div>
 
-          <div className="hidden lg:flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-6">
             {isConnected && (
               <Link href="/token/0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58">
                 <div className="px-3 py-2 cursor-pointer hover:bg-base-100 transition-colors">
@@ -161,13 +183,6 @@ export function Navbar() {
             <Link href="/launch" className="btn btn-primary">
               Launch a Token
             </Link>
-
-            <button
-              onClick={() => setIsHowItWorksOpen(true)}
-              className="btn btn-ghost"
-            >
-              How It Works
-            </button>
 
             <button
               onClick={() => setIsTutorialOpen(true)}
@@ -263,7 +278,7 @@ export function Navbar() {
         </div>
 
         <div
-          className={`lg:hidden ${
+          className={`md:hidden ${
             isMenuOpen ? "block" : "hidden"
           } border-t border-black/[.1] dark:border-white/[.1] bg-background/95 backdrop-blur-sm`}
         >
@@ -295,26 +310,6 @@ export function Navbar() {
                 </div>
               </Link>
             )}
-
-            <button
-              onClick={() => {
-                setIsHowItWorksOpen(true);
-                setIsMenuOpen(false);
-              }}
-              className="btn btn-ghost w-full justify-start"
-            >
-              How It Works
-            </button>
-
-            <button
-              onClick={() => {
-                setIsTutorialOpen(true);
-                setIsMenuOpen(false);
-              }}
-              className="btn btn-ghost w-full justify-start"
-            >
-              Tutorial
-            </button>
 
             <div className="flex items-center justify-between w-full px-4 py-2">
               <ThemeSwitcher className="w-full justify-start" />

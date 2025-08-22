@@ -6,7 +6,7 @@ import { formatUnits } from "viem";
 import { ERC20_ABI } from "@/src/lib/contracts/StremeStakingRewardsFunder";
 import { getPrices } from "@/src/lib/priceUtils";
 import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
-import { GrowthFundAnimation } from "@/src/components/GrowthFundAnimation";
+import { CrowdfundAnimation } from "@/src/components/CrowdfundAnimation";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useUnifiedWallet } from "@/src/hooks/useUnifiedWallet";
 import { useSafePrivy } from "@/src/hooks/useSafePrivy";
@@ -19,12 +19,22 @@ import {
   formatStakeAmount,
 } from "@/src/hooks/useStremeStakingContract";
 import Image from "next/image";
-import Link from "next/link";
+// import Link from "next/link";
 import { useRouter } from "next/navigation";
 import sdk from "@farcaster/miniapp-sdk";
 import { publicClient } from "@/src/lib/viemClient";
 
-export default function CrowdfundPage() {
+import { CrowdfundToken } from "@/src/lib/crowdfundTokens";
+
+interface CrowdfundPageProps {
+  tokenAddress?: string;
+  tokenConfig?: CrowdfundToken;
+}
+
+export default function CrowdfundPage({
+  tokenAddress = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58",
+  tokenConfig,
+}: CrowdfundPageProps) {
   const router = useRouter();
   const { isSDKLoaded } = useAppFrameLogic();
 
@@ -78,8 +88,10 @@ export default function CrowdfundPage() {
   const [unlockTime, setUnlockTime] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>("");
 
-  const STREME_TOKEN_ADDRESS = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
-  const DEPOSIT_CONTRACT_ADDRESS = "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
+  const CURRENT_TOKEN_ADDRESS = tokenAddress;
+  const DEPOSIT_CONTRACT_ADDRESS =
+    tokenConfig?.depositContractAddress ||
+    "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
   // const GOAL = 1000; // $1000 USD goal
 
   // ABI for the staking contract to check deposit timestamps
@@ -154,7 +166,7 @@ export default function CrowdfundPage() {
 
   // Read STREME token balance
   const { data: stremeBalance } = useReadContract({
-    address: STREME_TOKEN_ADDRESS as `0x${string}`,
+    address: CURRENT_TOKEN_ADDRESS as `0x${string}`,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: [DEPOSIT_CONTRACT_ADDRESS as `0x${string}`],
@@ -172,7 +184,10 @@ export default function CrowdfundPage() {
     refetchAllowance,
     refetchUserStakedTokenBalance,
     stakedStremeCoinAddress,
-  } = useStremeStakingContract(effectiveAddress);
+  } = useStremeStakingContract(
+    effectiveAddress,
+    tokenConfig?.depositContractAddress
+  );
 
   const {
     approveTokens,
@@ -185,7 +200,10 @@ export default function CrowdfundPage() {
     isConfirming,
     error: contractError,
     hash,
-  } = useStakingContractActions(effectiveAddress);
+  } = useStakingContractActions(
+    effectiveAddress,
+    tokenConfig?.depositContractAddress
+  );
 
   // Animated balance state
   const [baseStremeAmount, setBaseStremeAmount] = useState<number>(0);
@@ -199,10 +217,12 @@ export default function CrowdfundPage() {
     const fetchFlowRate = async () => {
       try {
         const GDA_FORWARDER_ADDRESS =
+          tokenConfig?.gdaForwarderAddress ||
           "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
-        const STREME_TOKEN_ADDRESS =
-          "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
-        const CROWDFUND_ADDRESS = "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
+        const CURRENT_TOKEN_ADDRESS = tokenAddress;
+        const CROWDFUND_ADDRESS =
+          tokenConfig?.depositContractAddress ||
+          "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
 
         // ABI for getNetFlow function
         const gdaForwarderAbi = [
@@ -223,7 +243,7 @@ export default function CrowdfundPage() {
           abi: gdaForwarderAbi,
           functionName: "getNetFlow",
           args: [
-            STREME_TOKEN_ADDRESS as `0x${string}`,
+            CURRENT_TOKEN_ADDRESS as `0x${string}`,
             CROWDFUND_ADDRESS as `0x${string}`,
           ],
         });
@@ -314,9 +334,9 @@ export default function CrowdfundPage() {
   useEffect(() => {
     const fetchPrice = async (retryCount = 0) => {
       try {
-        const prices = await getPrices([STREME_TOKEN_ADDRESS]);
-        if (prices?.[STREME_TOKEN_ADDRESS.toLowerCase()]) {
-          const newPrice = prices[STREME_TOKEN_ADDRESS.toLowerCase()];
+        const prices = await getPrices([CURRENT_TOKEN_ADDRESS]);
+        if (prices?.[CURRENT_TOKEN_ADDRESS.toLowerCase()]) {
+          const newPrice = prices[CURRENT_TOKEN_ADDRESS.toLowerCase()];
           setPrice(newPrice);
 
           // Update USD value immediately when price becomes available
@@ -356,9 +376,14 @@ export default function CrowdfundPage() {
       );
       setIsLoadingContributors(true);
 
-      // Use force parameter for explicit refreshes (e.g., after transactions)
-      const url = forceRefresh
-        ? `/api/crowdfund/leaderboard?force=true`
+      // Use force parameter for explicit refreshes and pass token address
+      const baseParams = tokenConfig?.depositContractAddress
+        ? `contract=${tokenConfig.depositContractAddress}`
+        : "";
+      const forceParam = forceRefresh ? "force=true" : "";
+      const params = [baseParams, forceParam].filter(Boolean).join("&");
+      const url = params
+        ? `/api/crowdfund/leaderboard?${params}`
         : "/api/crowdfund/leaderboard";
 
       const response = await fetch(url, {
@@ -743,8 +768,15 @@ export default function CrowdfundPage() {
 
   // Handle sharing to Farcaster
   const handleShareToFarcaster = async () => {
-    const shareUrl = `https://streme.fun/crowdfund`;
-    const shareText = `I just contributed ${successAmount} $streme to @streme's growth fund! Streme On 🎶 🚀`;
+    // Use the token address for the URL (matches the routing)
+    const shareTokenAddress =
+      tokenConfig?.address ||
+      tokenAddress ||
+      "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
+    const shareUrl = `https://streme.fun/crowdfund/${shareTokenAddress}`;
+    const shareText = `I just contributed ${successAmount} ${
+      tokenConfig?.symbol?.toLowerCase() || "tokens"
+    } to the ${tokenConfig?.fundTitle || "growth fund"}! 🚀`;
 
     if (isMiniAppView && isSDKLoaded && sdk) {
       try {
@@ -850,7 +882,8 @@ export default function CrowdfundPage() {
             <div className="flex-1 flex flex-col gap-1">
               <div className="flex items-center gap-1 justify-between">
                 <h2 className="text-lg md:text-xl font-bold text-base-content">
-                  Streme Growth Fund
+                  {tokenConfig?.fundTitle ||
+                    `${tokenConfig?.name || "Token"} Growth Fund`}
                 </h2>
                 {/* Info button in top right */}
                 <div className="flex items-center gap-1 ml-2">
@@ -876,29 +909,10 @@ export default function CrowdfundPage() {
                   </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Image
-                  src="https://imagedelivery.net/BXluQx4ige9GuW0Ia56BHw/46c48fa8-50e2-47a6-b46c-efdaed372500/original"
-                  alt="Zeni"
-                  width={20}
-                  height={20}
-                  className="rounded-full"
-                />
-                <div className="flex items-center gap-1">
-                  <span className="text-sm text-base-content/70 leading-snug">
-                    by
-                  </span>
-                  <Link
-                    href="https://farcaster.xyz/zeni.eth"
-                    className="text-sm text-base-content/70 leading-snug hover:underline"
-                  >
-                    zeni.eth
-                  </Link>
-                </div>
-              </div>
+
               <p className="text-sm text-base-content/70 leading-snug">
-                Help Streme grow through marketing and dev initiatives. Deposit
-                your staked $STREME to earn SUP rewards.
+                {tokenConfig?.fundDescription ||
+                  "Support the growth of this project by contributing your staked tokens."}
               </p>
             </div>
           </div>
@@ -910,11 +924,13 @@ export default function CrowdfundPage() {
         <div className="mb-3">
           {effectiveIsConnected ? (
             <div>
-              {/* Growth Fund Animation with Token Count - Hero Position */}
-              <div className="text-center mb-2">
-                <GrowthFundAnimation
+              {/* Crowdfund Animation with Token Image */}
+              <div className="text-center mb-2 relative">
+                <CrowdfundAnimation
                   contributorCount={0}
                   growthRate={Math.max(stremeGrowthRate, 0.1)}
+                  tokenConfig={tokenConfig}
+                  tokenImageUrl={undefined} // Now uses hardcoded images based on token symbol
                 />
                 {/* Animated STREME Balance Display */}
                 <div className="mt-1 mb-1">
@@ -924,7 +940,7 @@ export default function CrowdfundPage() {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}{" "}
-                      STREME
+                      {tokenConfig?.symbol || "TOKEN"}
                     </div>
 
                     <div className="text-xs text-base-content/60">
@@ -985,7 +1001,7 @@ export default function CrowdfundPage() {
                             clipRule="evenodd"
                           />
                         </svg>
-                        Deposit STREME
+                        Deposit {tokenConfig?.symbol || "TOKEN"}
                       </div>
                     )}
                   </button>
@@ -1000,7 +1016,7 @@ export default function CrowdfundPage() {
                 <div className="grid grid-cols-2 gap-2 text-center">
                   <div>
                     <div className="text-xs text-base-content/60 mb-1">
-                      stSTREME Deposited
+                      st{tokenConfig?.symbol || "TOKEN"} Deposited
                     </div>
                     <div className="font-mono font-semibold text-sm">
                       {totalBalance
@@ -1060,10 +1076,12 @@ export default function CrowdfundPage() {
           ) : (
             <div>
               {/* Growth Fund Animation with Token Count - Hero Position */}
-              <div className="text-center mb-3">
-                <GrowthFundAnimation
+              <div className="text-center mb-3 relative">
+                <CrowdfundAnimation
                   contributorCount={0}
                   growthRate={Math.max(stremeGrowthRate, 0.1)}
+                  tokenConfig={tokenConfig}
+                  tokenImageUrl={undefined} // Now uses hardcoded images based on token symbol
                 />
                 {/* Animated STREME Balance Display */}
                 <div className="mt-2 mb-1">
@@ -1073,7 +1091,7 @@ export default function CrowdfundPage() {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}{" "}
-                      STREME
+                      {tokenConfig?.symbol || "TOKEN"}
                     </div>
                     <div className="text-lg font-bold text-success mt-1">
                       {price
@@ -1084,7 +1102,7 @@ export default function CrowdfundPage() {
                         : "Loading price..."}
                     </div>
                     <div className="text-xs text-base-content/60 mt-1">
-                      pooled for growth initiatives
+                      {tokenConfig?.fundPurpose || "pooled for initiatives"}
                     </div>
                   </div>
                 </div>
@@ -1161,7 +1179,7 @@ export default function CrowdfundPage() {
                 <div className="grid grid-cols-2 gap-2 text-center">
                   <div>
                     <div className="text-xs text-base-content/60 mb-1">
-                      stSTREME Deposited
+                      st{tokenConfig?.symbol || "TOKEN"} Deposited
                     </div>
                     <div className="font-mono font-semibold text-sm">
                       {totalBalance
@@ -1207,128 +1225,135 @@ export default function CrowdfundPage() {
         </div>
       </div>
 
-      {/* Contributors Leaderboard */}
-      {(contributors.length > 0 || isLoadingContributors) && (
-        <div className="container mx-auto mt-6 mb-8">
-          <div className="">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold">Contributors</h3>
-              <div className="flex items-center gap-2">
-                {isRefreshingAfterTransaction && (
-                  <div className="flex items-center gap-1">
-                    <div className="loading loading-spinner loading-xs"></div>
-                    <span className="text-xs text-base-content/60">
-                      Updating...
-                    </span>
-                  </div>
-                )}
-                <button
-                  onClick={() => fetchContributors(true)}
-                  disabled={
-                    isLoadingContributors || isRefreshingAfterTransaction
-                  }
-                  className="btn btn-ghost btn-xs"
-                  title="Refresh leaderboard"
-                >
-                  <svg
-                    className="w-3 h-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+      {/* Contributors Leaderboard - Hide for BUTTHOLE token */}
+      {(contributors.length > 0 || isLoadingContributors) &&
+        tokenAddress?.toLowerCase() !==
+          "0x1c4f69f14cf754333c302246d25a48a13224118a" && (
+          <div className="container mx-auto mt-6 mb-8">
+            <div className="">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold">Contributors</h3>
+                <div className="flex items-center gap-2">
+                  {isRefreshingAfterTransaction && (
+                    <div className="flex items-center gap-1">
+                      <div className="loading loading-spinner loading-xs"></div>
+                      <span className="text-xs text-base-content/60">
+                        Updating...
+                      </span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => fetchContributors(true)}
+                    disabled={
+                      isLoadingContributors || isRefreshingAfterTransaction
+                    }
+                    className="btn btn-ghost btn-xs"
+                    title="Refresh leaderboard"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {isLoadingContributors && contributors.length === 0 ? (
-                <div className="flex justify-center py-8">
-                  <div className="loading loading-spinner loading-md"></div>
-                </div>
-              ) : (
-                contributors
-                  .sort((a, b) => Number(BigInt(b.amount) - BigInt(a.amount)))
-                  .slice(0, 10)
-                  .map((contributor, index) => (
-                    <div
-                      key={contributor.address}
-                      className="flex items-center justify-between p-3 bg-base-200/50 rounded-lg"
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-primary font-bold text-sm">
-                          #{index + 1}
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {isLoadingContributors && contributors.length === 0 ? (
+                  <div className="flex justify-center py-8">
+                    <div className="loading loading-spinner loading-md"></div>
+                  </div>
+                ) : (
+                  contributors
+                    .sort((a, b) => Number(BigInt(b.amount) - BigInt(a.amount)))
+                    .slice(0, 10)
+                    .map((contributor, index) => (
+                      <div
+                        key={contributor.address}
+                        className="flex items-center justify-between p-3 bg-base-200/50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-primary font-bold text-sm">
+                            #{index + 1}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {contributor.pfp_url ? (
+                              <Image
+                                src={contributor.pfp_url}
+                                alt={contributor.username || "Contributor"}
+                                width={24}
+                                height={24}
+                                className="rounded-full object-fill"
+                                unoptimized={
+                                  contributor.pfp_url.includes(".gif") ||
+                                  contributor.pfp_url.includes(
+                                    "imagedelivery.net"
+                                  )
+                                }
+                              />
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                                {contributor.username
+                                  ? contributor.username.charAt(0).toUpperCase()
+                                  : contributor.address
+                                      .slice(2, 4)
+                                      .toUpperCase()}
+                              </div>
+                            )}
+                            <div>
+                              <div className="text-sm font-medium">
+                                {contributor.username ? (
+                                  <a
+                                    href={`https://farcaster.xyz/${contributor.username}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="hover:underline"
+                                  >
+                                    {contributor.username}
+                                  </a>
+                                ) : (
+                                  truncateAddress(contributor.address)
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {contributor.pfp_url ? (
-                            <Image
-                              src={contributor.pfp_url}
-                              alt={contributor.username || "Contributor"}
-                              width={24}
-                              height={24}
-                              className="rounded-full object-fill"
-                              unoptimized={
-                                contributor.pfp_url.includes(".gif") ||
-                                contributor.pfp_url.includes(
-                                  "imagedelivery.net"
-                                )
-                              }
-                            />
-                          ) : (
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
-                              {contributor.username
-                                ? contributor.username.charAt(0).toUpperCase()
-                                : contributor.address.slice(2, 4).toUpperCase()}
+                        <div className="text-right">
+                          <div className="font-mono font-bold text-sm">
+                            {formatContributorAmount(contributor.amount)} st
+                            {tokenConfig?.symbol || "TOKEN"}
+                          </div>
+                          {contributor.percentage !== undefined && (
+                            <div className="text-xs text-base-content/60">
+                              {contributor.percentage < 0.1 &&
+                              contributor.percentage > 0
+                                ? `<0.1% of pool`
+                                : `${contributor.percentage.toFixed(
+                                    1
+                                  )}% of pool`}
                             </div>
                           )}
-                          <div>
-                            <div className="text-sm font-medium">
-                              {contributor.username ? (
-                                <a
-                                  href={`https://farcaster.xyz/${contributor.username}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="hover:underline"
-                                >
-                                  {contributor.username}
-                                </a>
-                              ) : (
-                                truncateAddress(contributor.address)
-                              )}
-                            </div>
-                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-mono font-bold text-sm">
-                          {formatContributorAmount(contributor.amount)} stSTREME
-                        </div>
-                        {contributor.percentage !== undefined && (
-                          <div className="text-xs text-base-content/60">
-                            {contributor.percentage < 0.1 &&
-                            contributor.percentage > 0
-                              ? `<0.1% of pool`
-                              : `${contributor.percentage.toFixed(1)}% of pool`}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))
+                    ))
+                )}
+              </div>
+              {contributors.length > 10 && (
+                <div className="text-center mt-3 text-sm text-base-content/60">
+                  Showing top 10 contributors
+                </div>
               )}
             </div>
-            {contributors.length > 10 && (
-              <div className="text-center mt-3 text-sm text-base-content/60">
-                Showing top 10 contributors
-              </div>
-            )}
           </div>
-        </div>
-      )}
+        )}
 
       {/* Contribution Modal */}
       <ContributionModal
@@ -1365,6 +1390,9 @@ export default function CrowdfundPage() {
           !isWithdrawalSuccess ? handleShareToFarcaster : undefined
         }
         isWithdrawal={isWithdrawalSuccess}
+        tokenSymbol={tokenConfig?.symbol || "STREME"}
+        tokenName={tokenConfig?.name || "STREME"}
+        fundTitle={tokenConfig?.fundTitle || "Streme Growth Fund"}
       />
 
       {/* FAQ Section */}
@@ -1378,14 +1406,14 @@ export default function CrowdfundPage() {
             <div className="collapse collapse-arrow bg-base-200">
               <input type="radio" name="faq-accordion" />
               <div className="collapse-title font-semibold">
-                How do Streme crowdfunds work?
+                How do {tokenConfig?.name || "token"} crowdfunds work?
               </div>
               <div className="collapse-content">
                 <p className="text-sm text-base-content/70 pt-2">
-                  When you stake STREME tokens, they generate yield aka rewards.
-                  By staking your STREME in the crowdfund contract, you
-                  temporarily redirect that yield to the Growth Fund. There are
-                  no locks and you can withdraw your staked STREME anytime.
+                  {tokenConfig?.howItWorks ||
+                    `When you stake ${
+                      tokenConfig?.symbol || "tokens"
+                    }, they generate yield. By staking in the crowdfund contract, you redirect that yield to the fund. No locks - withdraw anytime.`}
                 </p>
               </div>
             </div>
@@ -1396,37 +1424,37 @@ export default function CrowdfundPage() {
               </div>
               <div className="collapse-content">
                 <p className="text-sm text-base-content/70 pt-2">
-                  No, zeni.eth is the benevolent dictator of this crowdfund.
-                  However, if Streme crowdfunds work well, there&apos;s nothing
-                  stopping us from doing more and opening them up to other
-                  Streme-lauched tokens.
+                  No, the token deployer is the benevolent dictator of this
+                  crowdfund.
                 </p>
               </div>
             </div>
 
-            <div className="collapse collapse-arrow bg-base-200">
+            {/* <div className="collapse collapse-arrow bg-base-200">
               <input type="radio" name="faq-accordion" />
               <div className="collapse-title font-semibold">
-                What are SUP rewards?
+                What are {tokenConfig?.rewardToken || "SUP"} rewards?
               </div>
               <div className="collapse-content">
                 <p className="text-sm text-base-content/70 pt-2">
-                  $SUP is the Superfluid token. Fund contributors earn increases
-                  in SUP flow rate based on their contribution size. Be sure to
-                  claim daily to update your flow rate.
+                  {tokenConfig?.rewardDescription ||
+                    `$${
+                      tokenConfig?.rewardToken || "SUP"
+                    } rewards are earned based on your contribution size. Claim daily to update your flow rate.`}
                 </p>
               </div>
-            </div>
+            </div> */}
 
             <div className="collapse collapse-arrow bg-base-200">
               <input type="radio" name="faq-accordion" />
               <div className="collapse-title font-semibold">
-                Can I get my staked Streme back?
+                Can I get my staked {tokenConfig?.name || "tokens"} back?
               </div>
               <div className="collapse-content">
                 <p className="text-sm text-base-content/70 pt-2">
-                  Yes, you can withdraw your full principal at any time. Your
-                  Streme rewards will go back to your wallet.
+                  Yes, you can withdraw your full principal at any time. Your{" "}
+                  {tokenConfig?.name || "Token"} rewards will go back to your
+                  wallet.
                 </p>
               </div>
             </div>
@@ -1439,15 +1467,16 @@ export default function CrowdfundPage() {
               <div className="collapse-content">
                 <p className="text-sm text-base-content/70 pt-2">
                   We don&apos;t have detailed stats individual flow rate
-                  contributions yet, but we can see how much STREME you&apos;ve
-                  staked.
+                  contributions yet, but we can see how much{" "}
+                  {tokenConfig?.symbol || "TOKEN"} you&apos;ve staked.
                 </p>
               </div>
             </div>
             <div className="collapse collapse-arrow bg-base-200">
               <input type="radio" name="faq-accordion" />
               <div className="collapse-title font-semibold">
-                I just topped up my $STREME stake. How do I deposit?
+                I just topped up my {tokenConfig?.symbol || "TOKEN"} stake. How
+                do I deposit?
               </div>
               <div className="collapse-content">
                 <p className="text-sm text-base-content/70 pt-2">

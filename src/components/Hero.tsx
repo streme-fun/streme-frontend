@@ -51,24 +51,27 @@ export function Hero() {
   }, []);
 
   return (
-    <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-14">
+    <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-10">
       {/* Hero Text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center z-10 text-center">
         {/* Transparent background container */}
-        <div className="backdrop-blur-sm bg-base-100/1 border border-base-300/20 rounded-3xl px-8 py-6 md:px-12 md:py-8">
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-4">
+        <div className=" bg-base-100/1 border border-base-300/20 rounded-3xl px-8 py-6 md:px-12 md:py-8">
+          <h1 className="text-4xl md:text-7xl font-extrabold tracking-tight mb-4">
             <span className="text-primary drop-shadow-sm">Ape.</span>{" "}
             <span className="text-secondary drop-shadow-sm">Stake.</span>{" "}
             <span className="text-accent drop-shadow-sm">Earn.</span>
           </h1>
-          <div className="text-2xl font-semibold">
-            <span className="font-mono">
+          <div className="flex flex-col">
+            <span className="font-mono text-2xl font-semibold  md:text-3xl">
               {currentTotalRewards.toLocaleString(undefined, {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0,
               })}
             </span>
-            <span className="text-base-content/60"> rewards streamed</span>
+            <span className="text-base-content/60 font-medium text-lg">
+              {" "}
+              rewards streamed
+            </span>
           </div>
         </div>
       </div>

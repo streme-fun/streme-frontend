@@ -14,10 +14,7 @@ import { publicClient } from "../lib/viemClient";
 import { GDA_FORWARDER, GDA_ABI } from "../lib/contracts";
 import { useStreamingNumber } from "../hooks/useStreamingNumber";
 import { useTokenData } from "../hooks/useTokenData";
-import {
-  formatMarketCap,
-  format24hChange,
-} from "../lib/formatUtils";
+import { formatMarketCap, format24hChange } from "../lib/formatUtils";
 
 interface PoolMembership {
   units: string;
@@ -199,19 +196,29 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [accountExists, setAccountExists] = useState<boolean | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Progressive loading states
-  const [loadingPhase, setLoadingPhase] = useState<'initial' | 'balances' | 'metadata' | 'complete'>('initial');
-  
+  const [loadingPhase, setLoadingPhase] = useState<
+    "initial" | "balances" | "metadata" | "complete"
+  >("initial");
+
   // Liquidity data cache for sorting
-  const [liquidityCache, setLiquidityCache] = useState<Map<string, boolean>>(new Map());
+  const [liquidityCache, setLiquidityCache] = useState<Map<string, boolean>>(
+    new Map()
+  );
 
   // Get effective address based on context
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
   const effectiveIsConnected = isMiniAppView ? fcIsConnected : !!wagmiAddress;
 
   // Use centralized token data hook
-  const { balanceData, refreshTokenData, refreshAllData, registerActiveToken, unregisterActiveToken } = useTokenData();
+  const {
+    balanceData,
+    refreshTokenData,
+    refreshAllData,
+    registerActiveToken,
+    unregisterActiveToken,
+  } = useTokenData();
 
   // Helper function to safely call toLowerCase on potentially null values
   const safeToLowerCase = (value: string | null | undefined): string => {
@@ -278,7 +285,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
         });
 
         const batchResults = await Promise.all(batchPromises);
-        
+
         // Process results
         batchResults.forEach(({ batch, tokens }) => {
           batch.forEach((address, index) => {
@@ -289,13 +296,13 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                 logo: tokenData.img_url || tokenData.logo || tokenData.image,
                 marketData: tokenData.marketData,
               };
-              
+
               // Cache the result
               tokenDataCache.set(address, {
                 data: processedData,
                 timestamp: now,
               });
-              
+
               results.set(address, processedData);
             } else {
               // Token not found in database
@@ -446,14 +453,14 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
   // Effect to trigger Phase 2 when loading phase changes to 'balances'
   useEffect(() => {
-    if (loadingPhase === 'balances') {
+    if (loadingPhase === "balances") {
       processPhase2();
     }
   }, [loadingPhase]);
 
   // Effect to trigger Phase 3 when loading phase changes to 'metadata'
   useEffect(() => {
-    if (loadingPhase === 'metadata') {
+    if (loadingPhase === "metadata") {
       processPhase3();
     }
   }, [loadingPhase]);
@@ -463,7 +470,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     if (!effectiveAddress || stakes.length === 0) return;
 
     const stakesWithStaking = stakes.filter(
-      stake => stake.stakingAddress && stake.stakingAddress !== ""
+      (stake) => stake.stakingAddress && stake.stakingAddress !== ""
     );
 
     if (stakesWithStaking.length === 0) return;
@@ -493,14 +500,14 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
       );
 
       // Update stakes with new staked balances
-      setStakes(prevStakes =>
-        prevStakes.map(stake => {
+      setStakes((prevStakes) =>
+        prevStakes.map((stake) => {
           const resultIndex = stakesWithStaking.findIndex(
-            s => s.tokenAddress === stake.tokenAddress
+            (s) => s.tokenAddress === stake.tokenAddress
           );
           if (resultIndex >= 0) {
             const result = stakedBalanceResults[resultIndex];
-            if (result.status === 'fulfilled') {
+            if (result.status === "fulfilled") {
               return {
                 ...stake,
                 stakedBalance: result.value.stakedBalance,
@@ -511,7 +518,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
         })
       );
     } catch (error) {
-      console.warn('Failed to refresh staked balances:', error);
+      console.warn("Failed to refresh staked balances:", error);
     }
   }, [effectiveAddress, stakes]);
 
@@ -524,18 +531,25 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
   }, [isOpen, refreshStakedBalances]);
 
   // Create stable token list for dependencies
-  const tokenAddresses = stakes.map(s => s.tokenAddress).concat(ownedSuperTokens.map(t => t.tokenAddress)).sort().join(',');
-  
+  const tokenAddresses = stakes
+    .map((s) => s.tokenAddress)
+    .concat(ownedSuperTokens.map((t) => t.tokenAddress))
+    .sort()
+    .join(",");
+
   // Register active tokens when modal is open
   useEffect(() => {
     if (isOpen) {
-      const allTokens = [...stakes.map(s => s.tokenAddress), ...ownedSuperTokens.map(t => t.tokenAddress)];
-      allTokens.forEach(token => {
+      const allTokens = [
+        ...stakes.map((s) => s.tokenAddress),
+        ...ownedSuperTokens.map((t) => t.tokenAddress),
+      ];
+      allTokens.forEach((token) => {
         registerActiveToken(token);
       });
-      
+
       return () => {
-        allTokens.forEach(token => {
+        allTokens.forEach((token) => {
           unregisterActiveToken(token);
         });
       };
@@ -544,15 +558,19 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
   // Update stakes when balance data changes (but only when not loading/refreshing)
   useEffect(() => {
-    if (!effectiveAddress || stakes.length === 0 || loading || refreshing) return;
+    if (!effectiveAddress || stakes.length === 0 || loading || refreshing)
+      return;
 
     setStakes((prevStakes) =>
       prevStakes.map((stake) => {
         const cacheKey = `${stake.tokenAddress}-${effectiveAddress}`;
         const cachedData = balanceData.get(cacheKey);
 
-        if (cachedData && stake.stakingAddress) { // Only update if we have stakingAddress (stake is fully loaded)
-          const formattedBalance = Number(formatUnits(cachedData.tokenBalance, 18));
+        if (cachedData && stake.stakingAddress) {
+          // Only update if we have stakingAddress (stake is fully loaded)
+          const formattedBalance = Number(
+            formatUnits(cachedData.tokenBalance, 18)
+          );
           if (Math.abs(formattedBalance - stake.baseAmount) > 0.01) {
             return {
               ...stake,
@@ -664,7 +682,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     accountTokenSnapshots?: AccountTokenSnapshot[];
   }) => {
     // Reset progressive loading states
-    setLoadingPhase('initial');
+    setLoadingPhase("initial");
     // Step 1: Quick filtering and data collection
     const allTokens = new Set<string>();
     const validMemberships: PoolMembership[] = [];
@@ -716,7 +734,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     // Build initial data structures with just subgraph data
     validMemberships.forEach((membership) => {
       const tokenAddress = membership.pool.token.id;
-      
+
       // Calculate user flow rate
       const totalUnits = BigInt(membership.pool.totalUnits || "0");
       const memberUnits = BigInt(membership.units || "0");
@@ -771,42 +789,48 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     // Set initial states immediately for fast UI
     setStakes(stakesData);
     setOwnedSuperTokens(superTokensData);
-    
+
     // Trigger Phase 2 after a brief delay to allow React to render
     setTimeout(() => {
-      setLoadingPhase('balances');
+      setLoadingPhase("balances");
     }, 100);
   };
 
   // Phase 2: Load blockchain balances (critical data)
   const processPhase2 = async () => {
-    if (!effectiveAddress || stakes.length === 0 && ownedSuperTokens.length === 0) return;
-    
-    const uniqueTokens = Array.from(new Set([
-      ...stakes.map(stake => stake.tokenAddress),
-      ...ownedSuperTokens.map(token => token.tokenAddress)
-    ]));
-    
+    if (
+      !effectiveAddress ||
+      (stakes.length === 0 && ownedSuperTokens.length === 0)
+    )
+      return;
+
+    const uniqueTokens = Array.from(
+      new Set([
+        ...stakes.map((stake) => stake.tokenAddress),
+        ...ownedSuperTokens.map((token) => token.tokenAddress),
+      ])
+    );
+
     const balanceResults = new Map();
-    
+
     // Try to use cached balance data first
     for (const token of uniqueTokens) {
       const cacheKey = `${token}-${effectiveAddress}`;
       const cachedData = balanceData.get(cacheKey);
-      
+
       if (cachedData) {
         balanceResults.set(`balance-${token}-${effectiveAddress}`, {
           balance: cachedData.tokenBalance,
-          timestamp: cachedData.lastUpdated
+          timestamp: cachedData.lastUpdated,
         });
       }
     }
-    
+
     // Fetch any missing balances
     const missingTokens = uniqueTokens.filter(
-      token => !balanceResults.has(`balance-${token}-${effectiveAddress}`)
+      (token) => !balanceResults.has(`balance-${token}-${effectiveAddress}`)
     );
-    
+
     if (missingTokens.length > 0) {
       const additionalResults = await fetchBlockchainDataBatch(
         missingTokens.map((token) => ({
@@ -821,13 +845,13 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     }
 
     // Update states with balance data
-    const stakesWithBalances = stakes.map(stake => {
+    const stakesWithBalances = stakes.map((stake) => {
       const balanceCacheKey = `balance-${stake.tokenAddress}-${effectiveAddress}`;
       const balanceData = balanceResults.get(balanceCacheKey);
       const formattedBalance = balanceData?.balance
         ? Number(formatUnits(balanceData.balance, 18))
         : 0;
-      
+
       return {
         ...stake,
         receivedBalance: formattedBalance,
@@ -835,13 +859,13 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
       };
     });
 
-    const superTokensWithBalances = ownedSuperTokens.map(token => {
+    const superTokensWithBalances = ownedSuperTokens.map((token) => {
       const balanceCacheKey = `balance-${token.tokenAddress}-${effectiveAddress}`;
       const balanceData = balanceResults.get(balanceCacheKey);
       const formattedBalance = balanceData?.balance
         ? Number(formatUnits(balanceData.balance, 18))
         : 0;
-      
+
       return {
         ...token,
         balance: formattedBalance,
@@ -850,39 +874,46 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
     // Load staking data for stakes
     const finalStakesData = await loadStakingDataSync(stakesWithBalances);
-    
+
     setStakes(finalStakesData);
     setOwnedSuperTokens(superTokensWithBalances);
-    
+
     // Trigger Phase 3 after a brief delay
     setTimeout(() => {
-      setLoadingPhase('metadata');
+      setLoadingPhase("metadata");
     }, 300);
   };
 
   // Phase 3: Load metadata (logos, market data) and liquidity data - non-critical
   const processPhase3 = async () => {
-    if (!effectiveAddress || stakes.length === 0 && ownedSuperTokens.length === 0) return;
-    
-    const uniqueTokens = Array.from(new Set([
-      ...stakes.map(stake => stake.tokenAddress),
-      ...ownedSuperTokens.map(token => token.tokenAddress)
-    ]));
-    
+    if (
+      !effectiveAddress ||
+      (stakes.length === 0 && ownedSuperTokens.length === 0)
+    )
+      return;
+
+    const uniqueTokens = Array.from(
+      new Set([
+        ...stakes.map((stake) => stake.tokenAddress),
+        ...ownedSuperTokens.map((token) => token.tokenAddress),
+      ])
+    );
+
     const tokenDataMap = await fetchTokenDataBatch(uniqueTokens);
-    
+
     // Check liquidity for all tokens
     await checkLiquidityBatch(uniqueTokens);
-    
+
     // Update states with metadata
-    const stakesWithMetadata = stakes.map(stake => ({
+    const stakesWithMetadata = stakes.map((stake) => ({
       ...stake,
-      stakingAddress: tokenDataMap.get(stake.tokenAddress)?.staking_address || "",
+      stakingAddress:
+        tokenDataMap.get(stake.tokenAddress)?.staking_address || "",
       logo: tokenDataMap.get(stake.tokenAddress)?.logo,
       marketData: tokenDataMap.get(stake.tokenAddress)?.marketData,
     }));
 
-    const superTokensWithMetadata = ownedSuperTokens.map(token => ({
+    const superTokensWithMetadata = ownedSuperTokens.map((token) => ({
       ...token,
       stakingAddress: tokenDataMap.get(token.tokenAddress)?.staking_address,
       logo: tokenDataMap.get(token.tokenAddress)?.logo,
@@ -891,13 +922,13 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
     setStakes(stakesWithMetadata);
     setOwnedSuperTokens(superTokensWithMetadata);
-    setLoadingPhase('complete');
-    
+    setLoadingPhase("complete");
+
     // Register active tokens for automatic refresh
-    stakesWithMetadata.forEach(stake => {
+    stakesWithMetadata.forEach((stake) => {
       registerActiveToken(stake.tokenAddress);
     });
-    superTokensWithMetadata.forEach(token => {
+    superTokensWithMetadata.forEach((token) => {
       registerActiveToken(token.tokenAddress);
     });
   };
@@ -1021,12 +1052,11 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     return percentage.toFixed(2);
   };
 
-
   // Helper function to render 24h change
   const render24hChange = (change24h: number | undefined) => {
     const { formatted, isPositive } = format24hChange(change24h);
     if (isPositive === null) return formatted;
-    
+
     return (
       <span className={isPositive ? "text-green-500" : "text-red-500"}>
         {formatted}
@@ -1051,14 +1081,16 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
   // Function to check liquidity for multiple tokens
   const checkLiquidityBatch = async (tokenAddresses: string[]) => {
     const newLiquidityCache = new Map(liquidityCache);
-    
+
     // Check liquidity for each token that's not already cached
-    const uncachedTokens = tokenAddresses.filter(addr => !newLiquidityCache.has(addr.toLowerCase()));
-    
-    console.log('Checking liquidity for tokens:', uncachedTokens);
-    
+    const uncachedTokens = tokenAddresses.filter(
+      (addr) => !newLiquidityCache.has(addr.toLowerCase())
+    );
+
+    console.log("Checking liquidity for tokens:", uncachedTokens);
+
     if (uncachedTokens.length === 0) {
-      console.log('All tokens already cached');
+      console.log("All tokens already cached");
       return;
     }
 
@@ -1078,34 +1110,47 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
             },
             body: JSON.stringify({ tokenAddresses: batch }),
           });
-          
+
           if (response.ok) {
             const result = await response.json();
-            
+
             batch.forEach((tokenAddress, index) => {
               const tokenData = result.tokens[index];
-              
+
               console.log(`Token data for ${tokenAddress}:`, tokenData);
-              
+
               if (tokenData?.marketData) {
                 const marketCap = tokenData.marketData.marketCap || 0;
                 // Try different date fields that might exist
-                const launchTime = tokenData.created_at || 
-                                  tokenData.timestamp?.seconds ? new Date(tokenData.timestamp.seconds * 1000) :
-                                  tokenData.timestamp?._seconds ? new Date(tokenData.timestamp._seconds * 1000) :
-                                  new Date();
-                const hoursSinceLaunch = (Date.now() - new Date(launchTime).getTime()) / (1000 * 60 * 60);
-                
+                const launchTime =
+                  tokenData.created_at || tokenData.timestamp?.seconds
+                    ? new Date(tokenData.timestamp.seconds * 1000)
+                    : tokenData.timestamp?._seconds
+                    ? new Date(tokenData.timestamp._seconds * 1000)
+                    : new Date();
+                const hoursSinceLaunch =
+                  (Date.now() - new Date(launchTime).getTime()) /
+                  (1000 * 60 * 60);
+
                 // Consider low liquidity if:
                 // 1. Market cap is very low (< $5000) AND token is older than 1 hour
                 // 2. Or market cap is extremely low (< $1000) regardless of age
-                const isLowLiquidity = (marketCap < 5000 && hoursSinceLaunch > 1) || marketCap < 1000;
-                
-                console.log(`Token ${tokenAddress}: marketCap=${marketCap}, hoursSinceLaunch=${hoursSinceLaunch}, isLowLiquidity=${isLowLiquidity}`);
-                
-                newLiquidityCache.set(tokenAddress.toLowerCase(), isLowLiquidity);
+                const isLowLiquidity =
+                  (marketCap < 5000 && hoursSinceLaunch > 1) ||
+                  marketCap < 1000;
+
+                console.log(
+                  `Token ${tokenAddress}: marketCap=${marketCap}, hoursSinceLaunch=${hoursSinceLaunch}, isLowLiquidity=${isLowLiquidity}`
+                );
+
+                newLiquidityCache.set(
+                  tokenAddress.toLowerCase(),
+                  isLowLiquidity
+                );
               } else {
-                console.log(`No market data for ${tokenAddress}, assuming normal liquidity`);
+                console.log(
+                  `No market data for ${tokenAddress}, assuming normal liquidity`
+                );
                 // If no market data, assume normal liquidity
                 newLiquidityCache.set(tokenAddress.toLowerCase(), false);
               }
@@ -1113,23 +1158,26 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
           } else {
             console.warn(`Batch API call failed: ${response.status}`);
             // Default all tokens in batch to normal liquidity on error
-            batch.forEach(tokenAddress => {
+            batch.forEach((tokenAddress) => {
               newLiquidityCache.set(tokenAddress.toLowerCase(), false);
             });
           }
         } catch (error) {
           console.warn(`Failed to check liquidity for batch:`, error);
           // Default all tokens in batch to normal liquidity on error
-          batch.forEach(tokenAddress => {
+          batch.forEach((tokenAddress) => {
             newLiquidityCache.set(tokenAddress.toLowerCase(), false);
           });
         }
       }
-      
-      console.log('Updated liquidity cache:', Array.from(newLiquidityCache.entries()));
+
+      console.log(
+        "Updated liquidity cache:",
+        Array.from(newLiquidityCache.entries())
+      );
       setLiquidityCache(newLiquidityCache);
     } catch (error) {
-      console.warn('Batch liquidity check failed:', error);
+      console.warn("Batch liquidity check failed:", error);
     }
   };
 
@@ -1226,7 +1274,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     if (tokenAddress) {
       // Use centralized refresh for the specific token
       await refreshTokenData(tokenAddress, stakingAddress);
-      
+
       // Also update staked balance if staking address is provided
       if (stakingAddress) {
         updateStakedBalance(stakingAddress, tokenAddress);
@@ -1238,7 +1286,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
         await refreshAllData();
       }, 500);
     }
-    
+
     // Refresh staked balances to update unstake timers
     setTimeout(() => {
       refreshStakedBalances();
@@ -1257,7 +1305,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
   const handleSuperTokenStakeSuccess = async (tokenAddress: string) => {
     // Refresh token data which will update balances
     await refreshTokenData(tokenAddress);
-    
+
     // Also refresh stake data to see if new stake was created
     // Use a short delay to ensure the blockchain state is updated
     setTimeout(() => {
@@ -1533,9 +1581,24 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                   })
                   .reduce((acc, stake) => {
                     // Deduplicate by token address - keep the highest stake if multiple pools exist
-                    const existing = acc.find(s => s.tokenAddress.toLowerCase() === stake.tokenAddress.toLowerCase());
-                    if (!existing || calculateStakeUSDValue(stake) > calculateStakeUSDValue(existing)) {
-                      return [...acc.filter(s => s.tokenAddress.toLowerCase() !== stake.tokenAddress.toLowerCase()), stake];
+                    const existing = acc.find(
+                      (s) =>
+                        s.tokenAddress.toLowerCase() ===
+                        stake.tokenAddress.toLowerCase()
+                    );
+                    if (
+                      !existing ||
+                      calculateStakeUSDValue(stake) >
+                        calculateStakeUSDValue(existing)
+                    ) {
+                      return [
+                        ...acc.filter(
+                          (s) =>
+                            s.tokenAddress.toLowerCase() !==
+                            stake.tokenAddress.toLowerCase()
+                        ),
+                        stake,
+                      ];
                     }
                     return acc;
                   }, [] as StakeData[])
@@ -1543,11 +1606,11 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                     // First sort by liquidity status (normal liquidity tokens first)
                     const aIsLowLiquidity = isStakeLowLiquidity(a);
                     const bIsLowLiquidity = isStakeLowLiquidity(b);
-                    
+
                     if (aIsLowLiquidity !== bIsLowLiquidity) {
                       return aIsLowLiquidity ? 1 : -1; // Normal liquidity first
                     }
-                    
+
                     // Within the same liquidity group, sort by total USD value in descending order
                     const aUSDValue = calculateStakeUSDValue(a);
                     const bUSDValue = calculateStakeUSDValue(b);
@@ -1563,7 +1626,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                           <div className="flex items-center gap-3">
                             {/* Token Logo */}
                             <div className="w-8 h-8 rounded-full overflow-hidden bg-base-200 flex items-center justify-center">
-                              {loadingPhase !== 'complete' && !stake.logo ? (
+                              {loadingPhase !== "complete" && !stake.logo ? (
                                 <div className="w-full h-full bg-base-300 animate-pulse" />
                               ) : stake.logo ? (
                                 <img
@@ -1581,7 +1644,10 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                               ) : null}
                               <div
                                 className={`${
-                                  stake.logo || (loadingPhase !== 'complete' && !stake.logo) ? "hidden" : ""
+                                  stake.logo ||
+                                  (loadingPhase !== "complete" && !stake.logo)
+                                    ? "hidden"
+                                    : ""
                                 } w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold`}
                               >
                                 {stake.membership.pool.token.symbol.charAt(0)}
@@ -1606,9 +1672,9 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                           </div>
                           <div className="flex flex-col items-start">
                             <div className="text-right text-xs uppercase tracking-wider opacity-50">
-                              MKT CAP
+                              MCAP
                             </div>
-                            {loadingPhase !== 'complete' ? (
+                            {loadingPhase !== "complete" ? (
                               <div className="flex gap-2 items-baseline">
                                 <div className="h-4 w-16 bg-base-300 rounded animate-pulse" />
                                 <div className="h-3 w-12 bg-base-300 rounded animate-pulse" />
@@ -1708,7 +1774,8 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                         </div>
 
                         {/* Action buttons - show if we have a valid staking address */}
-                        {loadingPhase !== 'complete' && stake.stakingAddress === "" ? (
+                        {loadingPhase !== "complete" &&
+                        stake.stakingAddress === "" ? (
                           <div className="pt-3">
                             <div className="btn btn-disabled btn-sm w-full">
                               <span className="loading loading-spinner loading-xs"></span>
@@ -1716,8 +1783,8 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                             </div>
                           </div>
                         ) : stake.stakingAddress &&
-                        stake.stakingAddress !==
-                          "0x0000000000000000000000000000000000000000" ? (
+                          stake.stakingAddress !==
+                            "0x0000000000000000000000000000000000000000" ? (
                           <div className="space-y-2">
                             <div className="grid grid-cols-2 gap-2">
                               <StakeButton
@@ -1800,9 +1867,20 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                   })
                   .reduce((acc, token) => {
                     // Deduplicate by token address - keep the one with highest balance if duplicates exist
-                    const existing = acc.find(t => t.tokenAddress.toLowerCase() === token.tokenAddress.toLowerCase());
+                    const existing = acc.find(
+                      (t) =>
+                        t.tokenAddress.toLowerCase() ===
+                        token.tokenAddress.toLowerCase()
+                    );
                     if (!existing || token.balance > existing.balance) {
-                      return [...acc.filter(t => t.tokenAddress.toLowerCase() !== token.tokenAddress.toLowerCase()), token];
+                      return [
+                        ...acc.filter(
+                          (t) =>
+                            t.tokenAddress.toLowerCase() !==
+                            token.tokenAddress.toLowerCase()
+                        ),
+                        token,
+                      ];
                     }
                     return acc;
                   }, [] as SuperTokenData[])
@@ -1810,11 +1888,11 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                     // First sort by liquidity status (normal liquidity tokens first)
                     const aIsLowLiquidity = isTokenLowLiquidity(a);
                     const bIsLowLiquidity = isTokenLowLiquidity(b);
-                    
+
                     if (aIsLowLiquidity !== bIsLowLiquidity) {
                       return aIsLowLiquidity ? 1 : -1; // Normal liquidity first
                     }
-                    
+
                     // Within the same liquidity group, sort by USD value in descending order
                     const aUSDValue = calculateTokenUSDValue(a);
                     const bUSDValue = calculateTokenUSDValue(b);
@@ -1830,7 +1908,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                           <div className="flex items-center gap-3">
                             {/* Token Logo */}
                             <div className="w-8 h-8 rounded-full overflow-hidden bg-base-200 flex items-center justify-center">
-                              {loadingPhase !== 'complete' ? (
+                              {loadingPhase !== "complete" ? (
                                 <div className="w-full h-full bg-base-300 rounded-full animate-pulse" />
                               ) : token.logo ? (
                                 <img
@@ -1870,9 +1948,9 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                           <div className="flex flex-col items-end text-right">
                             <div className="flex flex-col items-baseline">
                               <div className="text-right text-xs uppercase tracking-wider opacity-50">
-                                MKT CAP
+                                MCAP
                               </div>
-                              {loadingPhase !== 'complete' ? (
+                              {loadingPhase !== "complete" ? (
                                 <div className="flex gap-2 items-baseline">
                                   <div className="h-4 w-16 bg-base-300 rounded animate-pulse" />
                                   <div className="h-3 w-12 bg-base-300 rounded animate-pulse" />
@@ -1880,7 +1958,9 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                               ) : (
                                 <div className="flex gap-2 items-baseline">
                                   <div className="font-mono text-sm font-bold">
-                                    {formatMarketCap(token.marketData?.marketCap)}
+                                    {formatMarketCap(
+                                      token.marketData?.marketCap
+                                    )}
                                   </div>
                                   <div className="text-xs mt-1">
                                     {render24hChange(
