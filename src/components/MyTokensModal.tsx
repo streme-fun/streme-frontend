@@ -15,6 +15,7 @@ import { GDA_FORWARDER, GDA_ABI } from "../lib/contracts";
 import { useStreamingNumber } from "../hooks/useStreamingNumber";
 import { useTokenData } from "../hooks/useTokenData";
 import { formatMarketCap, format24hChange } from "../lib/formatUtils";
+import { memo } from "react";
 
 interface PoolMembership {
   units: string;
@@ -90,7 +91,7 @@ interface MyTokensModalProps {
 }
 
 // Component for displaying streaming current balance
-const CurrentBalanceDisplay = ({
+const CurrentBalanceDisplay = memo(({
   stake,
 }: {
   stake: StakeData;
@@ -122,7 +123,9 @@ const CurrentBalanceDisplay = ({
       </div>
     </div>
   );
-};
+});
+
+CurrentBalanceDisplay.displayName = "CurrentBalanceDisplay";
 
 // Optimized cache with better TTL management
 const tokenDataCache = new Map<

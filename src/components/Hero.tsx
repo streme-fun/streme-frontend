@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import { Token } from "@/src/app/types/token";
 import { HeroAnimation } from "./HeroAnimation";
@@ -10,7 +10,7 @@ import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 // const initialTotal = 4234567.89; // About $4.2M
 // const ratePerSecond = 52.45; // About $4.5M per day
 
-export function Hero() {
+const HeroComponent = () => {
   const [initialTotalRewards, setInitialTotalRewards] = useState(0);
 
   // Use the reward counter hook for animated total rewards
@@ -80,4 +80,8 @@ export function Hero() {
       <HeroAnimation />
     </div>
   );
-}
+};
+
+export const Hero = memo(HeroComponent);
+
+Hero.displayName = "Hero";

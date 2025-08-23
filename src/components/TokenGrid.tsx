@@ -10,6 +10,7 @@ import { Token } from "../app/types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 import { CROWDFUND_TOKEN_ADDRESSES } from "@/src/lib/crowdfundTokens";
+import { memo } from "react";
 
 interface TokenGridProps {
   tokens: Token[];
@@ -447,7 +448,7 @@ export const TrendingTokensCarousel = ({
   );
 };
 
-const TokenCardComponent = ({
+const TokenCardComponent = memo(({
   token,
   isMiniApp = false,
 }: {
@@ -687,7 +688,9 @@ const TokenCardComponent = ({
       </div>
     </Link>
   );
-};
+});
+
+TokenCardComponent.displayName = "TokenCardComponent";
 
 export function TokenGrid({
   tokens,

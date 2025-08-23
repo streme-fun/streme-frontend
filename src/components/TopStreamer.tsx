@@ -2,13 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { Token } from "@/src/app/types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
 import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 
-export function TopStreamer() {
+const TopStreamerComponent = () => {
   const [token, setToken] = useState<Token | null>(null);
   const [initialRewards, setInitialRewards] = useState(0);
   const [totalStakers, setTotalStakers] = useState(0);
@@ -234,4 +234,8 @@ export function TopStreamer() {
       </div>
     </div>
   );
-}
+};
+
+export const TopStreamer = memo(TopStreamerComponent);
+
+TopStreamer.displayName = "TopStreamer";
