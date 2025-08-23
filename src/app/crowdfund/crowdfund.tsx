@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
+import Script from "next/script";
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
 import { ERC20_ABI } from "@/src/lib/contracts/StremeStakingRewardsFunder";
@@ -30,6 +31,190 @@ interface CrowdfundPageProps {
   tokenAddress?: string;
   tokenConfig?: CrowdfundToken;
 }
+
+// Video/Embed Player Component - Memoized to prevent re-renders from animation
+const VideoPlayer = memo(
+  ({
+    src,
+    onError,
+    onLoad,
+  }: {
+    src: string;
+    onError: () => void;
+    onLoad: () => void;
+  }) => {
+    const [loading, setLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
+
+    // Extract Vimeo ID from URL - simplified for known format
+    const getVimeoId = (url: string): string | null => {
+      const match = url.match(/vimeo\.com\/(\d+)/);
+      return match ? match[1] : null;
+    };
+
+    const isVimeoUrl = src.includes("vimeo.com");
+    const vimeoId = isVimeoUrl ? getVimeoId(src) : null;
+
+    const handleError = (event?: Event | React.SyntheticEvent) => {
+      console.error("Video/embed failed to load:", src);
+      console.error("Error details:", event);
+      if (isVimeoUrl) {
+        console.error("Vimeo embed details:", {
+          id: vimeoId,
+          constructedUrl: `https://player.vimeo.com/video/${vimeoId}?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1&muted=1`
+        });
+      }
+      setLoading(false);
+      setHasError(true);
+      onError();
+    };
+
+    const handleLoad = () => {
+      console.log("Video/embed loaded successfully:", src);
+      setLoading(false);
+      onLoad();
+    };
+
+    const handleIframeLoad = () => {
+      setLoading(false);
+      onLoad();
+    };
+
+    return (
+      <div className="relative w-full h-full">
+        {loading && !hasError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-base-200 rounded-lg z-10">
+            <div className="loading loading-spinner loading-lg"></div>
+          </div>
+        )}
+        {!hasError ? (
+          <>
+            {isVimeoUrl && vimeoId ? (
+              <>
+                <iframe
+                  src={`https://player.vimeo.com/video/${vimeoId}?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1&muted=1`}
+                  className={`w-full h-full rounded-lg transition-opacity duration-300 ${
+                    loading ? "opacity-0" : "opacity-100"
+                  }`}
+                  style={{ border: 0 }}
+                  allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  onLoad={handleIframeLoad}
+                  onError={handleError}
+                  title="$BUTTHOLE Launch"
+                />
+                <Script src="https://player.vimeo.com/api/player.js" strategy="lazyOnload" />
+              </>
+            ) : (
+              <video
+                className={`w-full h-full object-cover rounded-lg transition-opacity duration-300 ${
+                  loading ? "opacity-0" : "opacity-100"
+                }`}
+                autoPlay
+                loop
+                muted
+                playsInline
+                onError={handleError}
+                onLoadedData={handleLoad}
+                onLoadStart={() => setLoading(true)}
+              >
+                <source src={src} type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            )}
+          </>
+        ) : (
+          // Fallback for blocked videos - show clickable thumbnail
+          isVimeoUrl && vimeoId ? (
+            <div className="relative w-full h-full flex items-center justify-center bg-base-200 rounded-lg cursor-pointer hover:bg-base-300 transition-colors"
+                 onClick={() => window.open(src, '_blank')}>
+              <div className="text-center p-4">
+                <div className="text-4xl mb-2">🎥</div>
+                <div className="text-sm font-medium">Video Blocked</div>
+                <div className="text-xs text-base-content/60 mt-1">Click to view on Vimeo</div>
+              </div>
+            </div>
+          ) : null
+        )}
+      </div>
+    );
+  }
+);
+
+VideoPlayer.displayName = "VideoPlayer";
+
+// Animated Balance Component - Isolated to prevent video re-renders
+const AnimatedBalance = memo(
+  ({
+    amount,
+    symbol,
+    subtitle,
+  }: {
+    amount: number;
+    symbol: string;
+    subtitle: string;
+  }) => {
+    return (
+      <div className="mt-1 mb-1">
+        <div className="text-center">
+          <div className="text-2xl font-bold font-mono text-primary">
+            {amount.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}{" "}
+            {symbol}
+          </div>
+          <div className="text-xs text-base-content/60">{subtitle}</div>
+        </div>
+      </div>
+    );
+  }
+);
+
+AnimatedBalance.displayName = "AnimatedBalance";
+
+// Animated Balance with USD Component - Isolated to prevent video re-renders
+const AnimatedBalanceWithUSD = memo(
+  ({
+    amount,
+    symbol,
+    usdValue,
+    price,
+    subtitle,
+  }: {
+    amount: number;
+    symbol: string;
+    usdValue: number;
+    price: number | null;
+    subtitle: string;
+  }) => {
+    return (
+      <div className="mt-2 mb-1">
+        <div className="text-center">
+          <div className="text-3xl font-bold font-mono text-primary">
+            {amount.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}{" "}
+            {symbol}
+          </div>
+          <div className="text-lg font-bold text-success mt-1">
+            {price
+              ? `($${usdValue.toLocaleString("en-US", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })} USD)`
+              : "Loading price..."}
+          </div>
+          <div className="text-xs text-base-content/60 mt-1">{subtitle}</div>
+        </div>
+      </div>
+    );
+  }
+);
+
+AnimatedBalanceWithUSD.displayName = "AnimatedBalanceWithUSD";
 
 export default function CrowdfundPage({
   tokenAddress = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58",
@@ -87,12 +272,26 @@ export default function CrowdfundPage({
   const [lastWithdrawAmount, setLastWithdrawAmount] = useState("");
   const [unlockTime, setUnlockTime] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>("");
+  const [videoError, setVideoError] = useState<boolean>(false);
+
+  // Memoized callbacks for video component to prevent re-renders
+  const handleVideoError = useCallback(() => {
+    console.log("Video failed to load, falling back to animation");
+    setVideoError(true);
+  }, []);
+
+  const handleVideoLoad = useCallback(() => {
+    console.log("Video loaded successfully");
+  }, []);
 
   const CURRENT_TOKEN_ADDRESS = tokenAddress;
   const DEPOSIT_CONTRACT_ADDRESS =
     tokenConfig?.depositContractAddress ||
     "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
   // const GOAL = 1000; // $1000 USD goal
+
+  // Check if token has video configuration
+  const hasVideo = Boolean(tokenConfig?.videoUrl);
 
   // ABI for the staking contract to check deposit timestamps
   const stakingAbi = useMemo(
@@ -368,43 +567,48 @@ export default function CrowdfundPage({
   }, [baseStremeAmount]);
 
   // Fetch contributors leaderboard
-  const fetchContributors = useCallback(async (forceRefresh = false) => {
-    try {
-      console.log(
-        "Fetching contributors from API...",
-        forceRefresh ? "(force refresh)" : ""
-      );
-      setIsLoadingContributors(true);
+  const fetchContributors = useCallback(
+    async (forceRefresh = false) => {
+      try {
+        console.log(
+          "Fetching contributors from API...",
+          forceRefresh ? "(force refresh)" : ""
+        );
+        setIsLoadingContributors(true);
 
-      // Use force parameter for explicit refreshes and pass token address
-      const baseParams = tokenConfig?.depositContractAddress
-        ? `contract=${tokenConfig.depositContractAddress}`
-        : "";
-      const forceParam = forceRefresh ? "force=true" : "";
-      const params = [baseParams, forceParam].filter(Boolean).join("&");
-      const url = params
-        ? `/api/crowdfund/leaderboard?${params}`
-        : "/api/crowdfund/leaderboard";
+        // Use the crowdfund contract address from tokenConfig or fallback
+        const contractAddress =
+          tokenConfig?.depositContractAddress || DEPOSIT_CONTRACT_ADDRESS;
+        const params = new URLSearchParams({ contract: contractAddress });
+        if (forceRefresh) {
+          params.append('force', 'true');
+        }
+        const url = `/api/crowdfund/leaderboard?${params.toString()}`;
 
-      const response = await fetch(url, {
-        // Allow browser caching when not forcing refresh
-        cache: forceRefresh ? "reload" : "default",
-      });
+        const response = await fetch(url, {
+          // Allow browser caching when not forcing refresh
+          cache: forceRefresh ? "no-cache" : "default",
+        });
 
-      console.log("Contributors API response status:", response.status);
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Contributors data:", data);
-        setContributors(data);
-      } else {
-        console.error("Contributors API failed with status:", response.status);
+        console.log("Contributors API response status:", response.status);
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Contributors data:", data);
+          setContributors(data);
+        } else {
+          console.error(
+            "Contributors API failed with status:",
+            response.status
+          );
+        }
+      } catch (error) {
+        console.error("Error fetching contributors:", error);
+      } finally {
+        setIsLoadingContributors(false);
       }
-    } catch (error) {
-      console.error("Error fetching contributors:", error);
-    } finally {
-      setIsLoadingContributors(false);
-    }
-  }, []);
+    },
+    [tokenConfig?.depositContractAddress, DEPOSIT_CONTRACT_ADDRESS]
+  );
 
   // Fetch contributors with retry logic for transaction updates
   const fetchContributorsWithRetry = useCallback(async () => {
@@ -776,7 +980,7 @@ export default function CrowdfundPage({
     const shareUrl = `https://streme.fun/crowdfund/${shareTokenAddress}`;
     const shareText = `I just contributed ${successAmount} ${
       tokenConfig?.symbol?.toLowerCase() || "tokens"
-    } to the ${tokenConfig?.fundTitle || "growth fund"}! 🚀`;
+    } to the ${tokenConfig?.fundTitle || "crowdfund"}! 🚀`;
 
     if (isMiniAppView && isSDKLoaded && sdk) {
       try {
@@ -883,7 +1087,7 @@ export default function CrowdfundPage({
               <div className="flex items-center gap-1 justify-between">
                 <h2 className="text-lg md:text-xl font-bold text-base-content">
                   {tokenConfig?.fundTitle ||
-                    `${tokenConfig?.name || "Token"} Growth Fund`}
+                    `${tokenConfig?.name || "Token"} Crowdfund`}
                 </h2>
                 {/* Info button in top right */}
                 <div className="flex items-center gap-1 ml-2">
@@ -924,30 +1128,30 @@ export default function CrowdfundPage({
         <div className="mb-3">
           {effectiveIsConnected ? (
             <div>
-              {/* Crowdfund Animation with Token Image */}
+              {/* Crowdfund Animation with Token Image or Video if configured */}
               <div className="text-center mb-2 relative">
-                <CrowdfundAnimation
-                  contributorCount={0}
-                  growthRate={Math.max(stremeGrowthRate, 0.1)}
-                  tokenConfig={tokenConfig}
-                  tokenImageUrl={undefined} // Now uses hardcoded images based on token symbol
-                />
-                {/* Animated STREME Balance Display */}
-                <div className="mt-1 mb-1">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold font-mono text-primary">
-                      {totalStremeAmount.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{" "}
-                      {tokenConfig?.symbol || "TOKEN"}
-                    </div>
-
-                    <div className="text-xs text-base-content/60">
-                      pooled so far
-                    </div>
+                {hasVideo && tokenConfig?.videoUrl && !videoError ? (
+                  <div className="relative w-full h-64 sm:h-80 lg:h-96 xl:h-[28rem] rounded-lg overflow-hidden">
+                    <VideoPlayer
+                      src={tokenConfig.videoUrl}
+                      onError={handleVideoError}
+                      onLoad={handleVideoLoad}
+                    />
                   </div>
-                </div>
+                ) : (
+                  <CrowdfundAnimation
+                    contributorCount={0}
+                    growthRate={Math.max(stremeGrowthRate, 0.1)}
+                    tokenConfig={tokenConfig}
+                    tokenImageUrl={undefined} // Now uses hardcoded images based on token symbol
+                  />
+                )}
+                {/* Animated STREME Balance Display */}
+                <AnimatedBalance
+                  amount={totalStremeAmount}
+                  symbol={tokenConfig?.symbol || "TOKEN"}
+                  subtitle="pooled so far"
+                />
               </div>
 
               {/* CTA Button - Above the fold */}
@@ -1075,37 +1279,34 @@ export default function CrowdfundPage({
             </div>
           ) : (
             <div>
-              {/* Growth Fund Animation with Token Count - Hero Position */}
+              {/* Growth Fund Animation with Token Count - Hero Position or Video if configured */}
               <div className="text-center mb-3 relative">
-                <CrowdfundAnimation
-                  contributorCount={0}
-                  growthRate={Math.max(stremeGrowthRate, 0.1)}
-                  tokenConfig={tokenConfig}
-                  tokenImageUrl={undefined} // Now uses hardcoded images based on token symbol
-                />
-                {/* Animated STREME Balance Display */}
-                <div className="mt-2 mb-1">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold font-mono text-primary">
-                      {totalStremeAmount.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{" "}
-                      {tokenConfig?.symbol || "TOKEN"}
-                    </div>
-                    <div className="text-lg font-bold text-success mt-1">
-                      {price
-                        ? `($${totalUsdValue.toLocaleString("en-US", {
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 0,
-                          })} USD)`
-                        : "Loading price..."}
-                    </div>
-                    <div className="text-xs text-base-content/60 mt-1">
-                      {tokenConfig?.fundPurpose || "pooled for initiatives"}
-                    </div>
+                {hasVideo && tokenConfig?.videoUrl && !videoError ? (
+                  <div className="relative w-full h-64 sm:h-80 lg:h-96 xl:h-[28rem] rounded-lg overflow-hidden">
+                    <VideoPlayer
+                      src={tokenConfig.videoUrl}
+                      onError={handleVideoError}
+                      onLoad={handleVideoLoad}
+                    />
                   </div>
-                </div>
+                ) : (
+                  <CrowdfundAnimation
+                    contributorCount={0}
+                    growthRate={Math.max(stremeGrowthRate, 0.1)}
+                    tokenConfig={tokenConfig}
+                    tokenImageUrl={undefined} // Now uses hardcoded images based on token symbol
+                  />
+                )}
+                {/* Animated STREME Balance Display */}
+                <AnimatedBalanceWithUSD
+                  amount={totalStremeAmount}
+                  symbol={tokenConfig?.symbol || "TOKEN"}
+                  usdValue={totalUsdValue}
+                  price={price}
+                  subtitle={
+                    tokenConfig?.fundPurpose || "pooled for initiatives"
+                  }
+                />
               </div>
 
               {/* CTA Button - Above the fold */}
@@ -1124,8 +1325,8 @@ export default function CrowdfundPage({
                   </svg>
                   <span className="text-sm">
                     {isMiniAppView
-                      ? "Connect your wallet to join the growth fund"
-                      : "Connect your wallet to join the growth fund"}
+                      ? "Connect your wallet to join the fund"
+                      : "Connect your wallet to join the fund"}
                   </span>
                 </div>
                 {isMiniAppView ? (
@@ -1225,135 +1426,129 @@ export default function CrowdfundPage({
         </div>
       </div>
 
-      {/* Contributors Leaderboard - Hide for BUTTHOLE token */}
-      {(contributors.length > 0 || isLoadingContributors) &&
-        tokenAddress?.toLowerCase() !==
-          "0x1c4f69f14cf754333c302246d25a48a13224118a" && (
-          <div className="container mx-auto mt-6 mb-8">
-            <div className="">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold">Contributors</h3>
-                <div className="flex items-center gap-2">
-                  {isRefreshingAfterTransaction && (
-                    <div className="flex items-center gap-1">
-                      <div className="loading loading-spinner loading-xs"></div>
-                      <span className="text-xs text-base-content/60">
-                        Updating...
-                      </span>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => fetchContributors(true)}
-                    disabled={
-                      isLoadingContributors || isRefreshingAfterTransaction
-                    }
-                    className="btn btn-ghost btn-xs"
-                    title="Refresh leaderboard"
-                  >
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {isLoadingContributors && contributors.length === 0 ? (
-                  <div className="flex justify-center py-8">
-                    <div className="loading loading-spinner loading-md"></div>
+      {/* Contributors Leaderboard */}
+      {(contributors.length > 0 || isLoadingContributors) && (
+        <div className="container mx-auto mt-6 mb-8">
+          <div className="">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">Contributors</h3>
+              <div className="flex items-center gap-2">
+                {isRefreshingAfterTransaction && (
+                  <div className="flex items-center gap-1">
+                    <div className="loading loading-spinner loading-xs"></div>
+                    <span className="text-xs text-base-content/60">
+                      Updating...
+                    </span>
                   </div>
-                ) : (
-                  contributors
-                    .sort((a, b) => Number(BigInt(b.amount) - BigInt(a.amount)))
-                    .slice(0, 10)
-                    .map((contributor, index) => (
-                      <div
-                        key={contributor.address}
-                        className="flex items-center justify-between p-3 bg-base-200/50 rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-primary font-bold text-sm">
-                            #{index + 1}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {contributor.pfp_url ? (
-                              <Image
-                                src={contributor.pfp_url}
-                                alt={contributor.username || "Contributor"}
-                                width={24}
-                                height={24}
-                                className="rounded-full object-fill"
-                                unoptimized={
-                                  contributor.pfp_url.includes(".gif") ||
-                                  contributor.pfp_url.includes(
-                                    "imagedelivery.net"
-                                  )
-                                }
-                              />
-                            ) : (
-                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
-                                {contributor.username
-                                  ? contributor.username.charAt(0).toUpperCase()
-                                  : contributor.address
-                                      .slice(2, 4)
-                                      .toUpperCase()}
-                              </div>
-                            )}
-                            <div>
-                              <div className="text-sm font-medium">
-                                {contributor.username ? (
-                                  <a
-                                    href={`https://farcaster.xyz/${contributor.username}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="hover:underline"
-                                  >
-                                    {contributor.username}
-                                  </a>
-                                ) : (
-                                  truncateAddress(contributor.address)
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                )}
+                <button
+                  onClick={() => fetchContributors(true)}
+                  disabled={
+                    isLoadingContributors || isRefreshingAfterTransaction
+                  }
+                  className="btn btn-ghost btn-xs"
+                  title="Refresh leaderboard"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {isLoadingContributors && contributors.length === 0 ? (
+                <div className="flex justify-center py-8">
+                  <div className="loading loading-spinner loading-md"></div>
+                </div>
+              ) : (
+                contributors
+                  .sort((a, b) => Number(BigInt(b.amount) - BigInt(a.amount)))
+                  .slice(0, 10)
+                  .map((contributor, index) => (
+                    <div
+                      key={contributor.address}
+                      className="flex items-center justify-between p-3 bg-base-200/50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-primary font-bold text-sm">
+                          #{index + 1}
                         </div>
-                        <div className="text-right">
-                          <div className="font-mono font-bold text-sm">
-                            {formatContributorAmount(contributor.amount)} st
-                            {tokenConfig?.symbol || "TOKEN"}
-                          </div>
-                          {contributor.percentage !== undefined && (
-                            <div className="text-xs text-base-content/60">
-                              {contributor.percentage < 0.1 &&
-                              contributor.percentage > 0
-                                ? `<0.1% of pool`
-                                : `${contributor.percentage.toFixed(
-                                    1
-                                  )}% of pool`}
+                        <div className="flex items-center gap-2">
+                          {contributor.pfp_url ? (
+                            <Image
+                              src={contributor.pfp_url}
+                              alt={contributor.username || "Contributor"}
+                              width={24}
+                              height={24}
+                              className="rounded-full object-fill"
+                              unoptimized={
+                                contributor.pfp_url.includes(".gif") ||
+                                contributor.pfp_url.includes(
+                                  "imagedelivery.net"
+                                )
+                              }
+                            />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                              {contributor.username
+                                ? contributor.username.charAt(0).toUpperCase()
+                                : contributor.address.slice(2, 4).toUpperCase()}
                             </div>
                           )}
+                          <div>
+                            <div className="text-sm font-medium">
+                              {contributor.username ? (
+                                <a
+                                  href={`https://farcaster.xyz/${contributor.username}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hover:underline"
+                                >
+                                  {contributor.username}
+                                </a>
+                              ) : (
+                                truncateAddress(contributor.address)
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    ))
-                )}
-              </div>
-              {contributors.length > 10 && (
-                <div className="text-center mt-3 text-sm text-base-content/60">
-                  Showing top 10 contributors
-                </div>
+                      <div className="text-right">
+                        <div className="font-mono font-bold text-sm">
+                          {formatContributorAmount(contributor.amount)} st
+                          {tokenConfig?.symbol || "TOKEN"}
+                        </div>
+                        {contributor.percentage !== undefined && (
+                          <div className="text-xs text-base-content/60">
+                            {contributor.percentage < 0.1 &&
+                            contributor.percentage > 0
+                              ? `<0.1% of pool`
+                              : `${contributor.percentage.toFixed(1)}% of pool`}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
               )}
             </div>
+            {contributors.length > 10 && (
+              <div className="text-center mt-3 text-sm text-base-content/60">
+                Showing top 10 contributors
+              </div>
+            )}
           </div>
-        )}
+        </div>
+      )}
 
       {/* Contribution Modal */}
       <ContributionModal
@@ -1392,7 +1587,7 @@ export default function CrowdfundPage({
         isWithdrawal={isWithdrawalSuccess}
         tokenSymbol={tokenConfig?.symbol || "STREME"}
         tokenName={tokenConfig?.name || "STREME"}
-        fundTitle={tokenConfig?.fundTitle || "Streme Growth Fund"}
+        fundTitle={tokenConfig?.fundTitle || "Streme Crowdfund"}
       />
 
       {/* FAQ Section */}

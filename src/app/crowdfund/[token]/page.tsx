@@ -11,7 +11,7 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { token: tokenSlug } = await params;
   const crowdfundToken = getCrowdfundTokenBySlug(tokenSlug);
-  
+
   if (!crowdfundToken) {
     return {
       title: `Crowdfund Not Found | ${APP_NAME}`,
@@ -19,9 +19,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
-  const crowdfundTitle = `${crowdfundToken.name} Growth Fund`;
-  const crowdfundDescription = crowdfundToken.description || 
-    `Contribute to the ${crowdfundToken.name} growth fund and earn rewards.`;
+  const crowdfundTitle = `${crowdfundToken.name} Crowdfund`;
+  const crowdfundDescription =
+    crowdfundToken.description ||
+    `Contribute to the ${crowdfundToken.name} crowdfund and earn rewards.`;
   const crowdfundOgImageUrl = `${APP_URL}/api/crowdfund/image?token=${tokenSlug}`;
   const pageUrl = `${APP_URL}/crowdfund/${tokenSlug}`;
 
@@ -61,10 +62,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function TokenCrowdfundPage({ params }: Props) {
   const { token: tokenSlug } = await params;
   const crowdfundToken = getCrowdfundTokenBySlug(tokenSlug);
-  
+
   if (!crowdfundToken) {
     notFound();
   }
 
-  return <CrowdfundPage tokenAddress={crowdfundToken.address} tokenConfig={crowdfundToken} />;
+  return (
+    <CrowdfundPage
+      tokenAddress={crowdfundToken.address}
+      tokenConfig={crowdfundToken}
+    />
+  );
 }

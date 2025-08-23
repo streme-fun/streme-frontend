@@ -16,6 +16,7 @@ export interface CrowdfundToken {
   howItWorks?: string; // Explanation text
   rewardToken?: string; // e.g. "SUP"
   rewardDescription?: string; // What rewards users get
+  videoUrl?: string; // Optional video to display instead of animation (with fallback)
 
   // Contract addresses
   depositContractAddress?: string; // Where funds are pooled
@@ -62,6 +63,7 @@ export const CROWDFUND_TOKENS: CrowdfundToken[] = [
     rewardToken: "SUP",
     rewardDescription:
       "Contributors earn SUP token rewards based on their contribution.",
+    videoUrl: "https://vimeo.com/1112445012?share=copy",
 
     // Contract addresses - Using same contracts for now
     depositContractAddress: "0x003eAb4972C6056ab698B2A2fc6dB3DdD057daaB",

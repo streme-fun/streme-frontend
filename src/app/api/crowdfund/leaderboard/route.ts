@@ -87,22 +87,17 @@ export async function GET(request: Request) {
     
     // Determine API endpoint based on contract address
     const getApiUrl = (contract?: string | null) => {
-      // BUTTHOLE contract
-      if (contract === "0xff252Cf5BeB25ab533f2969A447D6b3b00CF052f") {
-        // For now, return empty array for BUTTHOLE as there's no specific API yet
-        return null;
+      if (!contract) {
+        // Default to STREME contract
+        contract = "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
       }
-      // Default to STREME API
-      return "https://api.streme.fun/api/qr/members";
+      
+      // Use the new crowdfund leaderboard endpoint structure
+      return `https://api.streme.fun/api/crowdfund/leaderboard/${contract.toLowerCase()}`;
     };
     
     const apiUrl = getApiUrl(contractAddress);
-    
-    // If no API URL, return empty array
-    if (!apiUrl) {
-      console.log(`No API available for contract: ${contractAddress}`);
-      return NextResponse.json([]);
-    }
+    console.log(`Using API URL: ${apiUrl}`);
     
     const cache = getCache(contractAddress || 'default');
     const now = Date.now();

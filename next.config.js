@@ -105,7 +105,7 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: `
               default-src 'self';
-              script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://telegram.org;
+              script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://telegram.org https://player.vimeo.com;
               style-src 'self' 'unsafe-inline';
               connect-src 'self' 
                 https://*.alchemy.com 
@@ -149,7 +149,9 @@ const nextConfig = {
                 https://oauth.telegram.org
                 https://*.geckoterminal.com
                 https://www.geckoterminal.com
-                https://app.uniswap.org;
+                https://app.uniswap.org
+                https://player.vimeo.com
+                https://*.vimeo.com;
               frame-ancestors 'self'
                 https://streme.fun
                 https://www.streme.fun

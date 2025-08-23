@@ -67,7 +67,7 @@ export default function CrowdfundListPage() {
                 </figure>
                 <div className="card-body">
                   <h2 className="card-title">
-                    {token.fundTitle || `${token.name} Growth Fund`}
+                    {token.fundTitle || `${token.name} Crowdfund`}
                     <div className="badge badge-secondary">${token.symbol}</div>
                   </h2>
                   <p className="opacity-80">
