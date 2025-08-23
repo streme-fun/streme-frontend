@@ -342,7 +342,7 @@ export const TrendingTokensCarousel = ({
 
   const scroll = (direction: "left" | "right") => {
     if (scrollContainerRef.current) {
-      const scrollAmount = isMiniApp ? 335 : 400;
+      const scrollAmount = isMiniApp ? 270 : 400;
       const currentScroll = scrollContainerRef.current.scrollLeft;
       const targetScroll =
         direction === "left"
@@ -436,7 +436,7 @@ export const TrendingTokensCarousel = ({
           {tokens.slice(0, 10).map((token) => (
             <div
               key={token.contract_address}
-              className={`flex-none ${isMiniApp ? "w-full" : "w-56"}`}
+              className={`flex-none ${isMiniApp ? "w-64" : "w-56"}`}
             >
               <TrendingTokenCard token={token} />
             </div>
