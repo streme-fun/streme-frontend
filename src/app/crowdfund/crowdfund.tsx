@@ -17,7 +17,7 @@ import {
   useStakingContractActions,
   formatStakeAmount,
 } from "@/src/hooks/useStremeStakingContract";
-import Image from "next/image";
+// import Image from "next/image"; // Commented out with leaderboard
 import sdk from "@farcaster/miniapp-sdk";
 import { publicClient } from "@/src/lib/viemClient";
 
@@ -30,7 +30,8 @@ import BackButton from "@/src/components/BackButton";
 import CrowdfundHeader from "@/src/components/crowdfund/CrowdfundHeader";
 import { DEFAULT_TOKEN_ADDRESS, DEFAULT_DEPOSIT_CONTRACT, STAKING_ABI } from "@/src/components/crowdfund/constants";
 import { usePriceData } from "@/src/hooks/crowdfund/usePriceData";
-import { useContributors } from "@/src/hooks/crowdfund/useContributors";
+// Temporarily commented out due to timeout issues
+// import { useContributors } from "@/src/hooks/crowdfund/useContributors";
 
 interface CrowdfundPageProps {
   tokenAddress?: string;
@@ -69,15 +70,20 @@ export default function CrowdfundPage({
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showContributionModal, setShowContributionModal] = useState(false);
   const [pendingDepositAmount, setPendingDepositAmount] = useState("");
-  const [isRefreshingAfterTransaction, setIsRefreshingAfterTransaction] =
-    useState(false);
+  // const [isRefreshingAfterTransaction, setIsRefreshingAfterTransaction] =
+  //   useState(false); // Commented out with leaderboard
   
-  // Use contributors hook
-  const { contributors, isLoadingContributors, refetchContributors } = useContributors(
-    tokenAddress,
-    tokenConfig,
-    isRefreshingAfterTransaction
-  );
+  // Temporarily commented out contributors hook due to timeout issues
+  // const { contributors, isLoadingContributors, refetchContributors } = useContributors(
+  //   tokenAddress,
+  //   tokenConfig,
+  //   isRefreshingAfterTransaction
+  // );
+  
+  // Temporary empty values to prevent UI errors (commented out with leaderboard)
+  // const contributors: any[] = [];
+  // const isLoadingContributors = false;
+  // const refetchContributors = () => Promise.resolve();
   const [isTransactionSuccess, setIsTransactionSuccess] = useState(false);
   const [successAmount, setSuccessAmount] = useState("");
   const [successPercentage, setSuccessPercentage] = useState("");
@@ -332,21 +338,26 @@ export default function CrowdfundPage({
   }, [stremeBalance, baseStremeAmount, price]);
 
 
-  // Fetch contributors with retry logic for transaction updates
+  // Temporarily commented out contributors retry logic due to timeout issues
+  // const fetchContributorsWithRetry = useCallback(async () => {
+  //   console.log("Fetching contributors after transaction...");
+  //   setIsRefreshingAfterTransaction(true);
+
+  //   // First attempt - immediate refresh with force refresh
+  //   await refetchContributors(true);
+
+  //   // Single retry after 3 seconds if external API needs time to update
+  //   setTimeout(() => {
+  //     console.log("Final refresh after 3 seconds...");
+  //     refetchContributors(true);
+  //     setIsRefreshingAfterTransaction(false); // Stop showing refresh indicator
+  //   }, 3000);
+  // }, [refetchContributors]);
+  
+  // Temporary empty function
   const fetchContributorsWithRetry = useCallback(async () => {
-    console.log("Fetching contributors after transaction...");
-    setIsRefreshingAfterTransaction(true);
-
-    // First attempt - immediate refresh with force refresh
-    await refetchContributors(true);
-
-    // Single retry after 3 seconds if external API needs time to update
-    setTimeout(() => {
-      console.log("Final refresh after 3 seconds...");
-      refetchContributors(true);
-      setIsRefreshingAfterTransaction(false); // Stop showing refresh indicator
-    }, 3000);
-  }, [refetchContributors]);
+    console.log("Contributors leaderboard temporarily disabled");
+  }, []);
 
   // Handle approval completion - proceed to deposit
   useEffect(() => {
@@ -677,11 +688,11 @@ export default function CrowdfundPage({
     }
   };
 
-  // Utility function to truncate addresses
-  const truncateAddress = (address: string) => {
-    if (!address) return "";
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
+  // Utility function to truncate addresses (commented out with leaderboard)
+  // const truncateAddress = (address: string) => {
+  //   if (!address) return "";
+  //   return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  // };
 
   // Handle sharing to Farcaster
   const handleShareToFarcaster = async () => {
@@ -722,16 +733,16 @@ export default function CrowdfundPage({
     }
   };
 
-  // Format contributor amount
-  const formatContributorAmount = (amountWei: string) => {
-    const amount = Number(formatUnits(BigInt(amountWei), 18));
-    if (amount >= 1000000) {
-      return `${(amount / 1000000).toFixed(1)}M`;
-    } else if (amount >= 1000) {
-      return `${(amount / 1000).toFixed(1)}K`;
-    }
-    return amount.toFixed(0);
-  };
+  // Format contributor amount (commented out with leaderboard)
+  // const formatContributorAmount = (amountWei: string) => {
+  //   const amount = Number(formatUnits(BigInt(amountWei), 18));
+  //   if (amount >= 1000000) {
+  //     return `${(amount / 1000000).toFixed(1)}M`;
+  //   } else if (amount >= 1000) {
+  //     return `${(amount / 1000).toFixed(1)}K`;
+  //   }
+  //   return amount.toFixed(0);
+  // };
 
   // Show loading state if wallet is initializing (like TokenActions)
   if (
@@ -1074,6 +1085,7 @@ export default function CrowdfundPage({
       </div>
 
       {/* Contributors Leaderboard */}
+      {/* Temporarily commented out due to frequent timeouts
       {(contributors.length > 0 || isLoadingContributors) && (
         <div className="container mx-auto mt-6 mb-8">
           <div className="">
@@ -1196,6 +1208,7 @@ export default function CrowdfundPage({
           </div>
         </div>
       )}
+      */}
 
       {/* Contribution Modal */}
       <ContributionModal
