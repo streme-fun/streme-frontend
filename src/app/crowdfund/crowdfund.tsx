@@ -61,7 +61,7 @@ const VideoPlayer = memo(
       if (isVimeoUrl) {
         console.error("Vimeo embed details:", {
           id: vimeoId,
-          constructedUrl: `https://player.vimeo.com/video/${vimeoId}?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1&muted=1`
+          constructedUrl: `https://player.vimeo.com/video/${vimeoId}?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1&muted=1`,
         });
       }
       setLoading(false);
@@ -81,7 +81,7 @@ const VideoPlayer = memo(
     };
 
     return (
-      <div className="relative w-full h-full">
+      <>
         {loading && !hasError && (
           <div className="absolute inset-0 flex items-center justify-center bg-base-200 rounded-lg z-10">
             <div className="loading loading-spinner loading-lg"></div>
@@ -92,11 +92,14 @@ const VideoPlayer = memo(
             {isVimeoUrl && vimeoId ? (
               <>
                 <iframe
-                  src={`https://player.vimeo.com/video/${vimeoId}?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1&muted=1`}
-                  className={`w-full h-full rounded-lg transition-opacity duration-300 ${
+                  src={`https://player.vimeo.com/video/${vimeoId}?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1&muted=1&background=1&color=000000&title=0&byline=0&portrait=0&controls=0&dnt=1&fit=cover`}
+                  className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${
                     loading ? "opacity-0" : "opacity-100"
                   }`}
-                  style={{ border: 0 }}
+                  style={{
+                    border: 0,
+                    objectFit: "cover",
+                  }}
                   allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
                   allowFullScreen
                   referrerPolicy="strict-origin-when-cross-origin"
@@ -104,11 +107,14 @@ const VideoPlayer = memo(
                   onError={handleError}
                   title="$BUTTHOLE Launch"
                 />
-                <Script src="https://player.vimeo.com/api/player.js" strategy="lazyOnload" />
+                <Script
+                  src="https://player.vimeo.com/api/player.js"
+                  strategy="lazyOnload"
+                />
               </>
             ) : (
               <video
-                className={`w-full h-full object-cover rounded-lg transition-opacity duration-300 ${
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
                   loading ? "opacity-0" : "opacity-100"
                 }`}
                 autoPlay
@@ -124,20 +130,22 @@ const VideoPlayer = memo(
               </video>
             )}
           </>
-        ) : (
-          // Fallback for blocked videos - show clickable thumbnail
-          isVimeoUrl && vimeoId ? (
-            <div className="relative w-full h-full flex items-center justify-center bg-base-200 rounded-lg cursor-pointer hover:bg-base-300 transition-colors"
-                 onClick={() => window.open(src, '_blank')}>
-              <div className="text-center p-4">
-                <div className="text-4xl mb-2">🎥</div>
-                <div className="text-sm font-medium">Video Blocked</div>
-                <div className="text-xs text-base-content/60 mt-1">Click to view on Vimeo</div>
+        ) : // Fallback for blocked videos - show clickable thumbnail
+        isVimeoUrl && vimeoId ? (
+          <div
+            className="absolute inset-0 flex items-center justify-center bg-base-200 rounded-lg cursor-pointer hover:bg-base-300 transition-colors"
+            onClick={() => window.open(src, "_blank")}
+          >
+            <div className="text-center p-4">
+              <div className="text-4xl mb-2">🎥</div>
+              <div className="text-sm font-medium">Video Blocked</div>
+              <div className="text-xs text-base-content/60 mt-1">
+                Click to view on Vimeo
               </div>
             </div>
-          ) : null
-        )}
-      </div>
+          </div>
+        ) : null}
+      </>
     );
   }
 );
@@ -581,7 +589,7 @@ export default function CrowdfundPage({
           tokenConfig?.depositContractAddress || DEPOSIT_CONTRACT_ADDRESS;
         const params = new URLSearchParams({ contract: contractAddress });
         if (forceRefresh) {
-          params.append('force', 'true');
+          params.append("force", "true");
         }
         const url = `/api/crowdfund/leaderboard?${params.toString()}`;
 
@@ -1131,7 +1139,7 @@ export default function CrowdfundPage({
               {/* Crowdfund Animation with Token Image or Video if configured */}
               <div className="text-center mb-2 relative">
                 {hasVideo && tokenConfig?.videoUrl && !videoError ? (
-                  <div className="relative w-full h-64 sm:h-80 lg:h-96 xl:h-[28rem] rounded-lg overflow-hidden">
+                  <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-neutral-900 dark:bg-neutral-900 my-4">
                     <VideoPlayer
                       src={tokenConfig.videoUrl}
                       onError={handleVideoError}
@@ -1282,7 +1290,7 @@ export default function CrowdfundPage({
               {/* Growth Fund Animation with Token Count - Hero Position or Video if configured */}
               <div className="text-center mb-3 relative">
                 {hasVideo && tokenConfig?.videoUrl && !videoError ? (
-                  <div className="relative w-full h-64 sm:h-80 lg:h-96 xl:h-[28rem] rounded-lg overflow-hidden">
+                  <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-neutral-900 dark:bg-neutral-900 my-4">
                     <VideoPlayer
                       src={tokenConfig.videoUrl}
                       onError={handleVideoError}
