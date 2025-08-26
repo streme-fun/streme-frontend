@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
-import Script from "next/script";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
 import { ERC20_ABI } from "@/src/lib/contracts/StremeStakingRewardsFunder";
-import { getPrices } from "@/src/lib/priceUtils";
 import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
 import { CrowdfundAnimation } from "@/src/components/CrowdfundAnimation";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
@@ -20,215 +18,30 @@ import {
   formatStakeAmount,
 } from "@/src/hooks/useStremeStakingContract";
 import Image from "next/image";
-// import Link from "next/link";
-import { useRouter } from "next/navigation";
 import sdk from "@farcaster/miniapp-sdk";
 import { publicClient } from "@/src/lib/viemClient";
 
 import { CrowdfundToken } from "@/src/lib/crowdfundTokens";
+
+// Extracted components
+import VideoPlayer from "@/src/components/crowdfund/VideoPlayer";
+import { AnimatedBalance, AnimatedBalanceWithUSD } from "@/src/components/crowdfund/AnimatedBalances";
+import BackButton from "@/src/components/BackButton";
+import CrowdfundHeader from "@/src/components/crowdfund/CrowdfundHeader";
+import { DEFAULT_TOKEN_ADDRESS, DEFAULT_DEPOSIT_CONTRACT, STAKING_ABI } from "@/src/components/crowdfund/constants";
+import { usePriceData } from "@/src/hooks/crowdfund/usePriceData";
+import { useContributors } from "@/src/hooks/crowdfund/useContributors";
 
 interface CrowdfundPageProps {
   tokenAddress?: string;
   tokenConfig?: CrowdfundToken;
 }
 
-// Video/Embed Player Component - Memoized to prevent re-renders from animation
-const VideoPlayer = memo(
-  ({
-    src,
-    onError,
-    onLoad,
-  }: {
-    src: string;
-    onError: () => void;
-    onLoad: () => void;
-  }) => {
-    const [loading, setLoading] = useState(true);
-    const [hasError, setHasError] = useState(false);
-
-    // Extract Vimeo ID from URL - simplified for known format
-    const getVimeoId = (url: string): string | null => {
-      const match = url.match(/vimeo\.com\/(\d+)/);
-      return match ? match[1] : null;
-    };
-
-    const isVimeoUrl = src.includes("vimeo.com");
-    const vimeoId = isVimeoUrl ? getVimeoId(src) : null;
-
-    const handleError = (event?: Event | React.SyntheticEvent) => {
-      console.error("Video/embed failed to load:", src);
-      console.error("Error details:", event);
-      if (isVimeoUrl) {
-        console.error("Vimeo embed details:", {
-          id: vimeoId,
-          constructedUrl: `https://player.vimeo.com/video/${vimeoId}?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1&muted=1`,
-        });
-      }
-      setLoading(false);
-      setHasError(true);
-      onError();
-    };
-
-    const handleLoad = () => {
-      console.log("Video/embed loaded successfully:", src);
-      setLoading(false);
-      onLoad();
-    };
-
-    const handleIframeLoad = () => {
-      setLoading(false);
-      onLoad();
-    };
-
-    return (
-      <>
-        {loading && !hasError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-base-200 rounded-lg z-10">
-            <div className="loading loading-spinner loading-lg"></div>
-          </div>
-        )}
-        {!hasError ? (
-          <>
-            {isVimeoUrl && vimeoId ? (
-              <>
-                <iframe
-                  src={`https://player.vimeo.com/video/${vimeoId}?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1&muted=1&background=1&color=000000&title=0&byline=0&portrait=0&controls=0&dnt=1&fit=cover`}
-                  className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${
-                    loading ? "opacity-0" : "opacity-100"
-                  }`}
-                  style={{
-                    border: 0,
-                    objectFit: "cover",
-                  }}
-                  allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-                  allowFullScreen
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  onLoad={handleIframeLoad}
-                  onError={handleError}
-                  title="$BUTTHOLE Launch"
-                />
-                <Script
-                  src="https://player.vimeo.com/api/player.js"
-                  strategy="lazyOnload"
-                />
-              </>
-            ) : (
-              <video
-                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-                  loading ? "opacity-0" : "opacity-100"
-                }`}
-                autoPlay
-                loop
-                muted
-                playsInline
-                onError={handleError}
-                onLoadedData={handleLoad}
-                onLoadStart={() => setLoading(true)}
-              >
-                <source src={src} type="video/mp4" />
-                Your browser does not support the video tag.
-              </video>
-            )}
-          </>
-        ) : // Fallback for blocked videos - show clickable thumbnail
-        isVimeoUrl && vimeoId ? (
-          <div
-            className="absolute inset-0 flex items-center justify-center bg-base-200 rounded-lg cursor-pointer hover:bg-base-300 transition-colors"
-            onClick={() => window.open(src, "_blank")}
-          >
-            <div className="text-center p-4">
-              <div className="text-4xl mb-2">🎥</div>
-              <div className="text-sm font-medium">Video Blocked</div>
-              <div className="text-xs text-base-content/60 mt-1">
-                Click to view on Vimeo
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </>
-    );
-  }
-);
-
-VideoPlayer.displayName = "VideoPlayer";
-
-// Animated Balance Component - Isolated to prevent video re-renders
-const AnimatedBalance = memo(
-  ({
-    amount,
-    symbol,
-    subtitle,
-  }: {
-    amount: number;
-    symbol: string;
-    subtitle: string;
-  }) => {
-    return (
-      <div className="mt-1 mb-1">
-        <div className="text-center">
-          <div className="text-2xl font-bold font-mono text-primary">
-            {amount.toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}{" "}
-            {symbol}
-          </div>
-          <div className="text-xs text-base-content/60">{subtitle}</div>
-        </div>
-      </div>
-    );
-  }
-);
-
-AnimatedBalance.displayName = "AnimatedBalance";
-
-// Animated Balance with USD Component - Isolated to prevent video re-renders
-const AnimatedBalanceWithUSD = memo(
-  ({
-    amount,
-    symbol,
-    usdValue,
-    price,
-    subtitle,
-  }: {
-    amount: number;
-    symbol: string;
-    usdValue: number;
-    price: number | null;
-    subtitle: string;
-  }) => {
-    return (
-      <div className="mt-2 mb-1">
-        <div className="text-center">
-          <div className="text-3xl font-bold font-mono text-primary">
-            {amount.toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}{" "}
-            {symbol}
-          </div>
-          <div className="text-lg font-bold text-success mt-1">
-            {price
-              ? `($${usdValue.toLocaleString("en-US", {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0,
-                })} USD)`
-              : "Loading price..."}
-          </div>
-          <div className="text-xs text-base-content/60 mt-1">{subtitle}</div>
-        </div>
-      </div>
-    );
-  }
-);
-
-AnimatedBalanceWithUSD.displayName = "AnimatedBalanceWithUSD";
 
 export default function CrowdfundPage({
-  tokenAddress = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58",
+  tokenAddress = DEFAULT_TOKEN_ADDRESS,
   tokenConfig,
 }: CrowdfundPageProps) {
-  const router = useRouter();
   const { isSDKLoaded } = useAppFrameLogic();
 
   const { ready: privyReady } = useSafePrivy();
@@ -247,29 +60,24 @@ export default function CrowdfundPage({
   const effectiveIsConnected = unifiedIsConnected;
   const effectiveAddress = unifiedAddress;
   const effectiveConnect = unifiedConnect;
-  const [price, setPrice] = useState<number | null>(null);
-  const [baseUsdValue, setBaseUsdValue] = useState<number>(0);
-  const [lastUsdUpdateTime, setLastUsdUpdateTime] = useState<number>(
-    Date.now()
-  );
+  
+  // Use price data hook
+  const { price, baseUsdValue, setBaseUsdValue, lastUsdUpdateTime, setLastUsdUpdateTime } = usePriceData(tokenAddress);
   const [amount, setAmount] = useState("");
   const [percentage, setPercentage] = useState(0);
   const [error, setError] = useState("");
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showContributionModal, setShowContributionModal] = useState(false);
   const [pendingDepositAmount, setPendingDepositAmount] = useState("");
-  const [contributors, setContributors] = useState<
-    Array<{
-      address: string;
-      amount: string;
-      username: string;
-      pfp_url: string;
-      percentage?: number;
-    }>
-  >([]);
-  const [isLoadingContributors, setIsLoadingContributors] = useState(true);
   const [isRefreshingAfterTransaction, setIsRefreshingAfterTransaction] =
     useState(false);
+  
+  // Use contributors hook
+  const { contributors, isLoadingContributors, refetchContributors } = useContributors(
+    tokenAddress,
+    tokenConfig,
+    isRefreshingAfterTransaction
+  );
   const [isTransactionSuccess, setIsTransactionSuccess] = useState(false);
   const [successAmount, setSuccessAmount] = useState("");
   const [successPercentage, setSuccessPercentage] = useState("");
@@ -294,27 +102,13 @@ export default function CrowdfundPage({
 
   const CURRENT_TOKEN_ADDRESS = tokenAddress;
   const DEPOSIT_CONTRACT_ADDRESS =
-    tokenConfig?.depositContractAddress ||
-    "0xceaCfbB5A17b6914051D12D8c91d3461382d503b";
-  // const GOAL = 1000; // $1000 USD goal
+    tokenConfig?.depositContractAddress || DEFAULT_DEPOSIT_CONTRACT;
 
   // Check if token has video configuration
   const hasVideo = Boolean(tokenConfig?.videoUrl);
 
-  // ABI for the staking contract to check deposit timestamps
-  const stakingAbi = useMemo(
-    () =>
-      [
-        {
-          name: "depositTimestamps",
-          type: "function",
-          stateMutability: "view",
-          inputs: [{ name: "account", type: "address" }],
-          outputs: [{ name: "", type: "uint256" }],
-        },
-      ] as const,
-    []
-  );
+  // Use staking ABI from constants
+  const stakingAbi = useMemo(() => STAKING_ABI, []);
 
   // Use effective wallet state (unified or wagmi fallback)
   const effectiveAuthenticated = effectiveIsConnected;
@@ -537,86 +331,6 @@ export default function CrowdfundPage({
     }
   }, [stremeBalance, baseStremeAmount, price]);
 
-  // Fetch price - optimized for faster loading
-  useEffect(() => {
-    const fetchPrice = async (retryCount = 0) => {
-      try {
-        const prices = await getPrices([CURRENT_TOKEN_ADDRESS]);
-        if (prices?.[CURRENT_TOKEN_ADDRESS.toLowerCase()]) {
-          const newPrice = prices[CURRENT_TOKEN_ADDRESS.toLowerCase()];
-          setPrice(newPrice);
-
-          // Update USD value immediately when price becomes available
-          if (baseStremeAmount > 0) {
-            setBaseUsdValue(baseStremeAmount * newPrice);
-            setLastUsdUpdateTime(Date.now());
-          }
-        } else if (retryCount < 3) {
-          // Retry up to 3 times with shorter delays
-          setTimeout(() => fetchPrice(retryCount + 1), 1000);
-        }
-      } catch (error) {
-        console.error("Error fetching price:", error);
-        if (retryCount < 3) {
-          // Retry with exponential backoff
-          setTimeout(
-            () => fetchPrice(retryCount + 1),
-            Math.pow(2, retryCount) * 1000
-          );
-        }
-      }
-    };
-
-    fetchPrice();
-
-    // Refresh price every 30 seconds for more up-to-date values
-    const interval = setInterval(() => fetchPrice(), 30000);
-    return () => clearInterval(interval);
-  }, [baseStremeAmount]);
-
-  // Fetch contributors leaderboard
-  const fetchContributors = useCallback(
-    async (forceRefresh = false) => {
-      try {
-        console.log(
-          "Fetching contributors from API...",
-          forceRefresh ? "(force refresh)" : ""
-        );
-        setIsLoadingContributors(true);
-
-        // Use the crowdfund contract address from tokenConfig or fallback
-        const contractAddress =
-          tokenConfig?.depositContractAddress || DEPOSIT_CONTRACT_ADDRESS;
-        const params = new URLSearchParams({ contract: contractAddress });
-        if (forceRefresh) {
-          params.append("force", "true");
-        }
-        const url = `/api/crowdfund/leaderboard?${params.toString()}`;
-
-        const response = await fetch(url, {
-          // Allow browser caching when not forcing refresh
-          cache: forceRefresh ? "no-cache" : "default",
-        });
-
-        console.log("Contributors API response status:", response.status);
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Contributors data:", data);
-          setContributors(data);
-        } else {
-          console.error(
-            "Contributors API failed with status:",
-            response.status
-          );
-        }
-      } catch (error) {
-        console.error("Error fetching contributors:", error);
-      } finally {
-        setIsLoadingContributors(false);
-      }
-    },
-    [tokenConfig?.depositContractAddress, DEPOSIT_CONTRACT_ADDRESS]
-  );
 
   // Fetch contributors with retry logic for transaction updates
   const fetchContributorsWithRetry = useCallback(async () => {
@@ -624,24 +338,15 @@ export default function CrowdfundPage({
     setIsRefreshingAfterTransaction(true);
 
     // First attempt - immediate refresh with force refresh
-    await fetchContributors(true);
+    await refetchContributors(true);
 
     // Single retry after 3 seconds if external API needs time to update
     setTimeout(() => {
       console.log("Final refresh after 3 seconds...");
-      fetchContributors(true);
+      refetchContributors(true);
       setIsRefreshingAfterTransaction(false); // Stop showing refresh indicator
     }, 3000);
-  }, [fetchContributors]);
-
-  useEffect(() => {
-    fetchContributors();
-    // Refresh contributors every 2 minutes
-    // The API has a 5-minute cache, so this ensures reasonably fresh data
-    // while dramatically reducing API calls
-    const interval = setInterval(fetchContributors, 120000);
-    return () => clearInterval(interval);
-  }, [fetchContributors]);
+  }, [refetchContributors]);
 
   // Handle approval completion - proceed to deposit
   useEffect(() => {
@@ -1058,78 +763,12 @@ export default function CrowdfundPage({
         isMiniAppView ? "pb-24" : "pb-4"
       }`}
     >
-      {/* Back Button - Only show in mini app */}
-      {isMiniAppView && (
-        <div className="px-4 pt-4 pb-2">
-          <button
-            onClick={() => router.push("/")}
-            className="flex items-center gap-2 text-sm text-base-content/70 hover:text-base-content transition-colors cursor-pointer"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            Back
-          </button>
-        </div>
-      )}
-      {/* if not mini-app, add pt-24 */}
-      <div
-        className={`container mx-auto px-4 sm:pt-4 ${
-          isMiniAppView ? "pt-2" : "pt-24"
-        }`}
-      >
-        <div className="mb-1">
-          <div className="flex justify-between items-start">
-            <div className="flex-1 flex flex-col gap-1">
-              <div className="flex items-center gap-1 justify-between">
-                <h2 className="text-lg md:text-xl font-bold text-base-content">
-                  {tokenConfig?.fundTitle ||
-                    `${tokenConfig?.name || "Token"} Crowdfund`}
-                </h2>
-                {/* Info button in top right */}
-                <div className="flex items-center gap-1 ml-2">
-                  <button
-                    onClick={() => setShowHowItWorks(true)}
-                    className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
-                    title="How it works"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <p className="text-sm text-base-content/70 leading-snug">
-                {tokenConfig?.fundDescription ||
-                  "Support the growth of this project by contributing your staked tokens."}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <BackButton isMiniAppView={isMiniAppView} />
+      <CrowdfundHeader
+        tokenConfig={tokenConfig}
+        isMiniAppView={isMiniAppView}
+        onShowHowItWorks={() => setShowHowItWorks(true)}
+      />
 
       <div className="container mx-auto">
         {/* Combined Animation and Contribution Section */}
@@ -1450,7 +1089,7 @@ export default function CrowdfundPage({
                   </div>
                 )}
                 <button
-                  onClick={() => fetchContributors(true)}
+                  onClick={() => refetchContributors(true)}
                   disabled={
                     isLoadingContributors || isRefreshingAfterTransaction
                   }

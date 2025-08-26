@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
+import BackButton from "@/src/components/BackButton";
 import { TokenActions } from "./TokenActions";
 import { Token } from "@/src/app/types/token";
 import { TokenInfo } from "./TokenInfo";
@@ -41,7 +42,6 @@ export function TokenPageContent() {
     hasPromptedToAdd,
   } = useAppFrameLogic();
 
-  const router = useRouter();
 
   // Function to fetch GeckoTerminal market data
   const fetchGeckoTerminalData = async (
@@ -267,31 +267,7 @@ ${shareUrl}`;
 
   return (
     <div className="max-w-[1440px] mx-auto sm:px-6 mt-6 md:px-8 md:mt-0 md:pt-28 pb-12">
-      {/* Back Arrow Button - Only show in mini app */}
-      {isMiniAppView && (
-        <div className="mb-4">
-          <button
-            onClick={() => router.push("/")}
-            className="flex items-center gap-2 text-sm text-base-content/70 hover:text-base-content transition-colors cursor-pointer"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            Back
-          </button>
-        </div>
-      )}
+      <BackButton isMiniAppView={isMiniAppView} className="mb-4" />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8">
         <div className="order-1 lg:order-2 lg:col-span-4 space-y-4">
