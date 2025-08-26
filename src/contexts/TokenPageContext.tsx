@@ -162,11 +162,10 @@ export function TokenPageProvider({ children, initialToken, tokenAddress }: Toke
     // Set up intelligent polling:
     // - More frequent for first 5 minutes (30s intervals)
     // - Then less frequent (5 minute intervals)
-    let shortInterval: NodeJS.Timeout;
     let longInterval: NodeJS.Timeout;
 
     // Short interval for first 5 minutes
-    shortInterval = setInterval(() => {
+    const shortInterval = setInterval(() => {
       console.log(`[TokenPageContext] Short interval fetch for ${tokenAddress}`);
       fetchTokenRef.current(false);
     }, 30000); // 30 seconds

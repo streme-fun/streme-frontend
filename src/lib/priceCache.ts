@@ -160,7 +160,7 @@ class PriceCacheService {
   /**
    * Clear expired cache entries
    */
-  private cleanupCache(): void {
+  public cleanupCache(): void {
     const now = Date.now();
     Object.keys(this.cache).forEach(address => {
       if (now - this.cache[address].timestamp > this.CACHE_DURATION) {
@@ -202,6 +202,6 @@ export const priceCache = new PriceCacheService();
 // Cleanup interval - runs every 10 minutes
 if (typeof window !== 'undefined') {
   setInterval(() => {
-    (priceCache as any).cleanupCache();
+    priceCache.cleanupCache();
   }, 10 * 60 * 1000);
 }
