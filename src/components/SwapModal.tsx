@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { parseEther } from "viem";
 import { Modal } from "./Modal";
 import { SwapButton } from "./SwapButton";
-import { getPrices, convertToUSD } from "@/src/lib/priceUtils";
 import { Token } from "@/src/app/types/token";
+import { useTokenPrice } from "@/src/hooks/useTokenPrice";
 
 interface SwapModalProps {
   isOpen: boolean;
@@ -30,14 +30,51 @@ export function SwapModal({
   } | null>(null);
   const [isPriceLoading, setIsPriceLoading] = useState(false);
 
-  // USD price states
-  const [usdPrices, setUsdPrices] = useState<{
-    eth: number | null;
-    token: number | null;
-  }>({
-    eth: null,
-    token: null,
+  // Use centralized price cache for token prices, separate logic for ETH
+  const { price: tokenPrice } = useTokenPrice(token.contract_address, {
+    refreshInterval: 300000, // 5 minutes  
+    autoRefresh: true,
   });
+
+  // ETH price - use separate state since useTokenPrice doesn't handle ETH
+  const [ethPrice, setEthPrice] = useState<number | null>(null);
+
+  // Fetch ETH price using original method
+  useEffect(() => {
+    const fetchETHPrice = async () => {
+      try {
+        const response = await fetch("/api/eth-price");
+        if (response.ok) {
+          const data = await response.json();
+          setEthPrice(data.eth || null);
+        }
+      } catch (error) {
+        console.warn("Error fetching ETH price:", error);
+      }
+    };
+
+    fetchETHPrice();
+    const interval = setInterval(fetchETHPrice, 300000); // 5 minutes
+    return () => clearInterval(interval);
+  }, []);
+
+  // Helper function to format USD values (replaces convertToUSD)
+  const formatUSD = (amount: string | number, price: number | null): string | null => {
+    if (!price || !amount) return null;
+
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    if (isNaN(numAmount) || numAmount <= 0) return null;
+
+    const usdValue = numAmount * price;
+
+    if (usdValue < 0.01) {
+      return `$${usdValue.toFixed(6)}`;
+    } else if (usdValue < 1) {
+      return `$${usdValue.toFixed(4)}`;
+    } else {
+      return `$${usdValue.toFixed(2)}`;
+    }
+  };
 
   // Create stable references for contract addresses
   const contractAddress = useMemo(() => {
@@ -94,32 +131,7 @@ export function SwapModal({
     [contractAddress]
   );
 
-  // Fetch USD prices
-  useEffect(() => {
-    const fetchUSDPrices = async () => {
-      try {
-        const prices = await getPrices([contractAddress]);
-        if (prices) {
-          setUsdPrices({
-            eth: prices.eth,
-            token:
-              prices[contractAddress?.toLowerCase() || ""] ||
-              token.price ||
-              null,
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching USD prices:", error);
-      }
-    };
-
-    if (isOpen) {
-      fetchUSDPrices();
-      // Update prices every minute while modal is open
-      const interval = setInterval(fetchUSDPrices, 60000);
-      return () => clearInterval(interval);
-    }
-  }, [contractAddress, token.price, isOpen]);
+  // USD prices are now handled by useTokenPrice hooks above
 
   // Debounced quote fetching
   useEffect(() => {
@@ -230,10 +242,10 @@ export function SwapModal({
             {/* USD equivalent for trade amount */}
             {tradeAmount && (
               <div className="absolute left-3 bottom-[-20px] text-xs text-gray-400">
-                {tradeDirection === "buy" && usdPrices.eth
-                  ? convertToUSD(tradeAmount, usdPrices.eth)
-                  : tradeDirection === "sell" && usdPrices.token
-                  ? convertToUSD(tradeAmount, usdPrices.token)
+                {tradeDirection === "buy"
+                  ? formatUSD(tradeAmount, ethPrice)
+                  : tradeDirection === "sell"
+                  ? formatUSD(tradeAmount, tokenPrice)
                   : null}
               </div>
             )}
@@ -300,10 +312,11 @@ export function SwapModal({
                 {(() => {
                   const amount = Number(priceQuote.buyAmount) / 1e18;
                   const price =
-                    tradeDirection === "buy" ? usdPrices.token : usdPrices.eth;
-                  return price ? (
+                    tradeDirection === "buy" ? tokenPrice : ethPrice;
+                  
+                  return formatUSD(amount, price) ? (
                     <div className="text-xs text-gray-400 mt-1">
-                      ≈ {convertToUSD(amount, price)}
+                      ≈ {formatUSD(amount, price)}
                     </div>
                   ) : null;
                 })()}

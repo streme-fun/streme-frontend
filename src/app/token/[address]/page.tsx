@@ -1,4 +1,5 @@
 import { TokenPageContent } from "./TokenPageContent";
+import { TokenPageProvider } from "@/src/contexts/TokenPageContext";
 import { Metadata } from "next";
 
 type Props = {
@@ -280,6 +281,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default function TokenPage() {
-  return <TokenPageContent />;
+export default async function TokenPage({ params }: Props) {
+  const { address } = await params;
+  
+  return (
+    <TokenPageProvider tokenAddress={address}>
+      <TokenPageContent />
+    </TokenPageProvider>
+  );
 }

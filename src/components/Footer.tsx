@@ -1,31 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import { ExternalLink } from "./ui/ExternalLink";
-import { fetchTokenPrice } from "../lib/priceUtils";
+import { useTokenPrice } from "../hooks/useTokenPrice";
 import Image from "next/image";
 
 export function Footer() {
   const { isMiniAppView } = useAppFrameLogic();
-  const [stremePrice, setStremePrice] = useState<number | null>(null);
 
   const STREME_CONTRACT = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
   const DEXSCREENER_URL =
     "https://dexscreener.com/base/0x9187c24a3a81618f07a9722b935617458f532737";
 
-  // Fetch STREME price on mount and periodically
-  useEffect(() => {
-    const fetchPrice = async () => {
-      const price = await fetchTokenPrice(STREME_CONTRACT);
-      setStremePrice(price);
-    };
-
-    fetchPrice();
-    // Update price every minute
-    const interval = setInterval(fetchPrice, 60000);
-    return () => clearInterval(interval);
-  }, []);
+  // Use centralized price cache instead of direct API calls
+  const { price: stremePrice } = useTokenPrice(STREME_CONTRACT, {
+    refreshInterval: 300000, // 5 minutes (less aggressive than before)
+    autoRefresh: true,
+  });
 
   if (isMiniAppView) {
     return null;

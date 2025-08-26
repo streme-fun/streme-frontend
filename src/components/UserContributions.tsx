@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAccount } from "wagmi";
 import { formatUnits } from "viem";
 import {
@@ -8,14 +8,21 @@ import {
   useStakingContractActions,
   formatStakeAmount,
 } from "@/src/hooks/useStremeStakingContract";
-import { getPrices } from "@/src/lib/priceUtils";
+import { useTokenPrice } from "@/src/hooks/useTokenPrice";
 
 export const UserContributions = () => {
   const { isConnected } = useAccount();
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
-  const [stremePrice, setStremePrice] = useState<number | null>(null);
+
+  const STREME_TOKEN_ADDRESS = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
+  
+  // Use centralized price cache
+  const { price: stremePrice } = useTokenPrice(STREME_TOKEN_ADDRESS, {
+    refreshInterval: 300000, // 5 minutes
+    autoRefresh: true,
+  });
 
   const { userDepositBalance, totalBalance, isPaused, refetchUserBalance } =
     useStremeStakingContract();
@@ -29,42 +36,7 @@ export const UserContributions = () => {
     hash,
   } = useStakingContractActions();
 
-  // STREME token contract address
-  const STREME_TOKEN_ADDRESS = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
-
-  // Fetch STREME price using the same method as crowdfund page
-  useEffect(() => {
-    const fetchStremePrice = async () => {
-      try {
-        const prices = await getPrices([STREME_TOKEN_ADDRESS]);
-        if (prices && prices[STREME_TOKEN_ADDRESS.toLowerCase()]) {
-          setStremePrice(prices[STREME_TOKEN_ADDRESS.toLowerCase()]);
-        } else {
-          // Fallback: try to get price from the token's single API endpoint
-          const response = await fetch(
-            `/api/tokens/single?address=${STREME_TOKEN_ADDRESS}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            const tokenPrice = data.data?.price || data.data?.marketData?.price;
-            if (tokenPrice && !isNaN(tokenPrice)) {
-              setStremePrice(tokenPrice);
-            }
-          }
-        }
-      } catch (error) {
-        console.error(
-          "Error fetching STREME price in UserContributions:",
-          error
-        );
-      }
-    };
-
-    fetchStremePrice();
-    // Update price every 2 minutes
-    const interval = setInterval(fetchStremePrice, 120000);
-    return () => clearInterval(interval);
-  }, [STREME_TOKEN_ADDRESS]);
+  // Price is now handled by useTokenPrice hook above
 
   // Format USD function using raw bigint amount
   const formatUsd = (stremeAmountBigint: bigint | undefined): string => {

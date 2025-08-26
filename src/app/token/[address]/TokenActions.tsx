@@ -16,8 +16,9 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useUnifiedWallet } from "@/src/hooks/useUnifiedWallet";
 import { Button as UiButton } from "@/src/components/ui/button";
 import { parseEther, parseUnits } from "viem";
-import { getPrices, convertToUSD } from "@/src/lib/priceUtils";
 import { useTokenBalance } from "@/src/hooks/useTokenData";
+import { useTokenData } from "@/src/contexts/TokenPageContext";
+import { useTokenPrice } from "@/src/hooks/useTokenPrice";
 
 // Base USDC contract address
 const USDC_BASE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -45,7 +46,9 @@ export function TokenActions({
   address: addressProp,
   isConnected: isConnectedProp,
 }: TokenActionsProps) {
-  const [token, setToken] = useState(initialToken);
+  // Use shared token data from context, fall back to prop for compatibility
+  const { token: contextToken } = useTokenData();
+  const token = contextToken || initialToken;
 
   // Use shared token data hook instead of individual state
   const {
@@ -57,9 +60,9 @@ export function TokenActions({
     isRefreshing: isRefreshingBalances,
     lastUpdated,
   } = useTokenBalance(
-    initialToken.contract_address,
-    initialToken.staking_address,
-    initialToken.staking_pool
+    token?.contract_address,
+    token?.staking_address,
+    token?.staking_pool
   );
 
   // USDC balance tracking
@@ -80,39 +83,76 @@ export function TokenActions({
   } | null>(null);
   const [isPriceLoading, setIsPriceLoading] = useState(false);
 
-  // USD price states
-  const [usdPrices, setUsdPrices] = useState<{
-    eth: number | null;
-    token: number | null;
-  }>({
-    eth: null,
-    token: null,
+  // Use centralized price cache for token prices, separate logic for ETH
+  const { price: tokenPrice } = useTokenPrice(token?.contract_address, {
+    refreshInterval: 300000, // 5 minutes  
+    autoRefresh: true,
   });
+
+  // ETH price - use separate state since useTokenPrice doesn't handle ETH
+  const [ethPrice, setEthPrice] = useState<number | null>(null);
+
+  // Fetch ETH price using original method
+  useEffect(() => {
+    const fetchETHPrice = async () => {
+      try {
+        const response = await fetch("/api/eth-price");
+        if (response.ok) {
+          const data = await response.json();
+          setEthPrice(data.eth || null);
+        }
+      } catch (error) {
+        console.warn("Error fetching ETH price:", error);
+      }
+    };
+
+    fetchETHPrice();
+    const interval = setInterval(fetchETHPrice, 300000); // 5 minutes
+    return () => clearInterval(interval);
+  }, []);
+
+  // Helper function to format USD values (replaces convertToUSD)
+  const formatUSD = (amount: string | number, price: number | null): string | null => {
+    if (!price || !amount) return null;
+
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    if (isNaN(numAmount) || numAmount <= 0) return null;
+
+    const usdValue = numAmount * price;
+
+    if (usdValue < 0.01) {
+      return `$${usdValue.toFixed(6)}`;
+    } else if (usdValue < 1) {
+      return `$${usdValue.toFixed(4)}`;
+    } else {
+      return `$${usdValue.toFixed(2)}`;
+    }
+  };
 
   // Create stable references for contract addresses to prevent unnecessary re-renders
   const stakingPoolAddress = useMemo(() => {
     console.log(
       "stakingPoolAddress memoized value changed:",
-      initialToken.staking_pool
+      token?.staking_pool
     );
-    return initialToken.staking_pool;
-  }, [initialToken.staking_pool]);
+    return token?.staking_pool;
+  }, [token?.staking_pool]);
 
   const contractAddress = useMemo(() => {
     console.log(
       "contractAddress memoized value changed:",
-      initialToken.contract_address
+      token?.contract_address
     );
-    return initialToken.contract_address;
-  }, [initialToken.contract_address]);
+    return token?.contract_address;
+  }, [token?.contract_address]);
 
   const stakingAddress = useMemo(() => {
     console.log(
       "stakingAddress memoized value changed:",
-      initialToken.staking_address
+      token?.staking_address
     );
-    return initialToken.staking_address;
-  }, [initialToken.staking_address]);
+    return token?.staking_address;
+  }, [token?.staking_address]);
 
   const { isSDKLoaded: fcSDKLoaded, farcasterContext } = useAppFrameLogic();
 
@@ -309,77 +349,6 @@ export function TokenActions({
 
   const validation = getTradeValidation();
 
-  useEffect(() => {
-    const addressToFetch = initialToken.contract_address;
-    const fetchTokenData = async () => {
-      try {
-        // console.log("Fetching token data for:", addressToFetch);
-        const response = await fetch(
-          `/api/tokens/single?address=${addressToFetch}`
-        );
-        if (!response.ok) {
-          console.error(
-            `TokenActions: Error fetching token data: ${response.status} for address ${addressToFetch}`
-          );
-          return;
-        }
-        const result = await response.json();
-        if (result.data) {
-          if (
-            result.data.contract_address &&
-            result.data.contract_address?.toLowerCase() ===
-              addressToFetch?.toLowerCase()
-          ) {
-            // Only update if the data actually changed
-            const newToken = result.data;
-            setToken((currentToken) => {
-              const hasChanged =
-                newToken.staking_pool !== currentToken.staking_pool ||
-                newToken.staking_address !== currentToken.staking_address ||
-                newToken.contract_address !== currentToken.contract_address;
-
-              if (hasChanged) {
-                console.log("Token data changed, updating:", {
-                  old: {
-                    staking_pool: currentToken.staking_pool,
-                    staking_address: currentToken.staking_address,
-                    contract_address: currentToken.contract_address,
-                  },
-                  new: {
-                    staking_pool: newToken.staking_pool,
-                    staking_address: newToken.staking_address,
-                    contract_address: newToken.contract_address,
-                  },
-                });
-                return newToken;
-              } else {
-                console.log("Token data unchanged, skipping update");
-                return currentToken;
-              }
-            });
-          } else {
-            console.warn(
-              "TokenActions: Fetched token data for a different address than requested.",
-              {
-                requested: addressToFetch,
-                received: result.data.contract_address,
-              }
-            );
-          }
-        }
-      } catch (error) {
-        console.error(
-          `TokenActions: Error fetching token ${addressToFetch}:`,
-          error
-        );
-      }
-    };
-
-    const intervalId = setInterval(fetchTokenData, 300000);
-    fetchTokenData();
-
-    return () => clearInterval(intervalId);
-  }, [initialToken.contract_address]);
 
   useEffect(() => {
     if (!currentAddress || !walletIsConnected) {
@@ -514,30 +483,7 @@ export function TokenActions({
     return () => clearInterval(intervalId);
   }, [walletIsConnected, currentAddress, refreshBalances]);
 
-  // Fetch USD prices
-  useEffect(() => {
-    const fetchUSDPrices = async () => {
-      try {
-        const prices = await getPrices([contractAddress]);
-        if (prices) {
-          setUsdPrices({
-            eth: prices.eth,
-            token:
-              prices[contractAddress?.toLowerCase() || ""] ||
-              token.price ||
-              null,
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching USD prices:", error);
-      }
-    };
-
-    fetchUSDPrices();
-    // Update prices every minute
-    const interval = setInterval(fetchUSDPrices, 300000);
-    return () => clearInterval(interval);
-  }, [contractAddress, token.price]);
+  // USD prices are now handled by useTokenPrice hooks above
 
   // Show loading state if wallet is initializing
   if (
@@ -676,11 +622,11 @@ export function TokenActions({
               {tradeAmount && (
                 <div className="absolute left-5 top-12 text-xs text-base-content/50">
                   {tradeDirection === "buy"
-                    ? tradeCurrency === "ETH" && usdPrices.eth
-                      ? `≈ ${convertToUSD(tradeAmount, usdPrices.eth)}`
+                    ? tradeCurrency === "ETH"
+                      ? formatUSD(tradeAmount, ethPrice)
                       : null // Don't show USD equivalent for USDC
-                    : tradeDirection === "sell" && usdPrices.token
-                    ? `≈ ${convertToUSD(tradeAmount, usdPrices.token)}`
+                    : tradeDirection === "sell"
+                    ? formatUSD(tradeAmount, tokenPrice)
                     : null}
                 </div>
               )}
@@ -802,12 +748,12 @@ export function TokenActions({
                     const amount = Number(priceQuote.buyAmount) / 1e18;
                     const price =
                       tradeDirection === "buy"
-                        ? usdPrices.token
-                        : usdPrices.eth;
+                        ? tokenPrice
+                        : ethPrice;
 
-                    return price ? (
+                    return formatUSD(amount, price) ? (
                       <div className="text-xs text-base-content/50 mt-1">
-                        ≈ {convertToUSD(amount, price)}
+                        ≈ {formatUSD(amount, price)}
                       </div>
                     ) : null;
                   })()}

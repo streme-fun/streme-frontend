@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, memo, useMemo } from "react";
 import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
-import { getPrices } from "@/src/lib/priceUtils";
+import { useTokenPrice } from "@/src/hooks/useTokenPrice";
 import { useUnifiedWallet } from "@/src/hooks/useUnifiedWallet";
 import { publicClient } from "@/src/lib/viemClient";
 import { formatUnits } from "viem";
@@ -29,8 +29,13 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
   const [baseAmount, setBaseAmount] = useState<number>(0);
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [flowRate, setFlowRate] = useState<string>("0");
-  const [stremePrice, setStremePrice] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Use centralized price cache
+  const { price: stremePrice } = useTokenPrice(STREME_TOKEN_ADDRESS, {
+    refreshInterval: 300000, // 5 minutes (much less aggressive)
+    autoRefresh: true,
+  });
 
   // Use refs to prevent effect dependency loops
   const lastFetchTimeRef = useRef(0);
@@ -195,24 +200,7 @@ function StreamingBalanceComponent({ className = "" }: StreamingBalanceProps) {
     };
   }, [effectiveAddress, fetchData]); // Only depend on address and stable fetchData
 
-  // Fetch STREME price
-  useEffect(() => {
-    const fetchPrice = async () => {
-      try {
-        const prices = await getPrices([STREME_TOKEN_ADDRESS]);
-        if (prices?.[STREME_TOKEN_ADDRESS.toLowerCase()]) {
-          setStremePrice(prices[STREME_TOKEN_ADDRESS.toLowerCase()]);
-        }
-      } catch (error) {
-        console.error("Error fetching STREME price:", error);
-      }
-    };
-
-    fetchPrice();
-    // Update price every 30 seconds
-    const interval = setInterval(fetchPrice, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  // Price is now handled by useTokenPrice hook
 
   // Memoized calculations to prevent unnecessary rerenders
   const usdValue = useMemo(

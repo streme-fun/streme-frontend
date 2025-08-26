@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import BackButton from "@/src/components/BackButton";
 import { TokenActions } from "./TokenActions";
-import { Token } from "@/src/app/types/token";
 import { TokenInfo } from "./TokenInfo";
 import { StakedBalance } from "@/src/components/StakedBalance";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
@@ -13,25 +12,15 @@ import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
 import { StakerLeaderboard } from "@/src/components/StakerLeaderboard";
 import { StakerLeaderboardEmbed } from "@/src/components/StakerLeaderboardEmbed";
 import { ClaimFeesButton } from "@/src/components/ClaimFeesButton";
-
-// Interface for GeckoTerminal market data
-interface GeckoTerminalData {
-  price: number;
-  change1h: number;
-  change24h: number;
-  volume24h: number;
-  marketCap: number;
-}
+import { useTokenData } from "@/src/contexts/TokenPageContext";
 
 export function TokenPageContent() {
-  const params = useParams();
-  const pageAddress = params.address as string;
-  const [token, setToken] = useState<Token | null>(null);
-  const [tokenLoading, setTokenLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [stakingUpdateTrigger, setStakingUpdateTrigger] = useState(0);
   const [isStakerLeaderboardOpen, setIsStakerLeaderboardOpen] = useState(false);
   const [userStakedBalance, setUserStakedBalance] = useState<bigint>(0n);
+
+  // Use shared token data from context
+  const { token, isLoading: tokenLoading, error } = useTokenData();
 
   const {
     isSDKLoaded,
@@ -42,100 +31,10 @@ export function TokenPageContent() {
     hasPromptedToAdd,
   } = useAppFrameLogic();
 
+  const params = useParams();
+  const pageAddress = params.address as string;
 
-  // Function to fetch GeckoTerminal market data
-  const fetchGeckoTerminalData = async (
-    poolAddress: string
-  ): Promise<GeckoTerminalData | null> => {
-    try {
-      const response = await fetch(
-        `/api/geckoterminal?poolAddress=${poolAddress}`
-      );
-      if (!response.ok) {
-        console.warn(`GeckoTerminal API failed with status ${response.status}`);
-        return null;
-      }
 
-      const data = await response.json();
-      if (data.error || !data?.data?.attributes) {
-        console.warn("Invalid GeckoTerminal response:", data);
-        return null;
-      }
-
-      const attrs = data.data.attributes;
-
-      // Helper to clean percentage strings
-      const cleanPercentage = (str: string) =>
-        parseFloat(str.replace(/%/g, "").replace(/[+]/g, ""));
-
-      return {
-        price: parseFloat(attrs.price_in_usd || "0"),
-        change1h: cleanPercentage(attrs.price_percent_changes?.last_1h || "0"),
-        change24h: cleanPercentage(
-          attrs.price_percent_changes?.last_24h || "0"
-        ),
-        volume24h: parseFloat(attrs.from_volume_in_usd || "0"),
-        marketCap: parseFloat(attrs.fully_diluted_valuation || "0"),
-      };
-    } catch (error) {
-      console.error("Error fetching GeckoTerminal data:", error);
-      return null;
-    }
-  };
-
-  useEffect(() => {
-    async function fetchToken() {
-      if (!pageAddress) {
-        setTokenLoading(false);
-        return;
-      }
-
-      try {
-        setTokenLoading(true);
-        const response = await fetch(
-          `/api/tokens/single?address=${pageAddress}`
-        );
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data.data) {
-          const baseToken = data.data;
-
-          // Fetch more accurate market data from GeckoTerminal
-          const geckoData = await fetchGeckoTerminalData(
-            baseToken.pool_address
-          );
-
-          // Merge the data, preferring GeckoTerminal for market data when available
-          const enhancedToken: Token = {
-            ...baseToken,
-            price: geckoData?.price ?? baseToken.price,
-            change1h: geckoData?.change1h ?? baseToken.change1h,
-            change24h: geckoData?.change24h ?? baseToken.change24h,
-            volume24h: geckoData?.volume24h ?? baseToken.volume24h,
-            marketCap: geckoData?.marketCap ?? baseToken.marketCap,
-          };
-
-          setToken(enhancedToken);
-        } else {
-          throw new Error("No token data found");
-        }
-      } catch (err) {
-        console.error("Error fetching token:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch token data"
-        );
-      } finally {
-        setTokenLoading(false);
-      }
-    }
-
-    fetchToken();
-  }, [pageAddress]);
 
   // Prompt to add mini app when in mini app view
   useEffect(() => {

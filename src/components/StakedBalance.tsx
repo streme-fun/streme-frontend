@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { publicClient } from "@/src/lib/viemClient"; // Import the centralized client
 import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
 import { useWallet } from "@/src/hooks/useWallet";
-import { getPrices } from "@/src/lib/priceUtils";
+import { useTokenPrice } from "@/src/hooks/useTokenPrice";
 import {
   useTokenLiquidity,
   isLiquidityLow,
@@ -42,7 +42,12 @@ export function StakedBalance({
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
-  const [tokenPrice, setTokenPrice] = useState<number | null>(null);
+
+  // Use centralized price cache
+  const { price: tokenPrice } = useTokenPrice(tokenAddress, {
+    refreshInterval: 300000, // 5 minutes
+    autoRefresh: true,
+  });
 
   // Use streaming number hook for animated balance
   const currentBalance = useStreamingNumber({
@@ -221,27 +226,7 @@ export function StakedBalance({
     }
   }, [refresh]);
 
-  // Fetch USD price
-  useEffect(() => {
-    let cancelled = false;
-    const fetchPrice = async () => {
-      try {
-        const prices = await getPrices([tokenAddress]);
-        if (!cancelled && prices?.[tokenAddress.toLowerCase()]) {
-          setTokenPrice(prices[tokenAddress.toLowerCase()]);
-        }
-      } catch {
-        // ignore price errors for UI
-      }
-    };
-
-    fetchPrice();
-    const interval = setInterval(fetchPrice, 30000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [tokenAddress]);
+  // Price is now handled by useTokenPrice hook
 
   // Use shared liquidity check (Uniswap V3 WETH reserves)
   const { wethBalance } = useTokenLiquidity(tokenAddress);
