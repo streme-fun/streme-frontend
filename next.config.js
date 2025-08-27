@@ -94,6 +94,14 @@ const nextConfig = {
         protocol: "https",
         hostname: "openseauserdata.com",
       },
+      {
+        protocol: "https",
+        hostname: "wrpcd.net",
+      },
+      {
+        protocol: "https",
+        hostname: "*.wrpcd.net",
+      },
     ],
   },
   async headers() {
