@@ -7,6 +7,7 @@ import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
+import { ensureTxHash } from "@/src/lib/ensureTxHash";
 import sdk from "@farcaster/miniapp-sdk";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
@@ -313,7 +314,7 @@ export function StakerLeaderboardEmbed({
             )} ETH for zap (excluding gas).`
           );
         }
-        txHash = await ethProvider.request({
+        const rawTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
           params: [
             {
@@ -325,8 +326,12 @@ export function StakerLeaderboardEmbed({
             },
           ],
         });
+        txHash = ensureTxHash(
+          rawTxHash,
+          "Farcaster Ethereum provider"
+        );
       } else {
-        if (!user?.wallet?.address)
+        if (!connectedUser?.wallet?.address)
           throw new Error("Wallet not connected.");
 
         // Simplified wallet access
@@ -365,7 +370,7 @@ export function StakerLeaderboardEmbed({
             )} ETH (inc. gas), have ${formatEther(currentEthBalance)} ETH.`
           );
         }
-        txHash = await provider.request({
+        const rawTxHash = await provider.request({
           method: "eth_sendTransaction",
           params: [
             {
@@ -378,6 +383,7 @@ export function StakerLeaderboardEmbed({
             },
           ],
         });
+        txHash = ensureTxHash(rawTxHash, "Wallet connector provider");
       }
 
       if (!txHash) {

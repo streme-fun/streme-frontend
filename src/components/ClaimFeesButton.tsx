@@ -10,6 +10,7 @@ import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { useSafeWallets } from "../hooks/useSafeWallet";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
+import { ensureTxHash } from "@/src/lib/ensureTxHash";
 
 interface ClaimFeesButtonProps {
   tokenAddress: string;
@@ -63,7 +64,7 @@ export function ClaimFeesButton({
           currentAddress as `0x${string}`
         );
 
-        txHash = await ethProvider.request({
+        const rawTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
           params: [
             {
@@ -74,6 +75,10 @@ export function ClaimFeesButton({
             },
           ],
         });
+        txHash = ensureTxHash(
+          rawTxHash,
+          "Farcaster Ethereum provider"
+        );
       } else {
         // Desktop/Mobile Path - use wagmi/privy for transaction
         if (!currentAddress) {
@@ -135,7 +140,7 @@ export function ClaimFeesButton({
             currentAddress as `0x${string}`
           );
 
-          txHash = await provider.request({
+          const rawTxHash = await provider.request({
             method: "eth_sendTransaction",
             params: [
               {
@@ -146,6 +151,10 @@ export function ClaimFeesButton({
               },
             ],
           });
+          txHash = ensureTxHash(
+            rawTxHash,
+            "Wallet connector provider"
+          );
         }
       }
 

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { GDA_FORWARDER } from "@/src/lib/contracts";
+import { ensureTxHash } from "@/src/lib/ensureTxHash";
 import sdk from "@farcaster/miniapp-sdk";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useSafeWallets } from "../hooks/useSafeWallet";
@@ -71,7 +72,7 @@ export function ConnectPoolButton({
           throw new Error("Farcaster Ethereum provider not available.");
         }
 
-        txHash = await ethProvider.request({
+        const rawTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
           params: [
             {
@@ -82,6 +83,10 @@ export function ConnectPoolButton({
             },
           ],
         });
+        txHash = ensureTxHash(
+          rawTxHash,
+          "Farcaster Ethereum provider"
+        );
 
         if (!txHash) {
           throw new Error(
@@ -126,7 +131,7 @@ export function ConnectPoolButton({
             params: [{ chainId: "0x2105" }],
           });
 
-          txHash = await provider.request({
+          const rawTxHash = await provider.request({
             method: "eth_sendTransaction",
             params: [
               {
@@ -137,6 +142,10 @@ export function ConnectPoolButton({
               },
             ],
           });
+          txHash = ensureTxHash(
+            rawTxHash,
+            "Wallet connector provider"
+          );
         }
 
         if (!txHash) {

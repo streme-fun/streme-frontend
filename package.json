@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "lint:types": "next lint --quiet | grep -E '(Unexpected any|no-explicit-any|@typescript-eslint)'",
+    "lint:types": "next lint --quiet | grep -E '(Unexpected any|no-explicit-any|@typescript-eslint)' && echo '❌ Found type-specific lint errors' && exit 1 || echo '✅ No type-specific lint issues found'",
     "check:all": "npm run typecheck && npm run lint:types && npm run lint:links",
     "lint:links": "next lint --quiet | grep -E 'no-html-link-for-pages' && echo '❌ Found HTML link errors that will fail build' && exit 1 || echo '✅ No HTML link errors found'",
     "test": "jest",

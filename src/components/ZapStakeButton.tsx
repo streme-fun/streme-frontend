@@ -14,6 +14,7 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useSafeWallets } from "../hooks/useSafeWallet";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 import Link from "next/link";
+import { ensureTxHash } from "@/src/lib/ensureTxHash";
 
 const WETH = "0x4200000000000000000000000000000000000006";
 const toHex = (address: string) => address as `0x${string}`;
@@ -176,7 +177,7 @@ export function ZapStakeButton({
           toHex(currentAddress!)
         );
         
-        txHash = await ethProvider.request({
+        const rawTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
           params: [
             {
@@ -188,6 +189,10 @@ export function ZapStakeButton({
             },
           ],
         });
+        txHash = ensureTxHash(
+          rawTxHash,
+          "Farcaster Ethereum provider"
+        );
       } else {
         // Desktop/Mobile Path - use wagmi/privy for transaction
         if (!currentAddress) {
@@ -267,7 +272,7 @@ export function ZapStakeButton({
             toHex(currentAddress!)
           );
           
-          txHash = await provider.request({
+          const rawTxHash = await provider.request({
             method: "eth_sendTransaction",
             params: [
               {
@@ -279,6 +284,10 @@ export function ZapStakeButton({
               },
             ],
           });
+          txHash = ensureTxHash(
+            rawTxHash,
+            "Wallet connector provider"
+          );
         }
       }
 
