@@ -135,7 +135,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     hash: claimHash,
   });
 
-  const { user: privyUser } = useSafePrivy();
+  const { user: connectedUser } = useSafePrivy();
   const {
     isMiniAppView,
     address: fcAddress,
@@ -145,7 +145,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
   // Get effective address and connection status based on context
   const effectiveAddress = isMiniAppView
     ? fcAddress
-    : privyUser?.wallet?.address;
+    : connectedUser?.wallet?.address;
   const isWalletConnected = isMiniAppView ? isFcConnected : isWagmiConnected;
 
   // Check locker status after creation transaction succeeds

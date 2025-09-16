@@ -1,116 +1,92 @@
 "use client";
 
-import { usePrivy, useWallets, useLinkAccount } from "@privy-io/react-auth";
-import { useSetActiveWallet } from "@privy-io/wagmi";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useCallback, useMemo } from "react";
+import { useAccount, useDisconnect } from "wagmi";
 import { useEnvironment } from "../components/providers/EnvironmentProvider";
 
+type WalletLikeUser = {
+  wallet?: {
+    address?: string | null;
+  } | null;
+} | null;
+
 /**
- * Safe Privy hooks that handle mini-app mode gracefully
- * These can be used anywhere instead of calling Privy hooks directly
+ * Safe wallet hooks that mimic the previous Privy helpers but run entirely on wagmi/RainbowKit.
+ * The helpers gracefully no-op in Farcaster mini-app environments where RainbowKit isn't used.
  */
 
 export function useSafePrivy() {
   const { isMiniApp } = useEnvironment();
-  
-  // Don't call Privy hooks at all in mini-app mode to avoid provider warnings
+
   if (isMiniApp) {
     return {
       authenticated: false,
       login: () => {},
       logout: () => {},
-      user: null,
+      user: null as WalletLikeUser,
       ready: true,
     };
   }
 
-  // Only call Privy hooks in browser mode when PrivyProvider is available
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const privyResult = usePrivy();
-    
-    return {
-      ...privyResult,
-    };
-  } catch {
-    return {
-      authenticated: false,
-      login: () => {},
-      logout: () => {},
-      user: null,
-      ready: true,
-    };
-  }
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { openConnectModal } = useConnectModal();
+
+  const login = useCallback(() => {
+    openConnectModal?.();
+  }, [openConnectModal]);
+
+  const logout = useCallback(() => {
+    disconnect();
+  }, [disconnect]);
+
+  const user = useMemo<WalletLikeUser>(() => {
+    if (!address) {
+      return null;
+    }
+    return { wallet: { address } };
+  }, [address]);
+
+  return {
+    authenticated: isConnected,
+    login,
+    logout,
+    user,
+    ready: true,
+  };
 }
 
 export function useSafeWallets() {
   const { isMiniApp } = useEnvironment();
-  
-  // Don't call Privy hooks at all in mini-app mode to avoid provider warnings
-  if (isMiniApp) {
-    return { wallets: [] };
+  const { address, connector } = useAccount();
+
+  if (isMiniApp || !address || !connector) {
+    return { wallets: [] as SafeWallet[] };
   }
 
-  // Only call Privy hooks in browser mode when PrivyProvider is available
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useWallets();
-  } catch {
-    return { wallets: [] };
-  }
+  const wallet: SafeWallet = {
+    address,
+    getEthereumProvider: async () => {
+      if (!connector.getProvider) {
+        throw new Error("Connector does not expose a provider");
+      }
+      const provider = await connector.getProvider();
+      if (!provider) {
+        throw new Error("No EIP-1193 provider available for the active connector");
+      }
+      return provider as EIP1193Provider;
+    },
+  };
+
+  return { wallets: [wallet] };
 }
 
-export function useSafeSetActiveWallet() {
-  const { isMiniApp } = useEnvironment();
-  
-  // Don't call Privy hooks at all in mini-app mode to avoid provider warnings
-  if (isMiniApp) {
-    return { setActiveWallet: () => {} };
-  }
+type EIP1193Provider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
 
-  // Only call Privy hooks in browser mode when PrivyProvider is available
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useSetActiveWallet();
-  } catch {
-    return { setActiveWallet: () => {} };
-  }
-}
-
-export function useSafeLinkAccount() {
-  const { isMiniApp } = useEnvironment();
-  
-  // Don't call Privy hooks at all in mini-app mode to avoid provider warnings
-  if (isMiniApp) {
-    return { 
-      linkWallet: () => {},
-      linkEmail: () => {},
-      linkGoogle: () => {},
-      linkTwitter: () => {},
-      linkDiscord: () => {},
-      linkGithub: () => {},
-      linkApple: () => {},
-      linkLinkedIn: () => {},
-      linkTikTok: () => {},
-      linkSpotify: () => {},
-    };
-  }
-
-  // Only call Privy hooks in browser mode when PrivyProvider is available
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useLinkAccount();
-  } catch {
-    return { 
-      linkWallet: () => {},
-      linkEmail: () => {},
-      linkGoogle: () => {},
-      linkTwitter: () => {},
-      linkDiscord: () => {},
-      linkGithub: () => {},
-      linkApple: () => {},
-      linkLinkedIn: () => {},
-      linkTikTok: () => {},
-      linkSpotify: () => {},
-    };
-  }
+interface SafeWallet {
+  address: string;
+  getEthereumProvider: () => Promise<EIP1193Provider>;
 }

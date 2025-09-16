@@ -208,7 +208,7 @@ export function ZapStakeButton({
           );
         }
 
-        // Get provider from Privy wallets or wagmi
+        // Get provider from wagmi wallet client or connector fallback
         if (walletClient) {
           // Use wagmi wallet client for zap & stake
           const { encodeFunctionData } = await import("viem");
@@ -251,7 +251,7 @@ export function ZapStakeButton({
             chain: undefined,
           });
         } else {
-          // Fallback to Privy wallet
+          // Fallback to connector-provided provider
           const wallet = wallets.find((w) => w.address === wagmiAddress);
           if (!wallet) {
             throw new Error("Wallet not found");

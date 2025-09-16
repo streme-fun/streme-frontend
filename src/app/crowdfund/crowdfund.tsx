@@ -45,7 +45,7 @@ export default function CrowdfundPage({
 }: CrowdfundPageProps) {
   const { isSDKLoaded } = useAppFrameLogic();
 
-  const { ready: privyReady } = useSafePrivy();
+  const { ready: walletReady } = useSafePrivy();
 
   // Use unified wallet connection logic like TokenActions
   const {
@@ -748,7 +748,7 @@ export default function CrowdfundPage({
   if (
     unifiedIsLoading ||
     (isMiniAppView && !isSDKLoaded) ||
-    (!isMiniAppView && !privyReady)
+    (!isMiniAppView && !walletReady)
   ) {
     return (
       <div className="min-h-screen flex items-center justify-center">

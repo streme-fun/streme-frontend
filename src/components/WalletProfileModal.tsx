@@ -54,7 +54,7 @@ export function WalletProfileModal({
   onClose,
   preloadedUserData,
 }: WalletProfileModalProps) {
-  const { user: privyUser } = useSafePrivy();
+  const { user: connectedUser } = useSafePrivy();
   const {
     farcasterContext,
     isMiniAppView,
@@ -72,7 +72,7 @@ export function WalletProfileModal({
   // Get effective address and FID based on mini-app context
   const effectiveAddress = isMiniAppView
     ? fcAddress
-    : privyUser?.wallet?.address;
+    : connectedUser?.wallet?.address;
 
   // Try multiple possible paths for FID based on SDK documentation
   const userFid =

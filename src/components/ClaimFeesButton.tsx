@@ -80,7 +80,7 @@ export function ClaimFeesButton({
           throw new Error("Wallet not connected.");
         }
 
-        // Get provider from Privy wallets or wagmi
+        // Get provider from wagmi wallet client or connector fallback
         if (walletClient) {
           // Use wagmi wallet client for claiming fees
           const { encodeFunctionData } = await import("viem");
@@ -112,7 +112,7 @@ export function ClaimFeesButton({
             chain: undefined,
           });
         } else {
-          // Fallback to Privy wallet
+          // Fallback to connector-provided provider
           const wallet = wallets.find((w) => w.address === currentAddress);
           if (!wallet) {
             throw new Error("Wallet not found");

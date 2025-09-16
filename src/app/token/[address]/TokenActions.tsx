@@ -156,7 +156,7 @@ export function TokenActions({
 
   const { isSDKLoaded: fcSDKLoaded, farcasterContext } = useAppFrameLogic();
 
-  const { ready: privyReady } = useSafePrivy();
+  const { ready: walletReady } = useSafePrivy();
 
   // Use unified wallet connection logic
   const {
@@ -489,7 +489,7 @@ export function TokenActions({
   if (
     unifiedIsLoading ||
     (isEffectivelyMiniApp && !fcSDKLoaded) ||
-    (!isEffectivelyMiniApp && !privyReady)
+    (!isEffectivelyMiniApp && !walletReady)
   ) {
     return (
       <div className="card bg-base-100 border border-black/[.1]1]">
@@ -814,7 +814,7 @@ export function TokenActions({
             />
           </div>
           {/* Buy & Stake Button (only for buy direction) */}
-          {tradeDirection === "buy" && stakingAddress && (
+          {tradeDirection === "buy" && tradeCurrency !== "USDC" && stakingAddress && (
             <ZapStakeButton
               tokenAddress={contractAddress as `0x${string}`}
               stakingAddress={stakingAddress as `0x${string}`}

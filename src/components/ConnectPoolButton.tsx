@@ -89,12 +89,12 @@ export function ConnectPoolButton({
           );
         }
       } else {
-        // Desktop/Mobile Path - use wagmi/privy for transaction
+        // Desktop/Mobile Path - use wagmi/RainbowKit for transaction
         if (!currentAddress) {
           throw new Error("Wallet not connected.");
         }
 
-        // Get provider from Privy wallets or wagmi
+        // Get provider from wagmi wallet client or connector fallback
         if (walletClient) {
           // Use wagmi wallet client for pool connection
           txHash = await walletClient.writeContract({
@@ -115,7 +115,7 @@ export function ConnectPoolButton({
             args: [toHex(stakingPoolAddress), "0x"],
           });
         } else {
-          // Fallback to Privy wallet
+          // Fallback to connector-provided provider
           const wallet = wallets.find((w) => w.address === wagmiAddress);
           if (!wallet) {
             throw new Error("Wallet not found");

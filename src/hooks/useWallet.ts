@@ -1,213 +1,61 @@
 "use client";
 
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useCallback, useMemo } from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { useMiniAppContext } from "../contexts/MiniAppContext";
-import { useCallback, useEffect } from "react";
-import {
-  useSafePrivy,
-  useSafeWallets,
-  useSafeSetActiveWallet,
-  useSafeLinkAccount,
-} from "./useSafePrivy";
 
 /**
  * Simplified wallet hook that provides a clean interface for wallet connections
  * across both browser and mini-app contexts.
  *
- * In mini-app: Uses wagmi directly with Farcaster connector
- * In browser: Uses Privy for auth + wagmi for blockchain interactions
+ * In mini-app: Uses wagmi directly with the Farcaster connector
+ * In browser: Uses RainbowKit to drive wallet selection
  */
 export function useWallet() {
-  const { address, isConnected: wagmiIsConnected, connector } = useAccount();
-  const { connect: wagmiConnect, connectors } = useConnect();
-  const { disconnect: wagmiDisconnect } = useDisconnect();
-  const {
-    authenticated,
-    login: privyLogin,
-    logout: privyLogout,
-    ready: privyReady,
-  } = useSafePrivy();
-  const { wallets } = useSafeWallets();
-  const { setActiveWallet } = useSafeSetActiveWallet();
-  const { linkWallet } = useSafeLinkAccount();
+  const { address, isConnected, connector } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { disconnect } = useDisconnect();
+  const { openConnectModal } = useConnectModal();
   const isMiniApp = useMiniAppContext();
 
-  // Get the active wallet from Privy
-  // In Privy + wagmi setup, the first wallet is typically the active one
-  const activeWallet = wallets[0];
-
-  // Handle wallet changes in browser mode
-  useEffect(() => {
-    if (!isMiniApp && authenticated && wallets.length > 0) {
-      // If wagmi address doesn't match any Privy wallet, sync them
-      const hasMatchingWallet = wallets.some(
-        (w) => w.address?.toLowerCase() === address?.toLowerCase()
-      );
-
-      if (!hasMatchingWallet && address) {
-        // Browser extension wallet changed outside of Privy
-        // Try to find and set the new wallet as active
-        const newWallet = wallets.find(
-          (w) => w.address?.toLowerCase() === address?.toLowerCase()
-        );
-        if (newWallet) {
-          setActiveWallet(newWallet);
-        }
-      } else if (!address && activeWallet) {
-        // Wagmi lost connection but Privy still has a wallet
-        // Try to reconnect
-        setActiveWallet(activeWallet);
-      }
-    }
-  }, [
-    isMiniApp,
-    authenticated,
-    wallets,
-    address,
-    activeWallet,
-    setActiveWallet,
-  ]);
-
-  // Listen for account changes from the browser wallet
-  useEffect(() => {
-    if (
-      !isMiniApp &&
-      typeof window !== "undefined" &&
-      (window as Window & { ethereum?: unknown }).ethereum
-    ) {
-      const handleAccountsChanged = (accounts: string[]) => {
-        console.log("Wallet accounts changed:", accounts);
-
-        if (accounts.length === 0) {
-          // Wallet disconnected
-          privyLogout();
-        } else if (accounts[0]?.toLowerCase() !== address?.toLowerCase()) {
-          // Account changed - need to update Privy
-          // Force a reconnection with the new account
-          const newAddress = accounts[0];
-          const newWallet = wallets.find(
-            (w) => w.address?.toLowerCase() === newAddress.toLowerCase()
-          );
-
-          if (newWallet) {
-            // Wallet already connected in Privy, just set it as active
-            setActiveWallet(newWallet);
-          } else {
-            // New wallet not in Privy, need to reconnect
-            console.log("New wallet detected, prompting reconnection...");
-            // Disconnect and reconnect to get the new wallet
-            privyLogout();
-            setTimeout(() => privyLogin(), 100);
-          }
-        }
-      };
-
-      // Add listener
-      const ethereum = (
-        window as Window & {
-          ethereum?: {
-            on: (event: string, callback: (accounts: string[]) => void) => void;
-            removeListener: (
-              event: string,
-              callback: (accounts: string[]) => void
-            ) => void;
-          };
-        }
-      ).ethereum;
-      ethereum?.on("accountsChanged", handleAccountsChanged);
-
-      // Cleanup
-      return () => {
-        ethereum?.removeListener("accountsChanged", handleAccountsChanged);
-      };
-    }
-  }, [isMiniApp, address, wallets, setActiveWallet, privyLogin, privyLogout]);
-
-  // Determine connection state based on context
-  // For browser mode, we need BOTH authentication AND a connected wallet
-  // This prevents showing "connected" when user is logged in but wallet is disconnected
-  const isConnected = isMiniApp
-    ? wagmiIsConnected
-    : authenticated && wagmiIsConnected && !!address;
-
-  // In browser mode, prefer wagmi's address (which should be synced with Privy)
-  // Only fall back to Privy's wallet if wagmi doesn't have an address
-  const effectiveAddress =
-    address || (!isMiniApp ? activeWallet?.address : undefined);
-
-  // Connect function that handles both contexts
-  const connect = useCallback(() => {
+  const handleConnect = useCallback(() => {
     if (isMiniApp) {
-      // In mini-app, use wagmi connect with Farcaster connector
       const farcasterConnector = connectors.find(
         (c) => c.id === "farcasterMiniApp"
       );
       if (farcasterConnector) {
-        wagmiConnect({ connector: farcasterConnector });
+        connect({ connector: farcasterConnector });
       } else {
         console.error("Farcaster connector not found");
       }
-    } else {
-      // In browser mode with Privy
-      if (!privyReady) {
-        console.log("Privy not ready yet");
-        return;
-      }
-
-      // If authenticated but no wallet is connected, use linkWallet
-      // This handles the case where user is logged in but wallet got disconnected
-      if (authenticated) {
-        if (!wagmiIsConnected || !address) {
-          console.log("User authenticated but wallet not connected, using linkWallet...");
-          linkWallet();
-        }
-        // If authenticated AND connected, nothing to do
-      } else {
-        // Not authenticated at all, do normal login
-        privyLogin();
-      }
+      return;
     }
-  }, [isMiniApp, connectors, wagmiConnect, privyLogin, authenticated, privyReady, linkWallet, wagmiIsConnected, address]);
 
-  // Disconnect function that handles both contexts
-  const disconnect = useCallback(() => {
-    if (isMiniApp) {
-      wagmiDisconnect();
-    } else {
-      privyLogout();
-    }
-  }, [isMiniApp, wagmiDisconnect, privyLogout]);
+    openConnectModal?.();
+  }, [isMiniApp, connectors, connect, openConnectModal]);
 
-  // Loading state - mini-app context being null means still detecting, or Privy not ready
-  const isLoading = isMiniApp === null || (!isMiniApp && !privyReady);
+  const handleDisconnect = useCallback(() => {
+    disconnect();
+  }, [disconnect]);
 
-  // Debug info for troubleshooting
-  const debug = {
-    isMiniApp,
-    wagmiIsConnected,
-    wagmiAddress: address,
-    authenticated,
-    privyReady,
-    privyWallets: wallets.map((w) => w.address),
-    activePrivyWallet: activeWallet?.address,
-    effectiveAddress,
-    connector: connector?.id,
-  };
+  const debug = useMemo(
+    () => ({
+      isMiniApp,
+      wagmiIsConnected: isConnected,
+      wagmiAddress: address,
+      connector: connector?.id,
+    }),
+    [isMiniApp, isConnected, address, connector?.id]
+  );
 
   return {
-    // Core properties
-    address: effectiveAddress,
+    address: address || undefined,
     isConnected,
-
-    // Actions
-    connect,
-    disconnect,
-
-    // Context info
+    connect: handleConnect,
+    disconnect: handleDisconnect,
     isMiniApp: Boolean(isMiniApp),
-    isLoading,
-
-    // Debug info (remove in production)
+    isLoading: isMiniApp === null,
     debug: process.env.NODE_ENV === "development" ? debug : undefined,
   };
 }

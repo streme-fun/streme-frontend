@@ -60,7 +60,7 @@ export function StakerLeaderboardEmbed({
   const [isZapStaking, setIsZapStaking] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { wallets } = useSafeWallets();
-  const { user } = useSafePrivy();
+  const { user: connectedUser } = useSafePrivy();
   const { primaryAddress } = useWalletAddressChange();
 
   // Constants for zap contract
@@ -70,10 +70,10 @@ export function StakerLeaderboardEmbed({
   // Get effective connection state and address
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
-    : !!user?.wallet?.address;
+    : !!connectedUser?.wallet?.address;
   const effectiveAddress = isMiniApp
     ? farcasterAddress
-    : primaryAddress || user?.wallet?.address;
+    : primaryAddress || connectedUser?.wallet?.address;
 
   const fetchTopStakers = useCallback(async () => {
     if (!stakingPoolAddress) return;
@@ -327,7 +327,7 @@ export function StakerLeaderboardEmbed({
         });
       } else {
         if (!user?.wallet?.address)
-          throw new Error("Privy wallet not connected.");
+          throw new Error("Wallet not connected.");
 
         // Simplified wallet access
         const wallet = wallets?.[0];
@@ -350,7 +350,7 @@ export function StakerLeaderboardEmbed({
             data: zapData,
           });
         } catch (e) {
-          console.error("Gas estimation failed (Privy):", e);
+          console.error("Gas estimation failed (wallet connector):", e);
         }
         const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.2));
         const currentEthBalance = await publicClient.getBalance({

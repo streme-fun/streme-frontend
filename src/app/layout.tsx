@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ClientLayout from "./ClientLayout";
 import "./globals.css";
+import "@rainbow-me/rainbowkit/styles.css";
 import { PostHogProvider } from "../components/providers/PostHogProvider";
 
 const geistSans = Geist({

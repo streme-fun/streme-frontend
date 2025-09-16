@@ -8,7 +8,7 @@ export default function DebugWalletPage() {
   const wallet = useWallet();
   const wagmiAccount = useAccount();
   const { connectors } = useConnect();
-  const privy = useSafePrivy();
+  const authState = useSafePrivy();
   const { wallets } = useSafeWallets();
 
   return (
@@ -41,13 +41,13 @@ export default function DebugWalletPage() {
       </div>
 
       <div className="card bg-base-200 p-6">
-        <h2 className="text-xl font-semibold mb-4">Privy State</h2>
+        <h2 className="text-xl font-semibold mb-4">Wallet Auth State</h2>
         <pre className="bg-base-300 p-4 rounded overflow-auto">
           {JSON.stringify(
             {
-              authenticated: privy.authenticated,
-              ready: privy.ready,
-              user: privy.user?.wallet?.address,
+              authenticated: authState.authenticated,
+              ready: authState.ready,
+              user: authState.user?.wallet?.address,
             },
             null,
             2
@@ -56,13 +56,11 @@ export default function DebugWalletPage() {
       </div>
 
       <div className="card bg-base-200 p-6">
-        <h2 className="text-xl font-semibold mb-4">Privy Wallets</h2>
+        <h2 className="text-xl font-semibold mb-4">Connector Wallets</h2>
         <pre className="bg-base-300 p-4 rounded overflow-auto">
           {JSON.stringify(
             wallets.map((w) => ({
               address: w.address,
-              walletClientType: w.walletClientType,
-              connectorType: w.connectorType,
             })),
             null,
             2
