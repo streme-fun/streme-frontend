@@ -6,7 +6,7 @@ import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import sdk from "@farcaster/miniapp-sdk";
 import Image from "next/image";
 import FarcasterIcon from "@/public/farcaster.svg";
-import { useSafeWallets } from "../hooks/useSafePrivy";
+import { useSafeWallets } from "../hooks/useSafeWallet";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "../lib/viemClient";
 import { toast } from "sonner";

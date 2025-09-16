@@ -8,7 +8,7 @@ import { publicClient } from "@/src/lib/viemClient";
 import { GDA_FORWARDER } from "@/src/lib/contracts";
 import sdk from "@farcaster/miniapp-sdk";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import { useSafeWallets } from "../hooks/useSafePrivy";
+import { useSafeWallets } from "../hooks/useSafeWallet";
 
 const toHex = (address: string) => address as `0x${string}`;
 

@@ -2,13 +2,13 @@
 
 import { useWallet } from "@/src/hooks/useWallet";
 import { useAccount, useConnect } from "wagmi";
-import { useSafePrivy, useSafeWallets } from "@/src/hooks/useSafePrivy";
+import { useSafeWalletAuth, useSafeWallets } from "@/src/hooks/useSafeWallet";
 
 export default function DebugWalletPage() {
   const wallet = useWallet();
   const wagmiAccount = useAccount();
   const { connectors } = useConnect();
-  const authState = useSafePrivy();
+  const authState = useSafeWalletAuth();
   const { wallets } = useSafeWallets();
 
   return (

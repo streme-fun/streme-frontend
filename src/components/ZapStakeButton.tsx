@@ -11,7 +11,7 @@ import { publicClient } from "@/src/lib/viemClient";
 import sdk from "@farcaster/miniapp-sdk";
 import { MyTokensModal } from "./MyTokensModal";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import { useSafeWallets } from "../hooks/useSafePrivy";
+import { useSafeWallets } from "../hooks/useSafeWallet";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 import Link from "next/link";
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useAccount, useDisconnect, useConnect } from "wagmi";
-import { useSafePrivy, useSafeWallets } from "./useSafePrivy";
+import { useSafeWalletAuth, useSafeWallets } from "./useSafeWallet";
 
 /**
  * Hook that listens for wallet account changes from browser extensions
@@ -103,7 +103,7 @@ export function useWalletSync() {
  * for components that need to update when the wallet address changes
  */
 export function useWalletAddressChange() {
-  const { user, ready } = useSafePrivy();
+  const { user, ready } = useSafeWalletAuth();
   const { wallets } = useSafeWallets();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const lastKnownAddress = useRef<string | null>(null);

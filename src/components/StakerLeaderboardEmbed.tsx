@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useSafeWallets, useSafePrivy } from "../hooks/useSafePrivy";
+import { useSafeWallets, useSafeWalletAuth } from "../hooks/useSafeWallet";
 import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
@@ -60,7 +60,7 @@ export function StakerLeaderboardEmbed({
   const [isZapStaking, setIsZapStaking] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { wallets } = useSafeWallets();
-  const { user: connectedUser } = useSafePrivy();
+  const { user: connectedUser } = useSafeWalletAuth();
   const { primaryAddress } = useWalletAddressChange();
 
   // Constants for zap contract

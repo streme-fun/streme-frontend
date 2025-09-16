@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSafePrivy } from "../hooks/useSafePrivy";
+import { useSafeWalletAuth } from "../hooks/useSafeWallet";
 import { formatEther } from "viem";
 import { publicClient } from "@/src/lib/viemClient";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
@@ -54,7 +54,7 @@ export function WalletProfileModal({
   onClose,
   preloadedUserData,
 }: WalletProfileModalProps) {
-  const { user: connectedUser } = useSafePrivy();
+  const { user: connectedUser } = useSafeWalletAuth();
   const {
     farcasterContext,
     isMiniAppView,

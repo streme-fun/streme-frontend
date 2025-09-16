@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useSafePrivy } from "@/src/hooks/useSafePrivy";
+import { useSafeWalletAuth } from "@/src/hooks/useSafeWallet";
 import { Token } from "@/src/app/types/token";
 import { StakeButton } from "@/src/components/StakeButton";
 import { publicClient } from "@/src/lib/viemClient";
@@ -156,7 +156,7 @@ export function TokenActions({
 
   const { isSDKLoaded: fcSDKLoaded, farcasterContext } = useAppFrameLogic();
 
-  const { ready: walletReady } = useSafePrivy();
+  const { ready: walletReady } = useSafeWalletAuth();
 
   // Use unified wallet connection logic
   const {

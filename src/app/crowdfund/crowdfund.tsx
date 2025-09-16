@@ -8,7 +8,7 @@ import { useStreamingNumber } from "@/src/hooks/useStreamingNumber";
 import { CrowdfundAnimation } from "@/src/components/CrowdfundAnimation";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useUnifiedWallet } from "@/src/hooks/useUnifiedWallet";
-import { useSafePrivy } from "@/src/hooks/useSafePrivy";
+import { useSafeWalletAuth } from "@/src/hooks/useSafeWallet";
 
 import { HowCrowdfundWorksModal } from "@/src/components/HowCrowdfundWorksModal";
 import { ContributionModal } from "@/src/components/ContributionModal";
@@ -45,7 +45,7 @@ export default function CrowdfundPage({
 }: CrowdfundPageProps) {
   const { isSDKLoaded } = useAppFrameLogic();
 
-  const { ready: walletReady } = useSafePrivy();
+  const { ready: walletReady } = useSafeWalletAuth();
 
   // Use unified wallet connection logic like TokenActions
   const {

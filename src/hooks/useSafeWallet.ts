@@ -12,44 +12,35 @@ type WalletLikeUser = {
 } | null;
 
 /**
- * Safe wallet hooks that mimic the previous Privy helpers but run entirely on wagmi/RainbowKit.
- * The helpers gracefully no-op in Farcaster mini-app environments where RainbowKit isn't used.
+ * Wallet-auth helper hooks that mirror the old Privy shape but run entirely on wagmi/RainbowKit.
+ * They no-op gracefully inside the Farcaster mini-app environment.
  */
 
-export function useSafePrivy() {
+export function useSafeWalletAuth() {
   const { isMiniApp } = useEnvironment();
-
-  if (isMiniApp) {
-    return {
-      authenticated: false,
-      login: () => {},
-      logout: () => {},
-      user: null as WalletLikeUser,
-      ready: true,
-    };
-  }
-
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { openConnectModal } = useConnectModal();
 
   const login = useCallback(() => {
+    if (isMiniApp) return;
     openConnectModal?.();
-  }, [openConnectModal]);
+  }, [isMiniApp, openConnectModal]);
 
   const logout = useCallback(() => {
+    if (isMiniApp) return;
     disconnect();
-  }, [disconnect]);
+  }, [isMiniApp, disconnect]);
 
   const user = useMemo<WalletLikeUser>(() => {
-    if (!address) {
+    if (isMiniApp || !address) {
       return null;
     }
     return { wallet: { address } };
-  }, [address]);
+  }, [isMiniApp, address]);
 
   return {
-    authenticated: isConnected,
+    authenticated: !isMiniApp && isConnected,
     login,
     logout,
     user,
@@ -90,3 +81,4 @@ interface SafeWallet {
   address: string;
   getEthereumProvider: () => Promise<EIP1193Provider>;
 }
+

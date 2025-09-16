@@ -5,7 +5,7 @@ import sdk from "@farcaster/miniapp-sdk";
 import Image from "next/image";
 import { X } from "lucide-react";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import { useSafePrivy } from "../hooks/useSafePrivy";
+import { useSafeWalletAuth } from "../hooks/useSafeWallet";
 import { useFarcasterAuth } from "../hooks/useFarcasterAuth";
 import { useSupPoints } from "../hooks/useSupPoints";
 import { useSupEligibility } from "../hooks/useSupEligibility";
@@ -135,7 +135,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
     hash: claimHash,
   });
 
-  const { user: connectedUser } = useSafePrivy();
+  const { user: connectedUser } = useSafeWalletAuth();
   const {
     isMiniAppView,
     address: fcAddress,

@@ -8,7 +8,7 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useWallet } from "@/src/hooks/useWallet";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
-import { useSafeWallets } from "../hooks/useSafePrivy";
+import { useSafeWallets } from "../hooks/useSafeWallet";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 
 interface ClaimFeesButtonProps {
