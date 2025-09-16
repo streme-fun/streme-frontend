@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useSafePrivy } from "@/src/hooks/useSafePrivy";
+import { useSafeWalletAuth } from "@/src/hooks/useSafeWallet";
 import { Token } from "@/src/app/types/token";
 import { StakeButton } from "@/src/components/StakeButton";
 import { publicClient } from "@/src/lib/viemClient";
@@ -156,7 +156,7 @@ export function TokenActions({
 
   const { isSDKLoaded: fcSDKLoaded, farcasterContext } = useAppFrameLogic();
 
-  const { ready: privyReady } = useSafePrivy();
+  const { ready: walletReady } = useSafeWalletAuth();
 
   // Use unified wallet connection logic
   const {
@@ -489,7 +489,7 @@ export function TokenActions({
   if (
     unifiedIsLoading ||
     (isEffectivelyMiniApp && !fcSDKLoaded) ||
-    (!isEffectivelyMiniApp && !privyReady)
+    (!isEffectivelyMiniApp && !walletReady)
   ) {
     return (
       <div className="card bg-base-100 border border-black/[.1]1]">
@@ -814,7 +814,7 @@ export function TokenActions({
             />
           </div>
           {/* Buy & Stake Button (only for buy direction) */}
-          {tradeDirection === "buy" && stakingAddress && (
+          {tradeDirection === "buy" && tradeCurrency !== "USDC" && stakingAddress && (
             <ZapStakeButton
               tokenAddress={contractAddress as `0x${string}`}
               stakingAddress={stakingAddress as `0x${string}`}

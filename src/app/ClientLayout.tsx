@@ -1,6 +1,5 @@
 "use client";
 
-import PrivyProviderWrapper from "../components/auth/PrivyProviderWrapper";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { MiniAppTopNavbar } from "../components/MiniAppTopNavbar";
@@ -644,7 +643,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Mini-app specific layout (no Privy)
+// Mini-app specific layout (no RainbowKit)
 function MiniAppLayout({ children }: { children: React.ReactNode }) {
   return (
     <EnvironmentProvider isMiniApp={true}>
@@ -659,19 +658,17 @@ function MiniAppLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Browser layout (with Privy)
+// Browser layout (RainbowKit + wagmi)
 function BrowserLayout({ children }: { children: React.ReactNode }) {
   return (
     <EnvironmentProvider isMiniApp={false}>
-      <PrivyProviderWrapper>
-        <FrameProvider>
-          <BrowserWagmiProvider>
-            <TokenDataProvider>
-              <AppContent>{children}</AppContent>
-            </TokenDataProvider>
-          </BrowserWagmiProvider>
-        </FrameProvider>
-      </PrivyProviderWrapper>
+      <FrameProvider>
+        <BrowserWagmiProvider>
+          <TokenDataProvider>
+            <AppContent>{children}</AppContent>
+          </TokenDataProvider>
+        </BrowserWagmiProvider>
+      </FrameProvider>
     </EnvironmentProvider>
   );
 }

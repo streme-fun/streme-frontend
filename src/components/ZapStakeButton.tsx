@@ -11,9 +11,10 @@ import { publicClient } from "@/src/lib/viemClient";
 import sdk from "@farcaster/miniapp-sdk";
 import { MyTokensModal } from "./MyTokensModal";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import { useSafeWallets } from "../hooks/useSafePrivy";
+import { useSafeWallets } from "../hooks/useSafeWallet";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 import Link from "next/link";
+import { ensureTxHash } from "@/src/lib/ensureTxHash";
 
 const WETH = "0x4200000000000000000000000000000000000006";
 const toHex = (address: string) => address as `0x${string}`;
@@ -176,7 +177,7 @@ export function ZapStakeButton({
           toHex(currentAddress!)
         );
         
-        txHash = await ethProvider.request({
+        const rawTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
           params: [
             {
@@ -188,6 +189,10 @@ export function ZapStakeButton({
             },
           ],
         });
+        txHash = ensureTxHash(
+          rawTxHash,
+          "Farcaster Ethereum provider"
+        );
       } else {
         // Desktop/Mobile Path - use wagmi/privy for transaction
         if (!currentAddress) {
@@ -208,7 +213,7 @@ export function ZapStakeButton({
           );
         }
 
-        // Get provider from Privy wallets or wagmi
+        // Get provider from wagmi wallet client or connector fallback
         if (walletClient) {
           // Use wagmi wallet client for zap & stake
           const { encodeFunctionData } = await import("viem");
@@ -251,7 +256,7 @@ export function ZapStakeButton({
             chain: undefined,
           });
         } else {
-          // Fallback to Privy wallet
+          // Fallback to connector-provided provider
           const wallet = wallets.find((w) => w.address === wagmiAddress);
           if (!wallet) {
             throw new Error("Wallet not found");
@@ -267,7 +272,7 @@ export function ZapStakeButton({
             toHex(currentAddress!)
           );
           
-          txHash = await provider.request({
+          const rawTxHash = await provider.request({
             method: "eth_sendTransaction",
             params: [
               {
@@ -279,6 +284,10 @@ export function ZapStakeButton({
               },
             ],
           });
+          txHash = ensureTxHash(
+            rawTxHash,
+            "Wallet connector provider"
+          );
         }
       }
 

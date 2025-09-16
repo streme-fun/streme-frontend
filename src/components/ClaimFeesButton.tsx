@@ -8,8 +8,9 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useWallet } from "@/src/hooks/useWallet";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
-import { useSafeWallets } from "../hooks/useSafePrivy";
+import { useSafeWallets } from "../hooks/useSafeWallet";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
+import { ensureTxHash } from "@/src/lib/ensureTxHash";
 
 interface ClaimFeesButtonProps {
   tokenAddress: string;
@@ -63,7 +64,7 @@ export function ClaimFeesButton({
           currentAddress as `0x${string}`
         );
 
-        txHash = await ethProvider.request({
+        const rawTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
           params: [
             {
@@ -74,13 +75,17 @@ export function ClaimFeesButton({
             },
           ],
         });
+        txHash = ensureTxHash(
+          rawTxHash,
+          "Farcaster Ethereum provider"
+        );
       } else {
         // Desktop/Mobile Path - use wagmi/privy for transaction
         if (!currentAddress) {
           throw new Error("Wallet not connected.");
         }
 
-        // Get provider from Privy wallets or wagmi
+        // Get provider from wagmi wallet client or connector fallback
         if (walletClient) {
           // Use wagmi wallet client for claiming fees
           const { encodeFunctionData } = await import("viem");
@@ -112,7 +117,7 @@ export function ClaimFeesButton({
             chain: undefined,
           });
         } else {
-          // Fallback to Privy wallet
+          // Fallback to connector-provided provider
           const wallet = wallets.find((w) => w.address === currentAddress);
           if (!wallet) {
             throw new Error("Wallet not found");
@@ -135,7 +140,7 @@ export function ClaimFeesButton({
             currentAddress as `0x${string}`
           );
 
-          txHash = await provider.request({
+          const rawTxHash = await provider.request({
             method: "eth_sendTransaction",
             params: [
               {
@@ -146,6 +151,10 @@ export function ClaimFeesButton({
               },
             ],
           });
+          txHash = ensureTxHash(
+            rawTxHash,
+            "Wallet connector provider"
+          );
         }
       }
 

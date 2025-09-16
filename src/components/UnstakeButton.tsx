@@ -11,7 +11,7 @@ import { useWallet } from "@/src/hooks/useWallet";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { formatUnits } from "viem";
-import { useSafeWallets } from "../hooks/useSafePrivy";
+import { useSafeWallets } from "../hooks/useSafeWallet";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 
 const stakingAbiEthers = [
@@ -225,13 +225,13 @@ export function UnstakeButton({
           throw new Error("Wallet not connected.");
         }
 
-        // Get provider from Privy wallets or wagmi
+        // Get provider from wagmi wallet client or connector fallback
         let provider: any; // eslint-disable-line @typescript-eslint/no-explicit-any
         if (walletClient) {
           // If wagmi wallet client is available, use it
           provider = walletClient;
         } else {
-          // Fallback to Privy wallet
+          // Fallback to connector-provided provider
           const wallet = wallets.find((w) => w.address === address);
           if (!wallet) {
             throw new Error("Wallet not found");
@@ -279,7 +279,7 @@ export function UnstakeButton({
             },
           });
         } else {
-          // Use Privy provider
+          // Use connector provider
           const unstakeIface = new Interface(stakingAbiEthers);
           const unstakeData = unstakeIface.encodeFunctionData("unstake", [
             toHex(address!),

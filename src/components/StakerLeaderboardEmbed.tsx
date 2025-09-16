@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useSafeWallets, useSafePrivy } from "../hooks/useSafePrivy";
+import { useSafeWallets, useSafeWalletAuth } from "../hooks/useSafeWallet";
 import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
 import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
+import { ensureTxHash } from "@/src/lib/ensureTxHash";
 import sdk from "@farcaster/miniapp-sdk";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 
@@ -60,7 +61,7 @@ export function StakerLeaderboardEmbed({
   const [isZapStaking, setIsZapStaking] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { wallets } = useSafeWallets();
-  const { user } = useSafePrivy();
+  const { user: connectedUser } = useSafeWalletAuth();
   const { primaryAddress } = useWalletAddressChange();
 
   // Constants for zap contract
@@ -70,10 +71,10 @@ export function StakerLeaderboardEmbed({
   // Get effective connection state and address
   const effectiveIsConnected = isMiniApp
     ? farcasterIsConnected
-    : !!user?.wallet?.address;
+    : !!connectedUser?.wallet?.address;
   const effectiveAddress = isMiniApp
     ? farcasterAddress
-    : primaryAddress || user?.wallet?.address;
+    : primaryAddress || connectedUser?.wallet?.address;
 
   const fetchTopStakers = useCallback(async () => {
     if (!stakingPoolAddress) return;
@@ -313,7 +314,7 @@ export function StakerLeaderboardEmbed({
             )} ETH for zap (excluding gas).`
           );
         }
-        txHash = await ethProvider.request({
+        const rawTxHash = await ethProvider.request({
           method: "eth_sendTransaction",
           params: [
             {
@@ -325,9 +326,13 @@ export function StakerLeaderboardEmbed({
             },
           ],
         });
+        txHash = ensureTxHash(
+          rawTxHash,
+          "Farcaster Ethereum provider"
+        );
       } else {
-        if (!user?.wallet?.address)
-          throw new Error("Privy wallet not connected.");
+        if (!connectedUser?.wallet?.address)
+          throw new Error("Wallet not connected.");
 
         // Simplified wallet access
         const wallet = wallets?.[0];
@@ -350,7 +355,7 @@ export function StakerLeaderboardEmbed({
             data: zapData,
           });
         } catch (e) {
-          console.error("Gas estimation failed (Privy):", e);
+          console.error("Gas estimation failed (wallet connector):", e);
         }
         const gasLimit = BigInt(Math.floor(Number(estimatedGas) * 1.2));
         const currentEthBalance = await publicClient.getBalance({
@@ -365,7 +370,7 @@ export function StakerLeaderboardEmbed({
             )} ETH (inc. gas), have ${formatEther(currentEthBalance)} ETH.`
           );
         }
-        txHash = await provider.request({
+        const rawTxHash = await provider.request({
           method: "eth_sendTransaction",
           params: [
             {
@@ -378,6 +383,7 @@ export function StakerLeaderboardEmbed({
             },
           ],
         });
+        txHash = ensureTxHash(rawTxHash, "Wallet connector provider");
       }
 
       if (!txHash) {

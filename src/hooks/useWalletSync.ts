@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useAccount, useDisconnect, useConnect } from "wagmi";
-import { useSafePrivy, useSafeWallets } from "./useSafePrivy";
+import { useSafeWalletAuth, useSafeWallets } from "./useSafeWallet";
 
 /**
  * Hook that listens for wallet account changes from browser extensions
@@ -103,7 +103,7 @@ export function useWalletSync() {
  * for components that need to update when the wallet address changes
  */
 export function useWalletAddressChange() {
-  const { user, ready } = useSafePrivy();
+  const { user, ready } = useSafeWalletAuth();
   const { wallets } = useSafeWallets();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const lastKnownAddress = useRef<string | null>(null);
@@ -254,7 +254,7 @@ export function useWalletAddressChange() {
     }
   }, [wallets, triggerRefresh]);
 
-  // Watch for browser wallet changes and compare with Privy state (reduced frequency)
+  // Watch for browser wallet changes and compare with RainbowKit/wagmi state (reduced frequency)
   useEffect(() => {
     const checkBrowserWallet = async () => {
       const browserAddress = await getBrowserWalletAddress();
@@ -272,11 +272,11 @@ export function useWalletAddressChange() {
           });
           lastKnownBrowserAccount.current = browserAddress;
 
-          // Check if Privy is out of sync with browser wallet
+          // Check if cached wallet state is out of sync with the browser wallet
           const primaryAddress = getPrimaryWalletAddress();
           if (primaryAddress?.toLowerCase() !== normalizedBrowserAddress) {
             console.log(
-              "Privy out of sync with browser wallet, forcing refresh"
+              "Wallet state out of sync with browser wallet, forcing refresh"
             );
             triggerRefresh();
           }
@@ -309,7 +309,7 @@ export function useWalletAddressChange() {
     if (typeof window !== "undefined" && window.ethereum) {
       const handleAccountsChanged = (accounts: string[]) => {
         console.log("Browser wallet accounts changed:", accounts);
-        console.log("Current Privy user wallet:", user?.wallet?.address);
+        console.log("Current connected wallet:", user?.wallet?.address);
         console.log(
           "Available wallets:",
           wallets?.map((w) => w.address)
@@ -322,11 +322,11 @@ export function useWalletAddressChange() {
           walletRequestCacheTime.current = Date.now();
         }
 
-        // Trigger refresh after a short delay to allow Privy to update
+        // Trigger refresh after a short delay to allow wagmi state to update
         setTimeout(() => {
           console.log("Triggering refresh due to accountsChanged");
           triggerRefresh();
-        }, 500); // Increased delay to allow Privy more time to sync
+        }, 500); // Increased delay to allow wagmi more time to sync
       };
 
       window.ethereum.on("accountsChanged", handleAccountsChanged);

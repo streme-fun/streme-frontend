@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSafePrivy } from "@/src/hooks/useSafePrivy";
+import { useSafeWalletAuth } from "@/src/hooks/useSafeWallet";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
@@ -24,7 +24,7 @@ import {
 } from "@/src/lib/contracts";
 
 export function CreateForm() {
-  const { login, authenticated, user } = useSafePrivy();
+  const { login, authenticated, user } = useSafeWalletAuth();
   const { isMiniAppView, isConnected, farcasterContext } = useAppFrameLogic();
   const { address } = useAccount();
   const router = useRouter();

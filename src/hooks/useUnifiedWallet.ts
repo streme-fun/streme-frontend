@@ -1,14 +1,14 @@
 "use client";
 
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { useAppFrameLogic } from "./useAppFrameLogic";
-import { useState, useEffect, useMemo } from "react";
-import { useSafePrivy, useSafeWallets } from "./useSafePrivy";
 
 /**
  * Unified wallet connection hook that handles all environments:
- * - Desktop: Privy authentication + wagmi connection
- * - Mobile: Privy authentication (primary) + wagmi connection (secondary)
+ * - Desktop: RainbowKit-managed wagmi connection
+ * - Mobile web: RainbowKit-managed wagmi connection
  * - Mini-app: Farcaster wallet connection
  *
  * Provides stable address management to prevent flickering during navigation
@@ -25,16 +25,7 @@ export function useUnifiedWallet() {
     isSDKLoaded,
   } = useAppFrameLogic();
 
-  // Use safe Privy hooks that handle mini-app mode gracefully
-  const {
-    authenticated: privyAuthenticatedRaw,
-    login: privyLogin,
-    user: privyUser,
-  } = useSafePrivy();
-  const { wallets } = useSafeWallets();
-
-  // Only use Privy data when not in mini-app mode
-  const privyAuthenticated = isMiniAppView ? false : privyAuthenticatedRaw;
+  const { openConnectModal } = useConnectModal();
 
   // Stable address management to prevent flickering
   const [stableAddress, setStableAddress] = useState<string>("");
@@ -43,11 +34,6 @@ export function useUnifiedWallet() {
 
   // Determine if we're in a mini-app environment
   const isEffectivelyMiniApp = isMiniAppView;
-
-  // Get the connected wallet address from Privy
-  const connectedWallet =
-    wallets.find((wallet) => wallet.address) || wallets[0];
-  const privyConnectedAddress = connectedWallet?.address;
 
   // Debug logging for mini-app connection state (only when there's a mismatch) - disabled to reduce re-render noise
   // if (
@@ -68,14 +54,14 @@ export function useUnifiedWallet() {
 
   // Simplified connection logic
   // For mini-app: In Farcaster mini-apps, wagmi might not report "connected" but still have an address
-  // For regular apps: use Privy authentication + wagmi address
+  // For regular apps: rely on RainbowKit-managed wagmi state
   const finalIsConnected = isEffectivelyMiniApp
     ? Boolean(wagmiAddress || farcasterAddress) && isSDKLoaded // Trust address presence in mini-app
-    : privyAuthenticated && Boolean(wagmiAddress || privyConnectedAddress);
+    : Boolean(wagmiAddress);
 
   const rawAddress = isEffectivelyMiniApp
     ? wagmiAddress || farcasterAddress
-    : wagmiAddress || privyConnectedAddress;
+    : wagmiAddress;
 
   // Update stable address when we have a valid connection
   useEffect(() => {
@@ -118,10 +104,12 @@ export function useUnifiedWallet() {
           console.warn("Farcaster connect function not available");
         }
       }
-    : privyLogin;
+    : () => {
+        openConnectModal?.();
+      };
 
   // Loading states
-  const isLoading = isEffectivelyMiniApp ? !isSDKLoaded : false; // Privy doesn't have a loading state we need to wait for
+  const isLoading = isEffectivelyMiniApp ? !isSDKLoaded : false;
 
   // The Farcaster mini-app connector should auto-connect if user has a wallet
   // We don't need to force connection - it should happen automatically
@@ -131,9 +119,6 @@ export function useUnifiedWallet() {
     () => ({
       wagmiAddress,
       wagmiIsConnected,
-      privyAuthenticated,
-      privyUserWalletAddress: privyUser?.wallet?.address,
-      privyConnectedAddress,
       farcasterAddress,
       farcasterIsConnected,
       isMiniAppView,
@@ -145,9 +130,6 @@ export function useUnifiedWallet() {
     [
       wagmiAddress,
       wagmiIsConnected,
-      privyAuthenticated,
-      privyUser?.wallet?.address,
-      privyConnectedAddress,
       farcasterAddress,
       farcasterIsConnected,
       isMiniAppView,
