@@ -68,7 +68,10 @@ type ClaimStep =
   | "success"
   | "error";
 
-export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
+export function SUPLeaderboardModal({
+  isOpen,
+  onClose,
+}: LeaderboardModalProps) {
   const [isSDKReady, setIsSDKReady] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<
     ProcessedLeaderboardEntry[]
@@ -695,11 +698,6 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
               <h4 className="font-medium text-blue-900 text-sm">
                 SUP Flow Rate
               </h4>
-              {eligibilityData.hasAllocations && (
-                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
-                  Eligible
-                </span>
-              )}
             </div>
             <p className="text-blue-700 text-sm">
               <span className="font-mono font-medium">
@@ -823,29 +821,28 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
         <div className="space-y-6">
           {/* Header */}
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              SUP Rewards
-            </h2>
-            <p className="text-gray-600 text-sm">
+            <p className="text-base-content/70 text-sm">
               Streme is part of Season 2 of SUP streaming rewards. SUP is the
               ecosystem token of Superfluid.
             </p>
           </div>
 
           {/* What is SUP */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-800 mb-2">What is SUP?</h3>
+          <div className="bg-base-200 rounded-lg p-4">
+            <h3 className="font-semibold text-base-content mb-2">
+              What is SUP?
+            </h3>
             <div className="text-center mb-4">
               <img
                 src="https://docs.streme.fun/~gitbook/image?url=https%3A%2F%2F1755512155-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FrfU6UkNRL91DlMTjk2m7%252Fuploads%252FCiLpsJHSRIuHRC0xUTrY%252FSuperfluid___Claim_App.png%3Falt%3Dmedia%26token%3D68242eb6-816b-420b-9bd6-91936f3244b4&width=400&dpr=2&quality=100&sign=d002354a&sv=2"
                 alt="The SUP claim page on the Superfluid website"
                 className="max-w-full h-auto rounded"
               />
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-base-content/60 mt-2">
                 The SUP claim page on the Superfluid website
               </p>
             </div>
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-base-content/80">
               Don&apos;t call it an airdrop. Superfluid powers tokens that
               stream value in real-time, per second. Ongoing engagement with the
               Superfluid protocol earns you streaming rewards of SUP.
@@ -853,82 +850,51 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
           </div>
 
           {/* How to Earn */}
-          <div className="bg-blue-50 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-800 mb-3">
+          <div className="bg-base-200 rounded-lg p-4">
+            <h3 className="font-semibold text-base-content mb-3">
               How to Earn SUP with Streme
             </h3>
-            <div className="bg-blue-100 border border-blue-200 rounded p-3 mb-3">
-              <p className="text-sm font-medium text-blue-800">
+            <div className="bg-base-100 border border-base-300 rounded p-3 mb-3">
+              <p className="text-sm font-medium text-base-content">
                 💡 Actions that contribute to the market success of Streme coins
                 will earn the most SUP rewards
               </p>
             </div>
-            <div className="space-y-2 text-sm text-gray-700">
+            <div className="space-y-2 text-sm text-base-content/80">
               <div className="flex items-start gap-2">
                 <span className="text-green-600">•</span>
                 <span>
                   Adding the Streme Farcaster mini app (keep notifications
-                  enabled) ➕
+                  enabled)
                 </span>
               </div>
-              <div className="flex items-start gap-2">
-                <span className="text-yellow-600">•</span>
-                <span>
-                  Creating tokens that nobody buys will count{" "}
-                  <em>very little</em>
-                </span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-red-600">🔥</span>
-                <span>Creating tokens with high volume 🔥</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-red-600">🔥</span>
-                <span>
-                  Creating tokens with (sustained) high market cap 🔥🔥
-                </span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-red-600">🔥</span>
-                <span>Holding Streme coins 🔥</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-red-600">🔥</span>
-                <span>Holding staked Streme coins 🔥🔥</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-blue-600">👍</span>
-                <span>Spreading the word and referring new users</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Leaderboard */}
-          <div className="bg-green-50 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-800 mb-3">
-              The Leaderboard
-            </h3>
-            <div className="text-center mb-4">
-              <img
-                src="https://docs.streme.fun/~gitbook/image?url=https%3A%2F%2F1755512155-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FrfU6UkNRL91DlMTjk2m7%252Fuploads%252FNbrxsjKOG5dY3BGOOxIZ%252FMini_Apps.png%3Falt%3Dmedia%26token%3D12aef18d-f526-41da-bc80-c36cdd95780a&width=400&dpr=2&quality=100&sign=eb1236c9&sv=2"
-                alt="Leaderboard tab on Streme Farcaster mini app"
-                className="max-w-full h-auto rounded"
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                Leaderboard tab on Streme Farcaster mini app
-              </p>
+              <div className="flex items-start gap-2">
+                <span className="text-green-600">•</span>
+
+                <span>
+                  Creating tokens with high volume and/or high market cap
+                </span>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <span className="text-green-600">•</span>
+
+                <span>Holding Streme coins</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-green-600">•</span>
+
+                <span>Holding staked Streme coins</span>
+              </div>
             </div>
-            <p className="text-sm text-gray-700">
-              In the Streme Farcaster app, you can see the current status of the
-              SUP rewards leaderboard.
-            </p>
           </div>
 
           {/* Key Message */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-sm font-semibold text-yellow-800 text-center">
-              Most of the rewards will flow to those who contribute to the
-              market success of Streme Coins.
+          <div className="bg-base-200 border border-base-300 rounded-lg p-4">
+            <p className="text-sm font-semibold text-base-content text-center">
+              Rewards flow to those who contribute most to the market success of
+              Streme.
             </p>
           </div>
         </div>
@@ -951,18 +917,12 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
             <h3 className="text-lg font-semibold text-base-content flex items-center gap-2">
               {!showInfoView && (
                 <svg
-                  className="w-5 h-5 text-base-content/70"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+                  className="w-5 h-5 mb-0.5"
+                  viewBox="0 0 45 45"
+                  fill="currentColor"
                   xmlns="http://www.w3.org/2000/svg"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
+                  <path d="M38.8027 0.647461H38.8076L39.0498 0.683594C40.2423 0.919985 41.1413 1.97266 41.1416 3.23438V39.0176C41.1416 40.4533 39.9777 41.6179 38.542 41.6182H3.02539C1.58945 41.6182 0.424805 40.4535 0.424805 39.0176V3.23438C0.425198 1.79873 1.58972 0.634766 3.02539 0.634766H38.5469L38.8027 0.647461ZM4.3252 37.7178H37.2422V4.53418H4.3252V37.7178ZM14.623 26.8369C14.954 26.8369 15.2234 27.1051 15.2236 27.4365V29.9697C15.2236 30.301 14.955 30.569 14.624 30.5693H12.0898C11.7585 30.5693 11.4902 30.3011 11.4902 29.9697V27.4365C11.4904 27.1053 11.7586 26.8369 12.0898 26.8369H14.623ZM27.1045 12.0127C27.8143 12.0127 28.3552 12.0123 28.7627 12.0576C29.1691 12.1028 29.4651 12.195 29.668 12.3975C29.8708 12.6003 29.9635 12.8971 30.0088 13.3037C30.0541 13.7112 30.0537 14.2523 30.0537 14.9619V22.9141C30.0537 23.2465 29.7835 23.5107 29.4531 23.5107H26.7539C26.4225 23.5107 26.1543 23.2425 26.1543 22.9111V16.3115C26.1541 16.091 25.974 15.9111 25.7529 15.9111H20.2695C19.9382 15.9111 19.67 15.6428 19.6699 15.3115V12.6123C19.6701 12.2814 19.9374 12.013 20.2686 12.0127H27.1045Z" />
                 </svg>
               )}
               {showInfoView ? "SUP Rewards Info" : "SUP Rewards Leaderboard"}
@@ -971,7 +931,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowInfoView(!showInfoView)}
-              className="p-2 hover:bg-base-200 rounded-full transition-colors"
+              className="p-2 hover:bg-base-200 rounded-full transition-colors cursor-pointer"
               title={showInfoView ? "Show Leaderboard" : "Show Info"}
             >
               {showInfoView ? (
@@ -1006,7 +966,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
             </button>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-base-200 rounded-full transition-colors"
+              className="p-2 hover:bg-base-200 rounded-full transition-colors cursor-pointer"
             >
               <X size={20} className="text-base-content/60" />
             </button>

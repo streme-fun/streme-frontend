@@ -3,7 +3,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { StreamingBalance } from "./StreamingBalance";
 import { useRouter } from "next/navigation";
 import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
 import { ThemeSwitcher } from "./ThemeSwitcher";
@@ -172,13 +171,6 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-6">
-            {isConnected && (
-              <Link href="/token/0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58">
-                <div className="px-3 py-2 cursor-pointer hover:bg-base-100 transition-colors">
-                  <StreamingBalance />
-                </div>
-              </Link>
-            )}
             {/* link to create page */}
             <Link href="/launch" className="btn btn-primary">
               Launch a Token
@@ -297,17 +289,6 @@ export function Navbar() {
                 onClick={() => setIsMenuOpen(false)}
               >
                 My Tokens
-              </Link>
-            )}
-
-            {isConnected && (
-              <Link
-                href="/token/0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <div className="px-3 py-2 rounded-lg hover:bg-base-200 transition-colors">
-                  <StreamingBalance />
-                </div>
               </Link>
             )}
 

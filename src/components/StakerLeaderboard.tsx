@@ -30,7 +30,6 @@ interface StakerLeaderboardProps {
 }
 
 export function StakerLeaderboard({
-  stakingPoolAddress,
   tokenAddress,
   tokenSymbol,
   isOpen,
@@ -46,18 +45,7 @@ export function StakerLeaderboard({
 
   // Filter and sort states
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "stakers" | "holders">(
-    "all"
-  );
-  const [filterFarcaster, setFilterFarcaster] = useState<
-    "all" | "with" | "without"
-  >("all");
-  const [filterConnection, setFilterConnection] = useState<
-    "all" | "connected" | "not_connected"
-  >("all");
-  const [sortBy, setSortBy] = useState<
-    "units" | "address" | "status" | "joined"
-  >("units");
+  const [sortBy, setSortBy] = useState<"units" | "address">("units");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Fetch stakers data from Streme API
@@ -69,7 +57,7 @@ export function StakerLeaderboard({
 
     try {
       const response = await fetch(
-        `https://api.streme.fun/api/token/${tokenAddress.toLowerCase()}/stakers`
+        `/api/token/${tokenAddress.toLowerCase()}/stakers`
       );
 
       if (!response.ok) {
@@ -81,20 +69,38 @@ export function StakerLeaderboard({
       console.log(`Fetched ${stakersData.length} stakers for token ${tokenAddress}`);
 
       // Transform the API response to match the expected format
-      const transformedStakers: TokenStaker[] = stakersData.map((staker: any) => ({
-        account: {
-          id: staker.address,
-        },
-        units: staker.units.toString(),
-        isConnected: staker.isConnected,
-        createdAtTimestamp: staker.createdAtTimestamp?.toString() || "0",
-        farcasterUser: staker.farcaster ? {
-          fid: staker.farcaster.fid,
-          username: staker.farcaster.username,
-          display_name: staker.farcaster.display_name,
-          pfp_url: staker.farcaster.pfp_url,
-        } : undefined,
-      }));
+      const transformedStakers: TokenStaker[] = stakersData
+        .filter((staker: { holder_address?: string; isStaker?: boolean }) =>
+          staker.holder_address && staker.isStaker
+        ) // Filter out entries without address or non-stakers
+        .map((staker: {
+          holder_address: string;
+          staked_balance?: number;
+          isConnected?: boolean;
+          lastUpdated?: {
+            _seconds: number;
+            _nanoseconds: number;
+          };
+          farcaster?: {
+            fid: number;
+            username: string;
+            display_name?: string;
+            pfp_url: string;
+          };
+        }) => ({
+          account: {
+            id: staker.holder_address,
+          },
+          units: (staker.staked_balance ?? 0).toString(),
+          isConnected: staker.isConnected ?? false,
+          createdAtTimestamp: staker.lastUpdated?._seconds?.toString() || "0",
+          farcasterUser: staker.farcaster ? {
+            fid: staker.farcaster.fid,
+            username: staker.farcaster.username,
+            display_name: staker.farcaster.display_name || staker.farcaster.username,
+            pfp_url: staker.farcaster.pfp_url,
+          } : undefined,
+        }));
 
       setStakers(transformedStakers);
       setStakersWithFarcaster(transformedStakers); // Already enriched with Farcaster data
@@ -145,35 +151,6 @@ export function StakerLeaderboard({
       );
     }
 
-    // Apply type filter
-    if (filterType !== "all") {
-      filtered = filtered.filter((staker) => {
-        const hasUnits = parseInt(staker.units) > 0;
-        if (filterType === "stakers") return hasUnits;
-        if (filterType === "holders") return !hasUnits;
-        return true;
-      });
-    }
-
-    // Apply Farcaster filter
-    if (filterFarcaster !== "all") {
-      filtered = filtered.filter((staker) => {
-        const hasFarcaster = !!staker.farcasterUser;
-        if (filterFarcaster === "with") return hasFarcaster;
-        if (filterFarcaster === "without") return !hasFarcaster;
-        return true;
-      });
-    }
-
-    // Apply connection filter
-    if (filterConnection !== "all") {
-      filtered = filtered.filter((staker) => {
-        if (filterConnection === "connected") return staker.isConnected;
-        if (filterConnection === "not_connected") return !staker.isConnected;
-        return true;
-      });
-    }
-
     // Apply sorting
     filtered.sort((a, b) => {
       let aValue: string | number;
@@ -187,14 +164,6 @@ export function StakerLeaderboard({
         case "address":
           aValue = a.farcasterUser?.username || a.account.id;
           bValue = b.farcasterUser?.username || b.account.id;
-          break;
-        case "status":
-          aValue = a.isConnected ? "connected" : "not_connected";
-          bValue = b.isConnected ? "connected" : "not_connected";
-          break;
-        case "joined":
-          aValue = parseInt(a.createdAtTimestamp);
-          bValue = parseInt(b.createdAtTimestamp);
           break;
         default:
           return 0;
@@ -221,13 +190,10 @@ export function StakerLeaderboard({
     }
   }, [isOpen, tokenAddress]);
 
-  // Reset filters when modal closes
+  // Reset search when modal closes
   useEffect(() => {
     if (!isOpen) {
       setSearchTerm("");
-      setFilterType("all");
-      setFilterFarcaster("all");
-      setFilterConnection("all");
       setStakers([]);
       setStakersWithFarcaster(null);
       setError(null);
@@ -277,101 +243,15 @@ export function StakerLeaderboard({
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-6">
-          {/* Search and Filters */}
-          <div className="mb-4 space-y-4">
-            {/* Search Input */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">
-                  Search by address or username
-                </span>
-              </label>
-              <input
-                type="text"
-                placeholder="Search address or Farcaster username..."
-                className="input input-bordered w-full text-base"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-wrap gap-4 items-end">
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Type</span>
-                </label>
-                <select
-                  className="select select-bordered select-sm"
-                  value={filterType}
-                  onChange={(e) =>
-                    setFilterType(
-                      e.target.value as "all" | "stakers" | "holders"
-                    )
-                  }
-                >
-                  <option value="all">All</option>
-                  <option value="stakers">Stakers Only</option>
-                  <option value="holders">Holders Only</option>
-                </select>
-              </div>
-
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Farcaster</span>
-                </label>
-                <select
-                  className="select select-bordered select-sm"
-                  value={filterFarcaster}
-                  onChange={(e) =>
-                    setFilterFarcaster(
-                      e.target.value as "all" | "with" | "without"
-                    )
-                  }
-                >
-                  <option value="all">All</option>
-                  <option value="with">With Farcaster</option>
-                  <option value="without">Without Farcaster</option>
-                </select>
-              </div>
-
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Connection</span>
-                </label>
-                <select
-                  className="select select-bordered select-sm"
-                  value={filterConnection}
-                  onChange={(e) =>
-                    setFilterConnection(
-                      e.target.value as "all" | "connected" | "not_connected"
-                    )
-                  }
-                >
-                  <option value="all">All</option>
-                  <option value="connected">Connected</option>
-                  <option value="not_connected">Not Connected</option>
-                </select>
-              </div>
-
-              {/* Clear Filters Button */}
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">&nbsp;</span>
-                </label>
-                <button
-                  className="btn btn-outline btn-sm"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setFilterType("all");
-                    setFilterFarcaster("all");
-                    setFilterConnection("all");
-                  }}
-                >
-                  Clear Filters
-                </button>
-              </div>
-            </div>
+          {/* Search */}
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search by address or username..."
+              className="input input-bordered w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
 
           {/* Results Counter */}
@@ -401,7 +281,7 @@ export function StakerLeaderboard({
                       onClick={() => handleSort("address")}
                     >
                       <div className="flex items-center gap-2">
-                        Staker / Farcaster
+                        Staker
                         {sortBy === "address" && (
                           <span className="text-primary">
                             {sortDirection === "asc" ? "↑" : "↓"}
@@ -416,32 +296,6 @@ export function StakerLeaderboard({
                       <div className="flex items-center gap-2">
                         Staked Balance
                         {sortBy === "units" && (
-                          <span className="text-primary">
-                            {sortDirection === "asc" ? "↑" : "↓"}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      className="cursor-pointer select-none hover:bg-base-200"
-                      onClick={() => handleSort("status")}
-                    >
-                      <div className="flex items-center gap-2">
-                        Status
-                        {sortBy === "status" && (
-                          <span className="text-primary">
-                            {sortDirection === "asc" ? "↑" : "↓"}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      className="cursor-pointer select-none hover:bg-base-200"
-                      onClick={() => handleSort("joined")}
-                    >
-                      <div className="flex items-center gap-2">
-                        Joined
-                        {sortBy === "joined" && (
                           <span className="text-primary">
                             {sortDirection === "asc" ? "↑" : "↓"}
                           </span>
@@ -466,6 +320,16 @@ export function StakerLeaderboard({
                             </div>
                           )}
                           <div>
+                            {staker.farcasterUser?.username && (
+                              <a
+                                href={`https://farcaster.xyz/${staker.farcasterUser.username}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm font-medium hover:text-primary hover:underline block"
+                              >
+                                @{staker.farcasterUser.username}
+                              </a>
+                            )}
                             <a
                               href={`https://basescan.org/address/${staker.account.id}`}
                               target="_blank"
@@ -479,39 +343,18 @@ export function StakerLeaderboard({
                                   )}...${staker.account.id.slice(-4)}`
                                 : "Unknown"}
                             </a>
-                            {staker.farcasterUser?.username && (
-                              <div className="text-xs text-base-content/70">
-                                @{staker.farcasterUser.username}
-                              </div>
-                            )}
                           </div>
                         </div>
                       </td>
                       <td className="font-mono text-xs">
                         {parseInt(staker.units).toLocaleString()}
                       </td>
-                      <td>
-                        <div
-                          className={`badge badge-xs ${
-                            staker.isConnected
-                              ? "badge-success"
-                              : "badge-warning"
-                          }`}
-                        >
-                          {staker.isConnected ? "Connected" : "Not Connected"}
-                        </div>
-                      </td>
-                      <td className="text-xs text-base-content/60">
-                        {new Date(
-                          parseInt(staker.createdAtTimestamp) * 1000
-                        ).toLocaleDateString()}
-                      </td>
                     </tr>
                   ))}
                   {filteredStakers.length === 0 && !loading && (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={2}
                         className="text-center text-base-content/50"
                       >
                         No stakers found

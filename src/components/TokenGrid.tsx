@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import FarcasterIcon from "@/public/farcaster.svg";
 // import { SearchBar } from "./SearchBar";
 // import { SortMenu } from "./SortMenu";
@@ -129,6 +130,8 @@ export const TrendingTokenCard = ({
 }: {
   token: Token & { rewards?: number; totalStakers?: number };
 }) => {
+  const router = useRouter();
+
   const formatMarketCap = (marketCap: number | undefined) => {
     if (!marketCap) return "-";
     if (marketCap >= 1000000) return `${(marketCap / 1000000).toFixed(1)}M`;
@@ -279,20 +282,20 @@ export const TrendingTokenCard = ({
                 <button className="btn btn-sm btn-outline btn-primary flex-1">
                   Trade
                 </button>
-                <Link
-                  href={
-                    token.contract_address.toLowerCase() ===
-                    "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58"
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const crowdfundUrl = token.contract_address.toLowerCase() ===
+                      "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58"
                       ? "/crowdfund/0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58"
-                      : "/crowdfund/0x1c4f69f14cf754333c302246d25a48a13224118a"
-                  }
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex-1"
+                      : "/crowdfund/0x1c4f69f14cf754333c302246d25a48a13224118a";
+                    router.push(crowdfundUrl);
+                  }}
+                  className="btn btn-sm btn-outline btn-accent flex-1"
                 >
-                  <button className="btn btn-sm btn-outline w-full relative btn-accent">
-                    Crowdfund
-                  </button>
-                </Link>
+                  Crowdfund
+                </button>
               </>
             ) : (
               <button className="btn btn-primary btn-outline btn-sm w-full">

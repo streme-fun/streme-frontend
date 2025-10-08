@@ -537,18 +537,6 @@ export function TokenActions({
     stakedBalance === 0n &&
     !isConnectedToPool;
 
-  // Debug logging for ConnectPoolButton visibility
-  console.log("ConnectPoolButton visibility check:", {
-    hasTokens,
-    stakingPoolAddress: !!stakingPoolAddress,
-    stakedBalance: stakedBalance.toString(),
-    stakedBalanceIsZero: stakedBalance === 0n,
-    isConnectedToPool,
-    showConnectPoolButton,
-    walletIsConnected,
-    balance: balance.toString(),
-  });
-
   return (
     <div className="bg-base-100 rounded-xl border border-base-300 shadow-sm">
       <div className="p-6 space-y-4">

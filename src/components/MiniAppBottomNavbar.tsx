@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { LaunchTokenModal } from "./LaunchTokenModal";
-import { LeaderboardModal } from "./LeaderboardModal";
+import { SUPLeaderboardModal } from "./SUPLeaderboardModal";
 import { WalletProfileModal } from "./WalletProfileModal";
 import { MyTokensModal } from "./MyTokensModal";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
@@ -138,7 +138,7 @@ Symbol: $[your ticker]
             Launch
           </button>
 
-          {/* Leaderboard Button */}
+          {/* SUP Leaderboard Button */}
           <button
             onClick={() => setIsLeaderboardModalOpen(true)}
             className="flex flex-col items-center justify-center text-xs sm:text-sm text-base-content/70 hover:text-primary flex-1 cursor-pointer transition-colors"
@@ -198,7 +198,7 @@ Symbol: $[your ticker]
         isOpen={isCreateTokenOpen}
         onClose={() => setIsCreateTokenOpen(false)}
       />
-      <LeaderboardModal
+      <SUPLeaderboardModal
         isOpen={isLeaderboardModalOpen}
         onClose={() => setIsLeaderboardModalOpen(false)}
       />

@@ -43,7 +43,6 @@ interface StakerLeaderboardEmbedProps {
 }
 
 export function StakerLeaderboardEmbed({
-  stakingPoolAddress,
   tokenAddress,
   tokenSymbol,
   stakingAddress,
@@ -84,7 +83,7 @@ export function StakerLeaderboardEmbed({
 
     try {
       const response = await fetch(
-        `https://api.streme.fun/api/token/${tokenAddress.toLowerCase()}/stakers`
+        `/api/token/${tokenAddress.toLowerCase()}/stakers`
       );
 
       if (!response.ok) {
@@ -94,20 +93,45 @@ export function StakerLeaderboardEmbed({
       const stakersData = await response.json();
 
       // Transform the API response to match the expected format and take top 10
-      const transformedStakers: TokenStaker[] = stakersData.slice(0, 10).map((staker: any) => ({
-        account: {
-          id: staker.address,
-        },
-        units: staker.units.toString(),
-        isConnected: staker.isConnected,
-        createdAtTimestamp: staker.createdAtTimestamp?.toString() || "0",
-        farcasterUser: staker.farcaster ? {
-          fid: staker.farcaster.fid,
-          username: staker.farcaster.username,
-          display_name: staker.farcaster.display_name,
-          pfp_url: staker.farcaster.pfp_url,
-        } : undefined,
-      }));
+      const transformedStakers: TokenStaker[] = stakersData
+        .filter(
+          (staker: { holder_address?: string; isStaker?: boolean }) =>
+            staker.holder_address && staker.isStaker
+        ) // Filter out entries without address or non-stakers
+        .slice(0, 10)
+        .map(
+          (staker: {
+            holder_address: string;
+            staked_balance?: number;
+            isConnected?: boolean;
+            lastUpdated?: {
+              _seconds: number;
+              _nanoseconds: number;
+            };
+            farcaster?: {
+              fid: number;
+              username: string;
+              display_name?: string;
+              pfp_url: string;
+            };
+          }) => ({
+            account: {
+              id: staker.holder_address,
+            },
+            units: (staker.staked_balance ?? 0).toString(),
+            isConnected: staker.isConnected ?? false,
+            createdAtTimestamp: staker.lastUpdated?._seconds?.toString() || "0",
+            farcasterUser: staker.farcaster
+              ? {
+                  fid: staker.farcaster.fid,
+                  username: staker.farcaster.username,
+                  display_name:
+                    staker.farcaster.display_name || staker.farcaster.username,
+                  pfp_url: staker.farcaster.pfp_url,
+                }
+              : undefined,
+          })
+        );
 
       setStakers(transformedStakers);
       setLoading(false);
@@ -247,10 +271,7 @@ export function StakerLeaderboardEmbed({
             },
           ],
         });
-        txHash = ensureTxHash(
-          rawTxHash,
-          "Farcaster Ethereum provider"
-        );
+        txHash = ensureTxHash(rawTxHash, "Farcaster Ethereum provider");
       } else {
         if (!connectedUser?.wallet?.address)
           throw new Error("Wallet not connected.");
@@ -452,7 +473,7 @@ export function StakerLeaderboardEmbed({
               {/* Profile */}
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 {/* Special handling for crowdfund address */}
-                {staker.account.id.toLowerCase() ===
+                {staker.account.id?.toLowerCase() ===
                 "0xceacfbb5a17b6914051d12d8c91d3461382d503b" ? (
                   <>
                     <div className="avatar">
@@ -485,9 +506,28 @@ export function StakerLeaderboardEmbed({
                     )}
                     <div className="flex-1 min-w-0">
                       {staker.farcasterUser?.username ? (
-                        <div className="text-sm font-medium">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (isMiniApp) {
+                              sdk.actions.openUrl(
+                                `https://farcaster.xyz/${
+                                  staker.farcasterUser!.username
+                                }`
+                              );
+                            } else {
+                              window.open(
+                                `https://farcaster.xyz/${
+                                  staker.farcasterUser!.username
+                                }`,
+                                "_blank"
+                              );
+                            }
+                          }}
+                          className="text-sm font-medium hover:text-primary hover:underline text-left cursor-pointer"
+                        >
                           @{staker.farcasterUser.username}
-                        </div>
+                        </button>
                       ) : (
                         <div className="font-mono text-xs text-primary">
                           <a

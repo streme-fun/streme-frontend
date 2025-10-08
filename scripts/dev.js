@@ -72,13 +72,13 @@ async function checkCloudflared() {
   return new Promise((resolve) => {
     const checkProcess = spawn("cloudflared", ["--version"], {
       shell: true,
-      stdio: "pipe"
+      stdio: "pipe",
     });
-    
+
     checkProcess.on("error", () => {
       resolve(false);
     });
-    
+
     checkProcess.on("exit", (code) => {
       resolve(code === 0);
     });
@@ -88,24 +88,30 @@ async function checkCloudflared() {
 async function startCloudflaredTunnel() {
   return new Promise((resolve, reject) => {
     console.log("🚇 Starting Cloudflare tunnel...");
-    
-    tunnelProcess = spawn("cloudflared", ["tunnel", "--url", "http://localhost:3000"], {
-      shell: true,
-      stdio: ["pipe", "pipe", "pipe"]
-    });
+
+    tunnelProcess = spawn(
+      "cloudflared",
+      ["tunnel", "--url", "http://localhost:3000"],
+      {
+        shell: true,
+        stdio: ["pipe", "pipe", "pipe"],
+      }
+    );
 
     let tunnelUrl = null;
-    
+
     tunnelProcess.stderr.on("data", (data) => {
       const output = data.toString();
-      
+
       // Look for the tunnel URL in the output
-      const urlMatch = output.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+      const urlMatch = output.match(
+        /https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/
+      );
       if (urlMatch && !tunnelUrl) {
         tunnelUrl = urlMatch[0];
         resolve(tunnelUrl);
       }
-      
+
       // Still log the output for debugging
       if (output.includes("error") || output.includes("Error")) {
         console.error(output);
@@ -190,7 +196,6 @@ After installation, run this command again.
    3. Enter this URL: ${frameUrl}
    4. Click "Preview" (note that it may take ~10 seconds to load)
 
-🔥 Cloudflare tunnels are more reliable than localtunnel and don't require IP whitelisting!
 `);
     } catch (error) {
       console.error("Failed to start tunnel:", error.message);
@@ -200,7 +205,7 @@ After installation, run this command again.
     frameUrl = "http://localhost:3000";
     console.log(`
 💻 To test your mini app:
-   1. Open the Warpcast Mini App Developer Tools: https://farcaster.xyz/~/developers
+   1. Open the Farcaster Mini App Developer Tools: https://farcaster.xyz/~/developers
    2. Scroll down to the "Preview Mini App" tool
    3. Enter this URL: ${frameUrl}
    4. Click "Preview" to test your mini app (note that it may take ~5 seconds to load the first time)
