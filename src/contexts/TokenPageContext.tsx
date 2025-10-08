@@ -65,7 +65,7 @@ export function TokenPageProvider({ children, initialToken, tokenAddress }: Toke
     setError(null);
 
     try {
-      const response = await fetch(`/api/tokens/single?address=${tokenAddress}`);
+      const response = await fetch(`/api/tokens/single?address=${tokenAddress}&type=all`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

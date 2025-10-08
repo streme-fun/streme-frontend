@@ -189,7 +189,7 @@ export default function LaunchedTokensPage() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/tokens/deployer/${deployerAddress}`);
+      const response = await fetch(`/api/tokens/deployer/${deployerAddress}?type=all`);
       const result = await response.json();
 
       if (!response.ok) {

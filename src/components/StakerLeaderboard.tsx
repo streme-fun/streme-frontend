@@ -23,6 +23,7 @@ interface FarcasterUser {
 
 interface StakerLeaderboardProps {
   stakingPoolAddress: string;
+  tokenAddress: string;
   tokenSymbol: string;
   isOpen: boolean;
   onClose: () => void;
@@ -30,6 +31,7 @@ interface StakerLeaderboardProps {
 
 export function StakerLeaderboard({
   stakingPoolAddress,
+  tokenAddress,
   tokenSymbol,
   isOpen,
   onClose,
@@ -58,165 +60,50 @@ export function StakerLeaderboard({
   >("units");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
-  // Fetch stakers data
+  // Fetch stakers data from Streme API
   const fetchStakers = async () => {
-    if (!stakingPoolAddress) return;
+    if (!tokenAddress) return;
 
     setLoading(true);
     setError(null);
 
-    const endpoints = [
-      "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",
-      "https://api.thegraph.com/subgraphs/name/superfluid-finance/protocol-v1-base",
-    ];
-
-    const query = `
-      query GetPoolStakers($poolId: ID!, $first: Int!, $skip: Int!) {
-        pool(id: $poolId) {
-          id
-          totalMembers
-          poolMembers(first: $first, skip: $skip, orderBy: units, orderDirection: desc) {
-            account {
-              id
-            }
-            units
-            isConnected
-            createdAtTimestamp
-          }
-        }
-      }
-    `;
-
-    for (const endpoint of endpoints) {
-      try {
-        const allStakers: TokenStaker[] = [];
-        const batchSize = 1000; // Fetch 1000 at a time
-        let skip = 0;
-        let hasMore = true;
-
-        while (hasMore) {
-          const response = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              query,
-              variables: {
-                poolId: stakingPoolAddress.toLowerCase(),
-                first: batchSize,
-                skip: skip,
-              },
-            }),
-          });
-
-          if (!response.ok) break;
-
-          const result = await response.json();
-
-          if (result.errors) break;
-
-          const poolData = result.data?.pool;
-          if (!poolData) break;
-
-          const batch = poolData.poolMembers || [];
-          allStakers.push(...batch);
-
-          // If we got less than the batch size, we've reached the end
-          if (batch.length < batchSize) {
-            hasMore = false;
-          } else {
-            skip += batchSize;
-          }
-        }
-
-        // If we successfully got data from this endpoint, set it and enrich
-        if (allStakers.length > 0) {
-          console.log(
-            `Fetched ${allStakers.length} stakers for pool ${stakingPoolAddress}`
-          );
-          setStakers(allStakers);
-          setLoading(false); // Stop loading immediately after getting stakers
-
-          // Start enriching with Farcaster data in the background
-          enrichStakersWithFarcaster(allStakers);
-        } else {
-          setStakers([]);
-          setLoading(false);
-        }
-        return; // Success, exit loop
-      } catch (err) {
-        console.warn(`Failed to fetch from ${endpoint}:`, err);
-        continue;
-      }
-    }
-
-    // If we get here, all endpoints failed
-    setError("Failed to fetch stakers from all available endpoints");
-    setLoading(false);
-  };
-
-  // Enrich stakers with Farcaster data
-  const enrichStakersWithFarcaster = async (stakersData: TokenStaker[]) => {
     try {
-      // Process in batches to avoid overwhelming the API
-      const BATCH_SIZE = 50;
-      const farcasterMap = new Map();
+      const response = await fetch(
+        `https://api.streme.fun/api/token/${tokenAddress.toLowerCase()}/stakers`
+      );
 
-      for (let i = 0; i < stakersData.length; i += BATCH_SIZE) {
-        const batch = stakersData.slice(i, i + BATCH_SIZE);
-        const addresses = batch.map((staker) => staker.account.id);
-
-        try {
-          const response = await fetch("/api/neynar/bulk-users-by-address", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ addresses }),
-          });
-
-          if (!response.ok) {
-            console.warn(
-              `Failed to fetch Farcaster data for batch ${i / BATCH_SIZE + 1}`
-            );
-            continue;
-          }
-
-          const farcasterData = await response.json();
-
-          // Handle the response format from neynar bulk users API
-          Object.entries(farcasterData).forEach(
-            ([address, users]: [string, unknown]) => {
-              if (Array.isArray(users) && users.length > 0) {
-                const user = users[0] as FarcasterUser; // Take the first user if multiple
-                farcasterMap.set(address.toLowerCase(), {
-                  fid: user.fid,
-                  username: user.username,
-                  display_name: user.display_name,
-                  pfp_url: user.pfp_url,
-                });
-              }
-            }
-          );
-        } catch (err) {
-          console.warn(
-            `Error fetching Farcaster data for batch ${i / BATCH_SIZE + 1}:`,
-            err
-          );
-        }
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stakers: ${response.statusText}`);
       }
 
-      // Update stakers with Farcaster data
-      const enrichedStakers = stakersData.map((staker) => ({
-        ...staker,
-        farcasterUser: farcasterMap.get(staker.account.id?.toLowerCase() || ""),
+      const stakersData = await response.json();
+
+      console.log(`Fetched ${stakersData.length} stakers for token ${tokenAddress}`);
+
+      // Transform the API response to match the expected format
+      const transformedStakers: TokenStaker[] = stakersData.map((staker: any) => ({
+        account: {
+          id: staker.address,
+        },
+        units: staker.units.toString(),
+        isConnected: staker.isConnected,
+        createdAtTimestamp: staker.createdAtTimestamp?.toString() || "0",
+        farcasterUser: staker.farcaster ? {
+          fid: staker.farcaster.fid,
+          username: staker.farcaster.username,
+          display_name: staker.farcaster.display_name,
+          pfp_url: staker.farcaster.pfp_url,
+        } : undefined,
       }));
 
-      setStakersWithFarcaster(enrichedStakers);
+      setStakers(transformedStakers);
+      setStakersWithFarcaster(transformedStakers); // Already enriched with Farcaster data
+      setLoading(false);
     } catch (err) {
-      console.error("Error enriching with Farcaster data:", err);
-      setStakersWithFarcaster(stakersData); // Fallback to stakers without Farcaster data
+      console.error("Error fetching stakers:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch stakers");
+      setStakers([]);
+      setLoading(false);
     }
   };
 
@@ -329,10 +216,10 @@ export function StakerLeaderboard({
 
   // Fetch data when modal opens
   useEffect(() => {
-    if (isOpen && stakingPoolAddress) {
+    if (isOpen && tokenAddress) {
       fetchStakers();
     }
-  }, [isOpen, stakingPoolAddress]);
+  }, [isOpen, tokenAddress]);
 
   // Reset filters when modal closes
   useEffect(() => {

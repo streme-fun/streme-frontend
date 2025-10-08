@@ -38,7 +38,7 @@ export async function fetchTokenPrice(
   tokenAddress: string
 ): Promise<number | null> {
   try {
-    const response = await fetch(`/api/tokens/single?address=${tokenAddress}`);
+    const response = await fetch(`/api/tokens/single?address=${tokenAddress}&type=all`);
 
     if (!response.ok) {
       console.warn(

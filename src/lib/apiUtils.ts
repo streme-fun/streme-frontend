@@ -6,13 +6,12 @@ export async function fetchTokensFromStreme(
 ): Promise<Token[]> {
   try {
     const params = new URLSearchParams();
+    params.append("type", "all");
     if (before) params.append("before", before.toString());
     if (limit) params.append("limit", limit.toString());
 
     const queryString = params.toString();
-    const url = `https://api.streme.fun/api/tokens${
-      queryString ? `?${queryString}` : ""
-    }`;
+    const url = `https://api.streme.fun/api/tokens?${queryString}`;
 
     const response = await fetch(url, {
       cache: "no-store",

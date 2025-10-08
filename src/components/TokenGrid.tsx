@@ -73,7 +73,7 @@ interface StremeTokenResponse {
 // Function to fetch trending tokens from the streme.fun API (exported for carousel)
 export const fetchTrendingTokens = async (): Promise<Token[]> => {
   try {
-    const response = await fetch("/api/tokens/trending");
+    const response = await fetch("/api/tokens/trending?type=all");
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }

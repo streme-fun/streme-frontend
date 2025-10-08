@@ -119,8 +119,8 @@ class PriceCacheService {
     // In the future, we could implement a bulk API endpoint
     const promises = addresses.map(async (address) => {
       try {
-        const response = await fetch(`/api/tokens/single?address=${address}`);
-        
+        const response = await fetch(`/api/tokens/single?address=${address}&type=all`);
+
         if (!response.ok) {
           results.set(address, null);
           return;
