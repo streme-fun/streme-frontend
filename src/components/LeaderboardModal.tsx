@@ -381,7 +381,7 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
 
     try {
       const rawSignature = userData.points.stackSignedData;
-      const programId = 7692;
+      const programId = 7786;
       const totalProgramUnits = userData.points.totalEarned;
       const nonce = userData.points.signatureTimestamp || 1748439037;
 
