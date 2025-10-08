@@ -434,12 +434,12 @@ export function SUPLeaderboardModal({
     if (claimStep === "checking") return "Checking...";
     if (claimStep === "creating-locker" || isCreateLockerPending)
       return "Creating Locker...";
-    if (claimStep === "claiming" || isClaimPending) return "Claiming Stream...";
+    if (claimStep === "claiming" || isClaimPending) return "Claiming SUP...";
     if (claimStep === "success") return "✅ Claimed Successfully!";
     if (claimStep === "error") return "Try Again";
 
     if (!userData) return "Loading...";
-    if (userData.points.totalEarned <= 0) return "No Stream to Claim";
+    if (userData.points.totalEarned <= 0) return "No SUP to claim";
 
     return "Claim your SUP stream";
   };
