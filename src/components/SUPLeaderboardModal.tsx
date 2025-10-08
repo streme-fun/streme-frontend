@@ -277,7 +277,7 @@ export function SUPLeaderboardModal({
           userData?.points.totalEarned || 0,
         [ANALYTICS_PROPERTIES.LOCKER_ADDRESS]:
           userData?.fluidLocker.address || "",
-        [ANALYTICS_PROPERTIES.CLAIM_PROGRAM_ID]: 7692,
+        [ANALYTICS_PROPERTIES.CLAIM_PROGRAM_ID]: 7786,
         [ANALYTICS_PROPERTIES.WALLET_TYPE]: isMiniAppView
           ? "farcaster"
           : "wagmi",
