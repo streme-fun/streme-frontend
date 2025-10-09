@@ -96,8 +96,10 @@ export function StakerLeaderboardEmbed({
       const transformedStakers: TokenStaker[] = stakersData
         .filter(
           (staker: { holder_address?: string; isStaker?: boolean }) =>
-            staker.holder_address && staker.isStaker
-        ) // Filter out entries without address or non-stakers
+            staker.holder_address &&
+            staker.isStaker &&
+            staker.holder_address.toLowerCase() !== "0xc749105bc4b4ea6285dbbe2e8221c922bea07a9d"
+        ) // Filter out entries without address, non-stakers, and specific excluded address
         .slice(0, 10)
         .map(
           (staker: {

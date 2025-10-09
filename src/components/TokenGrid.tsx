@@ -171,30 +171,40 @@ export const TrendingTokenCard = ({
 
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-black/5 to-transparent" />
 
-          {/* Verified badge */}
-          {(token.contract_address.toLowerCase() ===
-            "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58" ||
-            token.contract_address.toLowerCase() ===
-              "0x1c4f69f14cf754333c302246d25a48a13224118a" ||
-            token.contract_address.toLowerCase() ===
-              "0x063eda1b84ceaf79b8cc4a41658b449e8e1f9eeb") && (
-            <div
-              className="absolute top-2 left-2 bg-blue-500/90 backdrop-blur-sm rounded-full p-1 flex items-center justify-center z-10"
-              title="Verified Token"
-            >
-              <svg
-                className="w-4 h-4 text-white"
-                fill="currentColor"
-                viewBox="0 0 20 20"
+          {/* Verified badge and version label */}
+          <div className="absolute top-2 left-2 flex items-center gap-2 z-10">
+            {(token.contract_address.toLowerCase() ===
+              "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58" ||
+              token.contract_address.toLowerCase() ===
+                "0x1c4f69f14cf754333c302246d25a48a13224118a" ||
+              token.contract_address.toLowerCase() ===
+                "0x063eda1b84ceaf79b8cc4a41658b449e8e1f9eeb") && (
+              <div
+                className="bg-blue-500/90 backdrop-blur-sm rounded-full p-1 flex items-center justify-center"
+                title="Verified Token"
               >
-                <path
-                  fillRule="evenodd"
-                  d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-          )}
+                <svg
+                  className="w-4 h-4 text-white"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            )}
+            {token.type === "v2" && (
+              <div
+                className="bg-primary/90 backdrop-blur-sm rounded-full px-2 py-0.5 text-xs font-semibold text-white"
+                title="Version 2"
+              >
+                v2
+              </div>
+            )}
+          </div>
 
           {/* Creator avatar overlay */}
           {token.creator &&
@@ -286,10 +296,11 @@ export const TrendingTokenCard = ({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    const crowdfundUrl = token.contract_address.toLowerCase() ===
+                    const crowdfundUrl =
+                      token.contract_address.toLowerCase() ===
                       "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58"
-                      ? "/crowdfund/0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58"
-                      : "/crowdfund/0x1c4f69f14cf754333c302246d25a48a13224118a";
+                        ? "/crowdfund/0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58"
+                        : "/crowdfund/0x1c4f69f14cf754333c302246d25a48a13224118a";
                     router.push(crowdfundUrl);
                   }}
                   className="btn btn-sm btn-outline btn-accent flex-1"
@@ -451,209 +462,212 @@ export const TrendingTokensCarousel = ({
   );
 };
 
-const TokenCardComponent = memo(({
-  token,
-  isMiniApp = false,
-}: {
-  token: Token & { rewards: number; totalStakers: number };
-  isMiniApp?: boolean;
-}) => {
-  const [totalStakers, setTotalStakers] = useState<number>(token.totalStakers);
-
-  // Use the reward counter hook for animated rewards
-  const { currentRewards, elementRef } = useRewardCounter(
-    token.rewards,
-    REWARDS_PER_SECOND,
-    isMiniApp ? 200 : 150 // Faster updates for smoother animations
-  );
-
-  useEffect(() => {
-    if (!token.creator) {
-      console.log("Missing creator for token:", {
-        name: token.name,
-        symbol: token.symbol,
-        address: token.contract_address,
-      });
-    }
-  }, [token]);
-
-  useEffect(() => {
-    // Initialize state from props
-    setTotalStakers(token.totalStakers);
-  }, [token.totalStakers]);
-
-  // Helper function to shorten hash
-  const shortenHash = (hash: string | undefined) => {
-    if (!hash) return "";
-    return hash.slice(0, 10);
-  };
-
-  const handleFarcasterClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    window.open(
-      `https://farcaster.xyz/${token.creator?.name}/${shortenHash(
-        token.cast_hash
-      )}`,
-      "_blank",
-      "noopener,noreferrer"
+const TokenCardComponent = memo(
+  ({
+    token,
+    isMiniApp = false,
+  }: {
+    token: Token & { rewards: number; totalStakers: number };
+    isMiniApp?: boolean;
+  }) => {
+    const [totalStakers, setTotalStakers] = useState<number>(
+      token.totalStakers
     );
-  };
 
-  // Add the same helper function
-  // const formatPrice = (price: number | undefined) => {
-  //   if (!price || isNaN(price)) return "-";
+    // Use the reward counter hook for animated rewards
+    const { currentRewards, elementRef } = useRewardCounter(
+      token.rewards,
+      REWARDS_PER_SECOND,
+      isMiniApp ? 200 : 150 // Faster updates for smoother animations
+    );
 
-  //   if (price < 0.000001) {
-  //     const scientificStr = price.toExponential(2);
-  //     const [base, exponent] = scientificStr.split("e");
-  //     return (
-  //       <span className="whitespace-nowrap">
-  //         ${base}
-  //         <span className="text-xs opacity-60">×10{exponent}</span>
-  //       </span>
-  //     );
-  //   }
+    useEffect(() => {
+      if (!token.creator) {
+        console.log("Missing creator for token:", {
+          name: token.name,
+          symbol: token.symbol,
+          address: token.contract_address,
+        });
+      }
+    }, [token]);
 
-  //   return `$${price.toLocaleString(undefined, {
-  //     minimumFractionDigits: 6,
-  //     maximumFractionDigits: 6,
-  //   })}`;
-  // };
+    useEffect(() => {
+      // Initialize state from props
+      setTotalStakers(token.totalStakers);
+    }, [token.totalStakers]);
 
-  return (
-    <Link href={`/token/${token.contract_address}`} className="block group">
-      <div
-        ref={elementRef}
-        className="card card-side bg-base-100 rounded-md border-1 border-base-300 
+    // Helper function to shorten hash
+    const shortenHash = (hash: string | undefined) => {
+      if (!hash) return "";
+      return hash.slice(0, 10);
+    };
+
+    const handleFarcasterClick = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(
+        `https://farcaster.xyz/${token.creator?.name}/${shortenHash(
+          token.cast_hash
+        )}`,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    };
+
+    // Add the same helper function
+    // const formatPrice = (price: number | undefined) => {
+    //   if (!price || isNaN(price)) return "-";
+
+    //   if (price < 0.000001) {
+    //     const scientificStr = price.toExponential(2);
+    //     const [base, exponent] = scientificStr.split("e");
+    //     return (
+    //       <span className="whitespace-nowrap">
+    //         ${base}
+    //         <span className="text-xs opacity-60">×10{exponent}</span>
+    //       </span>
+    //     );
+    //   }
+
+    //   return `$${price.toLocaleString(undefined, {
+    //     minimumFractionDigits: 6,
+    //     maximumFractionDigits: 6,
+    //   })}`;
+    // };
+
+    return (
+      <Link href={`/token/${token.contract_address}`} className="block group">
+        <div
+          ref={elementRef}
+          className="card card-side bg-base-100 rounded-md border-1 border-base-300 
         hover:bg-base-200/50  transition-all duration-300 ease-out
         hover:shadow-lg hover:-translate-y-1 group-hover:border-primary/20"
-      >
-        {token.img_url ? (
-          <figure className="w-[110px] h-[110px] relative overflow-hidden">
-            <Image
-              src={token.img_url}
-              alt={token.name}
-              fill
-              sizes="110px"
-              className="object-cover transition-transform duration-300 group-hover:scale-110"
-              unoptimized={
-                token.img_url.includes(".gif") ||
-                token.img_url.includes("imagedelivery.net")
-              }
-            />
-          </figure>
-        ) : (
-          <div
-            className="w-[120px] h-[120px] bg-primary flex items-center justify-center 
+        >
+          {token.img_url ? (
+            <figure className="w-[110px] h-[110px] relative overflow-hidden">
+              <Image
+                src={token.img_url}
+                alt={token.name}
+                fill
+                sizes="110px"
+                className="object-cover transition-transform duration-300 group-hover:scale-110"
+                unoptimized={
+                  token.img_url.includes(".gif") ||
+                  token.img_url.includes("imagedelivery.net")
+                }
+              />
+            </figure>
+          ) : (
+            <div
+              className="w-[120px] h-[120px] bg-primary flex items-center justify-center 
             text-primary-content font-mono font-bold text-xl overflow-hidden px-2
             transition-colors duration-300 group-hover:bg-primary-focus"
-            title={token.symbol}
-          >
-            ${token.symbol.slice(0, 10)}
-            {token.symbol.length > 10 && "..."}
-          </div>
-        )}
-        <div className="card-body p-2 gap-2">
-          <div className="flex">
-            <div className="flex items-start justify-between w-full">
-              <div className="flex flex-col gap-2">
-                <h2
-                  className="card-title text-sm group-hover:text-primary transition-colors duration-300 truncate max-w-[200px] overflow-hidden"
-                  title={token.name}
-                >
-                  {token.name.length > 17
-                    ? token.name.slice(0, 17) + "..."
-                    : token.name}
-                </h2>
-                <div className="flex items-center gap-2">
-                  <div className="avatar transition-transform duration-300 group-hover:scale-110">
-                    <div className="rounded-full w-4 h-4">
-                      <Image
-                        src={
-                          token.creator?.profileImage &&
-                          token.creator.profileImage.trim() !== ""
-                            ? token.creator.profileImage
-                            : token.img_url ||
-                              `/avatars/${
-                                token.creator?.name?.trim() || "streme"
-                              }.png`
-                        }
-                        alt={
-                          token.creator?.name ||
+              title={token.symbol}
+            >
+              ${token.symbol.slice(0, 10)}
+              {token.symbol.length > 10 && "..."}
+            </div>
+          )}
+          <div className="card-body p-2 gap-2">
+            <div className="flex">
+              <div className="flex items-start justify-between w-full">
+                <div className="flex flex-col gap-2">
+                  <h2
+                    className="card-title text-sm group-hover:text-primary transition-colors duration-300 truncate max-w-[200px] overflow-hidden"
+                    title={token.name}
+                  >
+                    {token.name.length > 17
+                      ? token.name.slice(0, 17) + "..."
+                      : token.name}
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <div className="avatar transition-transform duration-300 group-hover:scale-110">
+                      <div className="rounded-full w-4 h-4">
+                        <Image
+                          src={
+                            token.creator?.profileImage &&
+                            token.creator.profileImage.trim() !== ""
+                              ? token.creator.profileImage
+                              : token.img_url ||
+                                `/avatars/${
+                                  token.creator?.name?.trim() || "streme"
+                                }.png`
+                          }
+                          alt={
+                            token.creator?.name ||
+                            `${token.contract_address.slice(
+                              0,
+                              6
+                            )}...${token.contract_address.slice(-4)}`
+                          }
+                          width={16}
+                          height={16}
+                          sizes="16px"
+                          unoptimized={
+                            (token.creator?.profileImage?.includes(".gif") ||
+                              token.creator?.profileImage?.includes(
+                                "imagedelivery.net"
+                              ) ||
+                              token.img_url?.includes(".gif") ||
+                              token.img_url?.includes("imagedelivery.net")) ??
+                            false
+                          }
+                        />
+                      </div>
+                    </div>
+                    <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2 max-w-[120px]">
+                      <span
+                        className="truncate"
+                        title={
+                          token.creator?.name?.trim() ||
                           `${token.contract_address.slice(
                             0,
                             6
                           )}...${token.contract_address.slice(-4)}`
                         }
-                        width={16}
-                        height={16}
-                        sizes="16px"
-                        unoptimized={
-                          (token.creator?.profileImage?.includes(".gif") ||
-                            token.creator?.profileImage?.includes(
-                              "imagedelivery.net"
-                            ) ||
-                            token.img_url?.includes(".gif") ||
-                            token.img_url?.includes("imagedelivery.net")) ??
-                          false
-                        }
-                      />
-                    </div>
-                  </div>
-                  <span className="text-xs opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2 max-w-[120px]">
-                    <span
-                      className="truncate"
-                      title={
-                        token.creator?.name?.trim() ||
-                        `${token.contract_address.slice(
-                          0,
-                          6
-                        )}...${token.contract_address.slice(-4)}`
-                      }
-                    >
-                      {token.creator?.name?.trim() ||
-                        `${token.contract_address.slice(
-                          0,
-                          6
-                        )}...${token.contract_address.slice(-4)}`}
-                    </span>
-                    {token.cast_hash && token.creator?.name?.trim() && (
-                      <button
-                        onClick={handleFarcasterClick}
-                        className="hover:text-primary inline-flex items-center ml-auto cursor-pointer"
-                        title="View on Farcaster"
                       >
-                        <Image
-                          src={FarcasterIcon}
-                          alt={`View on Farcaster`}
-                          width={12}
-                          height={12}
-                          className="opacity-80 group-hover:opacity-100"
-                        />
-                      </button>
-                    )}
-                  </span>
+                        {token.creator?.name?.trim() ||
+                          `${token.contract_address.slice(
+                            0,
+                            6
+                          )}...${token.contract_address.slice(-4)}`}
+                      </span>
+                      {token.cast_hash && token.creator?.name?.trim() && (
+                        <button
+                          onClick={handleFarcasterClick}
+                          className="hover:text-primary inline-flex items-center ml-auto cursor-pointer"
+                          title="View on Farcaster"
+                        >
+                          <Image
+                            src={FarcasterIcon}
+                            alt={`View on Farcaster`}
+                            width={12}
+                            height={12}
+                            className="opacity-80 group-hover:opacity-100"
+                          />
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end text-right">
+                  <div className="text-right text-xs uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
+                    MCAP
+                  </div>
+                  <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
+                    {token.marketCap
+                      ? `$${
+                          token.marketCap >= 1000000
+                            ? (token.marketCap / 1000000).toFixed(1) + "M"
+                            : token.marketCap >= 1000
+                            ? (token.marketCap / 1000).toFixed(1) + "K"
+                            : token.marketCap.toFixed(0)
+                        }`
+                      : "-"}
+                  </div>
                 </div>
               </div>
-              <div className="flex flex-col items-end text-right">
-                <div className="text-right text-xs uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
-                  MCAP
-                </div>
-                <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
-                  {token.marketCap
-                    ? `$${
-                        token.marketCap >= 1000000
-                          ? (token.marketCap / 1000000).toFixed(1) + "M"
-                          : token.marketCap >= 1000
-                          ? (token.marketCap / 1000).toFixed(1) + "K"
-                          : token.marketCap.toFixed(0)
-                      }`
-                    : "-"}
-                </div>
-              </div>
-            </div>
-            {/* Comment out market change display
+              {/* Comment out market change display
             <div className="flex items-center justify-between">
               <div
                 className={`transition-all duration-300 ${
@@ -668,30 +682,31 @@ const TokenCardComponent = memo(({
               </div>
             </div>
             */}
-          </div>
+            </div>
 
-          <div className="card-actions justify-end mt-auto">
-            <div className="w-full px-1">
-              <div className="text-[11px] uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
-                Rewards ({totalStakers}{" "}
-                {totalStakers === 1 ? "staker" : "stakers"})
-              </div>
-              <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
-                {currentRewards.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                <span className="text-xs font-normal opacity-60 group-hover:opacity-100 transition-opacity duration-300">
-                  ${token.symbol}
-                </span>
+            <div className="card-actions justify-end mt-auto">
+              <div className="w-full px-1">
+                <div className="text-[11px] uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
+                  Rewards ({totalStakers}{" "}
+                  {totalStakers === 1 ? "staker" : "stakers"})
+                </div>
+                <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
+                  {currentRewards.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  <span className="text-xs font-normal opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+                    ${token.symbol}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </Link>
-  );
-});
+      </Link>
+    );
+  }
+);
 
 TokenCardComponent.displayName = "TokenCardComponent";
 

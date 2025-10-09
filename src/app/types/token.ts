@@ -24,6 +24,16 @@ export interface Token {
     _nanoseconds: number;
   };
 
+  // Staking configuration (v2 tokens)
+  staking?: {
+    factory: string;
+    token: string;
+    pool: string;
+    lockDuration: number;
+    flowDuration: number;
+    supply: number;
+  };
+
   // Market data from Streme API
   marketData?: {
     marketCap: number;

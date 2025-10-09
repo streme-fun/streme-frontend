@@ -14,12 +14,15 @@ export async function GET() {
     };
 
     // Fetch trending tokens from the external API
-    const response = await fetch("https://api.streme.fun/api/tokens/trending?type=all", {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "Streme/1.0",
-      },
-    });
+    const response = await fetch(
+      "https://api.streme.fun/api/tokens/trending?type=all",
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Streme/1.0",
+        },
+      }
+    );
 
     if (!response.ok) {
       throw new Error(
@@ -41,10 +44,14 @@ export async function GET() {
       })
       .map((token) => {
         // Remove leading $ from symbol if present
-        if (token.symbol && typeof token.symbol === 'string' && token.symbol.startsWith('$')) {
+        if (
+          token.symbol &&
+          typeof token.symbol === "string" &&
+          token.symbol.startsWith("$")
+        ) {
           return {
             ...token,
-            symbol: token.symbol.substring(1)
+            symbol: token.symbol.substring(1),
           };
         }
         return token;

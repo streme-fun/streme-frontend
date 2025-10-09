@@ -359,6 +359,57 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
         </div>
       </div>
 
+      {/* Staking Configuration (v2 tokens) */}
+      {token.staking && (
+        <div className="border-t border-base-300 pt-3 space-y-2">
+          <div className="text-sm opacity-60 font-semibold mb-2">
+            Staking Configuration ({token.type === "v2" ? "v2" : "v1"})
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <div className="opacity-60">Lock Duration</div>
+              <div className="font-mono">
+                {token.staking.lockDuration >= 86400
+                  ? `${(token.staking.lockDuration / 86400).toFixed(0)} days`
+                  : `${(token.staking.lockDuration / 3600).toFixed(0)} hours`}
+              </div>
+            </div>
+            <div>
+              <div className="opacity-60">Flow Duration</div>
+              <div className="font-mono">
+                {token.staking.flowDuration >= 86400
+                  ? `${(token.staking.flowDuration / 86400).toFixed(0)} days`
+                  : `${(token.staking.flowDuration / 3600).toFixed(0)} hours`}
+              </div>
+            </div>
+            <div>
+              <div className="opacity-60">Supply</div>
+              <div className="font-mono">
+                {token.staking.supply.toLocaleString()}
+              </div>
+            </div>
+            <div>
+              <div className="opacity-60">Version</div>
+              <div className="font-mono">
+                {token.type === "v2" ? "v2" : "v1"}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Version badge for tokens without staking config */}
+      {!token.staking && token.type && (
+        <div className="border-t border-base-300 pt-3">
+          <div className="text-sm">
+            <span className="opacity-60">Version: </span>
+            <span className="font-mono">
+              {token.type === "v2" ? "v2" : "v1"}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Website Link for BUTTHOLE token */}
       {token.contract_address.toLowerCase() ===
         "0x1c4f69f14cf754333c302246d25a48a13224118a" && (
