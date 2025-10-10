@@ -44,24 +44,81 @@ export async function enrichTokensWithData(
   }
 
   // Transform tokens and use only market data from Streme API
-  const enrichedTokens = tokens.map((token) => ({
-    ...token,
-    creator: token.requestor_fid
+  const enrichedTokens = tokens.map((token) => {
+    // Process vault data from backend's vaults array
+    interface BackendVault {
+      vault: string;
+      token: string;
+      admin: string;
+      supply: number;
+      lockupDuration: number;
+      vestingDuration: number;
+      pool: string;
+      box: string;
+    }
+    const backendVaults = (token as Token & { vaults?: BackendVault[] }).vaults;
+    const vault = backendVaults && backendVaults.length > 0
       ? {
-          name: token.username || "Unknown",
-          score: 0,
-          recasts: 0,
-          likes: 0,
-          profileImage: token.pfp_url || "",
+          allocation: 0, // Will be calculated below
+          beneficiary: backendVaults[0].admin,
+          lockDuration: backendVaults[0].lockupDuration,
+          vestingDuration: backendVaults[0].vestingDuration,
+          supply: backendVaults[0].supply,
         }
-      : undefined,
-    // Use market data from Streme API only
-    price: token.marketData?.price,
-    marketCap: token.marketData?.marketCap,
-    volume24h: token.marketData?.volume24h,
-    change1h: token.marketData?.priceChange1h,
-    change24h: token.marketData?.priceChange24h,
-  })) as EnrichedToken[];
+      : undefined;
+
+    // Calculate allocations if we have staking data
+    let allocations = undefined;
+    if (token.staking || vault) {
+      const totalSupply = 100000000000; // 100B tokens (constant)
+      const stakingAllocation = token.staking
+        ? Math.round((token.staking.supply / totalSupply) * 100)
+        : 0;
+      const vaultAllocation = vault
+        ? Math.round((vault.supply / totalSupply) * 100)
+        : 0;
+      const liquidityAllocation = 100 - stakingAllocation - vaultAllocation;
+
+      allocations = {
+        staking: stakingAllocation,
+        vault: vaultAllocation,
+        liquidity: liquidityAllocation,
+      };
+
+      // Update vault allocation percentage
+      if (vault) {
+        vault.allocation = vaultAllocation;
+      }
+    }
+
+    // Add allocation percentage to staking config
+    const stakingWithAllocation = token.staking ? {
+      ...token.staking,
+      allocation: allocations?.staking,
+    } : undefined;
+
+    return {
+      ...token,
+      staking: stakingWithAllocation,
+      vault,
+      allocations,
+      creator: token.requestor_fid
+        ? {
+            name: token.username || "Unknown",
+            score: 0,
+            recasts: 0,
+            likes: 0,
+            profileImage: token.pfp_url || "",
+          }
+        : undefined,
+      // Use market data from Streme API only
+      price: token.marketData?.price,
+      marketCap: token.marketData?.marketCap,
+      volume24h: token.marketData?.volume24h,
+      change1h: token.marketData?.priceChange1h,
+      change24h: token.marketData?.priceChange24h,
+    };
+  }) as EnrichedToken[];
 
   return enrichedTokens;
 }

@@ -32,7 +32,28 @@ export interface Token {
     lockDuration: number;
     flowDuration: number;
     supply: number;
+    allocation?: number; // percentage of total supply
+    delegate?: string; // optional delegate address
   };
+
+  // Vault configuration (v2 tokens)
+  vault?: {
+    allocation: number; // percentage of total supply
+    beneficiary: string;
+    lockDuration: number;
+    vestingDuration: number;
+    supply: number;
+  };
+
+  // Token allocation breakdown
+  allocations?: {
+    staking: number; // percentage
+    vault: number; // percentage
+    liquidity: number; // percentage
+  };
+
+  // Optional description
+  description?: string;
 
   // Market data from Streme API
   marketData?: {

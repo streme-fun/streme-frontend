@@ -168,14 +168,33 @@ ${shareUrl}`;
     <div className="max-w-[1440px] mx-auto sm:px-6 mt-6 md:px-8 md:mt-0 md:pt-28 pb-12">
       <BackButton isMiniAppView={isMiniAppView} className="mb-4" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8">
-        <div className="order-1 lg:order-2 lg:col-span-4 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Left Column: Token Info + Chart */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Token Info */}
           <TokenInfo
             token={token}
             onShare={handleShare}
             isMiniAppView={isMiniAppView}
           />
 
+          {/* Chart - Always directly below Token Info */}
+          <div className="card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit">
+            <div className="card-body p-0 md:p-4 pb-12">
+              <iframe
+                data-privy-ignore
+                title="GeckoTerminal Embed"
+                src={isMiniAppView ? smallEmbedUrl : embedUrl}
+                className="w-full h-[500px] lg:h-[800px]"
+                allow="clipboard-write"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Trading Actions + Other Info */}
+        <div className="space-y-4">
           <TokenActions
             data-trading-section
             token={token}
@@ -185,6 +204,7 @@ ${shareUrl}`;
             address={address}
             isConnected={isConnected}
           />
+
           <StakedBalance
             data-staking-balance
             stakingAddress={token.staking_address}
@@ -216,19 +236,6 @@ ${shareUrl}`;
 
           {/* Claim Fees Button */}
           <ClaimFeesButton tokenAddress={token.contract_address} />
-        </div>
-
-        <div className="order-2 lg:order-1 lg:col-span-8 card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit lg:sticky lg:top-28">
-          <div className="card-body p-0 md:p-4 pb-12">
-            <iframe
-              data-privy-ignore
-              title="GeckoTerminal Embed"
-              src={isMiniAppView ? smallEmbedUrl : embedUrl}
-              className="w-full h-[500px] lg:h-[800px]"
-              allow="clipboard-write"
-              allowFullScreen
-            />
-          </div>
         </div>
       </div>
       <div className="fixed inset-0 -z-50">
