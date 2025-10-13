@@ -45,7 +45,7 @@ export function CreateForm() {
     "off"
   );
   const [v2Config, setV2Config] = useState({
-    stakingAllocation: 5,
+    stakingAllocation: 10,
     stakingLockDays: 1,
     stakingFlowDays: 365,
     stakingDelegate: "",
@@ -461,60 +461,10 @@ export function CreateForm() {
         </h3>
 
         {/* Preset Templates */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <div
             className="tooltip tooltip-bottom"
-            data-tip="Best for long-term holders. Higher lock period attracts committed stakers"
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setUseDefaultStaking(true);
-                setV2Config({
-                  ...v2Config,
-                  stakingAllocation: 3,
-                  stakingLockDays: 180,
-                  stakingFlowDays: 730,
-                });
-              }}
-              className={`btn btn-sm w-full ${
-                useDefaultStaking && v2Config.stakingAllocation === 3
-                  ? "btn-primary"
-                  : "btn-outline"
-              } flex-col h-auto py-3`}
-            >
-              <span className="font-semibold">Conservative</span>
-              <span className="text-xs opacity-70">3% / 180d lock / 730d</span>
-            </button>
-          </div>
-          <div
-            className="tooltip tooltip-bottom"
-            data-tip="Balanced approach. Recommended for most token launches"
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setUseDefaultStaking(true);
-                setV2Config({
-                  ...v2Config,
-                  stakingAllocation: 5,
-                  stakingLockDays: 1,
-                  stakingFlowDays: 365,
-                });
-              }}
-              className={`btn btn-sm w-full ${
-                useDefaultStaking && v2Config.stakingAllocation === 5
-                  ? "btn-primary"
-                  : "btn-outline"
-              } flex-col h-auto py-3`}
-            >
-              <span className="font-semibold">Standard</span>
-              <span className="text-xs opacity-70">5% / 1d lock / 365d</span>
-            </button>
-          </div>
-          <div
-            className="tooltip tooltip-bottom"
-            data-tip="High rewards, fast distribution. Attracts volume traders"
+            data-tip="Recommended configuration for most token launches"
           >
             <button
               type="button"
@@ -523,8 +473,8 @@ export function CreateForm() {
                 setV2Config({
                   ...v2Config,
                   stakingAllocation: 10,
-                  stakingLockDays: 0,
-                  stakingFlowDays: 180,
+                  stakingLockDays: 1,
+                  stakingFlowDays: 365,
                 });
               }}
               className={`btn btn-sm w-full ${
@@ -533,23 +483,21 @@ export function CreateForm() {
                   : "btn-outline"
               } flex-col h-auto py-3`}
             >
-              <span className="font-semibold">Aggressive</span>
-              <span className="text-xs opacity-70">10% / No lock / 180d</span>
+              <span className="font-semibold">Standard</span>
+              <span className="text-xs opacity-70">10% / 1d lock / 365d</span>
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setUseDefaultStaking(false)}
+            className={`btn btn-sm w-full ${
+              !useDefaultStaking ? "btn-primary" : "btn-outline"
+            } flex-col h-auto py-3`}
+          >
+            <span className="font-semibold">Custom</span>
+            <span className="text-xs opacity-70">Configure manually</span>
+          </button>
         </div>
-
-        <div className="divider my-2">OR</div>
-
-        <button
-          type="button"
-          onClick={() => setUseDefaultStaking(false)}
-          className={`btn btn-sm w-full ${
-            !useDefaultStaking ? "btn-primary" : "btn-outline"
-          }`}
-        >
-          Custom Configuration
-        </button>
 
         {!useDefaultStaking && (
           <>
