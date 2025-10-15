@@ -33,7 +33,7 @@ interface UnstakedTokensModalProps {
 }
 
 // Contract addresses
-const STAKING_MACRO_V2 = "0x5c4b8561363E80EE458D3F0f4F14eC671e1F54Af";
+const STAKING_MACRO_V2 = "0xFA4f84eEC83786d37C5B904e3631412c3b726a20";
 const MACRO_FORWARDER = "0xFD0268E33111565dE546af2675351A4b1587F89F";
 
 // ABIs for the contracts
