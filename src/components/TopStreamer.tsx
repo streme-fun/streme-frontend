@@ -37,7 +37,7 @@ const TopStreamerComponent = () => {
     // Fetch tokens and randomly select one
     async function fetchRandomToken() {
       try {
-        const response = await fetch("/api/tokens/trending?type=v2");
+        const response = await fetch("/api/tokens/trending?type=all");
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);

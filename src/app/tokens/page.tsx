@@ -204,7 +204,7 @@ export default function TokensPage() {
 
     try {
       const response = await fetch(
-        `/api/tokens/single?address=${tokenAddress}&type=v2`
+        `/api/tokens/single?address=${tokenAddress}&type=all`
       );
       if (response.ok) {
         const result = await response.json();
@@ -269,7 +269,7 @@ export default function TokensPage() {
         // Fetch all batches in parallel
         const batchPromises = batches.map(async (batch) => {
           try {
-            const response = await fetch("/api/tokens/multiple?type=v2", {
+            const response = await fetch("/api/tokens/multiple?type=all", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",

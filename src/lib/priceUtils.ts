@@ -39,7 +39,7 @@ export async function fetchTokenPrice(
 ): Promise<number | null> {
   try {
     const response = await fetch(
-      `/api/tokens/single?address=${tokenAddress}&type=v2`
+      `/api/tokens/single?address=${tokenAddress}&type=all`
     );
 
     if (!response.ok) {

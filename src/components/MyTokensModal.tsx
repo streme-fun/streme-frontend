@@ -265,7 +265,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
         // Fetch all batches in parallel
         const batchPromises = batches.map(async (batch) => {
           try {
-            const response = await fetch("/api/tokens/multiple?type=v2", {
+            const response = await fetch("/api/tokens/multiple?type=all", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -1103,7 +1103,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
 
       for (const batch of batches) {
         try {
-          const response = await fetch("/api/tokens/multiple?type=v2", {
+          const response = await fetch("/api/tokens/multiple?type=all", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

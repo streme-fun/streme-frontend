@@ -259,7 +259,7 @@ export default function LaunchedTokensPage() {
 
     try {
       const response = await fetch(
-        `/api/tokens/deployer/${deployerAddress}?type=v2`
+        `/api/tokens/deployer/${deployerAddress}?type=all`
       );
       const result = await response.json();
 

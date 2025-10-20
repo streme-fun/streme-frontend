@@ -124,7 +124,7 @@ class PriceCacheService {
     const promises = addresses.map(async (address) => {
       try {
         const response = await fetch(
-          `/api/tokens/single?address=${address}&type=v2`
+          `/api/tokens/single?address=${address}&type=all`
         );
 
         if (!response.ok) {

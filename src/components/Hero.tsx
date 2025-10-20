@@ -24,7 +24,7 @@ const HeroComponent = () => {
     // Fetch tokens and calculate total rewards
     async function fetchTotalRewards() {
       try {
-        const response = await fetch("/api/tokens?type=v2");
+        const response = await fetch("/api/tokens?type=all");
         const data = await response.json();
         const tokens: Token[] = data.data;
 
