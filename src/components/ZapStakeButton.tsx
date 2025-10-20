@@ -17,12 +17,14 @@ import Link from "next/link";
 import { ensureTxHash } from "@/src/lib/ensureTxHash";
 
 const WETH = "0x4200000000000000000000000000000000000006";
+const ETHX = "0x46fd5cfb4c12d87acd3a13e92baa53240c661d93";
 const toHex = (address: string) => address as `0x${string}`;
 
 interface ZapStakeButtonProps {
   tokenAddress: string;
   stakingAddress: string;
   symbol: string;
+  pair?: string;
   className?: string;
   disabled?: boolean;
   onSuccess?: () => void;
@@ -36,6 +38,7 @@ export function ZapStakeButton({
   tokenAddress,
   stakingAddress,
   symbol,
+  pair,
   className,
   disabled,
   onSuccess,
@@ -55,6 +58,11 @@ export function ZapStakeButton({
 
   // Use external amount if provided, otherwise default to "0.001"
   const amountIn = externalAmount || "0.001";
+
+  const normalizedPair = pair?.toUpperCase() ?? "WETH";
+  const isEthxPair = normalizedPair === "ETHX";
+  const pairedTokenAddress = isEthxPair ? ETHX : WETH;
+  const zapMethod: "zap" | "zapETHx" = isEthxPair ? "zapETHx" : "zap";
 
   // Use explicit mini-app check with fallback to passed prop
   const isEffectivelyMiniApp = isMiniApp || false;
@@ -131,7 +139,7 @@ export function ZapStakeButton({
         functionName: "quoteExactInputSingle",
         args: [
           {
-            tokenIn: WETH,
+            tokenIn: toHex(pairedTokenAddress),
             tokenOut: toHex(tokenAddress),
             amountIn: amountInWei,
             fee: 10000,
@@ -142,12 +150,13 @@ export function ZapStakeButton({
       const amountOut = quoteResult[0];
       const amountOutMin = amountOut - amountOut / 200n; // 0.5% slippage
 
-      const zapContractAddress = "0xeA25b9CD2D9F8Ba6cff45Ed0f6e1eFa2fC79a57E";
+      const zapContractAddress = "0x16a97D6924Ff246DD57eB78Ae993f91c23422F25";
       const zapAbi = [
         "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
+        "function zapETHx(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
       ];
       const zapIface = new Interface(zapAbi);
-      const zapData = zapIface.encodeFunctionData("zap", [
+      const zapData = zapIface.encodeFunctionData(zapMethod, [
         toHex(tokenAddress),
         amountInWei,
         amountOutMin,
@@ -230,11 +239,23 @@ export function ZapStakeButton({
               stateMutability: "payable",
               type: "function",
             },
+            {
+              inputs: [
+                { name: "tokenOut", type: "address" },
+                { name: "amountIn", type: "uint256" },
+                { name: "amountOutMin", type: "uint256" },
+                { name: "stakingContract", type: "address" },
+              ],
+              name: "zapETHx",
+              outputs: [{ name: "", type: "uint256" }],
+              stateMutability: "payable",
+              type: "function",
+            },
           ] as const;
           
           const zapDataEncoded = encodeFunctionData({
             abi,
-            functionName: "zap",
+            functionName: zapMethod,
             args: [
               toHex(tokenAddress),
               amountInWei,

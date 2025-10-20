@@ -15,7 +15,7 @@ export async function GET() {
 
     // Fetch trending tokens from the external API
     const response = await fetch(
-      "https://api.streme.fun/api/tokens/trending?type=all",
+      "https://api.streme.fun/api/tokens/trending?type=v2",
       {
         headers: {
           Accept: "application/json",

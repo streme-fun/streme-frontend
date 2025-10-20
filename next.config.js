@@ -198,6 +198,15 @@ const nextConfig = {
   },
   // This is required to support PostHog trailing slash API requests
   skipTrailingSlashRedirect: true,
+  webpack: (config) => {
+    // Ignore React Native modules that MetaMask SDK tries to import in browser
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@react-native-async-storage/async-storage': false,
+      'react-native': false,
+    };
+    return config;
+  },
 };
 
 export default nextConfig;

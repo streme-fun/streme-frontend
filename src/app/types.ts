@@ -107,7 +107,7 @@ export interface LaunchedToken {
   // Vault configuration (v2 tokens)
   vault?: {
     allocation: number; // percentage of total supply
-    beneficiary: string;
+    beneficiary: string | string[]; // single or multiple beneficiaries
     lockDuration: number;
     vestingDuration: number;
     supply: number;

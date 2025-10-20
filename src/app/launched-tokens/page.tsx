@@ -88,12 +88,13 @@ export default function LaunchedTokensPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Wallet connection hooks
-  const { isConnected: isWalletConnected, address: deployerAddress, isMiniApp } = useWallet();
   const {
-    isMiniAppView,
-    isSDKLoaded,
-  } = useAppFrameLogic();
-  
+    isConnected: isWalletConnected,
+    address: deployerAddress,
+    isMiniApp,
+  } = useWallet();
+  const { isMiniAppView, isSDKLoaded } = useAppFrameLogic();
+
   // Debug logging for address changes
   useEffect(() => {
     console.log("📍 Address change debug:", {
@@ -101,7 +102,7 @@ export default function LaunchedTokensPage() {
       deployerAddress,
       isWalletConnected,
       isMiniApp,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }, [isMiniAppView, deployerAddress, isWalletConnected, isMiniApp]);
   const [selectedTokenStakers, setSelectedTokenStakers] = useState<{
@@ -138,16 +139,19 @@ export default function LaunchedTokensPage() {
       const enrichmentPromises = tokenList.map(async (token) => {
         try {
           // Process vault data from backend's vaults array
-          const backendVaults = (token as LaunchedToken & { vaults?: BackendVault[] }).vaults;
-          const vault = backendVaults && backendVaults.length > 0
-            ? {
-                allocation: 0, // Will be calculated below
-                beneficiary: backendVaults[0].admin,
-                lockDuration: backendVaults[0].lockupDuration,
-                vestingDuration: backendVaults[0].vestingDuration,
-                supply: backendVaults[0].supply,
-              }
-            : undefined;
+          const backendVaults = (
+            token as LaunchedToken & { vaults?: BackendVault[] }
+          ).vaults;
+          const vault =
+            backendVaults && backendVaults.length > 0
+              ? {
+                  allocation: 0, // Will be calculated below
+                  beneficiary: backendVaults[0].admin,
+                  lockDuration: backendVaults[0].lockupDuration,
+                  vestingDuration: backendVaults[0].vestingDuration,
+                  supply: backendVaults[0].supply,
+                }
+              : undefined;
 
           // Calculate allocations if we have staking data or vault
           let allocations = undefined;
@@ -159,7 +163,8 @@ export default function LaunchedTokensPage() {
             const vaultAllocation = vault
               ? Math.round((vault.supply / totalSupply) * 100)
               : 0;
-            const liquidityAllocation = 100 - stakingAllocation - vaultAllocation;
+            const liquidityAllocation =
+              100 - stakingAllocation - vaultAllocation;
 
             allocations = {
               staking: stakingAllocation,
@@ -197,12 +202,20 @@ export default function LaunchedTokensPage() {
                 token0: data.token0,
                 token1: data.token1,
               };
-              console.log(`Claimable fees for ${token.contract_address}:`, claimableFees);
+              console.log(
+                `Claimable fees for ${token.contract_address}:`,
+                claimableFees
+              );
             } else {
-              console.warn(`Claimable fees API returned ${res.status} for token ${token.contract_address}`);
+              console.warn(
+                `Claimable fees API returned ${res.status} for token ${token.contract_address}`
+              );
             }
           } catch (error) {
-            console.warn(`Failed to fetch claimable fees for token ${token.contract_address}:`, error);
+            console.warn(
+              `Failed to fetch claimable fees for token ${token.contract_address}:`,
+              error
+            );
           }
 
           return {
@@ -245,7 +258,9 @@ export default function LaunchedTokensPage() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/tokens/deployer/${deployerAddress}?type=all`);
+      const response = await fetch(
+        `/api/tokens/deployer/${deployerAddress}?type=v2`
+      );
       const result = await response.json();
 
       if (!response.ok) {
@@ -521,10 +536,7 @@ export default function LaunchedTokensPage() {
           <HeroAnimationMini />
         </div>
 
-        <BackButton 
-          isMiniAppView={true} 
-          className="pt-4 relative z-10 mb-4" 
-        />
+        <BackButton isMiniAppView={true} className="pt-4 relative z-10 mb-4" />
 
         {/* Fixed header */}
         <h1 className="text-lg font-bold px-4 relative z-10">
@@ -565,7 +577,9 @@ export default function LaunchedTokensPage() {
           {loading && (
             <div className="flex flex-col justify-center items-center py-8 gap-3">
               <span className="loading loading-spinner loading-lg"></span>
-              <p className="text-sm opacity-70">Loading your launched tokens...</p>
+              <p className="text-sm opacity-70">
+                Loading your launched tokens...
+              </p>
             </div>
           )}
 
@@ -915,7 +929,10 @@ Symbol: $[your ticker]
               {deployerAddress ? (
                 <>
                   Tokens launched by:{" "}
-                  <span className="font-mono">{deployerAddress.slice(0, 6).toLowerCase()}...{deployerAddress.slice(-4).toLowerCase()}</span>
+                  <span className="font-mono">
+                    {deployerAddress.slice(0, 6).toLowerCase()}...
+                    {deployerAddress.slice(-4).toLowerCase()}
+                  </span>
                 </>
               ) : (
                 "Connect your wallet to view your launched tokens"
@@ -957,7 +974,9 @@ Symbol: $[your ticker]
             {loading && (
               <div className="flex flex-col justify-center items-center py-12 gap-4">
                 <span className="loading loading-spinner loading-lg"></span>
-                <p className="text-sm opacity-70">Loading your launched tokens...</p>
+                <p className="text-sm opacity-70">
+                  Loading your launched tokens...
+                </p>
               </div>
             )}
           </div>

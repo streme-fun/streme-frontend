@@ -49,12 +49,49 @@ export function CreateForm() {
     stakingLockDays: 1,
     stakingFlowDays: 365,
     stakingDelegate: "",
-    enableVault: false,
-    vaultAllocation: 0,
-    vaultBeneficiary: "",
-    vaultLockDays: 0,
-    vaultVestingDays: 0,
   });
+  const MIN_VAULT_LOCK_DAYS = 7;
+
+  const createEmptyVault = () => ({
+    allocation: 0,
+    beneficiary: "",
+    lockDays: MIN_VAULT_LOCK_DAYS,
+    vestingDays: 0,
+  });
+
+  // Multiple vaults support
+  const [vaults, setVaults] = useState<Array<{
+    allocation: number;
+    beneficiary: string;
+    lockDays: number;
+    vestingDays: number;
+  }>>([createEmptyVault()]);
+  const handleVaultChange = (
+    index: number,
+    updates: Partial<{
+      allocation: number;
+      beneficiary: string;
+      lockDays: number;
+      vestingDays: number;
+    }>
+  ) => {
+    setVaults((prev) =>
+      prev.map((vault, i) =>
+        i === index
+          ? {
+              ...vault,
+              ...updates,
+            }
+          : vault
+      )
+    );
+  };
+  const addVault = () => {
+    setVaults((prev) => [...prev, createEmptyVault()]);
+  };
+  const removeVault = (index: number) => {
+    setVaults((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [isDeploying, setIsDeploying] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -256,10 +293,15 @@ export function CreateForm() {
 
       console.log("Token config:", tokenConfig);
 
+      // Calculate total vault allocation
+      const totalVaultAllocation = vaultMode !== "off"
+        ? vaults.reduce((sum, vault) => sum + vault.allocation, 0)
+        : 0;
+
       // Validate allocations
       const validation = validateAllocations(
         v2Config.stakingAllocation,
-        v2Config.enableVault ? v2Config.vaultAllocation : 0
+        totalVaultAllocation
       );
       if (!validation.valid) {
         throw new Error(validation.error);
@@ -280,19 +322,28 @@ export function CreateForm() {
         );
       }
 
-      // Add vault allocation if enabled and > 0
-      if (v2Config.enableVault && v2Config.vaultAllocation > 0) {
-        if (!v2Config.vaultBeneficiary) {
-          throw new Error("Vault beneficiary address is required");
+      // Add vault allocations if enabled
+      if (vaultMode !== "off") {
+        for (const vault of vaults) {
+          if (vault.allocation > 0) {
+            if (!vault.beneficiary) {
+              throw new Error("Vault beneficiary address is required for all vaults with allocation > 0");
+            }
+            if (vault.lockDays < MIN_VAULT_LOCK_DAYS) {
+              throw new Error(
+                `Vault lock duration must be at least ${MIN_VAULT_LOCK_DAYS} days`
+              );
+            }
+            allocations.push(
+              createVaultAllocation(
+                vault.allocation,
+                vault.beneficiary,
+                Math.max(vault.lockDays, MIN_VAULT_LOCK_DAYS),
+                vault.vestingDays
+              )
+            );
+          }
         }
-        allocations.push(
-          createVaultAllocation(
-            v2Config.vaultAllocation,
-            v2Config.vaultBeneficiary,
-            v2Config.vaultLockDays,
-            v2Config.vaultVestingDays
-          )
-        );
       }
 
       console.log("Deploying V2 token with allocations:", {
@@ -338,10 +389,20 @@ export function CreateForm() {
     ? "LAUNCHING TOKEN..."
     : "LAUNCH TOKEN";
 
+  // Calculate total vault allocation for display
+  const totalVaultAllocation = vaultMode !== "off"
+    ? vaults.reduce((sum, vault) => sum + vault.allocation, 0)
+    : 0;
+  const vaultsWithAllocation = vaults.filter((vault) => vault.allocation > 0);
+  const remainingVaultAllocation = Math.max(
+    0,
+    100 - v2Config.stakingAllocation - totalVaultAllocation
+  );
+
   // Calculate LP allocation for display
   const lpAllocation = calculateLPAllocation(
     v2Config.stakingAllocation,
-    v2Config.enableVault ? v2Config.vaultAllocation : 0
+    totalVaultAllocation
   );
 
   return (
@@ -777,11 +838,7 @@ export function CreateForm() {
                 }`}
                 onClick={() => {
                   setVaultMode("off");
-                  setV2Config({
-                    ...v2Config,
-                    enableVault: false,
-                    vaultAllocation: 0,
-                  });
+                  setVaults([createEmptyVault()]);
                 }}
               >
                 Off
@@ -793,13 +850,12 @@ export function CreateForm() {
                 }`}
                 onClick={() => {
                   setVaultMode("default");
-                  setV2Config({
-                    ...v2Config,
-                    enableVault: true,
-                    vaultAllocation: 10,
-                    vaultLockDays: 30,
-                    vaultVestingDays: 365,
-                  });
+                  setVaults([{
+                    allocation: 10,
+                    beneficiary: "",
+                    lockDays: 30,
+                    vestingDays: 365,
+                  }]);
                 }}
               >
                 <div className="flex flex-col items-center">
@@ -816,7 +872,15 @@ export function CreateForm() {
                 }`}
                 onClick={() => {
                   setVaultMode("custom");
-                  setV2Config({ ...v2Config, enableVault: true });
+                  setVaults((prev) =>
+                    prev.map((vault) => ({
+                      ...vault,
+                      lockDays:
+                        vault.lockDays < MIN_VAULT_LOCK_DAYS
+                          ? MIN_VAULT_LOCK_DAYS
+                          : vault.lockDays,
+                    }))
+                  );
                 }}
               >
                 Custom
@@ -825,195 +889,275 @@ export function CreateForm() {
 
             {/* Vault Fields (only show when not "off") */}
             {vaultMode !== "off" && (
-            <div className="space-y-4">
-            <div>
-              <label className="block mb-2">
-                <span className="text-sm font-medium flex items-center gap-2">
-                  Vault Allocation (%)
-                  <div
-                    className="tooltip tooltip-right"
-                    data-tip="Percentage of total token supply allocated to the vault. These tokens will be locked and vested according to the schedule below."
+              <div className="space-y-4">
+                {vaults.map((vault, index) => {
+                  const otherAllocation = vaults.reduce((sum, currentVault, currentIndex) => {
+                    if (currentIndex === index) return sum;
+                    const value = Number.isFinite(currentVault.allocation)
+                      ? currentVault.allocation
+                      : 0;
+                    return sum + value;
+                  }, 0);
+                  const allocationValue = Number.isFinite(vault.allocation)
+                    ? vault.allocation
+                    : 0;
+                  const remainingForVault =
+                    100 - v2Config.stakingAllocation - otherAllocation;
+                  const allowedMax = Math.max(
+                    Math.round(allocationValue),
+                    Math.floor(Math.max(0, remainingForVault))
+                  );
+
+                  return (
+                    <div
+                      key={`vault-${index}`}
+                      className="rounded-lg border border-base-300 bg-base-100 p-4 space-y-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm">
+                          Vault {index + 1}
+                        </span>
+                        {vaultMode === "custom" && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs opacity-60">
+                              Remaining:{" "}
+                              {Math.max(
+                                0,
+                                100 - v2Config.stakingAllocation - (totalVaultAllocation - allocationValue)
+                              ).toFixed(2)}
+                              %
+                            </span>
+                            {vaults.length > 1 && (
+                              <button
+                                type="button"
+                                className="btn btn-xs btn-ghost text-error"
+                                onClick={() => removeVault(index)}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block mb-2">
+                            <span className="text-sm font-medium flex items-center gap-2">
+                              Allocation (%)
+                              <div
+                                className="tooltip tooltip-right"
+                                data-tip="Percentage of total token supply allocated to this vault."
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-4 w-4 opacity-60 hover:opacity-100 cursor-help"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                              </div>
+                            </span>
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            max={allowedMax}
+                            value={Math.round(allocationValue)}
+                            onChange={(e) => {
+                              const parsed = Number(e.target.value);
+                              const normalized = Number.isNaN(parsed)
+                                ? 0
+                                : Math.round(parsed);
+                              const clamped = Math.min(
+                                Math.max(0, normalized),
+                                allowedMax
+                              );
+                              handleVaultChange(index, { allocation: clamped });
+                            }}
+                            className="input input-bordered w-full bg-base-100"
+                            disabled={vaultMode === "default"}
+                          />
+                        </div>
+                        <div>
+                          <label className="block mb-2">
+                            <span className="text-sm font-medium flex items-center gap-2">
+                              Beneficiary Address
+                              {allocationValue > 0 && <span className="text-error">*</span>}
+                              <div
+                                className="tooltip tooltip-right"
+                                data-tip="Wallet address that will receive the vested tokens for this vault."
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-4 w-4 opacity-60 hover:opacity-100 cursor-help"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                              </div>
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="0x..."
+                            value={vault.beneficiary}
+                            onChange={(e) =>
+                              handleVaultChange(index, {
+                                beneficiary: e.target.value,
+                              })
+                            }
+                            className="input input-bordered w-full bg-base-100"
+                            required={allocationValue > 0}
+                            disabled={vaultMode === "default"}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block mb-2">
+                            <span className="text-sm font-medium flex items-center gap-2">
+                              Lock Duration (days)
+                              <div
+                                className="tooltip tooltip-right"
+                                data-tip="Initial lock period before vesting begins. No tokens can be claimed during this time."
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-4 w-4 opacity-60 hover:opacity-100 cursor-help"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                              </div>
+                            </span>
+                          </label>
+                          <input
+                            type="number"
+                            min={MIN_VAULT_LOCK_DAYS}
+                            value={vault.lockDays}
+                            onChange={(e) => {
+                              const parsed = Number(e.target.value);
+                              const nextValue = Number.isNaN(parsed)
+                                ? MIN_VAULT_LOCK_DAYS
+                                : Math.max(MIN_VAULT_LOCK_DAYS, Math.round(parsed));
+                              handleVaultChange(index, { lockDays: nextValue });
+                            }}
+                            className="input input-bordered w-full bg-base-100"
+                            disabled={vaultMode === "default"}
+                          />
+                          <p className="text-xs opacity-60 mt-1">
+                            Minimum lock duration: {MIN_VAULT_LOCK_DAYS} days.
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block mb-2">
+                            <span className="text-sm font-medium flex items-center gap-2">
+                              Vesting Duration (days)
+                              <div
+                                className="tooltip tooltip-right"
+                                data-tip="Time period over which tokens gradually become available after the lock period ends."
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-4 w-4 opacity-60 hover:opacity-100 cursor-help"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                              </div>
+                            </span>
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={vault.vestingDays}
+                            onChange={(e) => {
+                              const parsed = Number(e.target.value);
+                              const nextValue = Number.isNaN(parsed)
+                                ? 0
+                                : Math.max(0, Math.round(parsed));
+                              handleVaultChange(index, { vestingDays: nextValue });
+                            }}
+                            className="input input-bordered w-full bg-base-100"
+                            disabled={vaultMode === "default"}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {vaultMode === "custom" && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-ghost border border-dashed border-base-300 text-primary"
+                    onClick={addVault}
+                    disabled={remainingVaultAllocation <= 0}
                   >
+                    + Add Vault
+                  </button>
+                )}
+
+                <div className="text-xs opacity-60">
+                  Remaining allocation available:{" "}
+                  {remainingVaultAllocation.toFixed(2)}
+                  %
+                </div>
+
+                {/* Vault Warning */}
+                {totalVaultAllocation > 20 && (
+                  <div className="alert alert-warning py-2 mt-2">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 opacity-60 hover:opacity-100 cursor-help"
                       fill="none"
                       viewBox="0 0 24 24"
-                      stroke="currentColor"
+                      className="stroke-current shrink-0 w-5 h-5"
                     >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        strokeWidth="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                       />
                     </svg>
+                    <span className="text-xs">
+                      High vault allocation ({totalVaultAllocation}%) reduces
+                      available liquidity
+                    </span>
                   </div>
-                </span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                max={100 - v2Config.stakingAllocation}
-                value={v2Config.vaultAllocation}
-                onChange={(e) =>
-                  setV2Config({
-                    ...v2Config,
-                    vaultAllocation: Number(e.target.value),
-                  })
-                }
-                className="input input-bordered w-full bg-base-100"
-                disabled={vaultMode === "default"}
-              />
-            </div>
-
-            <div>
-              <label className="block mb-2">
-                <span className="text-sm font-medium flex items-center gap-2">
-                  Beneficiary Address
-                  {v2Config.vaultAllocation > 0 && (
-                    <span className="text-error">*</span>
-                  )}
-                  <div
-                    className="tooltip tooltip-right"
-                    data-tip="Wallet address that will receive the vested tokens. This address will be able to claim tokens as they vest over time."
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 opacity-60 hover:opacity-100 cursor-help"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  </div>
-                </span>
-              </label>
-              <input
-                type="text"
-                placeholder="0x..."
-                value={v2Config.vaultBeneficiary}
-                onChange={(e) =>
-                  setV2Config({
-                    ...v2Config,
-                    vaultBeneficiary: e.target.value,
-                  })
-                }
-                className="input input-bordered w-full bg-base-100"
-                required={v2Config.enableVault && v2Config.vaultAllocation > 0}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block mb-2">
-                  <span className="text-sm font-medium flex items-center gap-2">
-                    Lock Duration (days)
-                    <div
-                      className="tooltip tooltip-right"
-                      data-tip="Initial lock period before vesting begins. No tokens can be claimed during this time."
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 opacity-60 hover:opacity-100 cursor-help"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                    </div>
-                  </span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={v2Config.vaultLockDays}
-                  onChange={(e) =>
-                    setV2Config({
-                      ...v2Config,
-                      vaultLockDays: Number(e.target.value),
-                    })
-                  }
-                  className="input input-bordered w-full bg-base-100"
-                  disabled={vaultMode === "default"}
-                />
+                )}
               </div>
-              <div>
-                <label className="block mb-2">
-                  <span className="text-sm font-medium flex items-center gap-2">
-                    Vesting Duration (days)
-                    <div
-                      className="tooltip tooltip-right"
-                      data-tip="Time period over which tokens gradually become available after the lock period ends. Tokens stream continuously to the beneficiary."
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 opacity-60 hover:opacity-100 cursor-help"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                    </div>
-                  </span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={v2Config.vaultVestingDays}
-                  onChange={(e) =>
-                    setV2Config({
-                      ...v2Config,
-                      vaultVestingDays: Number(e.target.value),
-                    })
-                  }
-                  className="input input-bordered w-full bg-base-100"
-                  disabled={vaultMode === "default"}
-                />
-              </div>
-            </div>
-
-            {/* Vault Warning */}
-            {v2Config.vaultAllocation > 20 && (
-              <div className="alert alert-warning py-2 mt-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  className="stroke-current shrink-0 w-5 h-5"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-                <span className="text-xs">
-                  High vault allocation ({v2Config.vaultAllocation}%) reduces
-                  available liquidity
-                </span>
-              </div>
-            )}
-            </div>
             )}
           </div>
         </div>
@@ -1032,13 +1176,13 @@ export function CreateForm() {
           >
             {v2Config.stakingAllocation > 5 && `${v2Config.stakingAllocation}%`}
           </div>
-          {v2Config.enableVault && v2Config.vaultAllocation > 0 && (
+          {totalVaultAllocation > 0 && (
             <div
               className="bg-secondary flex items-center justify-center text-xs font-semibold text-white transition-all duration-300"
-              style={{ width: `${v2Config.vaultAllocation}%` }}
-              title={`Vault: ${v2Config.vaultAllocation}%`}
+              style={{ width: `${totalVaultAllocation}%` }}
+              title={`Vault: ${totalVaultAllocation}%`}
             >
-              {v2Config.vaultAllocation > 5 && `${v2Config.vaultAllocation}%`}
+              {totalVaultAllocation > 5 && `${totalVaultAllocation}%`}
             </div>
           )}
           <div
@@ -1061,14 +1205,14 @@ export function CreateForm() {
               {v2Config.stakingAllocation}%
             </span>
           </div>
-          {v2Config.enableVault && (
+          {totalVaultAllocation > 0 && (
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-secondary rounded"></div>
                 <span>Vault (Locked)</span>
               </div>
               <span className="font-mono font-semibold">
-                {v2Config.vaultAllocation}%
+                {totalVaultAllocation}%
               </span>
             </div>
           )}
@@ -1198,9 +1342,29 @@ export function CreateForm() {
             {/* Vault */}
             <div className="bg-base-200 p-3 rounded-lg">
               <div className="opacity-60 text-xs mb-1">Vault Configuration</div>
-              {v2Config.enableVault && v2Config.vaultAllocation > 0 ? (
-                <div className="font-semibold text-sm">
-                  {v2Config.vaultAllocation}% locked for {v2Config.vaultLockDays} {v2Config.vaultLockDays === 1 ? "day" : "days"}, vesting {v2Config.vaultVestingDays} {v2Config.vaultVestingDays === 1 ? "day" : "days"}
+              {totalVaultAllocation > 0 ? (
+                <div className="space-y-2 text-sm">
+                  <div className="font-semibold">
+                    Total locked: {totalVaultAllocation}% of supply
+                  </div>
+                  {vaultsWithAllocation.length > 0 ? (
+                    vaultsWithAllocation.map((vault, index) => (
+                      <div key={`summary-vault-${index}`} className="space-y-0.5">
+                        <div>
+                          Vault {index + 1}: {vault.allocation}% locked for{" "}
+                          {vault.lockDays} {vault.lockDays === 1 ? "day" : "days"}, vesting{" "}
+                          {vault.vestingDays} {vault.vestingDays === 1 ? "day" : "days"}
+                        </div>
+                        <div className="text-xs opacity-60">
+                          Beneficiary: {vault.beneficiary || "Not set"}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-xs opacity-60">
+                      Vault allocations configured but beneficiaries are still pending.
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-xs opacity-40 italic">

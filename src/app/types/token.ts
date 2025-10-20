@@ -36,19 +36,30 @@ export interface Token {
     delegate?: string; // optional delegate address
   };
 
-  // Vault configuration (v2 tokens)
+  // Vault configuration (v2 tokens) - single vault (legacy)
   vault?: {
     allocation: number; // percentage of total supply
-    beneficiary: string;
+    beneficiary: string | string[]; // single or multiple beneficiaries
     lockDuration: number;
     vestingDuration: number;
     supply: number;
   };
 
+  // Multiple vaults configuration (v2 tokens) - supports multiple vaults
+  vaults?: Array<{
+    allocation?: number; // percentage of total supply (optional, can be calculated from supply)
+    beneficiary?: string | string[]; // single or multiple beneficiaries
+    admin?: string; // beneficiary address (alternative field name from database)
+    lockDuration?: number; // lock duration in seconds
+    lockupDuration?: number; // alternative field name from database
+    vestingDuration?: number; // vesting duration in seconds
+    supply: number; // actual token amount allocated
+  }>;
+
   // Token allocation breakdown
   allocations?: {
     staking: number; // percentage
-    vault: number; // percentage
+    vault: number; // percentage - total vault allocation across all vaults
     liquidity: number; // percentage
   };
 

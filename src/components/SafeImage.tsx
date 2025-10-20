@@ -18,6 +18,20 @@ interface SafeImageProps {
 
 const DEFAULT_AVATAR = "/avatars/streme.png";
 
+// Validate if a string is a valid URL
+const isValidUrl = (urlString: string): boolean => {
+  try {
+    // Allow relative paths starting with /
+    if (urlString.startsWith('/')) return true;
+
+    // For absolute URLs, try to construct URL object
+    new URL(urlString);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export default function SafeImage({
   src,
   alt,
@@ -30,7 +44,9 @@ export default function SafeImage({
   fill,
   sizes,
 }: SafeImageProps) {
-  const [imageSrc, setImageSrc] = useState<string>(src || fallbackSrc);
+  // Validate URL before using it
+  const validatedSrc = src && isValidUrl(src) ? src : fallbackSrc;
+  const [imageSrc, setImageSrc] = useState<string>(validatedSrc);
   const [hasError, setHasError] = useState(false);
 
   const handleError = () => {

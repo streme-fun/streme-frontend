@@ -771,6 +771,7 @@ export function TokenActions({
               }
               tokenSymbol={token.symbol}
               className="mb-4"
+              pair={token.pair}
             />
           )}
 
@@ -807,6 +808,7 @@ export function TokenActions({
               tokenAddress={contractAddress as `0x${string}`}
               stakingAddress={stakingAddress as `0x${string}`}
               symbol={token.symbol}
+              pair={token.pair}
               onSuccess={() => {
                 refreshBalances();
                 onStakingChange();

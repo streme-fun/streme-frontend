@@ -74,7 +74,7 @@ interface StremeTokenResponse {
 // Function to fetch trending tokens from the streme.fun API (exported for carousel)
 export const fetchTrendingTokens = async (): Promise<Token[]> => {
   try {
-    const response = await fetch("/api/tokens/trending?type=all");
+    const response = await fetch("/api/tokens/trending?type=v2");
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -197,8 +197,9 @@ export const TrendingTokenCard = ({
               </div>
             )}
             {token.type === "v2" && (
+              // rounded
               <div
-                className="bg-primary/90 backdrop-blur-sm rounded-full px-2 py-0.5 text-xs font-semibold text-white"
+                className="bg-primary/90 backdrop-blur-sm rounded-full w-7 h-7 flex items-center justify-center text-xs font-semibold text-white"
                 title="Version 2"
               >
                 v2

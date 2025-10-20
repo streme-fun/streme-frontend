@@ -20,7 +20,7 @@ export async function GET(
     };
 
     const response = await fetch(
-      `https://api.streme.fun/api/tokens/deployer/${deployer}?type=all`
+      `https://api.streme.fun/api/tokens/deployer/${deployer}?type=v2`
     );
 
     if (!response.ok) {

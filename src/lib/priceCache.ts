@@ -51,9 +51,11 @@ class PriceCacheService {
   /**
    * Get multiple prices at once (more efficient)
    */
-  async getPrices(tokenAddresses: string[]): Promise<Map<string, TokenPriceData | null>> {
+  async getPrices(
+    tokenAddresses: string[]
+  ): Promise<Map<string, TokenPriceData | null>> {
     const results = new Map<string, TokenPriceData | null>();
-    
+
     // Process all addresses
     const promises = tokenAddresses.map(async (address) => {
       const normalizedAddress = address.toLowerCase();
@@ -76,7 +78,7 @@ class PriceCacheService {
 
     // Wait for batch window or process immediately if queue is getting large
     if (this.batchQueue.size < 5) {
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         this.batchTimeout = setTimeout(resolve, this.BATCH_DELAY);
       });
     }
@@ -92,7 +94,7 @@ class PriceCacheService {
     try {
       // Fetch prices for all addresses in batch
       const results = await this.fetchPricesBatch(addressesToFetch);
-      
+
       // Update cache with results
       results.forEach((priceData, address) => {
         if (priceData) {
@@ -103,7 +105,7 @@ class PriceCacheService {
       // Return the first result (for single requests)
       return results.get(addressesToFetch[0]) || null;
     } catch (error) {
-      console.error('Error fetching prices batch:', error);
+      console.error("Error fetching prices batch:", error);
       return null;
     }
   }
@@ -111,7 +113,9 @@ class PriceCacheService {
   /**
    * Fetch prices for multiple tokens using existing API
    */
-  private async fetchPricesBatch(addresses: string[]): Promise<Map<string, TokenPriceData | null>> {
+  private async fetchPricesBatch(
+    addresses: string[]
+  ): Promise<Map<string, TokenPriceData | null>> {
     const results = new Map<string, TokenPriceData | null>();
     const timestamp = Date.now();
 
@@ -119,7 +123,9 @@ class PriceCacheService {
     // In the future, we could implement a bulk API endpoint
     const promises = addresses.map(async (address) => {
       try {
-        const response = await fetch(`/api/tokens/single?address=${address}&type=all`);
+        const response = await fetch(
+          `/api/tokens/single?address=${address}&type=v2`
+        );
 
         if (!response.ok) {
           results.set(address, null);
@@ -127,10 +133,11 @@ class PriceCacheService {
         }
 
         const data = await response.json();
-        const price = data.data?.price || 
-                     data.data?.marketData?.price || 
-                     data.price || 
-                     data.marketData?.price;
+        const price =
+          data.data?.price ||
+          data.data?.marketData?.price ||
+          data.price ||
+          data.marketData?.price;
 
         if (price && !isNaN(price)) {
           results.set(address, {
@@ -162,7 +169,7 @@ class PriceCacheService {
    */
   public cleanupCache(): void {
     const now = Date.now();
-    Object.keys(this.cache).forEach(address => {
+    Object.keys(this.cache).forEach((address) => {
       if (now - this.cache[address].timestamp > this.CACHE_DURATION) {
         delete this.cache[address];
       }
@@ -174,8 +181,8 @@ class PriceCacheService {
    */
   getCacheStats(): { size: number; addresses: string[]; oldestEntry: number } {
     const addresses = Object.keys(this.cache);
-    const timestamps = addresses.map(addr => this.cache[addr].timestamp);
-    
+    const timestamps = addresses.map((addr) => this.cache[addr].timestamp);
+
     return {
       size: addresses.length,
       addresses,
@@ -188,10 +195,10 @@ class PriceCacheService {
    */
   async refreshPrice(tokenAddress: string): Promise<TokenPriceData | null> {
     const normalizedAddress = tokenAddress.toLowerCase();
-    
+
     // Remove from cache to force refresh
     delete this.cache[normalizedAddress];
-    
+
     return this.getPrice(normalizedAddress);
   }
 }
@@ -200,7 +207,7 @@ class PriceCacheService {
 export const priceCache = new PriceCacheService();
 
 // Cleanup interval - runs every 10 minutes
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   setInterval(() => {
     priceCache.cleanupCache();
   }, 10 * 60 * 1000);
