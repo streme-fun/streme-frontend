@@ -48,6 +48,7 @@ interface UnstakeButtonProps {
   className?: string;
   symbol: string;
   onSuccess?: () => void;
+  lockDuration?: number; // Lock duration in seconds (defaults to 24h for v1 tokens)
 }
 
 export function UnstakeButton({
@@ -57,6 +58,7 @@ export function UnstakeButton({
   className,
   symbol,
   onSuccess,
+  lockDuration = 86400, // Default to 24 hours (86400 seconds) for v1 tokens
 }: UnstakeButtonProps) {
   const { address, isConnected, isMiniApp } = useWallet();
   const { data: walletClient } = useWalletClient();
@@ -80,13 +82,13 @@ export function UnstakeButton({
         args: [toHex(address)],
       });
 
-      const unlockTimeStamp = Number(timestamp) + 86400; // 24 hours in seconds
+      const unlockTimeStamp = Number(timestamp) + lockDuration;
       setUnlockTime(unlockTimeStamp);
     } catch (error) {
       console.error("Error fetching unlock time:", error);
       // Don't show toast error for automatic fetching, only for manual clicks
     }
-  }, [address, isConnected, stakingAddress]);
+  }, [address, isConnected, stakingAddress, lockDuration]);
 
   // Reset unlock time when address changes
   useEffect(() => {
@@ -141,15 +143,29 @@ export function UnstakeButton({
         return;
       }
 
-      const hours = Math.floor(secondsLeft / 3600);
-      const minutes = Math.floor((secondsLeft % 3600) / 60);
-      const seconds = secondsLeft % 60;
+      // Check if more than 1 day (86400 seconds)
+      if (secondsLeft > 86400) {
+        const days = Math.floor(secondsLeft / 86400);
+        const hours = Math.floor((secondsLeft % 86400) / 3600);
+        const minutes = Math.floor((secondsLeft % 3600) / 60);
+        const seconds = secondsLeft % 60;
 
-      setTimeLeft(
-        `${hours}h ${minutes.toString().padStart(2, "0")}m ${seconds
-          .toString()
-          .padStart(2, "0")}s`
-      );
+        setTimeLeft(
+          `${days}d ${hours.toString().padStart(2, "0")}h ${minutes
+            .toString()
+            .padStart(2, "0")}m ${seconds.toString().padStart(2, "0")}s`
+        );
+      } else {
+        const hours = Math.floor(secondsLeft / 3600);
+        const minutes = Math.floor((secondsLeft % 3600) / 60);
+        const seconds = secondsLeft % 60;
+
+        setTimeLeft(
+          `${hours}h ${minutes.toString().padStart(2, "0")}m ${seconds
+            .toString()
+            .padStart(2, "0")}s`
+        );
+      }
     };
 
     updateTimer();

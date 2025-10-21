@@ -73,6 +73,7 @@ interface StakeData {
   lastUpdateTime: number;
   userFlowRate: number;
   stakedBalance: bigint;
+  lockDuration?: number; // Lock duration in seconds (defaults to 24h for v1 tokens)
   logo?: string;
   isConnectedToPool?: boolean;
   marketData?: {
@@ -125,23 +126,29 @@ const CurrentBalanceDisplay = memo(
 
 CurrentBalanceDisplay.displayName = "CurrentBalanceDisplay";
 
+// Type for cached token data
+interface CachedTokenDataItem {
+  staking_address?: string;
+  logo?: string;
+  staking?: {
+    lockDuration?: number;
+  };
+  marketData?: {
+    marketCap: number;
+    price: number;
+    priceChange1h: number;
+    priceChange24h: number;
+    priceChange5m: number;
+    volume24h: number;
+    lastUpdated: { _seconds: number; _nanoseconds: number };
+  };
+}
+
 // Optimized cache with better TTL management
 const tokenDataCache = new Map<
   string,
   {
-    data: {
-      staking_address?: string;
-      logo?: string;
-      marketData?: {
-        marketCap: number;
-        price: number;
-        priceChange1h: number;
-        priceChange24h: number;
-        priceChange5m: number;
-        volume24h: number;
-        lastUpdated: { _seconds: number; _nanoseconds: number };
-      };
-    };
+    data: CachedTokenDataItem;
     timestamp: number;
   }
 >();
@@ -886,13 +893,16 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     await checkLiquidityBatch(uniqueTokens);
 
     // Update states with metadata
-    const stakesWithMetadata = stakes.map((stake) => ({
-      ...stake,
-      stakingAddress:
-        tokenDataMap.get(stake.tokenAddress)?.staking_address || "",
-      logo: tokenDataMap.get(stake.tokenAddress)?.logo,
-      marketData: tokenDataMap.get(stake.tokenAddress)?.marketData,
-    }));
+    const stakesWithMetadata = stakes.map((stake) => {
+      const tokenData = tokenDataMap.get(stake.tokenAddress) as CachedTokenDataItem | undefined;
+      return {
+        ...stake,
+        stakingAddress: tokenData?.staking_address || "",
+        logo: tokenData?.logo,
+        marketData: tokenData?.marketData,
+        lockDuration: tokenData?.staking?.lockDuration, // Extract lock duration from staking config
+      };
+    });
 
     const superTokensWithMetadata = ownedSuperTokens.map((token) => ({
       ...token,
@@ -1807,6 +1817,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                               stakingAddress={stake.stakingAddress}
                               userStakedBalance={stake.stakedBalance}
                               symbol={stake.membership.pool.token.symbol}
+                              lockDuration={stake.lockDuration}
                               onSuccess={() =>
                                 handleStakeSuccess(
                                   stake.tokenAddress,

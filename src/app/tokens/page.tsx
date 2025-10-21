@@ -72,6 +72,7 @@ interface StakeData {
   lastUpdateTime: number;
   userFlowRate: number;
   stakedBalance: bigint;
+  lockDuration?: number; // Lock duration in seconds (defaults to 24h for v1 tokens)
   logo?: string;
   isConnectedToPool?: boolean;
   marketData?: {
@@ -86,22 +87,24 @@ interface StakeData {
 }
 
 // Cache for token data to avoid repeated API calls
-const tokenDataCache = new Map<
-  string,
-  {
-    staking_address?: string;
-    logo?: string;
-    marketData?: {
-      marketCap: number;
-      price: number;
-      priceChange1h: number;
-      priceChange24h: number;
-      priceChange5m: number;
-      volume24h: number;
-      lastUpdated: { _seconds: number; _nanoseconds: number };
-    };
-  }
->();
+interface CachedTokenData {
+  staking_address?: string;
+  logo?: string;
+  staking?: {
+    lockDuration?: number;
+  };
+  marketData?: {
+    marketCap: number;
+    price: number;
+    priceChange1h: number;
+    priceChange24h: number;
+    priceChange5m: number;
+    volume24h: number;
+    lastUpdated: { _seconds: number; _nanoseconds: number };
+  };
+}
+
+const tokenDataCache = new Map<string, CachedTokenData>();
 
 export default function TokensPage() {
   const { address: effectiveAddress } = useWallet();
@@ -873,6 +876,7 @@ export default function TokensPage() {
           stakedBalance: (stakedBalances[index] || BigInt(0)) as bigint,
           logo: tokenData.logo as string | undefined,
           marketData: tokenData.marketData as typeof stake.marketData,
+          lockDuration: (tokenData as CachedTokenData)?.staking?.lockDuration,
           isConnectedToPool: poolConnections[index] as boolean,
         };
       }
@@ -883,6 +887,7 @@ export default function TokensPage() {
         stakedBalance: BigInt(0) as bigint,
         logo: undefined as string | undefined,
         marketData: undefined as typeof stake.marketData,
+        lockDuration: undefined,
         isConnectedToPool: false as boolean,
       };
     });
@@ -980,6 +985,7 @@ export default function TokensPage() {
                 BigInt(0)) as bigint,
               logo: tokenData.logo as string | undefined,
               marketData: tokenData.marketData as typeof stake.marketData,
+              lockDuration: (tokenData as CachedTokenData)?.staking?.lockDuration,
               isConnectedToPool: poolConnections[batchIndex] as boolean,
             };
           }
@@ -1817,6 +1823,7 @@ export default function TokensPage() {
                                 stakingAddress={stake.stakingAddress}
                                 userStakedBalance={stake.stakedBalance}
                                 symbol={stake.membership.pool.token.symbol}
+                                lockDuration={stake.lockDuration}
                                 onSuccess={() =>
                                   handleStakeSuccess(
                                     stake.tokenAddress,
