@@ -193,13 +193,10 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
   };
   const creatorInfo = useMemo(() => {
     const normalizedHandle =
-      (token.creator?.name || token.username || "")
-        .trim()
-        .replace(/^@+/, "") || undefined;
+      (token.creator?.name || token.username || "").trim().replace(/^@+/, "") ||
+      undefined;
 
-    const handleLabel = normalizedHandle
-      ? `@${normalizedHandle}`
-      : undefined;
+    const handleLabel = normalizedHandle ? `@${normalizedHandle}` : undefined;
 
     const metadataDeployer =
       token.metadata &&
@@ -233,7 +230,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
         undefined,
       profileUrl:
         handleLabel && fid
-          ? `https://warpcast.com/${normalizedHandle}`
+          ? `https://farcaster.xyz/${normalizedHandle}`
           : undefined,
       isWalletLabel: !handleLabel,
       initial,
@@ -245,6 +242,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
       tokenName: token.name,
       tokenSymbol: token.symbol,
       tokenImageUrl: token.img_url ?? undefined,
+      tokenType: token.type,
       creatorLabel: creatorInfo?.label,
       creatorAvatarUrl: creatorInfo?.avatarUrl,
       creatorFallbackInitial:
@@ -260,6 +258,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
       token.name,
       token.symbol,
       token.img_url,
+      token.type,
       token.contract_address,
       creatorInfo,
     ]
@@ -285,9 +284,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
           <div>
             <span className="text-xs uppercase opacity-60 block">Supply</span>
             <span className="font-mono font-semibold text-base">
-              {vault.supply !== undefined
-                ? vault.supply.toLocaleString()
-                : "-"}
+              {vault.supply !== undefined ? vault.supply.toLocaleString() : "-"}
             </span>
           </div>
           <div>
@@ -366,8 +363,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
                 const totalDurationMs = vestingDuration * 1000;
                 const progressPercentRaw =
                   totalDurationMs > 0
-                    ? (now.getTime() - startTime.getTime()) /
-                      totalDurationMs
+                    ? (now.getTime() - startTime.getTime()) / totalDurationMs
                     : 0;
                 const progressPercent = Math.min(
                   Math.max(progressPercentRaw * 100, 0),
@@ -426,8 +422,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
     return parts.join(" • ");
   };
 
-  const hasVaultsArray =
-    Array.isArray(token.vaults) && token.vaults.length > 0;
+  const hasVaultsArray = Array.isArray(token.vaults) && token.vaults.length > 0;
   const vaultEntries: VaultLike[] = hasVaultsArray
     ? (token.vaults as VaultLike[])
     : token.vault
@@ -443,8 +438,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
           ? vault.lockupDuration
           : 0;
 
-      const normalizedLockDuration =
-        rawLockDuration > 1 ? rawLockDuration : 0;
+      const normalizedLockDuration = rawLockDuration > 1 ? rawLockDuration : 0;
 
       const vestingDuration =
         typeof vault.vestingDuration === "number" ? vault.vestingDuration : 0;
@@ -457,7 +451,8 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
       let allocation =
         supply !== undefined
           ? (supply / DEFAULT_TOTAL_SUPPLY) * 100
-          : typeof vault.allocation === "number" && !Number.isNaN(vault.allocation)
+          : typeof vault.allocation === "number" &&
+            !Number.isNaN(vault.allocation)
           ? vault.allocation
           : undefined;
 
@@ -715,17 +710,17 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
       <TokenHeader {...headerData} />
 
       {/* Main Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6">
         <div>
-          <div className="text-sm opacity-60">Price</div>
-          <div className="font-mono text-2xl font-bold">
+          <div className="text-xs sm:text-sm opacity-60">Price</div>
+          <div className="font-mono text-lg sm:text-xl md:text-2xl font-bold break-words">
             {formatPrice(token.price)}
           </div>
         </div>
         <div>
-          <div className="text-sm opacity-60">24h Change</div>
+          <div className="text-xs sm:text-sm opacity-60">24h Change</div>
           <div
-            className={`font-mono text-2xl font-bold ${
+            className={`font-mono text-lg sm:text-xl md:text-2xl font-bold ${
               token.change24h && token.change24h >= 0
                 ? "text-green-500"
                 : "text-red-500"
@@ -739,14 +734,14 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
           </div>
         </div>
         <div>
-          <div className="text-sm opacity-60">24h Volume</div>
-          <div className="font-mono text-2xl font-bold">
+          <div className="text-xs sm:text-sm opacity-60">24h Volume</div>
+          <div className="font-mono text-lg sm:text-xl md:text-2xl font-bold break-words">
             {formatCurrency(token.volume24h)}
           </div>
         </div>
         <div>
-          <div className="text-sm opacity-60">Market Cap</div>
-          <div className="font-mono text-2xl font-bold">
+          <div className="text-xs sm:text-sm opacity-60">Market Cap</div>
+          <div className="font-mono text-lg sm:text-xl md:text-2xl font-bold break-words">
             {formatCurrency(token.marketCap)}
           </div>
         </div>
@@ -754,11 +749,11 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
 
       {/* Total Rewards - Full Width */}
       <div className="mb-6">
-        <div className="text-sm opacity-60">
+        <div className="text-xs sm:text-sm opacity-60">
           Total Rewards Distributed ({totalStakers}{" "}
           {totalStakers === 1 ? "staker" : "stakers"})
         </div>
-        <div className="font-mono text-2xl font-bold">
+        <div className="font-mono text-lg sm:text-xl md:text-2xl font-bold break-words">
           {currentRewards.toLocaleString(undefined, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
@@ -957,7 +952,6 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
                       )}
                     </div>
                   )}
-
                 </div>
               )}
             </div>
@@ -1083,6 +1077,7 @@ interface TokenHeaderProps {
   tokenName: string;
   tokenSymbol: string;
   tokenImageUrl?: string;
+  tokenType?: string;
   creatorLabel?: string;
   creatorAvatarUrl?: string;
   creatorFallbackInitial: string;
@@ -1094,6 +1089,7 @@ const TokenHeader = memo(function TokenHeader({
   tokenName,
   tokenSymbol,
   tokenImageUrl,
+  tokenType,
   creatorLabel,
   creatorAvatarUrl,
   creatorFallbackInitial,
@@ -1118,7 +1114,18 @@ const TokenHeader = memo(function TokenHeader({
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-tight">{tokenName}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold leading-tight">{tokenName}</h2>
+            {(tokenType === "v1" || tokenType === "v2") && (
+              <span
+                className={`inline-block text-white px-2 py-1 rounded text-xs font-semibold ${
+                  tokenType === "v2" ? "bg-primary" : "bg-secondary"
+                }`}
+              >
+                {tokenType}
+              </span>
+            )}
+          </div>
           <div className="text-base opacity-60 mt-1">
             $
             {tokenSymbol?.startsWith("$")
