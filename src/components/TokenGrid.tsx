@@ -12,6 +12,7 @@ import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 import { CROWDFUND_TOKEN_ADDRESSES } from "@/src/lib/crowdfundTokens";
 import { memo } from "react";
+import SafeImage from "@/src/components/SafeImage";
 
 interface TokenGridProps {
   tokens: Token[];
@@ -70,6 +71,17 @@ interface StremeTokenResponse {
   };
   lastTraded?: { _seconds: number; _nanoseconds: number };
 }
+
+const isValidImageUrl = (url: string | null | undefined): boolean => {
+  if (!url) return false;
+  if (url.startsWith("/")) return true;
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 // Function to fetch trending tokens from the streme.fun API (exported for carousel)
 export const fetchTrendingTokens = async (): Promise<Token[]> => {
@@ -150,15 +162,15 @@ export const TrendingTokenCard = ({
       <div className="relative bg-base-100 rounded-xl border border-base-300 overflow-hidden ease-out transition-all duration-300 cursor-pointer group">
         {/* Token Image */}
         <div className="relative aspect-square bg-gradient-to-br from-primary/10 to-secondary/10">
-          {token.img_url ? (
-            <Image
+          {isValidImageUrl(token.img_url) ? (
+            <SafeImage
               src={token.img_url}
               alt={token.name}
               fill
               className="object-cover"
               unoptimized={
-                token.img_url.includes(".gif") ||
-                token.img_url.includes("imagedelivery.net")
+                token.img_url?.includes(".gif") ||
+                token.img_url?.includes("imagedelivery.net")
               }
             />
           ) : (
@@ -215,16 +227,18 @@ export const TrendingTokenCard = ({
               <div className="absolute bottom-2 left-2 flex items-center gap-2 z-10">
                 <div className="avatar">
                   <div className="w-6 h-6 rounded-full">
-                    <Image
+                    <SafeImage
                       src={
                         token.creator.profileImage?.trim()
                           ? token.creator.profileImage
-                          : token.img_url ||
-                            `/avatars/${token.creator.name.trim()}.png`
+                          : isValidImageUrl(token.img_url)
+                          ? token.img_url
+                          : `/avatars/${token.creator.name.trim()}.png`
                       }
                       alt={token.creator.name}
                       width={24}
                       height={24}
+                      fallbackSrc={`/avatars/${token.creator.name.trim()}.png`}
                     />
                   </div>
                 </div>
@@ -544,17 +558,17 @@ const TokenCardComponent = memo(
         hover:bg-base-200/50  transition-all duration-300 ease-out
         hover:shadow-lg hover:-translate-y-1 group-hover:border-primary/20"
         >
-          {token.img_url ? (
+          {isValidImageUrl(token.img_url) ? (
             <figure className="w-[110px] h-[110px] relative overflow-hidden">
-              <Image
+              <SafeImage
                 src={token.img_url}
                 alt={token.name}
                 fill
                 sizes="110px"
                 className="object-cover transition-transform duration-300 group-hover:scale-110"
                 unoptimized={
-                  token.img_url.includes(".gif") ||
-                  token.img_url.includes("imagedelivery.net")
+                  token.img_url?.includes(".gif") ||
+                  token.img_url?.includes("imagedelivery.net")
                 }
               />
             </figure>
@@ -584,13 +598,14 @@ const TokenCardComponent = memo(
                   <div className="flex items-center gap-2">
                     <div className="avatar transition-transform duration-300 group-hover:scale-110">
                       <div className="rounded-full w-4 h-4">
-                        <Image
+                        <SafeImage
                           src={
                             token.creator?.profileImage &&
                             token.creator.profileImage.trim() !== ""
                               ? token.creator.profileImage
-                              : token.img_url ||
-                                `/avatars/${
+                              : isValidImageUrl(token.img_url)
+                              ? token.img_url
+                              : `/avatars/${
                                   token.creator?.name?.trim() || "streme"
                                 }.png`
                           }
@@ -604,14 +619,16 @@ const TokenCardComponent = memo(
                           width={16}
                           height={16}
                           sizes="16px"
+                          fallbackSrc={`/avatars/${
+                            token.creator?.name?.trim() || "streme"
+                          }.png`}
                           unoptimized={
-                            (token.creator?.profileImage?.includes(".gif") ||
-                              token.creator?.profileImage?.includes(
-                                "imagedelivery.net"
-                              ) ||
-                              token.img_url?.includes(".gif") ||
-                              token.img_url?.includes("imagedelivery.net")) ??
-                            false
+                            token.creator?.profileImage?.includes(".gif") ||
+                            token.creator?.profileImage?.includes(
+                              "imagedelivery.net"
+                            ) ||
+                            token.img_url?.includes(".gif") ||
+                            token.img_url?.includes("imagedelivery.net")
                           }
                         />
                       </div>

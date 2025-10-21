@@ -3,12 +3,14 @@
 import Image from "next/image";
 import SafeImage from "@/src/components/SafeImage";
 import { Token } from "@/src/app/types/token";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import DexscreenerIcon from "@/public/dexscreener.webp";
 import InterfaceIcon from "@/public/interface.png";
 import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 import { useNavigation } from "@/src/hooks/useNavigation";
+import { ClaimVaultButton } from "@/src/components/ClaimVaultButton";
+import FarcasterIcon from "@/public/farcaster.svg";
 
 const formatPrice = (price: number | undefined) => {
   if (!price || isNaN(price)) return "-";
@@ -51,6 +53,11 @@ type VaultLike = {
   lockDuration?: number;
   lockupDuration?: number;
   vestingDuration?: number;
+  vault?: string;
+  pool?: string;
+  box?: string;
+  lockupEndTime?: number;
+  vestingEndTime?: number;
 };
 
 interface NormalizedVault {
@@ -61,6 +68,12 @@ interface NormalizedVault {
   lockDuration: number;
   vestingDuration: number;
   beneficiaries: string[];
+  adminAddress?: string;
+  vaultAddress?: string;
+  pool?: string;
+  box?: string;
+  lockupEndTime?: number;
+  vestingEndTime?: number;
 }
 
 const formatDuration = (seconds?: number) => {
@@ -178,6 +191,240 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
     const interfaceUrl = `https://app.interface.social/token/8453/${token.contract_address}`;
     await openExternalUrl(interfaceUrl);
   };
+  const creatorInfo = useMemo(() => {
+    const normalizedHandle =
+      (token.creator?.name || token.username || "")
+        .trim()
+        .replace(/^@+/, "") || undefined;
+
+    const handleLabel = normalizedHandle
+      ? `@${normalizedHandle}`
+      : undefined;
+
+    const metadataDeployer =
+      token.metadata &&
+      typeof token.metadata === "object" &&
+      token.metadata !== null &&
+      typeof (token.metadata as { deployer?: string }).deployer === "string"
+        ? ((token.metadata as { deployer?: string }).deployer as string)
+        : undefined;
+
+    const extendedToken = token as Token & { deployer?: string };
+    const deployerAddress =
+      extendedToken.deployer ||
+      metadataDeployer ||
+      token.staking_address ||
+      token.pool_address ||
+      token.contract_address;
+
+    const fid =
+      typeof token.requestor_fid === "number" ? token.requestor_fid : undefined;
+
+    const initial =
+      normalizedHandle?.[0]?.toUpperCase() ??
+      token.symbol?.[0]?.toUpperCase() ??
+      (deployerAddress ? deployerAddress.slice(2, 3).toUpperCase() : "?");
+
+    return {
+      label: handleLabel ?? shortenAddress(deployerAddress),
+      avatarUrl:
+        token.creator?.profileImage?.trim() ||
+        token.pfp_url?.trim() ||
+        undefined,
+      profileUrl:
+        handleLabel && fid
+          ? `https://warpcast.com/${normalizedHandle}`
+          : undefined,
+      isWalletLabel: !handleLabel,
+      initial,
+    };
+  }, [token]);
+
+  const headerData = useMemo(
+    () => ({
+      tokenName: token.name,
+      tokenSymbol: token.symbol,
+      tokenImageUrl: token.img_url ?? undefined,
+      creatorLabel: creatorInfo?.label,
+      creatorAvatarUrl: creatorInfo?.avatarUrl,
+      creatorFallbackInitial:
+        creatorInfo?.initial ??
+        token.symbol?.[0]?.toUpperCase() ??
+        (token.contract_address
+          ? token.contract_address.slice(2, 3).toUpperCase()
+          : "?"),
+      creatorProfileUrl: creatorInfo?.profileUrl,
+      hideCreatorAvatar: !!creatorInfo?.isWalletLabel,
+    }),
+    [
+      token.name,
+      token.symbol,
+      token.img_url,
+      token.contract_address,
+      creatorInfo,
+    ]
+  );
+
+  const renderVaultDetails = (vault: NormalizedVault) => {
+    const beneficiaryCount = vault.beneficiaries.length;
+    const hasBeneficiaries = beneficiaryCount > 0;
+
+    return (
+      <div className="space-y-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <span className="text-xs uppercase opacity-60 block">
+              Allocation
+            </span>
+            <span className="font-mono font-semibold text-base">
+              {vault.allocation !== undefined
+                ? formatPercent(vault.allocation)
+                : "-"}
+            </span>
+          </div>
+          <div>
+            <span className="text-xs uppercase opacity-60 block">Supply</span>
+            <span className="font-mono font-semibold text-base">
+              {vault.supply !== undefined
+                ? vault.supply.toLocaleString()
+                : "-"}
+            </span>
+          </div>
+          <div>
+            <span className="text-xs uppercase opacity-60 block">
+              Lock Duration
+            </span>
+            <span className="font-mono font-semibold text-base">
+              {formatDuration(vault.lockDuration)}
+            </span>
+          </div>
+          <div>
+            <span className="text-xs uppercase opacity-60 block">
+              Vesting Duration
+            </span>
+            <span className="font-mono font-semibold text-base">
+              {formatDuration(vault.vestingDuration)}
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <span className="text-xs uppercase opacity-60 block mb-1">
+            {hasBeneficiaries
+              ? `Beneficiaries (${beneficiaryCount})`
+              : "Beneficiaries"}
+          </span>
+          {hasBeneficiaries ? (
+            <div className="flex flex-wrap gap-2">
+              {vault.beneficiaries.map((beneficiary, index) => (
+                <a
+                  key={`${beneficiary}-${index}`}
+                  href={`https://basescan.org/address/${beneficiary}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="badge badge-outline font-mono text-xs"
+                >
+                  {shortenAddress(beneficiary)}
+                </a>
+              ))}
+            </div>
+          ) : (
+            <span className="font-mono opacity-60">-</span>
+          )}
+        </div>
+
+        {vault.adminAddress && (
+          <ClaimVaultButton
+            tokenAddress={token.contract_address}
+            adminAddress={vault.adminAddress}
+            className="btn btn-sm btn-outline btn-secondary w-full md:w-auto"
+          />
+        )}
+
+        <div>
+          <div className="text-xs uppercase opacity-60 mb-2">
+            Vesting Timeline
+          </div>
+          <div className="w-full">
+            {vault.vestingDuration > 0 ? (
+              (() => {
+                const startTime = token.timestamp
+                  ? new Date(token.timestamp._seconds * 1000)
+                  : new Date(token.created_at);
+                const vestingDuration = Math.max(vault.vestingDuration, 0);
+                const safeLockDuration = Math.max(
+                  0,
+                  Math.min(vault.lockDuration, vestingDuration)
+                );
+                const lockEndTime = new Date(
+                  startTime.getTime() + safeLockDuration * 1000
+                );
+                const vestEndTime = new Date(
+                  startTime.getTime() + vestingDuration * 1000
+                );
+                const now = new Date();
+                const totalDurationMs = vestingDuration * 1000;
+                const progressPercentRaw =
+                  totalDurationMs > 0
+                    ? (now.getTime() - startTime.getTime()) /
+                      totalDurationMs
+                    : 0;
+                const progressPercent = Math.min(
+                  Math.max(progressPercentRaw * 100, 0),
+                  100
+                );
+
+                return (
+                  <>
+                    <div className="w-full h-2 bg-base-300 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all"
+                        style={{ width: `${progressPercent}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between text-xs opacity-70 mt-1">
+                      <span>
+                        Lock Ends:{" "}
+                        {lockEndTime.toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                      <span>
+                        Vesting Ends:{" "}
+                        {vestEndTime.toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                  </>
+                );
+              })()
+            ) : (
+              <span className="text-xs opacity-70">
+                No vesting schedule. Distribution occurs on claim.
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const buildVaultSummaryMeta = (vault: NormalizedVault) => {
+    const parts: string[] = [];
+    if (vault.allocation !== undefined) {
+      parts.push(formatPercent(vault.allocation));
+    }
+    if (vault.lockDuration > 0) {
+      parts.push(`Lock ${formatDuration(vault.lockDuration)}`);
+    }
+    if (vault.vestingDuration > 0) {
+      parts.push(`Vest ${formatDuration(vault.vestingDuration)}`);
+    }
+    return parts.join(" • ");
+  };
 
   const hasVaultsArray =
     Array.isArray(token.vaults) && token.vaults.length > 0;
@@ -231,6 +478,31 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
           typeof address === "string" && address.length > 0
       );
 
+      const adminAddress =
+        typeof vault.admin === "string" && vault.admin.length > 0
+          ? vault.admin
+          : undefined;
+      const vaultAddress =
+        typeof vault.vault === "string" && vault.vault.length > 0
+          ? vault.vault
+          : undefined;
+      const pool =
+        typeof vault.pool === "string" && vault.pool.length > 0
+          ? vault.pool
+          : undefined;
+      const box =
+        typeof vault.box === "string" && vault.box.length > 0
+          ? vault.box
+          : undefined;
+      const lockupEndTime =
+        typeof vault.lockupEndTime === "number" && vault.lockupEndTime > 0
+          ? vault.lockupEndTime
+          : undefined;
+      const vestingEndTime =
+        typeof vault.vestingEndTime === "number" && vault.vestingEndTime > 0
+          ? vault.vestingEndTime
+          : undefined;
+
       return {
         id: `vault-${index}`,
         index: index + 1,
@@ -239,6 +511,12 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
         lockDuration: normalizedLockDuration,
         vestingDuration,
         beneficiaries,
+        adminAddress,
+        vaultAddress,
+        pool,
+        box,
+        lockupEndTime,
+        vestingEndTime,
       };
     }
   );
@@ -434,32 +712,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
         </div>
       )}
 
-      {/* Token Header - Horizontal */}
-      <div className="flex items-center gap-4 mb-6">
-        {token.img_url && isValidUrl(token.img_url) ? (
-          <div className="relative w-14 h-14 flex-shrink-0">
-            <SafeImage
-              src={token.img_url}
-              alt={token.name}
-              fill
-              className="object-cover rounded-lg"
-            />
-          </div>
-        ) : (
-          <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center text-xl font-mono flex-shrink-0">
-            {token.symbol?.[0] ?? "?"}
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-tight">{token.name}</h2>
-          <div className="text-base opacity-60">
-            $
-            {token.symbol?.startsWith("$")
-              ? token.symbol.substring(1)
-              : token.symbol}
-          </div>
-        </div>
-      </div>
+      <TokenHeader {...headerData} />
 
       {/* Main Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -589,7 +842,7 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
                   {token.staking && (
                     <div>
                       <div className="text-sm opacity-60 font-bold mb-3">
-                        Staking Rewards
+                        <span>Staking Rewards</span>
                       </div>
                       <div className="space-y-2 text-sm">
                         {token.staking.allocation !== undefined && (
@@ -652,210 +905,59 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
                   )}
 
                   {/* Vault Configuration */}
-                  {normalizedVaults.length > 0 &&
-                    normalizedVaults.map((vault) => {
-                      const beneficiaryCount = vault.beneficiaries.length;
+                  {normalizedVaults.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="text-sm opacity-60 font-bold">
+                        {normalizedVaults.length > 1 ? "Vaults" : "Vault"}
+                      </div>
 
-                      return (
-                        <div key={vault.id}>
-                          <div className="text-sm opacity-60 font-bold mb-3">
-                            {hasVaultsArray ? `Vault ${vault.index}` : "Vault"}
-                          </div>
-                          <div className="space-y-2 text-sm">
-                            <div>
-                              <span className="text-sm opacity-60">
-                                Allocation:{" "}
-                              </span>
-                              <span className="font-mono font-semibold">
-                                {vault.allocation !== undefined
-                                  ? formatPercent(vault.allocation)
-                                  : "-"}
-                                {vault.supply !== undefined
-                                  ? ` (${vault.supply.toLocaleString()})`
-                                  : ""}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-sm opacity-60">Lock: </span>
-                              <span className="font-mono font-semibold">
-                                {formatDuration(vault.lockDuration)}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-sm opacity-60">
-                                Vesting Duration:{" "}
-                              </span>
-                              <span className="font-mono font-semibold">
-                                {formatDuration(vault.vestingDuration)}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-sm opacity-60">
-                                {beneficiaryCount > 1
-                                  ? `Beneficiaries (${beneficiaryCount}):`
-                                  : "Beneficiary:"}
-                              </span>
-                              {beneficiaryCount > 0 ? (
-                                <div className="flex flex-col gap-1 mt-1">
-                                  {vault.beneficiaries.map(
-                                    (beneficiary, index) => (
-                                      <a
-                                        key={`${beneficiary}-${index}`}
-                                        href={`https://basescan.org/address/${beneficiary}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="font-mono link link-primary"
-                                      >
-                                        {shortenAddress(beneficiary)}
-                                      </a>
-                                    )
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="font-mono opacity-60 mt-1">
-                                  -
-                                </div>
-                              )}
-                            </div>
+                      {normalizedVaults.length === 1 ? (
+                        renderVaultDetails(normalizedVaults[0])
+                      ) : (
+                        <div className="space-y-2">
+                          {normalizedVaults.map((vault) => {
+                            const summaryMeta = buildVaultSummaryMeta(vault);
 
-                            {/* Vesting Timeline Chart */}
-                            <div className="mt-4">
-                              <div className="text-xs opacity-60 mb-2">
-                                Vesting Timeline
-                              </div>
-                              <div className="w-full">
-                                {vault.vestingDuration > 0 ? (
-                                  (() => {
-                                    const startTime = token.timestamp
-                                      ? new Date(token.timestamp._seconds * 1000)
-                                      : new Date(token.created_at);
-                                    const vestingDuration = Math.max(
-                                      vault.vestingDuration,
-                                      0
-                                    );
-                                    const safeLockDuration = Math.max(
-                                      0,
-                                      Math.min(
-                                        vault.lockDuration,
-                                        vestingDuration
-                                      )
-                                    );
-                                    const vestingWindow = Math.max(
-                                      vestingDuration - safeLockDuration,
-                                      0
-                                    );
-                                    const lockEndTime = new Date(
-                                      startTime.getTime() +
-                                        safeLockDuration * 1000
-                                    );
-                                    const vestEndTime = new Date(
-                                      startTime.getTime() +
-                                        vestingDuration * 1000
-                                    );
-                                    const now = new Date();
-                                    const totalDurationMs =
-                                      vestingDuration * 1000;
-                                    const progressPercentRaw =
-                                      totalDurationMs > 0
-                                        ? (now.getTime() -
-                                            startTime.getTime()) /
-                                          totalDurationMs
-                                        : 1;
-                                    const progressPercent = Math.min(
-                                      Math.max(progressPercentRaw * 100, 0),
-                                      100
-                                    );
-                                    const lockPercent =
-                                      vestingDuration > 0
-                                        ? Math.min(
-                                            (safeLockDuration /
-                                              vestingDuration) *
-                                              100,
-                                            100
-                                          )
-                                        : 0;
-                                    const vestPercent =
-                                      vestingDuration > 0
-                                        ? Math.max(100 - lockPercent, 0)
-                                        : 0;
-                                    const formatDateLabel = (date: Date) =>
-                                      date.toLocaleDateString("en-US", {
-                                        month: "short",
-                                        day: "numeric",
-                                        year: "numeric",
-                                      });
-
-                                    return (
-                                      <>
-                                        <div className="w-full h-6 flex rounded overflow-hidden relative">
-                                          {lockPercent > 0 && (
-                                            <div
-                                              className="bg-warning/30 border-r-2 border-warning flex items-center justify-center text-xs font-semibold"
-                                              style={{
-                                                width: `${lockPercent}%`,
-                                              }}
-                                              title={`Locked: ${formatDuration(
-                                                safeLockDuration
-                                              )}`}
-                                            >
-                                              {lockPercent > 15 && "Locked"}
-                                            </div>
-                                          )}
-                                          {vestPercent > 0 && (
-                                            <div
-                                              className="bg-success/30 flex items-center justify-center text-xs font-semibold"
-                                              style={{
-                                                width: `${vestPercent}%`,
-                                              }}
-                                              title={`Vesting: ${formatDuration(
-                                                vestingWindow
-                                              )}`}
-                                            >
-                                              {vestPercent > 15 && "Vesting"}
-                                            </div>
-                                          )}
-                                          {lockPercent === 0 &&
-                                            vestPercent === 0 && (
-                                              <div className="w-full h-full bg-base-300 flex items-center justify-center text-xs font-semibold text-base-content/60">
-                                                No lockup
-                                              </div>
-                                            )}
-                                          <div
-                                            className="absolute top-0 left-0 h-full border-r-2 border-primary"
-                                            style={{
-                                              width: `${progressPercent}%`,
-                                            }}
-                                            title={`Progress: ${progressPercent.toFixed(
-                                              1
-                                            )}%`}
-                                          />
-                                        </div>
-                                        <div className="flex justify-between text-xs opacity-60 mt-1">
-                                          <span>{formatDateLabel(startTime)}</span>
-                                          <span>{formatDateLabel(vestEndTime)}</span>
-                                        </div>
-                                        <div className="text-xs opacity-60 mt-1">
-                                          {now < lockEndTime && "Status: Locked"}
-                                          {now >= lockEndTime &&
-                                            now < vestEndTime &&
-                                            "Status: Actively Vesting"}
-                                          {now >= vestEndTime &&
-                                            "Status: Vesting Complete"}
-                                        </div>
-                                      </>
-                                    );
-                                  })()
-                                ) : (
-                                  <div className="text-xs opacity-60">
-                                    No vesting schedule configured.
+                            return (
+                              <details
+                                key={vault.id}
+                                className="group collapse bg-base-200 rounded-lg border border-base-300"
+                              >
+                                <summary className="collapse-title text-sm font-semibold py-2 flex items-center justify-between gap-3 [&::marker]:hidden [&::-webkit-details-marker]:hidden">
+                                  <div className="flex items-baseline gap-3">
+                                    <span className="font-semibold">
+                                      Vault {vault.index}
+                                    </span>
+                                    {summaryMeta && (
+                                      <span className="text-xs font-normal opacity-70">
+                                        {summaryMeta}
+                                      </span>
+                                    )}
                                   </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="h-4 w-4 shrink-0 transition-transform duration-200 group-open:rotate-180"
+                                  >
+                                    <path d="M6 9l6 6 6-6" />
+                                  </svg>
+                                </summary>
+                                <div className="collapse-content pt-0">
+                                  {renderVaultDetails(vault)}
+                                </div>
+                              </details>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      )}
+                    </div>
+                  )}
+
                 </div>
               )}
             </div>
@@ -977,3 +1079,95 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
     </div>
   );
 }
+interface TokenHeaderProps {
+  tokenName: string;
+  tokenSymbol: string;
+  tokenImageUrl?: string;
+  creatorLabel?: string;
+  creatorAvatarUrl?: string;
+  creatorFallbackInitial: string;
+  creatorProfileUrl?: string;
+  hideCreatorAvatar?: boolean;
+}
+
+const TokenHeader = memo(function TokenHeader({
+  tokenName,
+  tokenSymbol,
+  tokenImageUrl,
+  creatorLabel,
+  creatorAvatarUrl,
+  creatorFallbackInitial,
+  creatorProfileUrl,
+  hideCreatorAvatar = false,
+}: TokenHeaderProps) {
+  return (
+    <>
+      <div className="flex items-center gap-4 mb-6">
+        {tokenImageUrl && isValidUrl(tokenImageUrl) ? (
+          <div className="relative w-14 h-14 flex-shrink-0">
+            <SafeImage
+              src={tokenImageUrl}
+              alt={tokenName}
+              fill
+              className="object-cover rounded-lg"
+            />
+          </div>
+        ) : (
+          <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center text-xl font-mono flex-shrink-0">
+            {tokenSymbol?.[0] ?? "?"}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <h2 className="text-2xl font-bold leading-tight">{tokenName}</h2>
+          <div className="text-base opacity-60 mt-1">
+            $
+            {tokenSymbol?.startsWith("$")
+              ? tokenSymbol.substring(1)
+              : tokenSymbol}
+          </div>
+        </div>
+      </div>
+
+      {creatorLabel && (
+        <div className="flex items-center gap-2 mb-6">
+          {!hideCreatorAvatar && (
+            <div className="avatar">
+              {creatorAvatarUrl && isValidUrl(creatorAvatarUrl) ? (
+                <div className="w-6 h-6 rounded-full overflow-hidden">
+                  <SafeImage
+                    src={creatorAvatarUrl}
+                    alt={creatorLabel}
+                    width={24}
+                    height={24}
+                    unoptimized
+                  />
+                </div>
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
+                  {creatorFallbackInitial}
+                </div>
+              )}
+            </div>
+          )}
+          <span className="text-sm font-medium">{creatorLabel}</span>
+          {creatorProfileUrl && (
+            <a
+              href={creatorProfileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="opacity-80 hover:opacity-100 transition-opacity"
+              title="View on Farcaster"
+            >
+              <Image
+                src={FarcasterIcon}
+                alt="Farcaster profile"
+                width={14}
+                height={14}
+              />
+            </a>
+          )}
+        </div>
+      )}
+    </>
+  );
+});

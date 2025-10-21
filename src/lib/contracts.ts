@@ -233,6 +233,16 @@ export const STREME_VAULT_ABI = [
     inputs: [
       { name: "token", type: "address" },
       { name: "admin", type: "address" },
+    ],
+    name: "claim",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "admin", type: "address" },
       { name: "member", type: "address" },
       { name: "newUnits", type: "uint128" },
     ],
@@ -261,6 +271,25 @@ export const STREME_VAULT_ABI = [
     ],
     name: "getUnits",
     outputs: [{ name: "", type: "uint128" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "admin", type: "address" },
+    ],
+    name: "allocation",
+    outputs: [
+      { name: "tokenAddress", type: "address" },
+      { name: "amountTotal", type: "uint256" },
+      { name: "amountClaimed", type: "uint256" },
+      { name: "lockupEndTime", type: "uint256" },
+      { name: "vestingEndTime", type: "uint256" },
+      { name: "allocationAdmin", type: "address" },
+      { name: "pool", type: "address" },
+      { name: "box", type: "address" },
+    ],
     stateMutability: "view",
     type: "function",
   },

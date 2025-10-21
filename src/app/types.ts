@@ -108,10 +108,28 @@ export interface LaunchedToken {
   vault?: {
     allocation: number; // percentage of total supply
     beneficiary: string | string[]; // single or multiple beneficiaries
+    admin?: string;
     lockDuration: number;
     vestingDuration: number;
     supply: number;
+    pool?: string;
+    box?: string;
+    lockupEndTime?: number;
+    vestingEndTime?: number;
   };
+
+  vaults?: Array<{
+    vault: string;
+    token: string;
+    admin: string;
+    supply: number;
+    lockupDuration: number;
+    vestingDuration: number;
+    pool?: string;
+    box?: string;
+    lockupEndTime?: number;
+    vestingEndTime?: number;
+  }>;
 
   // Token allocation breakdown
   allocations?: {

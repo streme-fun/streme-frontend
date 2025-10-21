@@ -13,6 +13,7 @@ import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
 import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
 import sdk from "@farcaster/miniapp-sdk";
 import { UpdateVaultBeneficiaryModal } from "@/src/components/UpdateVaultBeneficiaryModal";
+import { ClaimVaultButton } from "@/src/components/ClaimVaultButton";
 
 interface TokenStaker {
   account: {
@@ -68,6 +69,8 @@ interface BackendVault {
   vestingDuration: number;
   pool: string;
   box: string;
+  lockupEndTime?: number;
+  vestingEndTime?: number;
 }
 
 interface EnrichedLaunchedToken extends LaunchedToken {
@@ -147,9 +150,14 @@ export default function LaunchedTokensPage() {
               ? {
                   allocation: 0, // Will be calculated below
                   beneficiary: backendVaults[0].admin,
+                  admin: backendVaults[0].admin,
                   lockDuration: backendVaults[0].lockupDuration,
                   vestingDuration: backendVaults[0].vestingDuration,
                   supply: backendVaults[0].supply,
+                  pool: backendVaults[0].pool,
+                  box: backendVaults[0].box,
+                  lockupEndTime: backendVaults[0].lockupEndTime,
+                  vestingEndTime: backendVaults[0].vestingEndTime,
                 }
               : undefined;
 
@@ -705,6 +713,13 @@ export default function LaunchedTokensPage() {
                       >
                         View Stakers
                       </button>
+                      {token.vault?.admin && isWalletConnected && (
+                        <ClaimVaultButton
+                          tokenAddress={token.contract_address}
+                          adminAddress={token.vault.admin}
+                          className="btn btn-sm btn-outline btn-success"
+                        />
+                      )}
                       {token.vault && isWalletConnected && (
                         <button
                           className="btn btn-sm btn-outline btn-primary"
@@ -1118,6 +1133,13 @@ Symbol: $[your ticker]
                                 >
                                   Connect Wallet
                                 </button>
+                              )}
+                              {token.vault?.admin && isWalletConnected && (
+                                <ClaimVaultButton
+                                  tokenAddress={token.contract_address}
+                                  adminAddress={token.vault.admin}
+                                  className="btn btn-sm btn-outline btn-success w-full"
+                                />
                               )}
                               {token.vault && isWalletConnected && (
                                 <button

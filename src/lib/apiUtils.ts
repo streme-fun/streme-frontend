@@ -55,15 +55,22 @@ export async function enrichTokensWithData(
       vestingDuration: number;
       pool: string;
       box: string;
+      lockupEndTime?: number;
+      vestingEndTime?: number;
     }
     const backendVaults = (token as Token & { vaults?: BackendVault[] }).vaults;
     const vault = backendVaults && backendVaults.length > 0
       ? {
           allocation: 0, // Will be calculated below
           beneficiary: backendVaults[0].admin,
+          admin: backendVaults[0].admin,
           lockDuration: backendVaults[0].lockupDuration,
           vestingDuration: backendVaults[0].vestingDuration,
           supply: backendVaults[0].supply,
+          pool: backendVaults[0].pool,
+          box: backendVaults[0].box,
+          lockupEndTime: backendVaults[0].lockupEndTime,
+          vestingEndTime: backendVaults[0].vestingEndTime,
         }
       : undefined;
 
