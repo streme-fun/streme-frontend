@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useWalletClient } from "wagmi";
 import { toast } from "sonner";
-import { LP_FACTORY_ADDRESS } from "@/src/lib/contracts";
+import { FEE_STREAMER_ADDRESS } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useWallet } from "@/src/hooks/useWallet";
 import { Interface } from "@ethersproject/abi";
@@ -68,7 +68,7 @@ export function ClaimFeesButton({
           method: "eth_sendTransaction",
           params: [
             {
-              to: LP_FACTORY_ADDRESS,
+              to: FEE_STREAMER_ADDRESS,
               from: currentAddress as `0x${string}`,
               data: claimDataWithReferral,
               chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
@@ -111,7 +111,7 @@ export function ClaimFeesButton({
           );
 
           txHash = await walletClient.sendTransaction({
-            to: LP_FACTORY_ADDRESS,
+            to: FEE_STREAMER_ADDRESS,
             data: claimDataWithReferral,
             account: currentAddress as `0x${string}`,
             chain: undefined,
@@ -144,7 +144,7 @@ export function ClaimFeesButton({
             method: "eth_sendTransaction",
             params: [
               {
-                to: LP_FACTORY_ADDRESS,
+                to: FEE_STREAMER_ADDRESS,
                 from: currentAddress,
                 data: claimDataWithReferral,
                 chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
