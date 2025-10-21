@@ -12,7 +12,7 @@ import { formatUnits } from "viem";
 import { useWallet } from "@/src/hooks/useWallet";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
-const STAKING_HELPER = "0x1738e0Fed480b04968A3B7b14086EAF4fDB685A3";
+const STAKING_HELPER = "0xE7079CDB11C6ba1339A4BCB40753f4EC0215B364";
 
 const gdaABI = [
   {
