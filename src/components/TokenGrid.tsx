@@ -190,7 +190,9 @@ export const TrendingTokenCard = ({
               token.contract_address.toLowerCase() ===
                 "0x1c4f69f14cf754333c302246d25a48a13224118a" ||
               token.contract_address.toLowerCase() ===
-                "0x063eda1b84ceaf79b8cc4a41658b449e8e1f9eeb") && (
+                "0x063eda1b84ceaf79b8cc4a41658b449e8e1f9eeb" ||
+              token.contract_address.toLowerCase() ===
+                "0x2800f7bbdd38e84f38ef0a556705a62b5104e91b") && (
               <div
                 className="bg-blue-500/90 backdrop-blur-sm rounded-full p-1 flex items-center justify-center"
                 title="Verified Token"

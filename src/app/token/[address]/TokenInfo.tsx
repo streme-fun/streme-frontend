@@ -536,20 +536,16 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
     vaultAllocationPercent = token.allocations.vault;
   }
 
-  let liquidityAllocationPercent =
-    typeof token.allocations?.liquidity === "number"
-      ? token.allocations.liquidity
-      : undefined;
+  // Always calculate LP as remainder: 100 - Staking - Vault
+  let liquidityAllocationPercent: number | undefined;
 
-  if (liquidityAllocationPercent === undefined) {
+  if (
+    stakingAllocationPercent !== undefined ||
+    vaultAllocationPercent !== undefined
+  ) {
     const knownAllocation =
       (stakingAllocationPercent ?? 0) + (vaultAllocationPercent ?? 0);
-    if (
-      stakingAllocationPercent !== undefined ||
-      vaultAllocationPercent !== undefined
-    ) {
-      liquidityAllocationPercent = Math.max(0, 100 - knownAllocation);
-    }
+    liquidityAllocationPercent = Math.max(0, 100 - knownAllocation);
   }
 
   const allocationSegments = [
