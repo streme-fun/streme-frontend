@@ -50,15 +50,15 @@ Symbol: $[your ticker]
       {/* <div className="fixed inset-0 -z-10">
         <HeroAnimationMini />
       </div> */}
-      <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-24 relative z-10 bg-base-100">
+      <div className="max-w-md lg:max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-24 relative z-10 bg-base-100">
         <div className="mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold tracking-tight mb-4">
               Launch a Streme Token
             </h1>
             <p className="opacity-60">
-              Launch a token with staking rewards. 20% of the total supply will
-              be streamed to stakers over 365 days.
+              Launch a token with customizable staking rewards and vesting schedules.
+              Configure flexible allocations for staking, vaults, and liquidity.
             </p>
           </div>
           

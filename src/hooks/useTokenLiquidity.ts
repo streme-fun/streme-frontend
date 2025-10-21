@@ -159,14 +159,23 @@ export const isLiquidityLow = (
   tokenLaunchTime: string | number | Date,
   threshold: number = 0.01 // Default threshold: 0.02 WETH
 ): boolean => {
-  if (!wethBalance) return true;
-
   const now = Date.now();
   const launchTime = new Date(tokenLaunchTime).getTime();
+  if (!Number.isFinite(launchTime) || launchTime <= 0) {
+    // Unknown launch time – skip warning until we have reliable data
+    return false;
+  }
+
   const hoursSinceLaunch = (now - launchTime) / (1000 * 60 * 60);
+  if (hoursSinceLaunch < 0) {
+    // Launch time in the future – treat as not yet launched
+    return false;
+  }
 
   // Only show warning for tokens launched over 1 hour ago
   if (hoursSinceLaunch < 1) return false;
+
+  if (!wethBalance) return true;
 
   const wethBalanceNum = parseFloat(formatEther(wethBalance));
   return wethBalanceNum < threshold;

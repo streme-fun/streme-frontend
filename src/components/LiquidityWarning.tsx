@@ -12,6 +12,7 @@ interface LiquidityWarningProps {
   tokenSymbol?: string;
   className?: string;
   onDismiss?: () => void;
+  pair?: string; // Paired token (e.g., "WETH", "ETHx")
 }
 
 export const LiquidityWarning = ({
@@ -20,9 +21,13 @@ export const LiquidityWarning = ({
   tokenSymbol = "token",
   className = "",
   onDismiss,
+  pair = "WETH",
 }: LiquidityWarningProps) => {
   const { wethBalance, wethBalanceFormatted, poolAddress, isLoading, error } =
     useTokenLiquidity(tokenAddress);
+
+  // Don't show warning for non-WETH pairs (ETHx, etc.) since hook only checks WETH
+  if (pair && pair.toUpperCase() !== "WETH") return null;
 
   // Don't show warning if still loading or if there's an error
   if (isLoading || error) return null;
@@ -94,9 +99,13 @@ export const InlineLiquidityWarning = ({
   tokenLaunchTime,
   tokenSymbol = "token",
   className = "",
+  pair = "WETH",
 }: Omit<LiquidityWarningProps, "onDismiss">) => {
   const { wethBalance, wethBalanceFormatted, isLoading, error } =
     useTokenLiquidity(tokenAddress);
+
+  // Don't show warning for non-WETH pairs (ETHx, etc.) since hook only checks WETH
+  if (pair && pair.toUpperCase() !== "WETH") return null;
 
   if (isLoading || error) return null;
 

@@ -91,39 +91,36 @@ interface MyTokensModalProps {
 }
 
 // Component for displaying streaming current balance
-const CurrentBalanceDisplay = memo(({
-  stake,
-}: {
-  stake: StakeData;
-  isMiniApp?: boolean;
-}) => {
-  const currentBalance = useStreamingNumber({
-    baseAmount: stake.baseAmount,
-    flowRatePerSecond: stake.userFlowRate / 86400, // Convert daily rate to per-second
-    lastUpdateTime: stake.lastUpdateTime,
-    updateInterval: 60, // Use 60ms for smooth requestAnimationFrame updates
-    pauseWhenHidden: true,
-    isMobileOptimized: false, // Disable mobile optimization for smooth animations
-  });
+const CurrentBalanceDisplay = memo(
+  ({ stake }: { stake: StakeData; isMiniApp?: boolean }) => {
+    const currentBalance = useStreamingNumber({
+      baseAmount: stake.baseAmount,
+      flowRatePerSecond: stake.userFlowRate / 86400, // Convert daily rate to per-second
+      lastUpdateTime: stake.lastUpdateTime,
+      updateInterval: 60, // Use 60ms for smooth requestAnimationFrame updates
+      pauseWhenHidden: true,
+      isMobileOptimized: false, // Disable mobile optimization for smooth animations
+    });
 
-  return (
-    <div>
-      <p className="text-base-content/70">Current Balance</p>
-      <div className="flex items-center">
-        <p
-          className="font-mono text-success"
-          style={{ willChange: "contents" }}
-        >
-          {currentBalance.toLocaleString("en-US", {
-            minimumFractionDigits: 6,
-            maximumFractionDigits: 6,
-          })}
-          <span className="ml-1">{stake.membership.pool.token.symbol}</span>
-        </p>
+    return (
+      <div>
+        <p className="text-base-content/70">Current Balance</p>
+        <div className="flex items-center">
+          <p
+            className="font-mono text-success"
+            style={{ willChange: "contents" }}
+          >
+            {currentBalance.toLocaleString("en-US", {
+              minimumFractionDigits: 6,
+              maximumFractionDigits: 6,
+            })}
+            <span className="ml-1">{stake.membership.pool.token.symbol}</span>
+          </p>
+        </div>
       </div>
-    </div>
-  );
-});
+    );
+  }
+);
 
 CurrentBalanceDisplay.displayName = "CurrentBalanceDisplay";
 

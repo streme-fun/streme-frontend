@@ -7,6 +7,7 @@ export async function GET() {
     return NextResponse.json(config);
   } catch (error) {
     console.error('Error generating metadata:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

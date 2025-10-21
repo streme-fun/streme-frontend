@@ -12,6 +12,8 @@ import { LaunchTokenModal } from "@/src/components/LaunchTokenModal";
 import { HeroAnimationMini } from "@/src/components/HeroAnimationMini";
 import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
 import sdk from "@farcaster/miniapp-sdk";
+import { UpdateVaultBeneficiaryModal } from "@/src/components/UpdateVaultBeneficiaryModal";
+import { ClaimVaultButton } from "@/src/components/ClaimVaultButton";
 
 interface TokenStaker {
   account: {
@@ -58,6 +60,19 @@ interface RawStakerData {
   profileImage?: string;
 }
 
+interface BackendVault {
+  vault: string;
+  token: string;
+  admin: string;
+  supply: number;
+  lockupDuration: number;
+  vestingDuration: number;
+  pool: string;
+  box: string;
+  lockupEndTime?: number;
+  vestingEndTime?: number;
+}
+
 interface EnrichedLaunchedToken extends LaunchedToken {
   totalStakers?: number;
   totalStaked?: number;
@@ -76,12 +91,13 @@ export default function LaunchedTokensPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Wallet connection hooks
-  const { isConnected: isWalletConnected, address: deployerAddress, isMiniApp } = useWallet();
   const {
-    isMiniAppView,
-    isSDKLoaded,
-  } = useAppFrameLogic();
-  
+    isConnected: isWalletConnected,
+    address: deployerAddress,
+    isMiniApp,
+  } = useWallet();
+  const { isMiniAppView, isSDKLoaded } = useAppFrameLogic();
+
   // Debug logging for address changes
   useEffect(() => {
     console.log("📍 Address change debug:", {
@@ -89,7 +105,7 @@ export default function LaunchedTokensPage() {
       deployerAddress,
       isWalletConnected,
       isMiniApp,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }, [isMiniAppView, deployerAddress, isWalletConnected, isMiniApp]);
   const [selectedTokenStakers, setSelectedTokenStakers] = useState<{
@@ -116,11 +132,60 @@ export default function LaunchedTokensPage() {
     "all" | "connected" | "not_connected"
   >("all");
   const [isLaunchTokenOpen, setIsLaunchTokenOpen] = useState(false);
+  const [vaultModalState, setVaultModalState] = useState<{
+    isOpen: boolean;
+    token?: EnrichedLaunchedToken;
+  }>({ isOpen: false });
 
   const enrichTokensWithStakingData = useCallback(
     async (tokenList: LaunchedToken[]): Promise<EnrichedLaunchedToken[]> => {
       const enrichmentPromises = tokenList.map(async (token) => {
         try {
+          // Process vault data from backend's vaults array
+          const backendVaults = (
+            token as LaunchedToken & { vaults?: BackendVault[] }
+          ).vaults;
+          const vault =
+            backendVaults && backendVaults.length > 0
+              ? {
+                  allocation: 0, // Will be calculated below
+                  beneficiary: backendVaults[0].admin,
+                  admin: backendVaults[0].admin,
+                  lockDuration: backendVaults[0].lockupDuration,
+                  vestingDuration: backendVaults[0].vestingDuration,
+                  supply: backendVaults[0].supply,
+                  pool: backendVaults[0].pool,
+                  box: backendVaults[0].box,
+                  lockupEndTime: backendVaults[0].lockupEndTime,
+                  vestingEndTime: backendVaults[0].vestingEndTime,
+                }
+              : undefined;
+
+          // Calculate allocations if we have staking data or vault
+          let allocations = undefined;
+          if (token.staking || vault) {
+            const totalSupply = 100000000000; // 100B tokens (constant)
+            const stakingAllocation = token.staking
+              ? Math.round((token.staking.supply / totalSupply) * 100)
+              : 0;
+            const vaultAllocation = vault
+              ? Math.round((vault.supply / totalSupply) * 100)
+              : 0;
+            const liquidityAllocation =
+              100 - stakingAllocation - vaultAllocation;
+
+            allocations = {
+              staking: stakingAllocation,
+              vault: vaultAllocation,
+              liquidity: liquidityAllocation,
+            };
+
+            // Update vault allocation percentage
+            if (vault) {
+              vault.allocation = vaultAllocation;
+            }
+          }
+
           // Fetch pool summary data (totalMembers) and stakers list in parallel
           const [poolSummary, stakers] = await Promise.all([
             fetchPoolSummary(token.staking_pool),
@@ -145,16 +210,26 @@ export default function LaunchedTokensPage() {
                 token0: data.token0,
                 token1: data.token1,
               };
-              console.log(`Claimable fees for ${token.contract_address}:`, claimableFees);
+              console.log(
+                `Claimable fees for ${token.contract_address}:`,
+                claimableFees
+              );
             } else {
-              console.warn(`Claimable fees API returned ${res.status} for token ${token.contract_address}`);
+              console.warn(
+                `Claimable fees API returned ${res.status} for token ${token.contract_address}`
+              );
             }
           } catch (error) {
-            console.warn(`Failed to fetch claimable fees for token ${token.contract_address}:`, error);
+            console.warn(
+              `Failed to fetch claimable fees for token ${token.contract_address}:`,
+              error
+            );
           }
 
           return {
             ...token,
+            vault,
+            allocations,
             totalStakers: poolSummary.totalMembers, // Use totalMembers from pool data
             totalStaked,
             stakers,
@@ -167,6 +242,8 @@ export default function LaunchedTokensPage() {
           );
           return {
             ...token,
+            vault: undefined,
+            allocations: undefined,
             totalStakers: 0,
             totalStaked: 0,
             stakers: [],
@@ -189,7 +266,9 @@ export default function LaunchedTokensPage() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/tokens/deployer/${deployerAddress}?type=all`);
+      const response = await fetch(
+        `/api/tokens/deployer/${deployerAddress}?type=all`
+      );
       const result = await response.json();
 
       if (!response.ok) {
@@ -465,10 +544,7 @@ export default function LaunchedTokensPage() {
           <HeroAnimationMini />
         </div>
 
-        <BackButton 
-          isMiniAppView={true} 
-          className="pt-4 relative z-10 mb-4" 
-        />
+        <BackButton isMiniAppView={true} className="pt-4 relative z-10 mb-4" />
 
         {/* Fixed header */}
         <h1 className="text-lg font-bold px-4 relative z-10">
@@ -507,8 +583,11 @@ export default function LaunchedTokensPage() {
           )}
 
           {loading && (
-            <div className="flex justify-center items-center py-8">
+            <div className="flex flex-col justify-center items-center py-8 gap-3">
               <span className="loading loading-spinner loading-lg"></span>
+              <p className="text-sm opacity-70">
+                Loading your launched tokens...
+              </p>
             </div>
           )}
 
@@ -605,7 +684,7 @@ export default function LaunchedTokensPage() {
                         </div>
                       )}
 
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-3 flex flex-wrap gap-2">
                       {isWalletConnected ? (
                         <ClaimFeesButton
                           tokenAddress={token.contract_address}
@@ -634,6 +713,23 @@ export default function LaunchedTokensPage() {
                       >
                         View Stakers
                       </button>
+                      {token.vault?.admin && isWalletConnected && (
+                        <ClaimVaultButton
+                          tokenAddress={token.contract_address}
+                          adminAddress={token.vault.admin}
+                          className="btn btn-sm btn-outline btn-success"
+                        />
+                      )}
+                      {token.vault && isWalletConnected && (
+                        <button
+                          className="btn btn-sm btn-outline btn-primary"
+                          onClick={() =>
+                            setVaultModalState({ isOpen: true, token })
+                          }
+                        >
+                          Manage Vault
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -682,6 +778,17 @@ Symbol: $[your ticker]
             </div>
           )}
         </div>
+
+        {/* Vault Management Modal for mini-app */}
+        {vaultModalState.isOpen && vaultModalState.token && (
+          <UpdateVaultBeneficiaryModal
+            isOpen={vaultModalState.isOpen}
+            onClose={() => setVaultModalState({ isOpen: false })}
+            tokenAddress={vaultModalState.token.contract_address}
+            adminAddress={deployerAddress || ""}
+            tokenSymbol={vaultModalState.token.symbol}
+          />
+        )}
 
         {/* Stakers Modal for mini-app */}
         {selectedTokenStakers && (
@@ -837,7 +944,10 @@ Symbol: $[your ticker]
               {deployerAddress ? (
                 <>
                   Tokens launched by:{" "}
-                  <span className="font-mono">{deployerAddress.slice(0, 6).toLowerCase()}...{deployerAddress.slice(-4).toLowerCase()}</span>
+                  <span className="font-mono">
+                    {deployerAddress.slice(0, 6).toLowerCase()}...
+                    {deployerAddress.slice(-4).toLowerCase()}
+                  </span>
                 </>
               ) : (
                 "Connect your wallet to view your launched tokens"
@@ -873,6 +983,15 @@ Symbol: $[your ticker]
                   />
                 </svg>
                 <span>{error}</span>
+              </div>
+            )}
+
+            {loading && (
+              <div className="flex flex-col justify-center items-center py-12 gap-4">
+                <span className="loading loading-spinner loading-lg"></span>
+                <p className="text-sm opacity-70">
+                  Loading your launched tokens...
+                </p>
               </div>
             )}
           </div>
@@ -999,21 +1118,40 @@ Symbol: $[your ticker]
                             {formatDate(token.timestamp)}
                           </td>
                           <td>
-                            {isWalletConnected ? (
-                              <ClaimFeesButton
-                                tokenAddress={token.contract_address}
-                                creatorAddress={token.deployer}
-                                className="btn btn-sm btn-outline btn-secondary"
-                              />
-                            ) : (
-                              <button
-                                className="btn btn-sm btn-outline btn-disabled"
-                                disabled
-                                title="Connect wallet to claim fees"
-                              >
-                                Connect Wallet
-                              </button>
-                            )}
+                            <div className="flex flex-col gap-2 w-32">
+                              {isWalletConnected ? (
+                                <ClaimFeesButton
+                                  tokenAddress={token.contract_address}
+                                  creatorAddress={token.deployer}
+                                  className="btn btn-sm btn-outline btn-secondary w-full"
+                                />
+                              ) : (
+                                <button
+                                  className="btn btn-sm btn-outline btn-disabled w-full"
+                                  disabled
+                                  title="Connect wallet to claim fees"
+                                >
+                                  Connect Wallet
+                                </button>
+                              )}
+                              {token.vault?.admin && isWalletConnected && (
+                                <ClaimVaultButton
+                                  tokenAddress={token.contract_address}
+                                  adminAddress={token.vault.admin}
+                                  className="btn btn-sm btn-outline btn-success w-full"
+                                />
+                              )}
+                              {token.vault && isWalletConnected && (
+                                <button
+                                  className="btn btn-sm btn-outline btn-primary w-full"
+                                  onClick={() =>
+                                    setVaultModalState({ isOpen: true, token })
+                                  }
+                                >
+                                  Manage Vault
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1356,6 +1494,17 @@ Symbol: $[your ticker]
         isOpen={isLaunchTokenOpen}
         onClose={() => setIsLaunchTokenOpen(false)}
       />
+
+      {/* Vault Management Modal */}
+      {vaultModalState.isOpen && vaultModalState.token && (
+        <UpdateVaultBeneficiaryModal
+          isOpen={vaultModalState.isOpen}
+          onClose={() => setVaultModalState({ isOpen: false })}
+          tokenAddress={vaultModalState.token.contract_address}
+          adminAddress={deployerAddress || ""}
+          tokenSymbol={vaultModalState.token.symbol}
+        />
+      )}
     </>
   );
 }

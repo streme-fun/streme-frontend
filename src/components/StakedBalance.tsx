@@ -255,20 +255,6 @@ export function StakedBalance({
     []
   );
 
-  const stakedAmountTokens = useMemo(
-    () => Number(formatUnits(stakedBalance, 18)),
-    [stakedBalance]
-  );
-  const flowRatePerDayNum = useMemo(
-    () => parseFloat(flowRate) || 0,
-    [flowRate]
-  );
-  const apyPercent = useMemo(() => {
-    if (stakedAmountTokens <= 0 || flowRatePerDayNum <= 0) return 0;
-    const yearlyRewards = flowRatePerDayNum * 365;
-    return (yearlyRewards / stakedAmountTokens) * 100;
-  }, [stakedAmountTokens, flowRatePerDayNum]);
-
   // Don't render anything if wallet is not connected or address is missing
   if (!isConnected || !address) return null;
 
@@ -307,12 +293,6 @@ export function StakedBalance({
           {flowRate} {symbol}/day
         </div>
       </div>
-      {apyPercent > 0 && isFinite(apyPercent) && (
-        <div>
-          <div className="text-sm opacity-60 mb-1">Est. APY</div>
-          <div className="font-mono">{apyPercent.toFixed(2)}%</div>
-        </div>
-      )}
     </div>
   );
 }
