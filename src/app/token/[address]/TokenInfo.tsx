@@ -242,7 +242,6 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
       tokenName: token.name,
       tokenSymbol: token.symbol,
       tokenImageUrl: token.img_url ?? undefined,
-      tokenType: token.type,
       creatorLabel: creatorInfo?.label,
       creatorAvatarUrl: creatorInfo?.avatarUrl,
       creatorFallbackInitial:
@@ -258,7 +257,6 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
       token.name,
       token.symbol,
       token.img_url,
-      token.type,
       token.contract_address,
       creatorInfo,
     ]
@@ -772,8 +770,19 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
           token.vault ||
           token.vaults) && (
           <details className="collapse collapse-arrow bg-base-200 rounded-lg mb-4">
-            <summary className="collapse-title text-base font-semibold">
-              Allocation & Distribution
+            <summary className="collapse-title text-base font-semibold flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span>Allocation & Distribution</span>
+                {(token.type === "v1" || token.type === "v2") && (
+                  <span
+                    className={`text-white px-2 py-0.5 rounded text-xs font-semibold ${
+                      token.type === "v2" ? "bg-primary" : "bg-secondary"
+                    }`}
+                  >
+                    {token.type}
+                  </span>
+                )}
+              </div>
             </summary>
             <div className="collapse-content">
               {/* Token Allocation (v2 tokens) */}
@@ -1073,7 +1082,6 @@ interface TokenHeaderProps {
   tokenName: string;
   tokenSymbol: string;
   tokenImageUrl?: string;
-  tokenType?: string;
   creatorLabel?: string;
   creatorAvatarUrl?: string;
   creatorFallbackInitial: string;
@@ -1085,7 +1093,6 @@ const TokenHeader = memo(function TokenHeader({
   tokenName,
   tokenSymbol,
   tokenImageUrl,
-  tokenType,
   creatorLabel,
   creatorAvatarUrl,
   creatorFallbackInitial,
@@ -1110,18 +1117,7 @@ const TokenHeader = memo(function TokenHeader({
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold leading-tight">{tokenName}</h2>
-            {(tokenType === "v1" || tokenType === "v2") && (
-              <span
-                className={`inline-block text-white px-2 py-1 rounded text-xs font-semibold ${
-                  tokenType === "v2" ? "bg-primary" : "bg-secondary"
-                }`}
-              >
-                {tokenType}
-              </span>
-            )}
-          </div>
+          <h2 className="text-2xl font-bold leading-tight">{tokenName}</h2>
           <div className="text-base opacity-60 mt-1">
             $
             {tokenSymbol?.startsWith("$")
