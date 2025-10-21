@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchTokenFromStreme } from "@/src/lib/apiUtils";
+import { BLACKLISTED_TOKENS } from "@/src/lib/blacklist";
 
 export const runtime = "nodejs";
 
@@ -30,8 +31,13 @@ export async function POST(request: NextRequest) {
     // Normalize addresses to lowercase
     const normalizedAddresses = tokenAddresses.map(addr => addr.toLowerCase());
 
+    // Filter out blacklisted addresses
+    const allowedAddresses = normalizedAddresses.filter(
+      (address) => !BLACKLISTED_TOKENS.includes(address)
+    );
+
     // Fetch all tokens in parallel
-    const tokenPromises = normalizedAddresses.map(async (address) => {
+    const tokenPromises = allowedAddresses.map(async (address) => {
       try {
         const tokenData = await fetchTokenFromStreme(address);
         return tokenData;

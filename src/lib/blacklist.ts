@@ -14,6 +14,7 @@ export const SPAMMER_BLACKLIST = [
   "farcasterintern.eth",
   "fcfsproject.eth",
   "mafa42o",
+  "rilas00",
 ];
 
 // Blacklisted token addresses

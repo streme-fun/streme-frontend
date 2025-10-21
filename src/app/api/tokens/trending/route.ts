@@ -1,9 +1,10 @@
-import { SPAMMER_BLACKLIST } from "@/src/lib/blacklist";
+import { SPAMMER_BLACKLIST, BLACKLISTED_TOKENS } from "@/src/lib/blacklist";
 
 interface TrendingToken {
   username?: string;
   name?: string;
   symbol?: string;
+  contract_address?: string;
   [key: string]: unknown;
 }
 
@@ -35,9 +36,16 @@ export async function GET() {
     // Filter out blacklisted tokens and clean up symbols
     const filteredData = trendingData
       .filter((token) => {
+        // Filter by spammer username
         if (token.username) {
           const username = token.username.toLowerCase();
           const isBlacklisted = SPAMMER_BLACKLIST.includes(username);
+          if (isBlacklisted) return false;
+        }
+        // Filter by token address
+        if (token.contract_address) {
+          const tokenAddress = (token.contract_address as string).toLowerCase();
+          const isBlacklisted = BLACKLISTED_TOKENS.includes(tokenAddress);
           if (isBlacklisted) return false;
         }
         return true;

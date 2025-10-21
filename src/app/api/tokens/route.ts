@@ -3,6 +3,7 @@ import {
   enrichTokensWithData,
 } from "@/src/lib/apiUtils";
 import { NextRequest } from "next/server";
+import { BLACKLISTED_TOKENS } from "@/src/lib/blacklist";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,18 +22,26 @@ export async function GET(request: NextRequest) {
 
     const enrichedTokens = await enrichTokensWithData(tokens);
 
+    // Filter out blacklisted tokens
+    const filteredTokens = enrichedTokens.filter(
+      (token) =>
+        !BLACKLISTED_TOKENS.includes(
+          token.contract_address?.toLowerCase() || ""
+        )
+    );
+
     const lastToken = tokens[tokens.length - 1];
     const nextPageTimestamp = lastToken?.timestamp?._seconds;
 
     // Debug final enriched tokens
     console.log(
       "Enriched tokens without creators:",
-      enrichedTokens.filter((t) => !t.creator).length
+      filteredTokens.filter((t) => !t.creator).length
     );
 
     return Response.json(
       {
-        data: enrichedTokens,
+        data: filteredTokens,
         hasMore: tokens.length === limit,
         nextPage: nextPageTimestamp,
       },
