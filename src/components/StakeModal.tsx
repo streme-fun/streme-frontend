@@ -521,7 +521,7 @@ ${shareUrl}`;
                 ))}
               </div>
               <div className="text-sm opacity-60 bg-base-200 p-3 rounded-lg">
-                Note: Staked tokens are locked for 24 hours before they can be
+                Note: Staked tokens are locked for {tokenAddress == "0x2800f7bbdd38e84f38ef0a556705a62b5104e91b" ? "30 days" : "24 hours"} before they can be
                 unstaked. Rewards will start streaming immediately.
               </div>
               <button
