@@ -838,6 +838,7 @@ export function TokenActions({
             symbol={token.symbol}
             className="btn btn-outline border-base-300 hover:border-base-400 text-base-content hover:text-base-content bg-base-100 hover:bg-base-200 w-full disabled:border-base-200 disabled:text-base-content/40 disabled:bg-base-100"
             tokenBalance={balance}
+            lockDuration={token.staking?.lockDuration}
           />
         )}
 

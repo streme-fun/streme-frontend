@@ -1817,6 +1817,7 @@ export default function TokensPage() {
                                     )
                                   }
                                   className="btn btn-primary btn-sm w-full"
+                                  lockDuration={stake.lockDuration}
                                 />
                               </div>
                               <UnstakeButton

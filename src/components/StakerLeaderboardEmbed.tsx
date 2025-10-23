@@ -100,6 +100,10 @@ export function StakerLeaderboardEmbed({
             staker.isStaker &&
             staker.holder_address.toLowerCase() !== "0xc749105bc4b4ea6285dbbe2e8221c922bea07a9d"
         ) // Filter out entries without address, non-stakers, and specific excluded address
+        .sort(
+          (a: { staked_balance?: number }, b: { staked_balance?: number }) =>
+            (b.staked_balance ?? 0) - (a.staked_balance ?? 0)
+        ) // Sort by staked balance in descending order
         .slice(0, 10)
         .map(
           (staker: {

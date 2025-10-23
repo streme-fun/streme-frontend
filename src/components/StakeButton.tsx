@@ -42,6 +42,7 @@ interface StakeButtonProps {
   onSuccess?: () => void;
   onPoolConnect?: () => void;
   tokenBalance?: bigint;
+  lockDuration?: number; // Lock duration in seconds (defaults to 24h for v1 tokens)
 }
 
 export function StakeButton({
@@ -55,6 +56,7 @@ export function StakeButton({
   onSuccess,
   onPoolConnect,
   tokenBalance = BigInt(0),
+  lockDuration,
 }: StakeButtonProps) {
   const { address, isConnected, isMiniApp } = useWallet();
   const { data: walletClient } = useWalletClient();
@@ -474,6 +476,7 @@ export function StakeButton({
         onStake={handleStake}
         onSuccess={onSuccess} // Pass onSuccess to modal if it needs to trigger something on close after success
         isMiniApp={isMiniApp}
+        lockDuration={lockDuration}
       />
     </>
   );

@@ -22,6 +22,7 @@ interface StakeModalProps {
   onSuccess?: () => void;
   onRefreshBalance?: () => Promise<void>;
   isMiniApp?: boolean;
+  lockDuration?: number; // Lock duration in seconds (defaults to 24h for v1 tokens)
 }
 
 const LoadingText = ({ text }: { text: string }) => {
@@ -65,6 +66,17 @@ const formatBalance = (value: bigint, decimals: number = 18) => {
   return parseFloat(formatUnits(value, decimals)).toFixed(4);
 };
 
+const formatLockDuration = (seconds: number): string => {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+
+  if (days > 0) {
+    return hours > 0 ? `${days} day${days > 1 ? "s" : ""} and ${hours} hour${hours > 1 ? "s" : ""}` : `${days} day${days > 1 ? "s" : ""}`;
+  }
+
+  return `${hours} hour${hours > 1 ? "s" : ""}`;
+};
+
 export function StakeModal({
   isOpen,
   onClose,
@@ -76,6 +88,7 @@ export function StakeModal({
   onSuccess,
   onRefreshBalance,
   isMiniApp,
+  lockDuration = 86400, // Default to 24 hours (86400 seconds) for v1 tokens
 }: StakeModalProps) {
   const [amount, setAmount] = useState("");
   const [isStaking, setIsStaking] = useState(false);
@@ -521,7 +534,7 @@ ${shareUrl}`;
                 ))}
               </div>
               <div className="text-sm opacity-60 bg-base-200 p-3 rounded-lg">
-                Note: Staked tokens are locked for {tokenAddress == "0x2800f7bbdd38e84f38ef0a556705a62b5104e91b" ? "30 days" : "24 hours"} before they can be
+                Note: Staked tokens are locked for {formatLockDuration(lockDuration)} before they can be
                 unstaked. Rewards will start streaming immediately.
               </div>
               <button
