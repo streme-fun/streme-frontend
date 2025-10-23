@@ -1128,35 +1128,35 @@ const TokenHeader = memo(function TokenHeader({
       </div>
 
       {creatorLabel && (
-        <div className="flex items-center gap-2 mb-6">
-          {!hideCreatorAvatar && (
-            <div className="avatar">
-              {creatorAvatarUrl && isValidUrl(creatorAvatarUrl) ? (
-                <div className="w-6 h-6 rounded-full overflow-hidden">
-                  <SafeImage
-                    src={creatorAvatarUrl}
-                    alt={creatorLabel}
-                    width={24}
-                    height={24}
-                    unoptimized
-                  />
-                </div>
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
-                  {creatorFallbackInitial}
-                </div>
-              )}
-            </div>
-          )}
-          <span className="text-sm font-medium">{creatorLabel}</span>
-          {creatorProfileUrl && (
+        <div className="mb-6">
+          {creatorProfileUrl ? (
             <a
               href={creatorProfileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="opacity-80 hover:opacity-100 transition-opacity"
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               title="View on Farcaster"
             >
+              {!hideCreatorAvatar && (
+                <div className="avatar">
+                  {creatorAvatarUrl && isValidUrl(creatorAvatarUrl) ? (
+                    <div className="w-6 h-6 rounded-full overflow-hidden">
+                      <SafeImage
+                        src={creatorAvatarUrl}
+                        alt={creatorLabel}
+                        width={24}
+                        height={24}
+                        unoptimized
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
+                      {creatorFallbackInitial}
+                    </div>
+                  )}
+                </div>
+              )}
+              <span className="text-sm font-medium">{creatorLabel}</span>
               <Image
                 src={FarcasterIcon}
                 alt="Farcaster profile"
@@ -1164,6 +1164,29 @@ const TokenHeader = memo(function TokenHeader({
                 height={14}
               />
             </a>
+          ) : (
+            <div className="flex items-center gap-2">
+              {!hideCreatorAvatar && (
+                <div className="avatar">
+                  {creatorAvatarUrl && isValidUrl(creatorAvatarUrl) ? (
+                    <div className="w-6 h-6 rounded-full overflow-hidden">
+                      <SafeImage
+                        src={creatorAvatarUrl}
+                        alt={creatorLabel}
+                        width={24}
+                        height={24}
+                        unoptimized
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
+                      {creatorFallbackInitial}
+                    </div>
+                  )}
+                </div>
+              )}
+              <span className="text-sm font-medium">{creatorLabel}</span>
+            </div>
           )}
         </div>
       )}

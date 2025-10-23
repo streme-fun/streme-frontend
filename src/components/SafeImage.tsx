@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, memo } from "react";
 
 interface SafeImageProps {
   src: string | null | undefined;
@@ -32,7 +32,7 @@ const isValidUrl = (urlString: string): boolean => {
   }
 };
 
-export default function SafeImage({
+const SafeImageComponent = ({
   src,
   alt,
   width,
@@ -43,7 +43,7 @@ export default function SafeImage({
   priority,
   fill,
   sizes,
-}: SafeImageProps) {
+}: SafeImageProps) => {
   // Validate URL before using it
   const validatedSrc = src && isValidUrl(src) ? src : fallbackSrc;
   const [imageSrc, setImageSrc] = useState<string>(validatedSrc);
@@ -92,4 +92,6 @@ export default function SafeImage({
       onError={handleError}
     />
   );
-}
+};
+
+export default memo(SafeImageComponent);

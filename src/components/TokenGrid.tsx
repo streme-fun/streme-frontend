@@ -478,17 +478,6 @@ const TokenCardComponent = memo(
     token: Token & { rewards: number; totalStakers: number };
     isMiniApp?: boolean;
   }) => {
-    const [totalStakers, setTotalStakers] = useState<number>(
-      token.totalStakers
-    );
-
-    // Use the reward counter hook for animated rewards
-    const { currentRewards, elementRef } = useRewardCounter(
-      token.rewards,
-      REWARDS_PER_SECOND,
-      isMiniApp ? 200 : 150 // Faster updates for smoother animations
-    );
-
     useEffect(() => {
       if (!token.creator) {
         console.log("Missing creator for token:", {
@@ -498,11 +487,6 @@ const TokenCardComponent = memo(
         });
       }
     }, [token]);
-
-    useEffect(() => {
-      // Initialize state from props
-      setTotalStakers(token.totalStakers);
-    }, [token.totalStakers]);
 
     // Helper function to shorten hash
     const shortenHash = (hash: string | undefined) => {
@@ -546,8 +530,7 @@ const TokenCardComponent = memo(
     return (
       <Link href={`/token/${token.contract_address}`} className="block group">
         <div
-          ref={elementRef}
-          className="card card-side bg-base-100 rounded-md border-1 border-base-300 
+          className="card card-side bg-base-100 rounded-md border-1 border-base-300
         hover:bg-base-200/50  transition-all duration-300 ease-out
         hover:shadow-lg hover:-translate-y-1 group-hover:border-primary/20"
         >
@@ -696,21 +679,12 @@ const TokenCardComponent = memo(
             </div>
 
             <div className="card-actions justify-end mt-auto">
-              <div className="w-full px-1">
-                <div className="text-[11px] uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
-                  Rewards ({totalStakers}{" "}
-                  {totalStakers === 1 ? "staker" : "stakers"})
-                </div>
-                <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
-                  {currentRewards.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  <span className="text-xs font-normal opacity-60 group-hover:opacity-100 transition-opacity duration-300">
-                    ${token.symbol}
-                  </span>
-                </div>
-              </div>
+              <RewardsDisplay
+                rewards={token.rewards}
+                symbol={token.symbol}
+                totalStakers={token.totalStakers}
+                isMiniApp={isMiniApp}
+              />
             </div>
           </div>
         </div>
@@ -720,6 +694,46 @@ const TokenCardComponent = memo(
 );
 
 TokenCardComponent.displayName = "TokenCardComponent";
+
+// Memoized rewards display to prevent re-renders of the entire card during animation
+const RewardsDisplay = memo(
+  ({
+    rewards,
+    symbol,
+    totalStakers,
+    isMiniApp,
+  }: {
+    rewards: number;
+    symbol: string;
+    totalStakers: number;
+    isMiniApp?: boolean;
+  }) => {
+    const { currentRewards, elementRef } = useRewardCounter(
+      rewards,
+      REWARDS_PER_SECOND,
+      isMiniApp ? 200 : 150
+    );
+
+    return (
+      <div ref={elementRef} className="w-full px-1">
+        <div className="text-[11px] uppercase tracking-wider opacity-50 group-hover:opacity-70 transition-opacity duration-300">
+          Rewards ({totalStakers} {totalStakers === 1 ? "staker" : "stakers"})
+        </div>
+        <div className="font-mono text-sm font-bold group-hover:text-primary transition-colors duration-300">
+          {currentRewards.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}{" "}
+          <span className="text-xs font-normal opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+            ${symbol}
+          </span>
+        </div>
+      </div>
+    );
+  }
+);
+
+RewardsDisplay.displayName = "RewardsDisplay";
 
 export function TokenGrid({
   tokens,
