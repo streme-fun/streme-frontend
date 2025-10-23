@@ -51,7 +51,7 @@ const HeroComponent = () => {
   }, []);
 
   return (
-    <div className="layout w-full max-w-[1440px] h-[300px] mb-[-50px] relative mt-10">
+    <div className="layout w-full max-w-[1440px] mx-auto h-[300px] mb-[-50px] relative mt-10">
       {/* Hero Text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center z-10 text-center">
         {/* Transparent background container */}
