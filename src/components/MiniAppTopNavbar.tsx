@@ -98,13 +98,6 @@ function MiniAppTopNavbarComponent({
         </Link>
       </div>
       <div className="flex items-center gap-2">
-        {isConnected && (
-          <Link href="/token/0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58">
-            <div className="px-3 py-2 cursor-pointer hover:bg-base-100 transition-colors">
-              <StreamingBalance />
-            </div>
-          </Link>
-        )}
         <button
           onClick={handleTutorialClick}
           className="btn btn-ghost btn-circle btn-sm flex-shrink-0"
