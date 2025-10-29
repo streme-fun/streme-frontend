@@ -4,7 +4,7 @@ import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { MiniAppTopNavbar } from "../components/MiniAppTopNavbar";
 import { MiniAppBottomNavbar } from "../components/MiniAppBottomNavbar";
-import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal";
+// import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal"; // DISABLED
 import { usePathname } from "next/navigation";
 import { FrameProvider } from "../components/providers/FrameProvider";
 import MiniAppWagmiProvider from "../components/providers/MiniAppWagmiProvider";
@@ -579,15 +579,16 @@ function AppContent({ children }: { children: React.ReactNode }) {
             />
           )}
           <main className={`px-4 ${isHomePage ? "pt-16 pb-20" : "pb-20"}`}>{children}</main>
-          <MiniAppBottomNavbar 
+          <MiniAppBottomNavbar
             profileImage={miniAppProfileImage}
             userData={miniAppUserData}
           />
-          <MiniAppTutorialModal
+          {/* Tutorial Modal - DISABLED */}
+          {/* <MiniAppTutorialModal
             isOpen={showTutorialModal}
             onClose={handleCloseTutorial}
             onSkip={handleSkipTutorial}
-          />
+          /> */}
         </>
       ) : (
         <>

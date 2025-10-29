@@ -16,7 +16,7 @@ import { useUnifiedWallet } from "../hooks/useUnifiedWallet";
 import { Button } from "../components/ui/button";
 import { base } from "wagmi/chains";
 import { usePostHog } from "posthog-js/react";
-import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal";
+// import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal"; // DISABLED
 import { SPAMMER_BLACKLIST } from "../lib/blacklist";
 import Link from "next/link";
 import { CheckinModal } from "../components/CheckinModal";
@@ -525,12 +525,12 @@ function App() {
           <HeroAnimationMini />
         </div> */}
 
-        {/* Tutorial Modal */}
-        <MiniAppTutorialModal
+        {/* Tutorial Modal - DISABLED */}
+        {/* <MiniAppTutorialModal
           isOpen={showTutorialModal}
           onClose={handleCloseTutorial}
           onSkip={handleSkipTutorial}
-        />
+        /> */}
 
         {/* Checkin Modal */}
         <CheckinModal
@@ -606,12 +606,12 @@ function App() {
         </div>
       </div>
 
-      {/* Tutorial Modal for Desktop */}
-      <MiniAppTutorialModal
+      {/* Tutorial Modal for Desktop - DISABLED */}
+      {/* <MiniAppTutorialModal
         isOpen={showTutorialModal}
         onClose={handleCloseTutorial}
         onSkip={handleSkipTutorial}
-      />
+      /> */}
     </>
   );
 }
