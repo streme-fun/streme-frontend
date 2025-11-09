@@ -129,6 +129,7 @@ CurrentBalanceDisplay.displayName = "CurrentBalanceDisplay";
 // Type for cached token data
 interface CachedTokenDataItem {
   staking_address?: string;
+  staking_pool?: string; // GDA pool address for filtering memberships
   logo?: string;
   staking?: {
     lockDuration?: number;
@@ -227,6 +228,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
       if (BLACKLISTED_TOKENS.includes(safeToLowerCase(address))) {
         results.set(address, {
           staking_address: undefined,
+          staking_pool: undefined,
           logo: undefined,
           marketData: undefined,
         });
@@ -281,6 +283,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
             if (tokenData) {
               const processedData = {
                 staking_address: tokenData.staking_address,
+                staking_pool: tokenData.staking_pool,
                 logo: tokenData.img_url || tokenData.logo || tokenData.image,
                 marketData: tokenData.marketData,
               };
@@ -296,6 +299,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
               // Token not found in database
               const fallbackData = {
                 staking_address: undefined,
+                staking_pool: undefined,
                 logo: undefined,
                 marketData: undefined,
               };
@@ -893,16 +897,36 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
     await checkLiquidityBatch(uniqueTokens);
 
     // Update states with metadata
-    const stakesWithMetadata = stakes.map((stake) => {
-      const tokenData = tokenDataMap.get(stake.tokenAddress) as CachedTokenDataItem | undefined;
-      return {
-        ...stake,
-        stakingAddress: tokenData?.staking_address || "",
-        logo: tokenData?.logo,
-        marketData: tokenData?.marketData,
-        lockDuration: tokenData?.staking?.lockDuration, // Extract lock duration from staking config
-      };
-    });
+    const stakesWithMetadata = stakes
+      .map((stake) => {
+        const tokenData = tokenDataMap.get(stake.tokenAddress) as CachedTokenDataItem | undefined;
+        return {
+          ...stake,
+          stakingAddress: tokenData?.staking_address || "",
+          logo: tokenData?.logo,
+          marketData: tokenData?.marketData,
+          lockDuration: tokenData?.staking?.lockDuration, // Extract lock duration from staking config
+        };
+      })
+      // Filter to only include stakes where the membership pool matches the official staking pool from database
+      .filter((stake) => {
+        const tokenData = tokenDataMap.get(stake.tokenAddress) as CachedTokenDataItem | undefined;
+        const officialStakingPool = tokenData?.staking_pool
+          ? safeToLowerCase(tokenData.staking_pool)
+          : null;
+        const membershipPoolId = safeToLowerCase(stake.stakingPoolAddress);
+
+        // Keep stake only if:
+        // 1. There's an official staking pool AND it matches the membership pool
+        // 2. OR there's no official staking pool (token not in database)
+        if (officialStakingPool && membershipPoolId !== officialStakingPool) {
+          console.log(
+            `Filtering out stake for ${stake.membership?.pool?.token?.symbol}: membership pool ${membershipPoolId} does not match official staking pool ${officialStakingPool}`
+          );
+          return false;
+        }
+        return true;
+      });
 
     const superTokensWithMetadata = ownedSuperTokens.map((token) => ({
       ...token,
