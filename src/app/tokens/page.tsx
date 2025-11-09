@@ -717,6 +717,10 @@ export default function TokensPage() {
     const tokenAddresses = memberships
       .map((membership) => membership.pool.token.id)
       .filter(Boolean); // Filter out null/undefined values
+
+    // Fetch token data to get official staking pools
+    const tokenDataMap = await fetchTokenDataBatch(tokenAddresses);
+
     const balanceResults = await fetchBalances(tokenAddresses);
     const balanceMap = new Map(
       balanceResults.map((result) => [result.tokenAddress, result.balance])
@@ -729,6 +733,25 @@ export default function TokensPage() {
           console.warn("Skipping membership with null token address");
           continue;
         }
+
+        // Get the official staking pool for this token from the database
+        const tokenData = tokenDataMap.get(tokenAddress);
+        const officialStakingPool = tokenData?.staking_address
+          ? safeToLowerCase(tokenData.staking_address)
+          : null;
+        const membershipPoolId = safeToLowerCase(membership.pool.id);
+
+        // Only create a stake if this membership pool matches the official staking pool
+        if (
+          officialStakingPool &&
+          membershipPoolId !== officialStakingPool
+        ) {
+          console.log(
+            `Skipping membership for ${membership.pool.token.symbol} (${tokenAddress}): membership pool ${membershipPoolId} does not match official staking pool ${officialStakingPool}`
+          );
+          continue;
+        }
+
         const receivedBalance =
           (balanceMap.get(tokenAddress) as bigint) || BigInt(0);
         const formattedReceived = Number(formatUnits(receivedBalance, 18));
@@ -752,6 +775,7 @@ export default function TokensPage() {
             poolId: membership.pool.id,
             units: membership.units,
             formattedReceived,
+            officialStakingPool,
           });
         }
 
