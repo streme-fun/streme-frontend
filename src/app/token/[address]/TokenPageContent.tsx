@@ -168,15 +168,28 @@ ${shareUrl}`;
     <div className="max-w-[1440px] mx-auto sm:px-6 mt-6 md:px-8 md:mt-0 md:pt-28 pb-12">
       <BackButton isMiniAppView={isMiniAppView} className="mb-4" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left Column: Token Info + Chart */}
-        <div className="lg:col-span-2 space-y-4">
+      <div className={isMiniAppView ? "space-y-4" : "grid grid-cols-1 lg:grid-cols-3 gap-4"}>
+        {/* Left Column: Token Info + Chart (or full width in mini-app) */}
+        <div className={isMiniAppView ? "space-y-4" : "lg:col-span-2 space-y-4"}>
           {/* Token Info */}
           <TokenInfo
             token={token}
             onShare={handleShare}
             isMiniAppView={isMiniAppView}
           />
+
+          {/* Trading Actions - Above chart in mini-app view */}
+          {isMiniAppView && (
+            <TokenActions
+              data-trading-section
+              token={token}
+              onStakingChange={handleStakingChange}
+              onStakedBalanceUpdate={handleStakedBalanceUpdate}
+              isMiniAppView={isMiniAppView}
+              address={address}
+              isConnected={isConnected}
+            />
+          )}
 
           {/* Chart - Always directly below Token Info */}
           <div className="card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit">
@@ -193,17 +206,18 @@ ${shareUrl}`;
           </div>
         </div>
 
-        {/* Right Column: Trading Actions + Other Info */}
-        <div className="space-y-4">
-          <TokenActions
-            data-trading-section
-            token={token}
-            onStakingChange={handleStakingChange}
-            onStakedBalanceUpdate={handleStakedBalanceUpdate}
-            isMiniAppView={isMiniAppView}
-            address={address}
-            isConnected={isConnected}
-          />
+        {/* Right Column: Trading Actions + Other Info (desktop only) */}
+        {!isMiniAppView && (
+          <div className="space-y-4">
+            <TokenActions
+              data-trading-section
+              token={token}
+              onStakingChange={handleStakingChange}
+              onStakedBalanceUpdate={handleStakedBalanceUpdate}
+              isMiniAppView={isMiniAppView}
+              address={address}
+              isConnected={isConnected}
+            />
 
           <StakedBalance
             data-staking-balance
@@ -236,7 +250,8 @@ ${shareUrl}`;
 
           {/* Claim Fees Button */}
           <ClaimFeesButton tokenAddress={token.contract_address} />
-        </div>
+          </div>
+        )}
       </div>
       <div className="fixed inset-0 -z-50">
         <HeroAnimationMini />
