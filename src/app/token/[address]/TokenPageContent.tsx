@@ -252,6 +252,46 @@ ${shareUrl}`;
           <ClaimFeesButton tokenAddress={token.contract_address} />
           </div>
         )}
+
+        {/* Staker Leaderboard for Mini-App (at the bottom) */}
+        {isMiniAppView && (
+          <div className="space-y-4">
+            <StakedBalance
+              data-staking-balance
+              stakingAddress={token.staking_address}
+              stakingPool={token.staking_pool}
+              symbol={token.symbol}
+              tokenAddress={token.contract_address}
+              tokenLaunchTime={
+                token.timestamp
+                  ? new Date(
+                      token.timestamp._seconds * 1000 +
+                        token.timestamp._nanoseconds / 1000000
+                    )
+                  : token.created_at
+              }
+              key={stakingUpdateTrigger}
+            />
+
+            {/* Embedded Staker Leaderboard */}
+            <StakerLeaderboardEmbed
+              stakingPoolAddress={token.staking_pool}
+              tokenAddress={token.contract_address}
+              tokenSymbol={token.symbol}
+              stakingAddress={token.staking_address}
+              onViewAll={() => setIsStakerLeaderboardOpen(true)}
+              onStakingChange={handleStakingChange}
+              isMiniApp={isMiniAppView}
+              farcasterAddress={address}
+              farcasterIsConnected={isConnected}
+              tokenPrice={token.price}
+              userStakedBalance={userStakedBalance}
+            />
+
+            {/* Claim Fees Button */}
+            <ClaimFeesButton tokenAddress={token.contract_address} />
+          </div>
+        )}
       </div>
       <div className="fixed inset-0 -z-50">
         <HeroAnimationMini />

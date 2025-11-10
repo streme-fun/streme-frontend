@@ -13,3 +13,12 @@ export const APP_WEBHOOK_URL =
   process.env.NEYNAR_API_KEY && process.env.NEYNAR_CLIENT_ID
     ? `https://api.neynar.com/f/app/${process.env.NEYNAR_CLIENT_ID}/event`
     : `${APP_URL}/api/webhook`;
+
+// Verified tokens
+export const VERIFIED_TOKENS = [
+  "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58", // STREME
+  "0x1c4f69f14cf754333c302246d25a48a13224118a", // BUTTHOLE
+  "0x063eda1b84ceaf79b8cc4a41658b449e8e1f9eeb",
+  "0x2800f7bbdd38e84f38ef0a556705a62b5104e91b",
+  "0x0358795322c04de04ead2338a803a9d3518a9877", // New verified token
+];

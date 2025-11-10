@@ -11,6 +11,7 @@ import { Token } from "../app/types/token";
 import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
 import { CROWDFUND_TOKEN_ADDRESSES } from "@/src/lib/crowdfundTokens";
+import { VERIFIED_TOKENS } from "@/src/lib/constants";
 import { memo } from "react";
 import SafeImage from "@/src/components/SafeImage";
 
@@ -185,14 +186,7 @@ export const TrendingTokenCard = ({
 
           {/* Verified badge and version label */}
           <div className="absolute top-2 left-2 flex items-center gap-2 z-10">
-            {(token.contract_address.toLowerCase() ===
-              "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58" ||
-              token.contract_address.toLowerCase() ===
-                "0x1c4f69f14cf754333c302246d25a48a13224118a" ||
-              token.contract_address.toLowerCase() ===
-                "0x063eda1b84ceaf79b8cc4a41658b449e8e1f9eeb" ||
-              token.contract_address.toLowerCase() ===
-                "0x2800f7bbdd38e84f38ef0a556705a62b5104e91b") && (
+            {VERIFIED_TOKENS.includes(token.contract_address.toLowerCase()) && (
               <div
                 className="bg-blue-500/90 backdrop-blur-sm rounded-full p-1 flex items-center justify-center"
                 title="Verified Token"
