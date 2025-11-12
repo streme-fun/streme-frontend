@@ -89,6 +89,7 @@ interface StakeData {
 // Cache for token data to avoid repeated API calls
 interface CachedTokenData {
   staking_address?: string;
+  staking_pool?: string;
   logo?: string;
   staking?: {
     lockDuration?: number;
@@ -195,6 +196,7 @@ export default function TokensPage() {
         const result = await response.json();
         const tokenData = {
           staking_address: result.data?.staking_address,
+          staking_pool: result.data?.staking_pool,
           logo: result.data?.img_url || result.data?.logo || result.data?.image,
           marketData: result.data?.marketData,
         };
@@ -211,6 +213,7 @@ export default function TokensPage() {
 
     const fallbackData = {
       staking_address: undefined,
+      staking_pool: undefined,
       logo: undefined,
       marketData: undefined,
     };
@@ -228,6 +231,7 @@ export default function TokensPage() {
       if (BLACKLISTED_TOKENS.includes(safeToLowerCase(address))) {
         results.set(address, {
           staking_address: undefined,
+          staking_pool: undefined,
           logo: undefined,
           marketData: undefined,
         });
@@ -282,6 +286,7 @@ export default function TokensPage() {
             if (tokenData) {
               const processedData = {
                 staking_address: tokenData.staking_address,
+                staking_pool: tokenData.staking_pool,
                 logo: tokenData.img_url || tokenData.logo || tokenData.image,
                 marketData: tokenData.marketData,
               };
@@ -293,6 +298,7 @@ export default function TokensPage() {
               // Token not found in database
               const fallbackData = {
                 staking_address: undefined,
+                staking_pool: undefined,
                 logo: undefined,
                 marketData: undefined,
               };
@@ -736,8 +742,8 @@ export default function TokensPage() {
 
         // Get the official staking pool for this token from the database
         const tokenData = tokenDataMap.get(tokenAddress);
-        const officialStakingPool = tokenData?.staking_address
-          ? safeToLowerCase(tokenData.staking_address)
+        const officialStakingPool = tokenData?.staking_pool
+          ? safeToLowerCase(tokenData.staking_pool)
           : null;
         const membershipPoolId = safeToLowerCase(membership.pool.id);
 
