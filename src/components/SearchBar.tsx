@@ -9,6 +9,7 @@ interface SearchBarProps {
   onChange: (value: string) => void;
   onSelectToken?: (contractAddress: string) => void;
   showSuggestions?: boolean;
+  onSearchResultsChange?: (results: any[]) => void;
 }
 
 export function SearchBar({
@@ -16,11 +17,20 @@ export function SearchBar({
   onChange,
   onSelectToken,
   showSuggestions = true,
+  onSearchResultsChange,
 }: SearchBarProps) {
   const { results, isLoading } = useTypesenseSearch(value, {
     debounceMs: 200,
     limit: 8,
   });
+
+  // Notify parent of search results (onSearchResultsChange is stable due to useCallback in parent)
+  useEffect(() => {
+    if (onSearchResultsChange) {
+      onSearchResultsChange(results);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results]);
 
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -44,6 +54,12 @@ export function SearchBar({
 
   const handleInputChange = (newValue: string) => {
     onChange(newValue);
+    // Show dropdown when user types
+    if (newValue.trim().length > 0) {
+      setShowDropdown(true);
+    } else {
+      setShowDropdown(false);
+    }
   };
 
   const handleSelectToken = (contractAddress: string) => {
@@ -56,8 +72,7 @@ export function SearchBar({
   const shouldShowDropdown =
     showSuggestions &&
     showDropdown &&
-    value.trim().length > 0 &&
-    (results.length > 0 || isLoading);
+    value.trim().length > 0;
 
   return (
     <div className="form-control w-full">

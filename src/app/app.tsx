@@ -23,11 +23,13 @@ import { CheckinModal } from "../components/CheckinModal";
 import { CheckinSuccessModal } from "../components/CheckinSuccessModal";
 import { useCheckinModal } from "../hooks/useCheckinModal";
 import sdk from "@farcaster/miniapp-sdk";
+import { convertTypesenseTokenToToken, TypesenseToken } from "../lib/typesenseClient";
 
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [typesenseResults, setTypesenseResults] = useState<Token[]>([]);
   const [sortBy, setSortBy] = useState<SortOption>("trending");
   const hasInitiallyFetched = useRef(false);
 
@@ -161,29 +163,18 @@ function App() {
 
   // Debug mode activation is now handled directly via handleLogoClick
 
-  // Fixed iterative pagination instead of recursive
+  // Fetch only top 30 tokens (trending by default from API)
   const fetchTokens = useCallback(async () => {
     try {
-      let allTokens: Token[] = [];
-      let nextPage: number | undefined = undefined;
-      let hasMore = true;
-
-      while (hasMore) {
-        const params = new URLSearchParams();
-        if (nextPage) params.append("before", nextPage.toString());
-
-        const response = await fetch(
-          `/api/tokens${params.toString() ? `?${params}` : ""}`
-        );
-        const data: TokensResponse = await response.json();
-
-        allTokens = [...allTokens, ...data.data];
-        hasMore = data.hasMore;
-        nextPage = data.nextPage;
-      }
+      const params = new URLSearchParams();
+      // Fetch only first page to get top 30 tokens
+      const response = await fetch(
+        `/api/tokens${params.toString() ? `?${params}` : ""}`
+      );
+      const data: TokensResponse = await response.json();
 
       // Filter out blacklisted tokens and tokens with $ in name/symbol before setting state
-      const filteredTokens = allTokens.filter((token) => {
+      const filteredTokens = data.data.filter((token) => {
         // Check blacklist
         if (token.creator?.name) {
           const creatorName = token.creator.name?.toLowerCase() || "";
@@ -335,6 +326,15 @@ function App() {
       autoConnectAttempted.current = false;
     }
   }, [isMiniAppView, isSDKLoaded, isConnected, unifiedConnect]);
+
+  // Handle search results change (memoized to prevent infinite loops)
+  const handleSearchResultsChange = useCallback((results: TypesenseToken[]) => {
+    // Convert Typesense results to Token format
+    const convertedTokens = results.map((tsToken: TypesenseToken) =>
+      convertTypesenseTokenToToken(tsToken)
+    );
+    setTypesenseResults(convertedTokens);
+  }, []);
 
   // Check checkin status when miniapp first opens (only after wallet is connected)
   useEffect(() => {
@@ -500,14 +500,16 @@ function App() {
               <SearchBar
                 value={searchQuery}
                 onChange={(value) => setSearchQuery(value)}
+                onSearchResultsChange={handleSearchResultsChange}
               />
             </div>
           </div>
           <TokenGrid
             tokens={tokens}
-            searchQuery={searchQuery}
+            searchQuery=""
             sortBy={sortBy}
             isMiniApp={true}
+            isSearchMode={false}
           />
 
           {!isOnCorrectNetwork && isConnected ? (
@@ -589,6 +591,7 @@ function App() {
                 <SearchBar
                   value={searchQuery}
                   onChange={(value) => setSearchQuery(value)}
+                  onSearchResultsChange={handleSearchResultsChange}
                 />
               </div>
             </div>
@@ -597,9 +600,10 @@ function App() {
             ) : (
               <TokenGrid
                 tokens={tokens}
-                searchQuery={searchQuery}
+                searchQuery=""
                 sortBy={sortBy}
                 isMiniApp={false}
+                isSearchMode={false}
               />
             )}
           </div>

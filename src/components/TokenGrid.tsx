@@ -20,6 +20,7 @@ interface TokenGridProps {
   searchQuery: string;
   sortBy: SortOption;
   isMiniApp?: boolean;
+  isSearchMode?: boolean;
 }
 
 export type SortOption =
@@ -734,6 +735,7 @@ export function TokenGrid({
   searchQuery,
   sortBy,
   isMiniApp = false,
+  isSearchMode = false,
 }: TokenGridProps) {
   const [displayedTokens, setDisplayedTokens] = useState<
     Array<Token & { rewards: number; totalStakers: number }>
@@ -1006,8 +1008,10 @@ export function TokenGrid({
       const baseFilteredTokens = uniqueIncomingTokens;
 
       // Use searchQuery prop for filtering
+      // Skip client-side filtering if using Typesense search (isSearchMode)
       let searchedTokensResult: Token[];
-      if (searchQuery.trim()) {
+      if (searchQuery.trim() && !isSearchMode) {
+        // Client-side filtering (fallback, shouldn't be used with Typesense)
         const searchLower = searchQuery.toLowerCase().trim();
         searchedTokensResult = baseFilteredTokens.filter((token) => {
           const nameMatch =

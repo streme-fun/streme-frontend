@@ -1,4 +1,5 @@
 import Typesense from "typesense";
+import { Token } from "../app/types/token";
 
 const apiKey = process.env.NEXT_PUBLIC_TYPESENSE_API_KEY;
 const host = process.env.NEXT_PUBLIC_TYPESENSE_HOST || "api.streme.fun";
@@ -37,6 +38,57 @@ export interface TypesenseToken {
   timestamp: number;
 }
 
+// Convert Typesense token to Token format for UI
+export function convertTypesenseTokenToToken(
+  tsToken: TypesenseToken
+): Token {
+  return {
+    id: 0, // Not available from Typesense
+    created_at: new Date(tsToken.timestamp * 1000).toISOString(),
+    tx_hash: "", // Not available
+    contract_address: tsToken.contract_address,
+    requestor_fid: tsToken.requestor_fid,
+    name: tsToken.name,
+    symbol: tsToken.symbol,
+    img_url: "", // Not available from search results
+    pool_address: "", // Not available
+    cast_hash: "", // Not available
+    type: tsToken.type,
+    pair: "", // Not available
+    chain_id: tsToken.chain_id,
+    metadata: {},
+    profileImage: null,
+    pool_id: "",
+    staking_pool: "",
+    staking_address: "",
+    pfp_url: "", // Not available
+    username: tsToken.username,
+    timestamp: {
+      _seconds: Math.floor(tsToken.timestamp),
+      _nanoseconds: 0,
+    },
+    marketData: {
+      marketCap: tsToken.market_cap,
+      price: 0,
+      priceChange1h: 0,
+      priceChange24h: 0,
+      priceChange5m: 0,
+      volume24h: tsToken.volume,
+      lastUpdated: {
+        _seconds: Math.floor(Date.now() / 1000),
+        _nanoseconds: 0,
+      },
+    },
+    creator: {
+      name: tsToken.username,
+      score: 0,
+      recasts: 0,
+      likes: 0,
+      profileImage: "",
+    },
+  };
+}
+
 export async function searchTokens(
   query: string,
   limit = 20
@@ -46,23 +98,18 @@ export async function searchTokens(
   }
 
   try {
-    const searchParams = {
-      q: query.trim(),
-      query_by: "name,symbol,username,contract_address",
-      limit,
-      per_page: limit,
-    };
+    // Use backend proxy to avoid CORS issues
+    const response = await fetch(
+      `/api/search?q=${encodeURIComponent(query.trim())}&limit=${limit}`
+    );
 
-    const results = await typesenseClient
-      .collections("tokens")
-      .documents()
-      .search(searchParams);
-
-    if (results.hits) {
-      return results.hits.map((hit) => hit.document as TypesenseToken);
+    if (!response.ok) {
+      console.error("Search API error:", response.status);
+      return [];
     }
 
-    return [];
+    const tokens = await response.json();
+    return tokens as TypesenseToken[];
   } catch (error) {
     console.error("Error searching tokens:", error);
     return [];

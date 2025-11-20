@@ -10,12 +10,11 @@ interface UseTypesenseSearchOptions {
 }
 
 export function useTypesenseSearch(
-  initialQuery: string = "",
+  externalQuery: string = "",
   options: UseTypesenseSearchOptions = {}
 ) {
   const { debounceMs = 300, limit = 20 } = options;
 
-  const [query, setQueryState] = useState(initialQuery);
   const [results, setResults] = useState<TypesenseToken[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,35 +47,28 @@ export function useTypesenseSearch(
     [limit]
   );
 
-  const setQuery = useCallback(
-    (newQuery: string) => {
-      setQueryState(newQuery);
-
-      // Clear existing debounce timer
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
-
-      // Set new debounce timer
-      debounceTimer.current = setTimeout(() => {
-        performSearch(newQuery);
-      }, debounceMs);
-    },
-    [performSearch, debounceMs]
-  );
-
-  // Cleanup debounce timer on unmount
+  // Watch for external query changes and debounce search
   useEffect(() => {
+    // Clear existing debounce timer
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    // Set new debounce timer
+    debounceTimer.current = setTimeout(() => {
+      performSearch(externalQuery);
+    }, debounceMs);
+
+    // Cleanup debounce timer on unmount
     return () => {
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
       }
     };
-  }, []);
+  }, [externalQuery, performSearch, debounceMs]);
 
   return {
-    query,
-    setQuery,
+    query: externalQuery,
     results,
     isLoading,
     error,
