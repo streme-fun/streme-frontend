@@ -231,6 +231,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
           staking_pool: undefined,
           logo: undefined,
           marketData: undefined,
+          staking: undefined,
         });
         return;
       }
@@ -286,6 +287,10 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                 staking_pool: tokenData.staking_pool,
                 logo: tokenData.img_url || tokenData.logo || tokenData.image,
                 marketData: tokenData.marketData,
+                // Preserve staking config so we can surface lock durations in the UI
+                staking: tokenData.staking
+                  ? { lockDuration: tokenData.staking.lockDuration }
+                  : undefined,
               };
 
               // Cache the result
@@ -302,6 +307,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                 staking_pool: undefined,
                 logo: undefined,
                 marketData: undefined,
+                staking: undefined,
               };
               tokenDataCache.set(address, {
                 data: fallbackData,

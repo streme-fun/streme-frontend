@@ -772,6 +772,8 @@ export function TokenActions({
               tokenSymbol={token.symbol}
               className="mb-4"
               pair={token.pair}
+              type={token.type}
+              poolAddress={token.pool_address}
             />
           )}
 

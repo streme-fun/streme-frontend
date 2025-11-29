@@ -45,7 +45,10 @@ interface LiquidityInfo {
 // Common fee tiers for Uniswap V3 (0.05%, 0.3%, 1%)
 const COMMON_FEE_TIERS = [500, 3000, 10000];
 
-export const useTokenLiquidity = (tokenAddress: string): LiquidityInfo => {
+export const useTokenLiquidity = (
+  tokenAddress: string,
+  poolAddress?: string
+): LiquidityInfo => {
   const [liquidityInfo, setLiquidityInfo] = useState<LiquidityInfo>({
     poolAddress: null,
     wethBalance: null,
@@ -72,6 +75,37 @@ export const useTokenLiquidity = (tokenAddress: string): LiquidityInfo => {
       try {
         let foundPool: string | null = null;
         let wethBalance: bigint | null = null;
+
+        // If pool address is provided, use it directly
+        if (poolAddress && poolAddress !== "0x0000000000000000000000000000000000000000") {
+          try {
+            const balance = (await publicClient.readContract({
+              address: WETH_ADDRESS as `0x${string}`,
+              abi: ERC20_ABI,
+              functionName: "balanceOf",
+              args: [poolAddress as `0x${string}`],
+            })) as bigint;
+
+            foundPool = poolAddress;
+            wethBalance = balance;
+
+            const wethBalanceFormatted = wethBalance
+              ? formatEther(wethBalance)
+              : null;
+
+            setLiquidityInfo({
+              poolAddress: foundPool,
+              wethBalance,
+              wethBalanceFormatted,
+              isLoading: false,
+              error: null,
+            });
+            return;
+          } catch (error) {
+            console.warn("Failed to check provided pool address:", error);
+            // Fall through to Uniswap pool search
+          }
+        }
 
         // Try different fee tiers to find the pool with the most liquidity
         for (const feeTier of COMMON_FEE_TIERS) {
@@ -148,7 +182,7 @@ export const useTokenLiquidity = (tokenAddress: string): LiquidityInfo => {
     };
 
     fetchLiquidityInfo();
-  }, [tokenAddress]);
+  }, [tokenAddress, poolAddress]);
 
   return liquidityInfo;
 };
