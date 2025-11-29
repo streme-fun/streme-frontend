@@ -23,6 +23,12 @@ export const STREME_STAKING_FACTORY_V2 =
   "0xC749105bc4b4eA6285dBBe2E8221c922BEA07A9d";
 export const STREME_VAULT = "0xDa902C1F73160daDE69AB3c3355110442359EB70";
 
+// V2Aero Addresses
+export const FEE_COLLECTOR =
+  "0x7CF7a05fE8f172dfeDBe2d3A36C2B899233d02c0";
+export const ZAP_CONTRACT_ADDRESS =
+  "0x47217096d8fe0FfECCCf2701e9c450658A93b59a";
+
 export const LP_FACTORY_ABI = [
   {
     inputs: [{ name: "account", type: "address" }],

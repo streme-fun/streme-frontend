@@ -15,6 +15,7 @@ import { useSafeWallets } from "../hooks/useSafeWallet";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 import Link from "next/link";
 import { ensureTxHash } from "@/src/lib/ensureTxHash";
+import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
 
 const WETH = "0x4200000000000000000000000000000000000006";
 const ETHX = "0x46fd5cfb4c12d87acd3a13e92baa53240c661d93";
@@ -150,7 +151,7 @@ export function ZapStakeButton({
       const amountOut = quoteResult[0];
       const amountOutMin = amountOut - amountOut / 200n; // 0.5% slippage
 
-      const zapContractAddress = "0x16a97D6924Ff246DD57eB78Ae993f91c23422F25";
+      const zapContractAddress = ZAP_CONTRACT_ADDRESS;
       const zapAbi = [
         "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
         "function zapETHx(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",

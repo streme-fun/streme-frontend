@@ -10,6 +10,7 @@ import { publicClient } from "@/src/lib/viemClient";
 import { ensureTxHash } from "@/src/lib/ensureTxHash";
 import sdk from "@farcaster/miniapp-sdk";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
+import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
 
 interface TokenStaker {
   account: {
@@ -235,7 +236,7 @@ export function StakerLeaderboardEmbed({
       const amountOut = quoteResult[0];
       const amountOutMin = amountOut - amountOut / 200n; // 0.5% slippage
 
-      const zapContractAddress = "0xeA25b9CD2D9F8Ba6cff45Ed0f6e1eFa2fC79a57E";
+      const zapContractAddress = ZAP_CONTRACT_ADDRESS;
       const zapAbi = [
         "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
       ];
