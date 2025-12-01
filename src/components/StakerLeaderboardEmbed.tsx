@@ -34,6 +34,7 @@ interface StakerLeaderboardEmbedProps {
   tokenAddress: string;
   tokenSymbol: string;
   stakingAddress?: string;
+  lpType?: "uniswap" | "aero";
   onViewAll: () => void;
   onStakingChange?: () => void;
   isMiniApp?: boolean;
@@ -47,6 +48,7 @@ export function StakerLeaderboardEmbed({
   tokenAddress,
   tokenSymbol,
   stakingAddress,
+  lpType,
   onViewAll,
   onStakingChange,
   isMiniApp,
@@ -192,8 +194,8 @@ export function StakerLeaderboardEmbed({
       const amountInWei = parseEther(amountIn);
 
       // 1. Get quote
-      const quoterAddress = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
-      const quoterAbi = [
+      var quoterAddress = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
+      var quoterAbi = [
         {
           inputs: [
             {
@@ -219,6 +221,34 @@ export function StakerLeaderboardEmbed({
           type: "function",
         },
       ];
+      if (lpType === "aero") {
+        quoterAddress = "0x3d4C22254F86f64B7eC90ab8F7aeC1FBFD271c6C";
+        quoterAbi[0].inputs[0].components[3] = {
+          name: "tickSpacing", type: "int24"
+        };
+      }
+      var args;
+      if (lpType === "aero") {
+        args = [
+          {
+            tokenIn: WETH,
+            tokenOut: toHex(tokenAddress),
+            amountIn: amountInWei,
+            tickSpacing: 500,
+            sqrtPriceLimitX96: 0n,
+          },
+        ];
+      } else {
+        args = [
+          {
+            tokenIn: WETH,
+            tokenOut: toHex(tokenAddress),
+            amountIn: amountInWei,
+            fee: 10000,
+            sqrtPriceLimitX96: 0n,
+          },
+        ];
+      }
       const quoteResult = (await publicClient.readContract({
         address: quoterAddress as `0x${string}`,
         abi: quoterAbi,

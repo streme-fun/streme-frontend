@@ -242,6 +242,7 @@ ${shareUrl}`;
             tokenAddress={token.contract_address}
             tokenSymbol={token.symbol}
             stakingAddress={token.staking_address}
+            lpType={token.type === "v2aero" ? "aero" : "uniswap"}
             onViewAll={() => setIsStakerLeaderboardOpen(true)}
             onStakingChange={handleStakingChange}
             tokenPrice={token.price}
