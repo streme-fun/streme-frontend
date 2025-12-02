@@ -811,6 +811,7 @@ export function TokenActions({
               stakingAddress={stakingAddress as `0x${string}`}
               symbol={token.symbol}
               pair={token.pair}
+              lpType={token.type === "v2aero" ? "aero" : "uniswap"}
               onSuccess={() => {
                 refreshBalances();
                 onStakingChange();
