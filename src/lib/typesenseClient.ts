@@ -1,13 +1,14 @@
 import Typesense from "typesense";
 import { Token } from "../app/types/token";
 
-const apiKey = process.env.NEXT_PUBLIC_TYPESENSE_API_KEY;
-const host = process.env.NEXT_PUBLIC_TYPESENSE_HOST || "api.streme.fun";
-const port = process.env.NEXT_PUBLIC_TYPESENSE_PORT || "443";
-const protocol = process.env.NEXT_PUBLIC_TYPESENSE_PROTOCOL || "https";
+// Server-side only - these env vars should NOT have NEXT_PUBLIC_ prefix
+const apiKey = process.env.TYPESENSE_API_KEY;
+const host = process.env.TYPESENSE_HOST || "api.streme.fun";
+const port = process.env.TYPESENSE_PORT || "443";
+const protocol = process.env.TYPESENSE_PROTOCOL || "https";
 
 if (!apiKey) {
-  console.warn("NEXT_PUBLIC_TYPESENSE_API_KEY is not set");
+  console.warn("TYPESENSE_API_KEY is not set (server-side only)");
 }
 
 export const typesenseClient = new Typesense.Client({
@@ -115,29 +116,5 @@ export async function searchTokens(
   } catch (error) {
     console.error("Error searching tokens:", error);
     return [];
-  }
-}
-
-export async function getTokenById(
-  contractAddress: string
-): Promise<TypesenseToken | null> {
-  try {
-    const results = await typesenseClient
-      .collections("tokens")
-      .documents()
-      .search({
-        q: contractAddress,
-        query_by: "contract_address",
-        limit: 1,
-      });
-
-    if (results.hits && results.hits.length > 0) {
-      return results.hits[0].document as TypesenseToken;
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Error fetching token:", error);
-    return null;
   }
 }

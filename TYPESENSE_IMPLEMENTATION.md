@@ -13,11 +13,10 @@ Typesense is now integrated into the search functionality, providing fast, typo-
 Core Typesense client configuration and search functions.
 
 **Key Functions:**
-- `searchTokens(query: string, limit?: number)`: Searches tokens using Typesense
-- `getTokenById(contractAddress: string)`: Retrieves a single token by address
+- `searchTokens(query: string, limit?: number)`: Searches tokens using Typesense via the server-side API proxy
 
 **Configuration:**
-- Uses environment variables: `NEXT_PUBLIC_TYPESENSE_API_KEY`, `NEXT_PUBLIC_TYPESENSE_HOST`, `NEXT_PUBLIC_TYPESENSE_PORT`, `NEXT_PUBLIC_TYPESENSE_PROTOCOL`
+- Uses environment variables: `TYPESENSE_API_KEY`, `TYPESENSE_HOST`, `TYPESENSE_PORT`, `TYPESENSE_PROTOCOL` (server-side only)
 - Default: `api.streme.fun` on port 443 with HTTPS
 
 **Search Fields:**
@@ -68,10 +67,10 @@ Enhanced search bar with dropdown suggestions.
 Add these to your `.env.local` file:
 
 ```bash
-NEXT_PUBLIC_TYPESENSE_API_KEY=your_api_key_here
-NEXT_PUBLIC_TYPESENSE_HOST=api.streme.fun
-NEXT_PUBLIC_TYPESENSE_PORT=443
-NEXT_PUBLIC_TYPESENSE_PROTOCOL=https
+TYPESENSE_API_KEY=your_api_key_here
+TYPESENSE_HOST=api.streme.fun
+TYPESENSE_PORT=443
+TYPESENSE_PROTOCOL=https
 ```
 
 ## Usage in Components
