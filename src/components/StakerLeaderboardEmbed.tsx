@@ -194,8 +194,8 @@ export function StakerLeaderboardEmbed({
       const amountInWei = parseEther(amountIn);
 
       // 1. Get quote
-      var quoterAddress = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
-      var quoterAbi = [
+      let quoterAddress = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
+      const quoterAbi = [
         {
           inputs: [
             {
@@ -227,7 +227,7 @@ export function StakerLeaderboardEmbed({
           name: "tickSpacing", type: "int24"
         };
       }
-      var args;
+      let args;
       if (lpType === "aero") {
         args = [
           {
