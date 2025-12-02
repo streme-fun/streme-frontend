@@ -20,10 +20,11 @@ interface TokenGridProps {
   searchQuery: string;
   sortBy: SortOption;
   isMiniApp?: boolean;
+  isSearchMode?: boolean;
 }
 
 export type SortOption =
-  | "stakers"
+  | "marketCap"
   | "newest"
   | "oldest"
   | "trending"
@@ -134,6 +135,63 @@ export const fetchTrendingTokens = async (): Promise<Token[]> => {
   } catch (error) {
     console.error("Error fetching trending tokens:", error);
     return [];
+  }
+};
+
+// Interface for pagination metadata
+export interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalResults: number;
+  hasMore: boolean;
+}
+
+// Function to fetch sorted tokens from Typesense (exported for TokenGrid)
+export const fetchSortedTokens = async (
+  sortBy: "newest" | "oldest" | "marketCap",
+  page: number = 1,
+  limit: number = 36,
+  filter?: "crowdfunds"
+): Promise<{ tokens: Token[]; pagination: PaginationInfo }> => {
+  try {
+    const params = new URLSearchParams({
+      sortBy,
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+
+    if (filter) {
+      params.set("filter", filter);
+    }
+
+    const response = await fetch(`/api/tokens/sorted?${params.toString()}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    return {
+      tokens: data.data || [],
+      pagination: data.pagination || {
+        currentPage: page,
+        totalPages: 0,
+        totalResults: 0,
+        hasMore: false,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching sorted tokens:", error);
+    return {
+      tokens: [],
+      pagination: {
+        currentPage: page,
+        totalPages: 0,
+        totalResults: 0,
+        hasMore: false,
+      },
+    };
   }
 };
 
@@ -258,7 +316,7 @@ export const TrendingTokenCard = ({
 
             {/* 24h Volume */}
             <div className="flex flex-col">
-              <p className="text-[10px] opacity-60 uppercase">24H</p>
+              <p className="text-[10px] opacity-60 uppercase">Volume</p>
               <p className="font-mono text-sm">
                 ${formatVolume(token.volume24h)}
               </p>
@@ -734,6 +792,7 @@ export function TokenGrid({
   searchQuery,
   sortBy,
   isMiniApp = false,
+  isSearchMode = false,
 }: TokenGridProps) {
   const [displayedTokens, setDisplayedTokens] = useState<
     Array<Token & { rewards: number; totalStakers: number }>
@@ -741,8 +800,6 @@ export function TokenGrid({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItemsCount, setTotalItemsCount] = useState(0);
-  const [stakersSortedAllTokensCache, setStakersSortedAllTokensCache] =
-    useState<Array<Token & { rewards: number; totalStakers: number }>>([]);
   const [isFetchingTrending, setIsFetchingTrending] = useState(false);
   const [isEnrichingTrending, setIsEnrichingTrending] = useState(false);
   const trendingTokensRef = useRef<Token[]>([]);
@@ -895,14 +952,13 @@ export function TokenGrid({
       setDisplayedTokens([]);
     }
     setTotalItemsCount(0);
-    setStakersSortedAllTokensCache([]);
   }, [tokens, sortBy, searchQuery]); // Added searchQuery to reset pagination when search changes
 
   // Helper to enrich a batch of tokens with rewards and stakers data
   const enrichTokenBatch = async (batch: Token[]) => {
     return Promise.all(
       batch.map(async (token) => {
-        // If token already has rewards/stakers (e.g. from stakersSortedAllTokensCache), use them
+        // If token already has rewards/stakers, use them
         if ("rewards" in token && "totalStakers" in token) {
           return token as Token & { rewards: number; totalStakers: number };
         }
@@ -968,164 +1024,130 @@ export function TokenGrid({
     }
 
     const fetchDataAndProcess = async () => {
-      // Determine which tokens to use based on sortBy
-      let sourceTokens: Token[];
-      if (sortBy === "trending") {
-        sourceTokens = trendingTokensRef.current;
-      } else if (sortBy === "crowdfunds") {
-        // Filter to only show crowdfund tokens
-        sourceTokens = tokens.filter((token) =>
-          CROWDFUND_TOKEN_ADDRESSES.includes(
-            token.contract_address.toLowerCase()
-          )
-        );
-      } else {
-        sourceTokens = tokens;
-      }
-
-      if (!sourceTokens || sourceTokens.length === 0) {
-        // Only clear state if we're not in a loading state and this isn't the initial render
-        if (!isFetchingTrending && !isLoadingMore) {
-          if (displayedTokens.length > 0) setDisplayedTokens([]);
-          if (totalItemsCount > 0) setTotalItemsCount(0);
-          if (stakersSortedAllTokensCache.length > 0)
-            setStakersSortedAllTokensCache([]);
-        }
-        setIsLoadingMore(false);
-        return;
-      }
-
       setIsLoadingMore(true);
 
-      const uniqueIncomingTokens = Array.from(
-        new Map(
-          sourceTokens.map((token) => [token.contract_address, token])
-        ).values()
-      );
-      // No need to filter here anymore - filtering happens at API level
-      const baseFilteredTokens = uniqueIncomingTokens;
+      try {
+        // Determine data source based on sortBy
+        let sourceTokens: Token[];
+        let paginationInfo: PaginationInfo | undefined;
 
-      // Use searchQuery prop for filtering
-      let searchedTokensResult: Token[];
-      if (searchQuery.trim()) {
-        const searchLower = searchQuery.toLowerCase().trim();
-        searchedTokensResult = baseFilteredTokens.filter((token) => {
-          const nameMatch =
-            token.name &&
-            typeof token.name === "string" &&
-            token.name.toLowerCase().includes(searchLower);
-          const symbolMatch =
-            token.symbol &&
-            typeof token.symbol === "string" &&
-            token.symbol.toLowerCase().includes(searchLower);
-          const creatorNameMatch =
-            token.creator &&
-            token.creator.name &&
-            typeof token.creator.name === "string" &&
-            token.creator.name.toLowerCase().includes(searchLower);
-          return nameMatch || symbolMatch || creatorNameMatch;
-        });
-      } else {
-        searchedTokensResult = baseFilteredTokens;
-      }
+        if (sortBy === "trending") {
+          // Use existing trending logic
+          sourceTokens = trendingTokensRef.current;
 
-      // Use sortBy prop for sorting
-      let sortedTokens: Array<
-        Token & { rewards: number; totalStakers: number }
-      >;
-      if (sortBy === "stakers") {
-        // If searching, we must enrich and sort the searched subset.
-        // If not searching, we can use the cache or build it.
-        if (searchQuery.trim()) {
-          const enrichedSearched = await enrichTokenBatch(searchedTokensResult);
-          sortedTokens = enrichedSearched.sort(
-            (a, b) => b.totalStakers - a.totalStakers
+          if (!sourceTokens || sourceTokens.length === 0) {
+            if (!isFetchingTrending && !isLoadingMore) {
+              if (displayedTokens.length > 0) setDisplayedTokens([]);
+              if (totalItemsCount > 0) setTotalItemsCount(0);
+            }
+            setIsLoadingMore(false);
+            return;
+          }
+
+          // Apply search filter if needed
+          if (searchQuery.trim() && !isSearchMode) {
+            const searchLower = searchQuery.toLowerCase().trim();
+            sourceTokens = sourceTokens.filter((token) => {
+              const nameMatch =
+                token.name &&
+                typeof token.name === "string" &&
+                token.name.toLowerCase().includes(searchLower);
+              const symbolMatch =
+                token.symbol &&
+                typeof token.symbol === "string" &&
+                token.symbol.toLowerCase().includes(searchLower);
+              const creatorNameMatch =
+                token.creator &&
+                token.creator.name &&
+                typeof token.creator.name === "string" &&
+                token.creator.name.toLowerCase().includes(searchLower);
+              return nameMatch || symbolMatch || creatorNameMatch;
+            });
+          }
+
+          // Client-side pagination for trending
+          setTotalItemsCount(sourceTokens.length);
+          const startIndex = (currentPage - 1) * TOKENS_PER_PAGE;
+          const endIndex = currentPage * TOKENS_PER_PAGE;
+          sourceTokens = sourceTokens.slice(startIndex, endIndex);
+        } else if (sortBy === "crowdfunds") {
+          // Use Typesense with crowdfund filter
+          const response = await fetchSortedTokens(
+            "newest",
+            currentPage,
+            TOKENS_PER_PAGE,
+            "crowdfunds"
           );
+          sourceTokens = response.tokens;
+          paginationInfo = response.pagination;
+        } else if (["newest", "oldest", "marketCap"].includes(sortBy)) {
+          // Use Typesense server-side sorting
+          const response = await fetchSortedTokens(
+            sortBy as "newest" | "oldest" | "marketCap",
+            currentPage,
+            TOKENS_PER_PAGE
+          );
+          sourceTokens = response.tokens;
+          paginationInfo = response.pagination;
         } else {
-          // Not searching, use cache or build it
-          if (stakersSortedAllTokensCache.length > 0 && currentPage > 1) {
-            // Use cache if available and not on the first page (first page might rebuild cache)
-            sortedTokens = stakersSortedAllTokensCache;
-          } else {
-            // Build/rebuild cache for all non-searched tokens
-            const enrichedAll = await enrichTokenBatch(searchedTokensResult); // searchedTokensResult is baseFilteredTokens here
-            sortedTokens = enrichedAll.sort(
-              (a, b) => b.totalStakers - a.totalStakers
-            );
-            setStakersSortedAllTokensCache(sortedTokens);
+          // Fallback to tokens prop (shouldn't happen with current SortOption types)
+          sourceTokens = tokens;
+
+          // Apply search filter if needed
+          if (searchQuery.trim() && !isSearchMode) {
+            const searchLower = searchQuery.toLowerCase().trim();
+            sourceTokens = sourceTokens.filter((token) => {
+              const nameMatch =
+                token.name &&
+                typeof token.name === "string" &&
+                token.name.toLowerCase().includes(searchLower);
+              const symbolMatch =
+                token.symbol &&
+                typeof token.symbol === "string" &&
+                token.symbol.toLowerCase().includes(searchLower);
+              const creatorNameMatch =
+                token.creator &&
+                token.creator.name &&
+                typeof token.creator.name === "string" &&
+                token.creator.name.toLowerCase().includes(searchLower);
+              return nameMatch || symbolMatch || creatorNameMatch;
+            });
+          }
+
+          // Client-side pagination for fallback
+          setTotalItemsCount(sourceTokens.length);
+          const startIndex = (currentPage - 1) * TOKENS_PER_PAGE;
+          const endIndex = currentPage * TOKENS_PER_PAGE;
+          sourceTokens = sourceTokens.slice(startIndex, endIndex);
+        }
+
+        // Update total items count from pagination if available
+        if (paginationInfo) {
+          setTotalItemsCount(paginationInfo.totalResults);
+        }
+
+        // Enrich tokens with rewards and stakers data
+        const finalPageBatch = await enrichTokenBatch(sourceTokens);
+
+        if (currentPage === 1) {
+          setDisplayedTokens(finalPageBatch);
+        } else {
+          if (finalPageBatch.length > 0) {
+            // Deduplicate before appending, ensuring keys are unique for React
+            setDisplayedTokens((prev) => {
+              const existingKeys = new Set(prev.map((t) => t.contract_address));
+              const newUniqueTokens = finalPageBatch.filter(
+                (t) => !existingKeys.has(t.contract_address)
+              );
+              return [...prev, ...newUniqueTokens];
+            });
           }
         }
-      } else if (sortBy === "trending") {
-        // For trending, tokens are already sorted by the API, just enrich them
-        const enrichedTrending = await enrichTokenBatch(searchedTokensResult);
-        sortedTokens = enrichedTrending;
-        // Clear staker cache if we switch to trending
-        if (stakersSortedAllTokensCache.length > 0)
-          setStakersSortedAllTokensCache([]);
-      } else if (sortBy === "crowdfunds") {
-        // For crowdfunds, sort by newest first and enrich
-        const sortedCrowdfunds = sortTokensByDate(
-          searchedTokensResult as Array<
-            Token & { rewards?: number; totalStakers?: number }
-          >,
-          "newest"
-        );
-        const enrichedCrowdfunds = await enrichTokenBatch(sortedCrowdfunds);
-        sortedTokens = enrichedCrowdfunds;
-        // Clear staker cache if we switch to crowdfunds
-        if (stakersSortedAllTokensCache.length > 0)
-          setStakersSortedAllTokensCache([]);
-      } else {
-        // For "newest" or "oldest" sort: Sort by date. Enrichment happens per page.
-        // We cast searchedTokensResult here as its enrichment status is not yet guaranteed.
-        sortedTokens = sortTokensByDate(
-          searchedTokensResult as Array<
-            Token & { rewards?: number; totalStakers?: number }
-          >,
-          sortBy as "newest" | "oldest"
-        ) as Array<Token & { rewards: number; totalStakers: number }>; // Assume enrichment will happen
-        // Clear staker cache if we switch away from staker sort
-        if (stakersSortedAllTokensCache.length > 0)
-          setStakersSortedAllTokensCache([]);
+        setIsLoadingMore(false);
+      } catch (error) {
+        console.error("Error fetching/processing tokens:", error);
+        setIsLoadingMore(false);
       }
-
-      setTotalItemsCount(sortedTokens.length);
-
-      const startIndex = (currentPage - 1) * TOKENS_PER_PAGE;
-      const endIndex = currentPage * TOKENS_PER_PAGE;
-      const pageBatchUnenriched = sortedTokens.slice(startIndex, endIndex);
-
-      let finalPageBatch: Array<
-        Token & { rewards: number; totalStakers: number }
-      >;
-      // Use sortBy prop for logic
-      if (
-        (sortBy !== "stakers" && sortBy !== "trending") ||
-        searchQuery.trim()
-      ) {
-        finalPageBatch = await enrichTokenBatch(pageBatchUnenriched);
-      } else {
-        // If staker sort or trending and no search, tokens are already enriched from sortedTokens (or cache)
-        finalPageBatch = pageBatchUnenriched as Array<
-          Token & { rewards: number; totalStakers: number }
-        >;
-      }
-
-      if (currentPage === 1) {
-        setDisplayedTokens(finalPageBatch);
-      } else {
-        if (finalPageBatch.length > 0) {
-          // Deduplicate before appending, ensuring keys are unique for React
-          setDisplayedTokens((prev) => {
-            const existingKeys = new Set(prev.map((t) => t.contract_address));
-            const newUniqueTokens = finalPageBatch.filter(
-              (t) => !existingKeys.has(t.contract_address)
-            );
-            return [...prev, ...newUniqueTokens];
-          });
-        }
-      }
-      setIsLoadingMore(false);
     };
 
     fetchDataAndProcess();
