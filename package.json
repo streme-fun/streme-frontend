@@ -85,5 +85,8 @@
     "postcss": "^8.5.1",
     "ts-jest": "^29.4.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "graphql": "^16.11.0"
   }
 }

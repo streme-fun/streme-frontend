@@ -13,6 +13,8 @@ interface LiquidityWarningProps {
   className?: string;
   onDismiss?: () => void;
   pair?: string; // Paired token (e.g., "WETH", "ETHx")
+  type?: string; // Token pool type (e.g., "v2aero", "v2uni")
+  poolAddress?: string; // Liquidity pool address
 }
 
 export const LiquidityWarning = ({
@@ -22,9 +24,14 @@ export const LiquidityWarning = ({
   className = "",
   onDismiss,
   pair = "WETH",
+  type,
+  poolAddress: providedPoolAddress,
 }: LiquidityWarningProps) => {
   const { wethBalance, wethBalanceFormatted, poolAddress, isLoading, error } =
-    useTokenLiquidity(tokenAddress);
+    useTokenLiquidity(tokenAddress, providedPoolAddress);
+
+  // Don't show warning for Aerodrome pools or other non-Uniswap pool types
+  if (type && type.toLowerCase() === "v2aero") return null;
 
   // Don't show warning for non-WETH pairs (ETHx, etc.) since hook only checks WETH
   if (pair && pair.toUpperCase() !== "WETH") return null;
@@ -100,9 +107,14 @@ export const InlineLiquidityWarning = ({
   tokenSymbol = "token",
   className = "",
   pair = "WETH",
+  type,
+  poolAddress: providedPoolAddress,
 }: Omit<LiquidityWarningProps, "onDismiss">) => {
   const { wethBalance, wethBalanceFormatted, isLoading, error } =
-    useTokenLiquidity(tokenAddress);
+    useTokenLiquidity(tokenAddress, providedPoolAddress);
+
+  // Don't show warning for Aerodrome pools or other non-Uniswap pool types
+  if (type && type.toLowerCase() === "v2aero") return null;
 
   // Don't show warning for non-WETH pairs (ETHx, etc.) since hook only checks WETH
   if (pair && pair.toUpperCase() !== "WETH") return null;

@@ -10,6 +10,7 @@ import { publicClient } from "@/src/lib/viemClient";
 import { ensureTxHash } from "@/src/lib/ensureTxHash";
 import sdk from "@farcaster/miniapp-sdk";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
+import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
 
 interface TokenStaker {
   account: {
@@ -33,6 +34,7 @@ interface StakerLeaderboardEmbedProps {
   tokenAddress: string;
   tokenSymbol: string;
   stakingAddress?: string;
+  lpType?: "uniswap" | "aero";
   onViewAll: () => void;
   onStakingChange?: () => void;
   isMiniApp?: boolean;
@@ -46,6 +48,7 @@ export function StakerLeaderboardEmbed({
   tokenAddress,
   tokenSymbol,
   stakingAddress,
+  lpType,
   onViewAll,
   onStakingChange,
   isMiniApp,
@@ -191,7 +194,7 @@ export function StakerLeaderboardEmbed({
       const amountInWei = parseEther(amountIn);
 
       // 1. Get quote
-      const quoterAddress = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
+      let quoterAddress = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
       const quoterAbi = [
         {
           inputs: [
@@ -218,6 +221,34 @@ export function StakerLeaderboardEmbed({
           type: "function",
         },
       ];
+      if (lpType === "aero") {
+        quoterAddress = "0x3d4C22254F86f64B7eC90ab8F7aeC1FBFD271c6C";
+        quoterAbi[0].inputs[0].components[3] = {
+          name: "tickSpacing", type: "int24"
+        };
+      }
+      let args;
+      if (lpType === "aero") {
+        args = [
+          {
+            tokenIn: WETH,
+            tokenOut: toHex(tokenAddress),
+            amountIn: amountInWei,
+            tickSpacing: 500,
+            sqrtPriceLimitX96: 0n,
+          },
+        ];
+      } else {
+        args = [
+          {
+            tokenIn: WETH,
+            tokenOut: toHex(tokenAddress),
+            amountIn: amountInWei,
+            fee: 10000,
+            sqrtPriceLimitX96: 0n,
+          },
+        ];
+      }
       const quoteResult = (await publicClient.readContract({
         address: quoterAddress as `0x${string}`,
         abi: quoterAbi,
@@ -235,7 +266,7 @@ export function StakerLeaderboardEmbed({
       const amountOut = quoteResult[0];
       const amountOutMin = amountOut - amountOut / 200n; // 0.5% slippage
 
-      const zapContractAddress = "0xeA25b9CD2D9F8Ba6cff45Ed0f6e1eFa2fC79a57E";
+      const zapContractAddress = ZAP_CONTRACT_ADDRESS;
       const zapAbi = [
         "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
       ];

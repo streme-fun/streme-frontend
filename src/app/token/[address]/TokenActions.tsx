@@ -772,6 +772,8 @@ export function TokenActions({
               tokenSymbol={token.symbol}
               className="mb-4"
               pair={token.pair}
+              type={token.type}
+              poolAddress={token.pool_address}
             />
           )}
 
@@ -809,6 +811,7 @@ export function TokenActions({
               stakingAddress={stakingAddress as `0x${string}`}
               symbol={token.symbol}
               pair={token.pair}
+              lpType={token.type === "v2aero" ? "aero" : "uniswap"}
               onSuccess={() => {
                 refreshBalances();
                 onStakingChange();

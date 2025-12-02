@@ -15,6 +15,7 @@ import { useSafeWallets } from "../hooks/useSafeWallet";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 import Link from "next/link";
 import { ensureTxHash } from "@/src/lib/ensureTxHash";
+import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
 
 const WETH = "0x4200000000000000000000000000000000000006";
 const ETHX = "0x46fd5cfb4c12d87acd3a13e92baa53240c661d93";
@@ -25,6 +26,7 @@ interface ZapStakeButtonProps {
   stakingAddress: string;
   symbol: string;
   pair?: string;
+  lpType?: string;
   className?: string;
   disabled?: boolean;
   onSuccess?: () => void;
@@ -39,6 +41,7 @@ export function ZapStakeButton({
   stakingAddress,
   symbol,
   pair,
+  lpType,
   className,
   disabled,
   onSuccess,
@@ -106,7 +109,7 @@ export function ZapStakeButton({
       const amountInWei = parseEther(amountIn);
 
       // 1. Get quote (common for both paths)
-      const quoterAddress = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
+      let quoterAddress = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a";
       const quoterAbi = [
         {
           inputs: [
@@ -133,11 +136,25 @@ export function ZapStakeButton({
           type: "function",
         },
       ];
-      const quoteResult = (await publicClient.readContract({
-        address: quoterAddress as `0x${string}`,
-        abi: quoterAbi,
-        functionName: "quoteExactInputSingle",
-        args: [
+      if (lpType === "aero") {
+        quoterAddress = "0x3d4C22254F86f64B7eC90ab8F7aeC1FBFD271c6C";
+        quoterAbi[0].inputs[0].components[3] = {
+          name: "tickSpacing", type: "int24"
+        };
+      }
+      let args;
+      if (lpType === "aero") {
+        args = [
+          {
+            tokenIn: toHex(pairedTokenAddress),
+            tokenOut: toHex(tokenAddress),
+            amountIn: amountInWei,
+            tickSpacing: 500,
+            sqrtPriceLimitX96: 0n,
+          },
+        ];
+      } else {
+        args = [
           {
             tokenIn: toHex(pairedTokenAddress),
             tokenOut: toHex(tokenAddress),
@@ -145,12 +162,18 @@ export function ZapStakeButton({
             fee: 10000,
             sqrtPriceLimitX96: 0n,
           },
-        ],
+        ];
+      }
+      const quoteResult = (await publicClient.readContract({
+        address: quoterAddress as `0x${string}`,
+        abi: quoterAbi,
+        functionName: "quoteExactInputSingle",
+        args: args,
       })) as [bigint, bigint, number, bigint];
       const amountOut = quoteResult[0];
       const amountOutMin = amountOut - amountOut / 200n; // 0.5% slippage
 
-      const zapContractAddress = "0x16a97D6924Ff246DD57eB78Ae993f91c23422F25";
+      const zapContractAddress = ZAP_CONTRACT_ADDRESS;
       const zapAbi = [
         "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
         "function zapETHx(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
