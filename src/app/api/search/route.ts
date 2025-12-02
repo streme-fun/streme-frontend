@@ -10,10 +10,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const typesenseHost = process.env.NEXT_PUBLIC_TYPESENSE_HOST;
-    const typesenseApiKey = process.env.NEXT_PUBLIC_TYPESENSE_API_KEY;
-    const typesensePort = process.env.NEXT_PUBLIC_TYPESENSE_PORT || "443";
-    const typesenseProtocol = process.env.NEXT_PUBLIC_TYPESENSE_PROTOCOL || "https";
+    const typesenseHost = process.env.TYPESENSE_HOST || "api.streme.fun";
+    const typesenseApiKey = process.env.TYPESENSE_API_KEY;
+    const typesensePort = process.env.TYPESENSE_PORT || "443";
+    const typesenseProtocol = process.env.TYPESENSE_PROTOCOL || "https";
 
     if (!typesenseHost || !typesenseApiKey) {
       console.error("Missing Typesense credentials");

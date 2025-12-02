@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
   }
 
   // Check Typesense credentials
-  const typesenseHost = process.env.NEXT_PUBLIC_TYPESENSE_HOST;
-  const typesenseApiKey = process.env.NEXT_PUBLIC_TYPESENSE_API_KEY;
+  const typesenseHost = process.env.TYPESENSE_HOST || "api.streme.fun";
+  const typesenseApiKey = process.env.TYPESENSE_API_KEY;
 
   if (!typesenseHost || !typesenseApiKey) {
     console.error("Missing Typesense credentials");
