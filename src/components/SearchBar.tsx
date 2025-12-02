@@ -3,13 +3,15 @@
 import { useRef, useState, useEffect } from "react";
 import { useTypesenseSearch } from "../hooks/useTypesenseSearch";
 import Link from "next/link";
+import SafeImage from "./SafeImage";
+import { TypesenseToken } from "../lib/typesenseClient";
 
 interface SearchBarProps {
   value: string;
   onChange: (value: string) => void;
   onSelectToken?: (contractAddress: string) => void;
   showSuggestions?: boolean;
-  onSearchResultsChange?: (results: any[]) => void;
+  onSearchResultsChange?: (results: TypesenseToken[]) => void;
 }
 
 export function SearchBar({
@@ -70,9 +72,7 @@ export function SearchBar({
   };
 
   const shouldShowDropdown =
-    showSuggestions &&
-    showDropdown &&
-    value.trim().length > 0;
+    showSuggestions && showDropdown && value.trim().length > 0;
 
   return (
     <div className="form-control w-full">
@@ -80,7 +80,7 @@ export function SearchBar({
         <input
           ref={inputRef}
           type="text"
-          placeholder="Token/User"
+          placeholder="Search by Token or User"
           value={value}
           onChange={(e) => handleInputChange(e.target.value)}
           onFocus={() => {
@@ -125,13 +125,27 @@ export function SearchBar({
                     href={`/token/${token.contract_address}`}
                   >
                     <div
-                      onClick={() =>
-                        handleSelectToken(token.contract_address)
-                      }
+                      onClick={() => handleSelectToken(token.contract_address)}
                       className="p-3 hover:bg-base-200 cursor-pointer transition-colors flex items-center gap-3"
                     >
-                      <div className="flex-shrink-0 w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center font-bold text-sm">
-                        ${token.symbol?.slice(0, 1) || "?"}
+                      <div className="flex-shrink-0 w-8 h-8 bg-primary/10 rounded-full overflow-hidden flex items-center justify-center">
+                        {token.img_url ? (
+                          <SafeImage
+                            src={token.img_url}
+                            alt={token.name}
+                            width={32}
+                            height={32}
+                            className="object-cover"
+                            unoptimized={
+                              token.img_url?.includes(".gif") ||
+                              token.img_url?.includes("imagedelivery.net")
+                            }
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center font-bold text-sm">
+                            ${token.symbol?.slice(0, 1) || "?"}
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{token.name}</div>
@@ -142,7 +156,8 @@ export function SearchBar({
                       </div>
                       {token.market_cap !== undefined && (
                         <div className="flex-shrink-0 text-xs opacity-60 font-mono">
-                          ${token.market_cap >= 1000000
+                          $
+                          {token.market_cap >= 1000000
                             ? `${(token.market_cap / 1000000).toFixed(1)}M`
                             : token.market_cap >= 1000
                             ? `${(token.market_cap / 1000).toFixed(1)}K`

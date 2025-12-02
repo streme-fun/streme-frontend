@@ -17,7 +17,7 @@ const SORT_OPTIONS_STANDARD: { value: SortOption; label: string }[] = [
   { value: "trending", label: "Trending" },
   { value: "newest", label: "Newest" },
   { value: "oldest", label: "Oldest" },
-  { value: "stakers", label: "Most Stakers" },
+  { value: "marketCap", label: "Market Cap" },
   // { value: "crowdfunds", label: "Crowdfunds" },
 ];
 

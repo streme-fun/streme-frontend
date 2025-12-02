@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     if (results.hits) {
       return NextResponse.json(
-        results.hits.map((hit: any) => hit.document)
+        results.hits.map((hit: { document: unknown }) => hit.document)
       );
     }
 

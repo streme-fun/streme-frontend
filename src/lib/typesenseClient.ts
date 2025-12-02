@@ -36,6 +36,8 @@ export interface TypesenseToken {
   market_cap: number;
   volume: number;
   timestamp: number;
+  img_url?: string;
+  pfp_url?: string;
 }
 
 // Convert Typesense token to Token format for UI
@@ -50,7 +52,7 @@ export function convertTypesenseTokenToToken(
     requestor_fid: tsToken.requestor_fid,
     name: tsToken.name,
     symbol: tsToken.symbol,
-    img_url: "", // Not available from search results
+    img_url: tsToken.img_url || "",
     pool_address: "", // Not available
     cast_hash: "", // Not available
     type: tsToken.type,
@@ -61,7 +63,7 @@ export function convertTypesenseTokenToToken(
     pool_id: "",
     staking_pool: "",
     staking_address: "",
-    pfp_url: "", // Not available
+    pfp_url: tsToken.pfp_url || "",
     username: tsToken.username,
     timestamp: {
       _seconds: Math.floor(tsToken.timestamp),
@@ -84,7 +86,7 @@ export function convertTypesenseTokenToToken(
       score: 0,
       recasts: 0,
       likes: 0,
-      profileImage: "",
+      profileImage: tsToken.pfp_url || "",
     },
   };
 }
