@@ -77,7 +77,10 @@ export const useTokenLiquidity = (
         let wethBalance: bigint | null = null;
 
         // If pool address is provided, use it directly
-        if (poolAddress && poolAddress !== "0x0000000000000000000000000000000000000000") {
+        if (
+          poolAddress &&
+          poolAddress !== "0x0000000000000000000000000000000000000000"
+        ) {
           try {
             const balance = (await publicClient.readContract({
               address: WETH_ADDRESS as `0x${string}`,
@@ -191,7 +194,7 @@ export const useTokenLiquidity = (
 export const isLiquidityLow = (
   wethBalance: bigint | null,
   tokenLaunchTime: string | number | Date,
-  threshold: number = 0.01 // Default threshold: 0.02 WETH
+  threshold: number = 0.001 // Default threshold: 0.02 WETH
 ): boolean => {
   const now = Date.now();
   const launchTime = new Date(tokenLaunchTime).getTime();
