@@ -19,6 +19,7 @@ import { parseEther, parseUnits } from "viem";
 import { useTokenBalance } from "@/src/hooks/useTokenData";
 import { useTokenData } from "@/src/contexts/TokenPageContext";
 import { useTokenPrice } from "@/src/hooks/useTokenPrice";
+import { isStakingDisabled } from "@/src/lib/tokenUtils";
 
 // Base USDC contract address
 const USDC_BASE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -804,8 +805,8 @@ export function TokenActions({
               }`}
             />
           </div>
-          {/* Buy & Stake Button (only for buy direction) */}
-          {tradeDirection === "buy" && tradeCurrency !== "USDC" && stakingAddress && (
+          {/* Buy & Stake Button (only for buy direction) - Hidden for v2/v2aero tokens */}
+          {tradeDirection === "buy" && tradeCurrency !== "USDC" && stakingAddress && !isStakingDisabled(token.type, contractAddress) && (
             <ZapStakeButton
               tokenAddress={contractAddress as `0x${string}`}
               stakingAddress={stakingAddress as `0x${string}`}
@@ -828,8 +829,8 @@ export function TokenActions({
           )}
         </div>
         <div className="my-6 h-px bg-base-300" />
-        {/* Staking Actions */}
-        {stakingAddress && (
+        {/* Staking Actions - Hidden for v2/v2aero tokens */}
+        {stakingAddress && !isStakingDisabled(token.type, contractAddress) && (
           <StakeButton
             tokenAddress={contractAddress as `0x${string}`}
             stakingAddress={stakingAddress as `0x${string}`}

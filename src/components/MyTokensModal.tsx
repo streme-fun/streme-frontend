@@ -1847,6 +1847,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                 farcasterAddress={effectiveAddress}
                                 farcasterIsConnected={effectiveIsConnected}
                                 className="btn btn-secondary btn-sm"
+                                tokenType={stake.tokenType}
                               />
                             </div>
                             <UnstakeButton
@@ -2050,6 +2051,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                 farcasterAddress={effectiveAddress}
                                 farcasterIsConnected={effectiveIsConnected}
                                 className="btn btn-secondary btn-sm"
+                                tokenType={token.tokenType}
                               />
                             </div>
                           </div>

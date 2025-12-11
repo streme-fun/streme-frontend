@@ -235,6 +235,7 @@ export function CheckinModal({
             onSuccess={handleStakeSuccess}
             className="btn btn-lg btn-primary w-full"
             buttonText={BUTTON_TEXT.STAKE}
+            tokenType="v1"
           />
         )}
 

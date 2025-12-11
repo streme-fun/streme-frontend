@@ -10,6 +10,7 @@ import { usePostHog } from "posthog-js/react";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { formatUnits } from "viem";
 import { useWallet } from "@/src/hooks/useWallet";
+import { isStakingDisabled } from "@/src/lib/tokenUtils";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 const STAKING_HELPER = "0xE7079CDB11C6ba1339A4BCB40753f4EC0215B364";
@@ -42,6 +43,7 @@ interface StakeAllButtonProps {
   farcasterIsConnected?: boolean;
   tokenBalance?: bigint;
   buttonText?: string;
+  tokenType?: string; // Token type (v1, v2, v2aero, etc.)
 }
 
 export function StakeAllButton({
@@ -57,6 +59,7 @@ export function StakeAllButton({
   farcasterIsConnected,
   tokenBalance = BigInt(0),
   buttonText = "Stake All",
+  tokenType,
 }: StakeAllButtonProps) {
   const { wallets } = useSafeWallets();
   const { address: unifiedAddress, isConnected: unifiedIsConnected, isMiniApp: detectedMiniApp } = useWallet();
@@ -251,8 +254,8 @@ export function StakeAllButton({
     }
   };
 
-  // Don't show button if no balance
-  if (balance === 0n) {
+  // Don't show button if no balance or staking is disabled
+  if (balance === 0n || isStakingDisabled(tokenType, tokenAddress)) {
     return null;
   }
 
