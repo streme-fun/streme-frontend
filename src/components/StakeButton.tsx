@@ -12,6 +12,10 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { formatUnits } from "viem";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
+import {
+  isStakingDisabled,
+  getStakingDisabledMessage,
+} from "@/src/lib/tokenUtils";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 const STAKING_HELPER = "0xE7079CDB11C6ba1339A4BCB40753f4EC0215B364";
@@ -43,6 +47,7 @@ interface StakeButtonProps {
   onPoolConnect?: () => void;
   tokenBalance?: bigint;
   lockDuration?: number; // Lock duration in seconds (defaults to 24h for v1 tokens)
+  tokenType?: string; // Token type (v1, v2, v2aero, etc.)
 }
 
 export function StakeButton({
@@ -57,6 +62,7 @@ export function StakeButton({
   onPoolConnect,
   tokenBalance = BigInt(0),
   lockDuration,
+  tokenType,
 }: StakeButtonProps) {
   const { address, isConnected, isMiniApp } = useWallet();
   const { data: walletClient } = useWalletClient();
@@ -455,11 +461,17 @@ export function StakeButton({
     setIsModalOpen(true);
   };
 
+  // Check if staking is disabled for this token type or address
+  const stakingDisabled = isStakingDisabled(tokenType, tokenAddress);
+  const disabledMessage = getStakingDisabledMessage(tokenType, tokenAddress);
+
   return (
     <>
       <button
         onClick={handleModalOpen}
-        disabled={disabled || isLoading || isLoadingBalance} // Disable button when loading
+        disabled={
+          disabled || isLoading || isLoadingBalance || stakingDisabled
+        } // Disable button when loading or token type is v2/v2aero
         className={className}
       >
         {isLoading ? "Processing..." : isLoadingBalance ? "Loading..." : "Stake"}
@@ -477,6 +489,7 @@ export function StakeButton({
         onSuccess={onSuccess} // Pass onSuccess to modal if it needs to trigger something on close after success
         isMiniApp={isMiniApp}
         lockDuration={lockDuration}
+        tokenType={tokenType}
       />
     </>
   );

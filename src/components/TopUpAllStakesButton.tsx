@@ -10,6 +10,7 @@ import sdk from "@farcaster/miniapp-sdk";
 import { TopUpStakeSelectionModal } from "./TopUpStakeSelectionModal";
 import { usePostHog } from "posthog-js/react";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
+import { isStakingDisabled } from "@/src/lib/tokenUtils";
 
 // Contract addresses
 //const STAKING_MACRO_V2 = "0xFA4f84eEC83786d37C5B904e3631412c3b726a20";
@@ -39,6 +40,7 @@ interface TopUpAllStakesButtonProps {
     stakingAddress: string;
     stakingPoolAddress: string;
     baseAmount: number;
+    tokenType?: string; // Token type (v1, v2, v2aero, etc.)
     membership: {
       pool: {
         token: {
@@ -52,6 +54,7 @@ interface TopUpAllStakesButtonProps {
     symbol: string;
     balance: number;
     stakingAddress?: string;
+    tokenType?: string; // Token type (v1, v2, v2aero, etc.)
   }>;
   disabled?: boolean;
   className?: string;
@@ -86,6 +89,7 @@ export function TopUpAllStakesButton({
       stakingPoolAddress: string;
       symbol: string;
       balance: bigint;
+      tokenType?: string;
     }>
   >([]);
   const postHog = usePostHog();
@@ -344,10 +348,16 @@ export function TopUpAllStakesButton({
         stakingPoolAddress: string;
         symbol: string;
         balance: bigint;
+        tokenType?: string;
       }> = [];
 
       // Process already staked tokens
       for (const stake of validStakes) {
+        // Skip v2/v2aero tokens and manually blocked addresses
+        if (isStakingDisabled(stake.tokenType, stake.tokenAddress)) {
+          continue;
+        }
+
         // Get current balance from the stake's receivedBalance + streamedAmount
         const currentBalance = stake.baseAmount;
         const balanceInWei = BigInt(Math.floor(currentBalance * 1e18));
@@ -359,12 +369,18 @@ export function TopUpAllStakesButton({
             stakingPoolAddress: stake.stakingPoolAddress,
             symbol: stake.membership.pool.token.symbol,
             balance: balanceInWei,
+            tokenType: stake.tokenType,
           });
         }
       }
 
       // Process owned SuperTokens (not yet staked)
       for (const superToken of ownedSuperTokens) {
+        // Skip v2/v2aero tokens and manually blocked addresses
+        if (isStakingDisabled(superToken.tokenType, superToken.tokenAddress)) {
+          continue;
+        }
+
         // Only include tokens that have staking addresses and positive balances
         if (
           superToken.stakingAddress &&
@@ -389,6 +405,7 @@ export function TopUpAllStakesButton({
               stakingPoolAddress: "", // SuperTokens don't have existing pool addresses
               symbol: superToken.symbol,
               balance: balanceInWei,
+              tokenType: superToken.tokenType,
             });
           }
         }
@@ -423,7 +440,8 @@ export function TopUpAllStakesButton({
       stake.stakingAddress &&
       stake.stakingAddress !== "" &&
       stake.stakingAddress !== "0x0000000000000000000000000000000000000000" &&
-      stake.baseAmount > 0 // Must have positive balance to be stakeable
+      stake.baseAmount > 0 && // Must have positive balance to be stakeable
+      !isStakingDisabled(stake.tokenType, stake.tokenAddress) // Exclude v2/v2aero tokens and manually blocked addresses
   ).length;
 
   const validSuperTokensCount = ownedSuperTokens.filter(
@@ -432,6 +450,7 @@ export function TopUpAllStakesButton({
       token.stakingAddress !== "" &&
       token.stakingAddress !== "0x0000000000000000000000000000000000000000" &&
       token.balance > 0 &&
+      !isStakingDisabled(token.tokenType, token.tokenAddress) && // Exclude v2/v2aero tokens and manually blocked addresses
       // Avoid counting duplicates with stakes
       !stakes.some(
         (stake) =>

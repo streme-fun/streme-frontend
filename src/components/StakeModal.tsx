@@ -9,6 +9,10 @@ import Image from "next/image";
 import FarcasterIcon from "@/public/farcaster.svg";
 import { MyTokensModal } from "./MyTokensModal";
 import Link from "next/link";
+import {
+  isStakingDisabled,
+  getStakingDisabledMessage,
+} from "@/src/lib/tokenUtils";
 
 interface StakeModalProps {
   isOpen: boolean;
@@ -23,6 +27,7 @@ interface StakeModalProps {
   onRefreshBalance?: () => Promise<void>;
   isMiniApp?: boolean;
   lockDuration?: number; // Lock duration in seconds (defaults to 24h for v1 tokens)
+  tokenType?: string; // Token type (v1, v2, v2aero, etc.)
 }
 
 const LoadingText = ({ text }: { text: string }) => {
@@ -71,7 +76,11 @@ const formatLockDuration = (seconds: number): string => {
   const hours = Math.floor((seconds % 86400) / 3600);
 
   if (days > 0) {
-    return hours > 0 ? `${days} day${days > 1 ? "s" : ""} and ${hours} hour${hours > 1 ? "s" : ""}` : `${days} day${days > 1 ? "s" : ""}`;
+    return hours > 0
+      ? `${days} day${days > 1 ? "s" : ""} and ${hours} hour${
+          hours > 1 ? "s" : ""
+        }`
+      : `${days} day${days > 1 ? "s" : ""}`;
   }
 
   return `${hours} hour${hours > 1 ? "s" : ""}`;
@@ -89,6 +98,7 @@ export function StakeModal({
   onRefreshBalance,
   isMiniApp,
   lockDuration = 86400, // Default to 24 hours (86400 seconds) for v1 tokens
+  tokenType,
 }: StakeModalProps) {
   const [amount, setAmount] = useState("");
   const [isStaking, setIsStaking] = useState(false);
@@ -488,6 +498,12 @@ ${shareUrl}`;
 
           {error && <div className="alert alert-error text-sm">{error}</div>}
 
+          {isStakingDisabled(tokenType, tokenAddress) && (
+            <div className="alert alert-warning text-sm">
+              {getStakingDisabledMessage(tokenType, tokenAddress)}
+            </div>
+          )}
+
           <div>
             <div className="flex justify-between text-sm mb-2">
               <span className="opacity-60">Amount</span>
@@ -533,10 +549,6 @@ ${shareUrl}`;
                   </button>
                 ))}
               </div>
-              <div className="text-sm opacity-60 bg-base-200 p-3 rounded-lg">
-                Note: Staked tokens are locked for {formatLockDuration(lockDuration)} before they can be
-                unstaked. Rewards will start streaming immediately.
-              </div>
               <button
                 className="btn btn-primary w-full"
                 onClick={handleStake}
@@ -546,7 +558,8 @@ ${shareUrl}`;
                   (isMaxAmount
                     ? balance <= 0n
                     : parseUnits(amount || "0", 18) > balance) ||
-                  (isMaxAmount ? false : parseUnits(amount || "0", 18) <= 0n)
+                  (isMaxAmount ? false : parseUnits(amount || "0", 18) <= 0n) ||
+                  isStakingDisabled(tokenType, tokenAddress)
                 }
               >
                 {step === "staking" ? (

@@ -16,6 +16,10 @@ import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 import Link from "next/link";
 import { ensureTxHash } from "@/src/lib/ensureTxHash";
 import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
+import {
+  isStakingDisabled,
+  getStakingDisabledMessage,
+} from "@/src/lib/tokenUtils";
 
 const WETH = "0x4200000000000000000000000000000000000006";
 const ETHX = "0x46fd5cfb4c12d87acd3a13e92baa53240c661d93";
@@ -34,6 +38,7 @@ interface ZapStakeButtonProps {
   farcasterAddress?: string;
   farcasterIsConnected?: boolean;
   amount?: string;
+  tokenType?: string; // Token type (v1, v2, v2aero, etc.)
 }
 
 export function ZapStakeButton({
@@ -49,6 +54,7 @@ export function ZapStakeButton({
   farcasterAddress,
   farcasterIsConnected,
   amount: externalAmount,
+  tokenType,
 }: ZapStakeButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -417,11 +423,15 @@ export function ZapStakeButton({
     }
   };
 
+  // Check if staking is disabled for this token type or address
+  const stakingDisabled = isStakingDisabled(tokenType, tokenAddress);
+  const disabledMessage = getStakingDisabledMessage(tokenType, tokenAddress);
+
   return (
     <>
       <button
         onClick={handleZapStake}
-        disabled={disabled || isLoading || !isValid}
+        disabled={disabled || isLoading || !isValid || stakingDisabled}
         className={className}
       >
         {isLoading ? (

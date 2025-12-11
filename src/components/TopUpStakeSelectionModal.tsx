@@ -11,6 +11,7 @@ interface StakeOption {
   symbol: string;
   balance: bigint;
   selected: boolean;
+  tokenType?: string; // Token type (v1, v2, v2aero, etc.)
 }
 
 type FilterType = "all" | "topup" | "unstaked";
@@ -24,6 +25,7 @@ interface TopUpStakeSelectionModalProps {
     stakingPoolAddress: string;
     symbol: string;
     balance: bigint;
+    tokenType?: string; // Token type (v1, v2, v2aero, etc.)
   }>;
   onProceed: (
     selectedStakes: Array<{
@@ -32,6 +34,7 @@ interface TopUpStakeSelectionModalProps {
       stakingPoolAddress: string;
       symbol: string;
       balance: bigint;
+      tokenType?: string; // Token type (v1, v2, v2aero, etc.)
     }>
   ) => void;
 }

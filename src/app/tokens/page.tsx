@@ -38,6 +38,7 @@ interface SuperTokenData {
   symbol: string;
   balance: number;
   stakingAddress?: string;
+  tokenType?: string; // Token type (v1, v2, v2aero, etc.)
   isNativeAssetSuperToken: boolean;
   logo?: string;
   isConnectedToPool?: boolean;
@@ -73,6 +74,7 @@ interface StakeData {
   userFlowRate: number;
   stakedBalance: bigint;
   lockDuration?: number; // Lock duration in seconds (defaults to 24h for v1 tokens)
+  tokenType?: string; // Token type (v1, v2, v2aero, etc.)
   logo?: string;
   isConnectedToPool?: boolean;
   marketData?: {
@@ -796,6 +798,7 @@ export default function TokensPage() {
           lastUpdateTime: Date.now(),
           userFlowRate,
           stakedBalance: BigInt(0),
+          tokenType: tokenData?.type, // Add token type from API data
           logo: undefined,
         });
       } catch (error) {
@@ -1188,6 +1191,7 @@ export default function TokensPage() {
         return {
           ...token,
           stakingAddress: tokenData.staking_address,
+          tokenType: tokenData.type,
           logo: tokenData.logo,
           marketData: tokenData.marketData,
           isConnectedToPool: poolConnections[enhanceIndex],
@@ -1198,6 +1202,7 @@ export default function TokensPage() {
       return {
         ...token,
         stakingAddress: undefined,
+        tokenType: undefined,
         logo: undefined,
         marketData: undefined,
         isConnectedToPool: false,
@@ -1270,6 +1275,7 @@ export default function TokensPage() {
             return {
               ...token,
               stakingAddress: tokenData.staking_address,
+              tokenType: tokenData.type,
               logo: tokenData.logo,
               marketData: tokenData.marketData,
               isConnectedToPool: poolConnections[batchIndex],
@@ -1848,6 +1854,7 @@ export default function TokensPage() {
                                   }
                                   className="btn btn-primary btn-sm w-full"
                                   lockDuration={stake.lockDuration}
+                                  tokenType={stake.tokenType}
                                 />
                               </div>
                               <UnstakeButton
@@ -1985,6 +1992,7 @@ export default function TokensPage() {
                                     )
                                   }
                                   className="btn btn-primary btn-sm w-full"
+                                  tokenType={token.tokenType}
                                 />
                               </div>
                             </div>

@@ -40,6 +40,7 @@ interface SuperTokenData {
   symbol: string;
   balance: number;
   stakingAddress?: string;
+  tokenType?: string; // Token type (v1, v2, v2aero, etc.)
   isNativeAssetSuperToken: boolean;
   logo?: string;
   isConnectedToPool?: boolean;
@@ -74,6 +75,7 @@ interface StakeData {
   userFlowRate: number;
   stakedBalance: bigint;
   lockDuration?: number; // Lock duration in seconds (defaults to 24h for v1 tokens)
+  tokenType?: string; // Token type (v1, v2, v2aero, etc.)
   logo?: string;
   isConnectedToPool?: boolean;
   marketData?: {
@@ -131,6 +133,7 @@ interface CachedTokenDataItem {
   staking_address?: string;
   staking_pool?: string; // GDA pool address for filtering memberships
   logo?: string;
+  type?: string; // Token type (v1, v2, v2aero, etc.)
   staking?: {
     lockDuration?: number;
   };
@@ -912,6 +915,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
           logo: tokenData?.logo,
           marketData: tokenData?.marketData,
           lockDuration: tokenData?.staking?.lockDuration, // Extract lock duration from staking config
+          tokenType: tokenData?.type, // Add token type
         };
       })
       // Filter to only include stakes where the membership pool matches the official staking pool from database
@@ -939,6 +943,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
       stakingAddress: tokenDataMap.get(token.tokenAddress)?.staking_address,
       logo: tokenDataMap.get(token.tokenAddress)?.logo,
       marketData: tokenDataMap.get(token.tokenAddress)?.marketData,
+      tokenType: tokenDataMap.get(token.tokenAddress)?.type, // Add token type
     }));
 
     setStakes(stakesWithMetadata);
@@ -1823,6 +1828,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                   )
                                 }
                                 className="btn btn-primary btn-sm"
+                                tokenType={stake.tokenType}
                               />
                               <StakeAllButton
                                 tokenAddress={stake.tokenAddress}
@@ -2026,6 +2032,7 @@ export function MyTokensModal({ isOpen, onClose }: MyTokensModalProps) {
                                   )
                                 }
                                 className="btn btn-primary btn-sm"
+                                tokenType={token.tokenType}
                               />
                               <StakeAllButton
                                 tokenAddress={token.tokenAddress}
