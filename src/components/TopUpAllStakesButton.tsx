@@ -12,8 +12,10 @@ import { usePostHog } from "posthog-js/react";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 
 // Contract addresses
-const STAKING_MACRO_V2 = "0xFA4f84eEC83786d37C5B904e3631412c3b726a20";
-const MACRO_FORWARDER = "0xFD0268E33111565dE546af2675351A4b1587F89F";
+//const STAKING_MACRO_V2 = "0xFA4f84eEC83786d37C5B904e3631412c3b726a20";
+//const MACRO_FORWARDER = "0xFD0268E33111565dE546af2675351A4b1587F89F";
+const STAKING_MACRO_V2 = "";
+const MACRO_FORWARDER = "";
 
 // Batch processing configuration
 const MAX_TOKENS_PER_BATCH = 30; // Conservative limit to ensure transactions succeed
