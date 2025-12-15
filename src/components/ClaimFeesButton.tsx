@@ -68,7 +68,7 @@ export function ClaimFeesButton({
           method: "eth_sendTransaction",
           params: [
             {
-              to: tokenAddress.toLowerCase() === '0x3ea91263dc6037ced4db9ff74a7de774df0f5355' ? FEE_COLLECTOR_LETS : FEE_COLLECTOR,
+              to: (tokenAddress.toLowerCase() === '0x3ea91263dc6037ced4db9ff74a7de774df0f5355' || tokenAddress.toLowerCase() === '0x22f1cd353441351911691ee4049c7b773abb1ecf') ? FEE_COLLECTOR_LETS : FEE_COLLECTOR,
               from: currentAddress as `0x${string}`,
               data: claimDataWithReferral,
               chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
@@ -111,7 +111,7 @@ export function ClaimFeesButton({
           );
 
           txHash = await walletClient.sendTransaction({
-            to: tokenAddress.toLowerCase() === '0x3ea91263dc6037ced4db9ff74a7de774df0f5355' ? FEE_COLLECTOR_LETS : FEE_COLLECTOR,
+            to: (tokenAddress.toLowerCase() === '0x3ea91263dc6037ced4db9ff74a7de774df0f5355' || tokenAddress.toLowerCase() === '0x22f1cd353441351911691ee4049c7b773abb1ecf') ? FEE_COLLECTOR_LETS : FEE_COLLECTOR,
             data: claimDataWithReferral,
             account: currentAddress as `0x${string}`,
             chain: undefined,
@@ -144,7 +144,7 @@ export function ClaimFeesButton({
             method: "eth_sendTransaction",
             params: [
               {
-                to: tokenAddress.toLowerCase() === '0x3ea91263dc6037ced4db9ff74a7de774df0f5355' ? FEE_COLLECTOR_LETS : FEE_COLLECTOR,
+                to: (tokenAddress.toLowerCase() === '0x3ea91263dc6037ced4db9ff74a7de774df0f5355' || tokenAddress.toLowerCase() === '0x22f1cd353441351911691ee4049c7b773abb1ecf') ? FEE_COLLECTOR_LETS : FEE_COLLECTOR,
                 from: currentAddress,
                 data: claimDataWithReferral,
                 chainId: "0x2105", // Base mainnet chain ID (8453 in hex)
