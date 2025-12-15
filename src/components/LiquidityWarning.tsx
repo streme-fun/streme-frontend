@@ -31,7 +31,7 @@ export const LiquidityWarning = ({
     useTokenLiquidity(tokenAddress, providedPoolAddress);
 
   // Don't show warning for Aerodrome pools or other non-Uniswap pool types
-  if (type && type.toLowerCase() === "v2aero") return null;
+  if (type && (type.toLowerCase() === "v2aero" || type.toLowerCase() === "v2aeronew")) return null;
 
   // Don't show warning for non-WETH pairs (ETHx, etc.) since hook only checks WETH
   if (pair && pair.toUpperCase() !== "WETH") return null;
@@ -114,7 +114,7 @@ export const InlineLiquidityWarning = ({
     useTokenLiquidity(tokenAddress, providedPoolAddress);
 
   // Don't show warning for Aerodrome pools or other non-Uniswap pool types
-  if (type && type.toLowerCase() === "v2aero") return null;
+  if (type && (type.toLowerCase() === "v2aero" || type.toLowerCase() === "v2aeronew")) return null;
 
   // Don't show warning for non-WETH pairs (ETHx, etc.) since hook only checks WETH
   if (pair && pair.toUpperCase() !== "WETH") return null;
