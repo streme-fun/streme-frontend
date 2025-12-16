@@ -525,6 +525,10 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
       ? (token.staking.supply / DEFAULT_TOTAL_SUPPLY) * 100
       : undefined);
 
+  // Special handling for BEAMR token - move pre-buy from vault to LP
+  const isBeamrToken = token.contract_address.toLowerCase() === "0x22f1cd353441351911691ee4049c7b773abb1ecf";
+  const preBuyAllocationPercent = isBeamrToken ? 35.42 : 0;
+
   let vaultAllocationPercent =
     totalVaultAllocationPercent > 0 ? totalVaultAllocationPercent : undefined;
   if (
@@ -532,6 +536,11 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
     typeof token.allocations?.vault === "number"
   ) {
     vaultAllocationPercent = token.allocations.vault;
+  }
+
+  // For BEAMR, subtract pre-buy from vault allocation
+  if (isBeamrToken && vaultAllocationPercent !== undefined) {
+    vaultAllocationPercent = Math.max(0, vaultAllocationPercent - preBuyAllocationPercent);
   }
 
   // Always calculate LP as remainder: 100 - Staking - Vault
