@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { parseEther } from "viem";
+import { parseEther, formatEther } from "viem";
 import { Modal } from "./Modal";
 import { SwapButton } from "./SwapButton";
 import { Token } from "@/src/app/types/token";
 import { useTokenPrice } from "@/src/hooks/useTokenPrice";
+import { useTokenBalance } from "@/src/hooks/useTokenData";
 
 interface SwapModalProps {
   isOpen: boolean;
@@ -32,9 +33,12 @@ export function SwapModal({
 
   // Use centralized price cache for token prices, separate logic for ETH
   const { price: tokenPrice } = useTokenPrice(token.contract_address, {
-    refreshInterval: 300000, // 5 minutes  
+    refreshInterval: 300000, // 5 minutes
     autoRefresh: true,
   });
+
+  // Get user's token balance for sell calculations
+  const { tokenBalance } = useTokenBalance(token.contract_address);
 
   // ETH price - use separate state since useTokenPrice doesn't handle ETH
   const [ethPrice, setEthPrice] = useState<number | null>(null);
@@ -148,11 +152,30 @@ export function SwapModal({
   }, [tradeAmount, tradeDirection, getGaslessQuote]);
 
   // Handle percentage button clicks for selling
-  const handlePercentageClick = useCallback((percentage: number) => {
-    // This would need token balance data - simplified for now
-    const calculatedAmount = (0.1 * percentage) / 100; // Placeholder calculation
-    setTradeAmount(calculatedAmount.toFixed(6));
-  }, []);
+  const handlePercentageClick = useCallback(
+    (percentage: number) => {
+      if (!tokenBalance || tokenBalance === BigInt(0)) {
+        setTradeAmount("");
+        return;
+      }
+
+      // Calculate percentage at BigInt level for maximum precision
+      const percentageBalance = (tokenBalance * BigInt(percentage)) / BigInt(100);
+
+      // Subtract a small safety margin (0.0001 tokens = 1e14 wei) to ensure sufficient balance
+      // This prevents rounding errors from causing "insufficient balance" errors
+      const safetyMargin = BigInt(1e14);
+      const safeAmount = percentageBalance > safetyMargin
+        ? percentageBalance - safetyMargin
+        : BigInt(0);
+
+      // Convert to decimal string
+      const amountInTokens = formatEther(safeAmount);
+
+      setTradeAmount(amountInTokens);
+    },
+    [tokenBalance]
+  );
 
   // Handle fixed ETH amount clicks for buying
   const handleFixedAmountClick = useCallback((amount: number) => {
