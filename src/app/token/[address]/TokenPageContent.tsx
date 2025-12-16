@@ -34,8 +34,6 @@ export function TokenPageContent() {
   const params = useParams();
   const pageAddress = params.address as string;
 
-
-
   // Prompt to add mini app when in mini app view
   useEffect(() => {
     if (
@@ -168,9 +166,15 @@ ${shareUrl}`;
     <div className="max-w-[1440px] mx-auto sm:px-6 mt-6 md:px-8 md:mt-0 md:pt-28 pb-12">
       <BackButton isMiniAppView={isMiniAppView} className="mb-4" />
 
-      <div className={isMiniAppView ? "space-y-4" : "grid grid-cols-1 lg:grid-cols-3 gap-4"}>
+      <div
+        className={
+          isMiniAppView ? "space-y-4" : "grid grid-cols-1 lg:grid-cols-3 gap-4"
+        }
+      >
         {/* Left Column: Token Info + Chart (or full width in mini-app) */}
-        <div className={isMiniAppView ? "space-y-4" : "lg:col-span-2 space-y-4"}>
+        <div
+          className={isMiniAppView ? "space-y-4" : "lg:col-span-2 space-y-4"}
+        >
           {/* Token Info */}
           <TokenInfo
             token={token}
@@ -193,12 +197,12 @@ ${shareUrl}`;
 
           {/* Chart - Always directly below Token Info */}
           <div className="card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit">
-            <div className="card-body p-0 md:p-4 pb-12">
+            <div className="card-body p-0 md:p-4">
               <iframe
                 data-privy-ignore
                 title="GeckoTerminal Embed"
                 src={isMiniAppView ? smallEmbedUrl : embedUrl}
-                className="w-full h-[500px] lg:h-[800px]"
+                className="w-full h-[500px] lg:h-[800px] rounded-lg"
                 allow="clipboard-write"
                 allowFullScreen
               />
@@ -219,38 +223,42 @@ ${shareUrl}`;
               isConnected={isConnected}
             />
 
-          <StakedBalance
-            data-staking-balance
-            stakingAddress={token.staking_address}
-            stakingPool={token.staking_pool}
-            symbol={token.symbol}
-            tokenAddress={token.contract_address}
-            tokenLaunchTime={
-              token.timestamp
-                ? new Date(
-                    token.timestamp._seconds * 1000 +
-                      token.timestamp._nanoseconds / 1000000
-                  )
-                : token.created_at
-            }
-            key={stakingUpdateTrigger}
-          />
+            <StakedBalance
+              data-staking-balance
+              stakingAddress={token.staking_address}
+              stakingPool={token.staking_pool}
+              symbol={token.symbol}
+              tokenAddress={token.contract_address}
+              tokenLaunchTime={
+                token.timestamp
+                  ? new Date(
+                      token.timestamp._seconds * 1000 +
+                        token.timestamp._nanoseconds / 1000000
+                    )
+                  : token.created_at
+              }
+              key={stakingUpdateTrigger}
+            />
 
-          {/* Embedded Staker Leaderboard */}
-          <StakerLeaderboardEmbed
-            stakingPoolAddress={token.staking_pool}
-            tokenAddress={token.contract_address}
-            tokenSymbol={token.symbol}
-            stakingAddress={token.staking_address}
-            lpType={(token.type === "v2aero" || token.type === "v2aeronew") ? "aero" : "uniswap"}
-            onViewAll={() => setIsStakerLeaderboardOpen(true)}
-            onStakingChange={handleStakingChange}
-            tokenPrice={token.price}
-            userStakedBalance={userStakedBalance}
-          />
+            {/* Embedded Staker Leaderboard */}
+            <StakerLeaderboardEmbed
+              stakingPoolAddress={token.staking_pool}
+              tokenAddress={token.contract_address}
+              tokenSymbol={token.symbol}
+              stakingAddress={token.staking_address}
+              lpType={
+                token.type === "v2aero" || token.type === "v2aeronew"
+                  ? "aero"
+                  : "uniswap"
+              }
+              onViewAll={() => setIsStakerLeaderboardOpen(true)}
+              onStakingChange={handleStakingChange}
+              tokenPrice={token.price}
+              userStakedBalance={userStakedBalance}
+            />
 
-          {/* Claim Fees Button */}
-          <ClaimFeesButton tokenAddress={token.contract_address} />
+            {/* Claim Fees Button */}
+            <ClaimFeesButton tokenAddress={token.contract_address} />
           </div>
         )}
 
