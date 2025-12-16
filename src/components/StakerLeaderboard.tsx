@@ -5,20 +5,13 @@ import { Modal } from "./Modal";
 import { toast } from "sonner";
 
 interface TokenStaker {
-  account: {
-    id: string;
-  };
+  address: string;
   units: string;
+  percentage: number;
   isConnected: boolean;
-  createdAtTimestamp: string;
-  farcasterUser?: FarcasterUser;
-}
-
-interface FarcasterUser {
-  fid: number;
-  username: string;
-  display_name: string;
-  pfp_url: string;
+  fid?: number;
+  username?: string;
+  pfp_url?: string | null;
 }
 
 interface StakerLeaderboardProps {
@@ -49,61 +42,30 @@ export function StakerLeaderboard({
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Fetch stakers data from Streme API
-  const fetchStakers = async () => {
+  const fetchStakers = async (bustCache = false) => {
     if (!tokenAddress) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/token/${tokenAddress.toLowerCase()}/stakers`
-      );
+      // Build URL with optional cache-busting parameter
+      const url = `/api/token/${tokenAddress.toLowerCase()}/stakers${
+        bustCache ? `?v=${Date.now()}` : ""
+      }`;
+
+      const response = await fetch(url);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch stakers: ${response.statusText}`);
       }
 
-      const stakersData = await response.json();
+      const stakersData: TokenStaker[] = await response.json();
 
       console.log(`Fetched ${stakersData.length} stakers for token ${tokenAddress}`);
 
-      // Transform the API response to match the expected format
-      const transformedStakers: TokenStaker[] = stakersData
-        .filter((staker: { holder_address?: string; isStaker?: boolean }) =>
-          staker.holder_address && staker.isStaker
-        ) // Filter out entries without address or non-stakers
-        .map((staker: {
-          holder_address: string;
-          staked_balance?: number;
-          isConnected?: boolean;
-          lastUpdated?: {
-            _seconds: number;
-            _nanoseconds: number;
-          };
-          farcaster?: {
-            fid: number;
-            username: string;
-            display_name?: string;
-            pfp_url: string;
-          };
-        }) => ({
-          account: {
-            id: staker.holder_address,
-          },
-          units: (staker.staked_balance ?? 0).toString(),
-          isConnected: staker.isConnected ?? false,
-          createdAtTimestamp: staker.lastUpdated?._seconds?.toString() || "0",
-          farcasterUser: staker.farcaster ? {
-            fid: staker.farcaster.fid,
-            username: staker.farcaster.username,
-            display_name: staker.farcaster.display_name || staker.farcaster.username,
-            pfp_url: staker.farcaster.pfp_url,
-          } : undefined,
-        }));
-
-      setStakers(transformedStakers);
-      setStakersWithFarcaster(transformedStakers); // Already enriched with Farcaster data
+      setStakers(stakersData);
+      setStakersWithFarcaster(stakersData); // Already enriched with Farcaster data
       setLoading(false);
     } catch (err) {
       console.error("Error fetching stakers:", err);
@@ -117,7 +79,7 @@ export function StakerLeaderboard({
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await fetchStakers();
+      await fetchStakers(true); // Bust cache on manual refresh
       toast.success("Staker data refreshed!");
     } catch {
       toast.error("Failed to refresh staker data");
@@ -145,9 +107,8 @@ export function StakerLeaderboard({
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (staker) =>
-          staker.account.id?.toLowerCase().includes(searchLower) ||
-          (staker.farcasterUser?.username &&
-            staker.farcasterUser.username.toLowerCase().includes(searchLower))
+          staker.address?.toLowerCase().includes(searchLower) ||
+          (staker.username && staker.username.toLowerCase().includes(searchLower))
       );
     }
 
@@ -162,8 +123,8 @@ export function StakerLeaderboard({
           bValue = parseInt(b.units);
           break;
         case "address":
-          aValue = a.farcasterUser?.username || a.account.id;
-          bValue = b.farcasterUser?.username || b.account.id;
+          aValue = a.username || a.address;
+          bValue = b.username || b.address;
           break;
         default:
           return 0;
@@ -267,7 +228,7 @@ export function StakerLeaderboard({
           ) : error ? (
             <div className="text-center py-8">
               <p className="text-error mb-4">{error}</p>
-              <button onClick={fetchStakers} className="btn btn-primary btn-sm">
+              <button onClick={() => fetchStakers()} className="btn btn-primary btn-sm">
                 Retry
               </button>
             </div>
@@ -306,41 +267,41 @@ export function StakerLeaderboard({
                 </thead>
                 <tbody>
                   {filteredStakers.map((staker, index) => (
-                    <tr key={`${staker.account.id}-${index}`}>
+                    <tr key={`${staker.address}-${index}`}>
                       <td>
                         <div className="flex items-center gap-3">
-                          {staker.farcasterUser?.pfp_url && (
+                          {staker.pfp_url && (
                             <div className="avatar">
                               <div className="mask mask-squircle w-8 h-8">
                                 <img
-                                  src={staker.farcasterUser.pfp_url}
-                                  alt={staker.farcasterUser.username || "User"}
+                                  src={staker.pfp_url}
+                                  alt={staker.username || "User"}
                                 />
                               </div>
                             </div>
                           )}
                           <div>
-                            {staker.farcasterUser?.username && (
+                            {staker.username && (
                               <a
-                                href={`https://farcaster.xyz/${staker.farcasterUser.username}`}
+                                href={`https://farcaster.xyz/${staker.username}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-sm font-medium hover:text-primary hover:underline block"
                               >
-                                @{staker.farcasterUser.username}
+                                @{staker.username}
                               </a>
                             )}
                             <a
-                              href={`https://basescan.org/address/${staker.account.id}`}
+                              href={`https://basescan.org/address/${staker.address}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="link link-primary font-mono text-xs"
                             >
-                              {staker.account.id
-                                ? `${staker.account.id.slice(
+                              {staker.address
+                                ? `${staker.address.slice(
                                     0,
                                     6
-                                  )}...${staker.account.id.slice(-4)}`
+                                  )}...${staker.address.slice(-4)}`
                                 : "Unknown"}
                             </a>
                           </div>

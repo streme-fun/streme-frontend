@@ -13,20 +13,13 @@ import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
 
 interface TokenStaker {
-  account: {
-    id: string;
-  };
+  address: string;
   units: string;
+  percentage: number;
   isConnected: boolean;
-  createdAtTimestamp: string;
-  farcasterUser?: FarcasterUser;
-}
-
-interface FarcasterUser {
-  fid: number;
-  username: string;
-  display_name: string;
-  pfp_url: string;
+  fid?: number;
+  username?: string;
+  pfp_url?: string | null;
 }
 
 interface StakerLeaderboardEmbedProps {
@@ -78,71 +71,35 @@ export function StakerLeaderboardEmbed({
     ? farcasterAddress
     : primaryAddress || connectedUser?.wallet?.address;
 
-  const fetchTopStakers = useCallback(async () => {
+  const fetchTopStakers = useCallback(async (bustCache = false) => {
     if (!tokenAddress) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/token/${tokenAddress.toLowerCase()}/stakers`
-      );
+      // Build URL with optional cache-busting parameter
+      const url = `/api/token/${tokenAddress.toLowerCase()}/stakers${
+        bustCache ? `?v=${Date.now()}` : ""
+      }`;
+
+      const response = await fetch(url);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch stakers: ${response.statusText}`);
       }
 
-      const stakersData = await response.json();
+      const stakersData: TokenStaker[] = await response.json();
 
-      // Transform the API response to match the expected format and take top 10
-      const transformedStakers: TokenStaker[] = stakersData
+      // Filter out specific excluded address and take top 10
+      const filteredStakers = stakersData
         .filter(
-          (staker: { holder_address?: string; isStaker?: boolean }) =>
-            staker.holder_address &&
-            staker.isStaker &&
-            staker.holder_address.toLowerCase() !== "0xc749105bc4b4ea6285dbbe2e8221c922bea07a9d"
-        ) // Filter out entries without address, non-stakers, and specific excluded address
-        .sort(
-          (a: { staked_balance?: number }, b: { staked_balance?: number }) =>
-            (b.staked_balance ?? 0) - (a.staked_balance ?? 0)
-        ) // Sort by staked balance in descending order
-        .slice(0, 10)
-        .map(
-          (staker: {
-            holder_address: string;
-            staked_balance?: number;
-            isConnected?: boolean;
-            lastUpdated?: {
-              _seconds: number;
-              _nanoseconds: number;
-            };
-            farcaster?: {
-              fid: number;
-              username: string;
-              display_name?: string;
-              pfp_url: string;
-            };
-          }) => ({
-            account: {
-              id: staker.holder_address,
-            },
-            units: (staker.staked_balance ?? 0).toString(),
-            isConnected: staker.isConnected ?? false,
-            createdAtTimestamp: staker.lastUpdated?._seconds?.toString() || "0",
-            farcasterUser: staker.farcaster
-              ? {
-                  fid: staker.farcaster.fid,
-                  username: staker.farcaster.username,
-                  display_name:
-                    staker.farcaster.display_name || staker.farcaster.username,
-                  pfp_url: staker.farcaster.pfp_url,
-                }
-              : undefined,
-          })
-        );
+          (staker) =>
+            staker.address.toLowerCase() !== "0xc749105bc4b4ea6285dbbe2e8221c922bea07a9d"
+        )
+        .slice(0, 10);
 
-      setStakers(transformedStakers);
+      setStakers(filteredStakers);
       setLoading(false);
     } catch (err) {
       console.error("Error fetching stakers:", err);
@@ -170,7 +127,7 @@ export function StakerLeaderboardEmbed({
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await fetchTopStakers();
+      await fetchTopStakers(true); // Bust cache on manual refresh
       toast.success("Staker data refreshed!");
     } catch {
       toast.error("Failed to refresh staker data");
@@ -393,7 +350,7 @@ export function StakerLeaderboardEmbed({
 
       // Wait 2 seconds before refreshing to allow blockchain state to update
       setTimeout(() => {
-        fetchTopStakers();
+        fetchTopStakers(true); // Bust cache after staking
         onStakingChange?.();
       }, 1000);
     } catch (error: unknown) {
@@ -443,7 +400,7 @@ export function StakerLeaderboardEmbed({
         <h3 className="text-lg font-bold mb-4">Top Stakers</h3>
         <div className="text-center py-4">
           <p className="text-error text-sm mb-2">{error}</p>
-          <button onClick={fetchTopStakers} className="btn btn-primary btn-sm">
+          <button onClick={() => fetchTopStakers()} className="btn btn-primary btn-sm">
             Retry
           </button>
         </div>
@@ -499,7 +456,7 @@ export function StakerLeaderboardEmbed({
         <div className="space-y-2">
           {stakers.map((staker, index) => (
             <div
-              key={`${staker.account.id}-${index}`}
+              key={`${staker.address}-${index}`}
               className="flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 transition-colors"
             >
               {/* Rank */}
@@ -510,7 +467,7 @@ export function StakerLeaderboardEmbed({
               {/* Profile */}
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 {/* Special handling for crowdfund address */}
-                {staker.account.id?.toLowerCase() ===
+                {staker.address?.toLowerCase() ===
                 "0xceacfbb5a17b6914051d12d8c91d3461382d503b" ? (
                   <>
                     <div className="avatar">
@@ -531,53 +488,49 @@ export function StakerLeaderboardEmbed({
                   </>
                 ) : (
                   <>
-                    {staker.farcasterUser?.pfp_url && (
+                    {staker.pfp_url && (
                       <div className="avatar">
                         <div className="mask mask-squircle w-6 h-6">
                           <img
-                            src={staker.farcasterUser.pfp_url}
-                            alt={staker.farcasterUser.username || "User"}
+                            src={staker.pfp_url}
+                            alt={staker.username || "User"}
                           />
                         </div>
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      {staker.farcasterUser?.username ? (
+                      {staker.username ? (
                         <button
                           onClick={(e) => {
                             e.preventDefault();
                             if (isMiniApp) {
                               sdk.actions.openUrl(
-                                `https://farcaster.xyz/${
-                                  staker.farcasterUser!.username
-                                }`
+                                `https://farcaster.xyz/${staker.username}`
                               );
                             } else {
                               window.open(
-                                `https://farcaster.xyz/${
-                                  staker.farcasterUser!.username
-                                }`,
+                                `https://farcaster.xyz/${staker.username}`,
                                 "_blank"
                               );
                             }
                           }}
                           className="text-sm font-medium hover:text-primary hover:underline text-left cursor-pointer"
                         >
-                          @{staker.farcasterUser.username}
+                          @{staker.username}
                         </button>
                       ) : (
                         <div className="font-mono text-xs text-primary">
                           <a
-                            href={`https://basescan.org/address/${staker.account.id}`}
+                            href={`https://basescan.org/address/${staker.address}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="hover:underline"
                           >
-                            {staker.account.id
-                              ? `${staker.account.id.slice(
+                            {staker.address
+                              ? `${staker.address.slice(
                                   0,
                                   6
-                                )}...${staker.account.id.slice(-4)}`
+                                )}...${staker.address.slice(-4)}`
                               : "Unknown"}
                           </a>
                         </div>
@@ -630,7 +583,7 @@ export function StakerLeaderboardEmbed({
   function isUserTopStaker(): boolean {
     if (!effectiveAddress || stakers.length === 0) return false;
     return (
-      stakers[0]?.account?.id?.toLowerCase() === effectiveAddress.toLowerCase()
+      stakers[0]?.address?.toLowerCase() === effectiveAddress.toLowerCase()
     );
   }
 

@@ -12,16 +12,23 @@ export async function GET(
       );
     }
 
+    // Extract cache-busting parameter from URL (if present)
+    const url = new URL(request.url);
+    const cacheParam = url.searchParams.get('v');
+
+    // Build API URL with cache-busting parameter
+    const apiUrl = new URL(`https://api.streme.fun/api/stakers/${tokenAddress}`);
+    if (cacheParam) {
+      apiUrl.searchParams.set('v', cacheParam);
+    }
+
     // Fetch from the external Streme API
-    const response = await fetch(
-      `https://api.streme.fun/api/token/${tokenAddress}/stakers`,
-      {
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "Streme/1.0",
-        },
-      }
-    );
+    const response = await fetch(apiUrl.toString(), {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Streme/1.0",
+      },
+    });
 
     if (!response.ok) {
       throw new Error(`External API error: ${response.status}`);
