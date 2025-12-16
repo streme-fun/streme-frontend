@@ -129,6 +129,14 @@ const isValidUrl = (urlString: string | undefined): boolean => {
   }
 };
 
+// Helper function to check if token was launched less than 24 hours ago
+const isTokenNew = (createdAt: string): boolean => {
+  const now = Date.now();
+  const tokenCreationTime = new Date(createdAt).getTime();
+  const hoursSinceLaunch = (now - tokenCreationTime) / (1000 * 60 * 60);
+  return hoursSinceLaunch < 24;
+};
+
 interface TokenInfoProps {
   token: Token;
   onShare?: () => Promise<void>;
@@ -722,19 +730,25 @@ export function TokenInfo({ token, onShare, isMiniAppView }: TokenInfoProps) {
         </div>
         <div>
           <div className="text-xs sm:text-sm opacity-60">24h Change</div>
-          <div
-            className={`font-mono text-lg sm:text-xl md:text-2xl font-bold ${
-              token.change24h && token.change24h >= 0
-                ? "text-green-500"
-                : "text-red-500"
-            }`}
-          >
-            {token.change24h
-              ? `${token.change24h >= 0 ? "+" : ""}${token.change24h.toFixed(
-                  2
-                )}%`
-              : "-"}
-          </div>
+          {isTokenNew(token.created_at) ? (
+            <div className="font-mono text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent">
+              NEW
+            </div>
+          ) : (
+            <div
+              className={`font-mono text-lg sm:text-xl md:text-2xl font-bold ${
+                token.change24h && token.change24h >= 0
+                  ? "text-green-500"
+                  : "text-red-500"
+              }`}
+            >
+              {token.change24h
+                ? `${token.change24h >= 0 ? "+" : ""}${token.change24h.toFixed(
+                    2
+                  )}%`
+                : "-"}
+            </div>
+          )}
         </div>
         <div>
           <div className="text-xs sm:text-sm opacity-60">24h Volume</div>

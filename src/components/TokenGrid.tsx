@@ -85,6 +85,14 @@ const isValidImageUrl = (url: string | null | undefined): boolean => {
   }
 };
 
+// Helper function to check if token was launched less than 24 hours ago
+const isTokenNew = (createdAt: string): boolean => {
+  const now = Date.now();
+  const tokenCreationTime = new Date(createdAt).getTime();
+  const hoursSinceLaunch = (now - tokenCreationTime) / (1000 * 60 * 60);
+  return hoursSinceLaunch < 24;
+};
+
 // Function to fetch trending tokens from the streme.fun API (exported for carousel)
 export const fetchTrendingTokens = async (): Promise<Token[]> => {
   try {
@@ -325,19 +333,25 @@ export const TrendingTokenCard = ({
             {/* 24h Change */}
             <div className="flex flex-col">
               <p className="text-[10px] opacity-60 uppercase">24H Δ</p>
-              <p
-                className={`font-mono font-bold text-sm ${
-                  token.change24h && token.change24h >= 0
-                    ? "text-green-500"
-                    : "text-red-500"
-                }`}
-              >
-                {token.change24h
-                  ? `${
-                      token.change24h >= 0 ? "+" : ""
-                    }${token.change24h.toFixed(1)}%`
-                  : "-"}
-              </p>
+              {isTokenNew(token.created_at) ? (
+                <p className="font-mono font-bold text-sm bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_auto] animate-shimmer bg-clip-text text-transparent">
+                  NEW
+                </p>
+              ) : (
+                <p
+                  className={`font-mono font-bold text-sm ${
+                    token.change24h && token.change24h >= 0
+                      ? "text-green-500"
+                      : "text-red-500"
+                  }`}
+                >
+                  {token.change24h
+                    ? `${
+                        token.change24h >= 0 ? "+" : ""
+                      }${token.change24h.toFixed(1)}%`
+                    : "-"}
+                </p>
+              )}
             </div>
           </div>
 

@@ -12,9 +12,9 @@ module.exports = {
           "100%": { transform: "rotate(360deg)" },
         },
         shimmer: {
-          "0%": { opacity: "0.1" },
-          "50%": { opacity: "0.2" },
-          "100%": { opacity: "0.1" },
+          "0%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+          "100%": { backgroundPosition: "0% 50%" },
         },
       },
     },
