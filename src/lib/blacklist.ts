@@ -41,6 +41,7 @@ export const BLACKLISTED_TOKENS = [
   "0x32a3359147872911dd29f46550cbbff51010650d",
   "0x246c54d46e1a799d0aa91f049e13202809c6e38f",
   "0x05876bfc369423f713a3941cc2c32a56dd620dc0",
+  "0xa69f80524381275A7fFdb3AE01c54150644c8792", // SUP token
 ].map((addr) => addr?.toLowerCase() || "");
 
 // Blacklisted deployer addresses
