@@ -277,7 +277,7 @@ export function SUPLeaderboardModal({
           userData?.points.totalEarned || 0,
         [ANALYTICS_PROPERTIES.LOCKER_ADDRESS]:
           userData?.fluidLocker.address || "",
-        [ANALYTICS_PROPERTIES.CLAIM_PROGRAM_ID]: 7786,
+        [ANALYTICS_PROPERTIES.CLAIM_PROGRAM_ID]: 7845,
         [ANALYTICS_PROPERTIES.WALLET_TYPE]: isMiniAppView
           ? "farcaster"
           : "wagmi",
@@ -384,7 +384,7 @@ export function SUPLeaderboardModal({
 
     try {
       const rawSignature = userData.points.stackSignedData;
-      const programId = 7786;
+      const programId = 7845;
       const totalProgramUnits = userData.points.totalEarned;
       const nonce = userData.points.signatureTimestamp || 1748439037;
 
