@@ -6,10 +6,7 @@
  * Manually blocked token addresses (lowercase)
  * These tokens have staking disabled regardless of their type
  */
-const MANUALLY_BLOCKED_ADDRESSES = [
-  "0x2800f7bbdd38e84f38ef0a556705a62b5104e91b",
-  "0x3ea91263dc6037ced4db9ff74a7de774df0f5355",
-];
+const MANUALLY_BLOCKED_ADDRESSES: string[] = [];
 
 /**
  * Check if a token address is manually blocked from staking
@@ -37,10 +34,8 @@ export const isStakingDisabled = (
     return true;
   }
 
-  // Check token type
-  if (!tokenType) return false; // Allow if undefined (backwards compatibility)
-  const normalized = tokenType.toLowerCase();
-  return normalized === "v2" || normalized === "v2aero";
+  // v2/v2aero staking is now enabled
+  return false;
 };
 
 /**
@@ -55,9 +50,6 @@ export const getStakingDisabledMessage = (
 ): string | null => {
   if (isTokenManuallyBlocked(tokenAddress)) {
     return "Staking temporarily disabled for this token while security updates are applied";
-  }
-  if (isStakingDisabled(tokenType, tokenAddress)) {
-    return "Staking temporarily disabled for this token type while security updates are applied";
   }
   return null;
 };
