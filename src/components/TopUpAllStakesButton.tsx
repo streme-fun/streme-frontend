@@ -13,7 +13,8 @@ import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { isStakingDisabled } from "@/src/lib/tokenUtils";
 
 // Contract addresses
-const STAKING_MACRO_V2 = "0xFA4f84eEC83786d37C5B904e3631412c3b726a20";
+//const STAKING_MACRO_V2 = "0xFA4f84eEC83786d37C5B904e3631412c3b726a20"; // OLD
+const STAKING_MACRO_V2 = "0x788A32f5Cb1f60A892D6F88bC35127E65B98b638";
 const MACRO_FORWARDER = "0xFD0268E33111565dE546af2675351A4b1587F89F";
 
 // Batch processing configuration
