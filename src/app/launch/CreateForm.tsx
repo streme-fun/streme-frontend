@@ -20,6 +20,7 @@ import {
   STREME_SUPER_TOKEN_FACTORY,
   STREME_ALLOCATION_HOOK,
   LP_FACTORY_ADDRESS,
+  MAIN_STREME_ADDRESS,
 } from "@/src/lib/contracts";
 import {
   createStakingAllocation,
@@ -235,17 +236,18 @@ export function CreateForm() {
       const deployerAddress = STREME_PUBLIC_DEPLOYER_V2;
       const tokenFactory = STREME_SUPER_TOKEN_FACTORY;
       const postDeployHook = STREME_ALLOCATION_HOOK;
+      const mainStremeAddress = MAIN_STREME_ADDRESS;
 
       // Generate salt using the appropriate contract
       let salt =
         "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
 
       try {
-        console.log("Generating salt for V2:", deployerAddress);
+        console.log("Generating salt for V2:", mainStremeAddress);
         console.log("Using TOKEN_FACTORY:", tokenFactory);
 
         const saltResult = await readContract(config, {
-          address: deployerAddress,
+          address: mainStremeAddress,
           abi: STREME_DEPLOY_V2_ABI,
           functionName: "generateSalt",
           args: [
