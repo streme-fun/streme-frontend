@@ -33,6 +33,7 @@ export default function CrowdfundHeader({
                   onClick={onShowHowItWorks}
                   className="btn btn-ghost btn-sm btn-circle flex-shrink-0"
                   title="How it works"
+                  aria-label="Learn how this crowdfund works" 
                 >
                   <svg
                     className="w-4 h-4"
