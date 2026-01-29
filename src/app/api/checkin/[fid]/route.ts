@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifySessionToken } from "@/src/app/api/auth/verify-siwf/route";
+import { verifySessionToken } from "@/src/lib/siwf-auth";
 
 interface CheckinStatusResponse {
   fid: number;

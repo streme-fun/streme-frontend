@@ -1,6 +1,7 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals'
 import { NextRequest } from 'next/server'
-import { POST, verifySessionToken, _setAppClientForTesting } from '@/src/app/api/auth/verify-siwf/route'
+import { POST } from '@/src/app/api/auth/verify-siwf/route'
+import { verifySessionToken, _setAppClientForTesting } from '@/src/lib/siwf-auth'
 
 // Create mock function for verifySignInMessage
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
