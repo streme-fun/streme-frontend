@@ -88,7 +88,6 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get("authorization");
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.log("Missing or invalid authorization header:", authHeader);
       return NextResponse.json(
         { error: "Missing or invalid authorization header" },
         { status: 401 }
@@ -96,13 +95,6 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.substring(7); // Remove "Bearer " prefix
-    console.log("Received token for checkin:");
-    console.log("- Token length:", token.length);
-    console.log("- Token starts with:", token.substring(0, 20) + "...");
-    console.log(
-      "- Token format appears to be:",
-      token.includes(".") ? "JWT-like" : "Simple string"
-    );
 
     // Verify Quick Auth JWT per Farcaster docs
     try {
@@ -120,7 +112,6 @@ export async function POST(request: NextRequest) {
 
     // Make the request to the external API
     const externalApiUrl = "https://api.streme.fun/api/checkin";
-    console.log("Making checkin request to:", externalApiUrl);
 
     const response = await fetch(externalApiUrl, {
       method: "POST",
@@ -131,16 +122,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log("External API response status:", response.status);
-
     // Get the response text first to avoid consuming the body multiple times
     const responseText = await response.text();
 
     if (!response.ok) {
-      console.error("External API error details:");
-      console.error("- Status:", response.status);
-      console.error("- Status Text:", response.statusText);
-      console.error("- Response body:", responseText);
+      console.error("Checkin API error:", response.status);
 
       // Parse error response if possible
       let errorMessage = `External API error: ${response.status}`;
@@ -167,39 +153,22 @@ export async function POST(request: NextRequest) {
     let checkinData: CheckinResponse;
     try {
       checkinData = JSON.parse(responseText);
-
-      // Debug: Log the actual response structure
-      console.log(
-        "Raw checkin response:",
-        JSON.stringify(checkinData, null, 2)
-      );
-
-      console.log("Checkin successful:", {
-        fid: checkinData.fid,
-        totalCheckins: checkinData.totalCheckins,
-        currentStreak: checkinData.currentStreak,
-        dropAmount: checkinData.dropAmount,
-      });
-    } catch (parseError) {
-      console.error("Failed to parse JSON response:", parseError);
-      console.error("Response text:", responseText);
+    } catch {
+      console.error("Checkin API: Invalid JSON response");
       throw new Error("Invalid JSON response from external API");
     }
 
     return NextResponse.json(checkinData);
   } catch (error) {
-    console.error("Checkin API route error:");
     console.error(
-      "- Error message:",
+      "Checkin API error:",
       error instanceof Error ? error.message : "Unknown error"
     );
-    console.error("- Full error object:", error);
 
     return NextResponse.json(
       {
         success: false,
         error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );

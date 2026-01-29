@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchTokenFromStreme } from "@/src/lib/apiUtils";
 import { BLACKLISTED_TOKENS } from "@/src/lib/blacklist";
+import { isAddress } from "viem";
 
 export const runtime = "nodejs";
 
@@ -24,6 +25,17 @@ export async function POST(request: NextRequest) {
     if (tokenAddresses.length > 30) {
       return NextResponse.json(
         { error: "Maximum 30 addresses per request" },
+        { status: 400 }
+      );
+    }
+
+    // Validate all addresses are properly formatted
+    const invalidAddresses = tokenAddresses.filter(
+      (addr: unknown) => typeof addr !== "string" || !isAddress(addr)
+    );
+    if (invalidAddresses.length > 0) {
+      return NextResponse.json(
+        { error: `Invalid address format: ${invalidAddresses.slice(0, 3).join(", ")}${invalidAddresses.length > 3 ? "..." : ""}` },
         { status: 400 }
       );
     }

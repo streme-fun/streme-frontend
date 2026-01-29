@@ -48,12 +48,12 @@ export async function GET(request: NextRequest) {
       { headers }
     );
   } catch (error) {
-    console.error("Error fetching tokens:", error);
+    console.error(
+      "Error fetching tokens:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
     return Response.json(
-      {
-        error: "Failed to fetch tokens",
-        details: error instanceof Error ? error.message : undefined,
-      },
+      { error: "Failed to fetch tokens" },
       { status: 500 }
     );
   }

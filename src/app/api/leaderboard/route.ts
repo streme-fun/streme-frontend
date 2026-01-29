@@ -49,12 +49,12 @@ export async function GET() {
       { headers }
     );
   } catch (error) {
-    console.error("Error fetching leaderboard data:", error);
+    console.error(
+      "Error fetching leaderboard data:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
     return Response.json(
-      {
-        error: "Failed to fetch leaderboard data",
-        details: error instanceof Error ? error.message : undefined,
-      },
+      { error: "Failed to fetch leaderboard data" },
       { status: 500 }
     );
   }

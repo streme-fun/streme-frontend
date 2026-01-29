@@ -67,12 +67,12 @@ export async function GET() {
 
     return Response.json(filteredData, { headers });
   } catch (error) {
-    console.error("Error fetching trending tokens:", error);
+    console.error(
+      "Error fetching trending tokens:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
     return Response.json(
-      {
-        error: "Failed to fetch trending tokens",
-        details: error instanceof Error ? error.message : undefined,
-      },
+      { error: "Failed to fetch trending tokens" },
       { status: 500 }
     );
   }

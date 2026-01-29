@@ -43,12 +43,12 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Error fetching stakers:", error);
+    console.error(
+      "Error fetching stakers:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
     return Response.json(
-      {
-        error: "Failed to fetch stakers",
-        details: error instanceof Error ? error.message : undefined,
-      },
+      { error: "Failed to fetch stakers" },
       { status: 500 }
     );
   }

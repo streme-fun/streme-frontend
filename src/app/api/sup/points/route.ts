@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get("authorization");
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.log("Missing or invalid authorization header:", authHeader);
       return NextResponse.json(
         { error: "Missing or invalid authorization header" },
         { status: 401 }
@@ -41,13 +40,6 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.substring(7); // Remove "Bearer " prefix
-    console.log("Received token for API call:");
-    console.log("- Token length:", token.length);
-    console.log("- Token starts with:", token.substring(0, 20) + "...");
-    console.log(
-      "- Token format appears to be:",
-      token.includes(".") ? "JWT-like" : "Simple string"
-    );
 
     // Verify Quick Auth JWT per Farcaster docs
     let fid = 0;
@@ -71,7 +63,6 @@ export async function GET(request: NextRequest) {
 
     // Make the request to the external API
     const externalApiUrl = "https://api.streme.fun/api/sup/points";
-    console.log("Making request to:", externalApiUrl);
 
     const response = await fetch(externalApiUrl, {
       method: "GET",
@@ -82,27 +73,13 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    console.log("External API response status:", response.status);
-    console.log(
-      "External API response headers:",
-      Object.fromEntries(response.headers.entries())
-    );
-
     // Get the response text first to avoid consuming the body multiple times
     const responseText = await response.text();
 
     if (!response.ok) {
-      console.error("External API error details:");
-      console.error("- Status:", response.status);
-      console.error("- Status Text:", response.statusText);
-      console.error("- Response body:", responseText);
-
+      console.error("SUP points API error:", response.status);
       return NextResponse.json(
-        {
-          error: `External API error: ${response.status} ${response.statusText}`,
-          details: responseText,
-          apiUrl: externalApiUrl,
-        },
+        { error: "Failed to fetch points data" },
         { status: response.status }
       );
     }
@@ -111,16 +88,12 @@ export async function GET(request: NextRequest) {
     let externalData: ExternalApiResponse;
     try {
       externalData = JSON.parse(responseText);
-
-      // Debug: Log the actual response structure
-      console.log(
-        "Raw response structure:",
-        JSON.stringify(externalData, null, 2)
+    } catch {
+      console.error("SUP points API: Invalid JSON response");
+      return NextResponse.json(
+        { error: "Invalid response from points service" },
+        { status: 502 }
       );
-    } catch (parseError) {
-      console.error("Failed to parse JSON response:", parseError);
-      console.error("Response text:", responseText);
-      throw new Error("Invalid JSON response from external API");
     }
 
     // Map external response to expected format
@@ -142,35 +115,14 @@ export async function GET(request: NextRequest) {
       },
     };
 
-    console.log("Successfully fetched and mapped user data:");
-    console.log("- FID:", userData.fid);
-    console.log("- Wallet:", userData.wallet);
-    console.log("- Points earned:", userData.points.totalEarned);
-    console.log("- In Stack:", externalData.inStack);
-    console.log("- Has signature:", !!externalData.signature);
-    console.log("- FluidLocker address:", userData.fluidLocker.address);
-    console.log("- FluidLocker created:", userData.fluidLocker.isCreated);
-
     return NextResponse.json(userData);
   } catch (error) {
-    console.error("API route error - detailed information:");
     console.error(
-      "- Error message:",
+      "SUP points API error:",
       error instanceof Error ? error.message : "Unknown error"
     );
-    console.error(
-      "- Error stack:",
-      error instanceof Error ? error.stack : "No stack trace"
-    );
-    console.error("- Error type:", typeof error);
-    console.error("- Full error object:", error);
-
     return NextResponse.json(
-      {
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString(),
-      },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

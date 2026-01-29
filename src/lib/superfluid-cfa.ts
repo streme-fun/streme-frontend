@@ -1,9 +1,12 @@
-import { Address, parseUnits, formatUnits } from "viem";
+import { Address } from "viem";
 import { publicClient } from "./viemClient";
 import { CFA_V1 } from "./superfluid-contracts";
+import { STREME_SUPER_TOKEN } from "./superfluid-constants";
+// Import flow rate converters from superfluid-streaming to avoid duplication
+import { tokensPerDayToFlowRate, flowRateToTokensPerDay } from "./superfluid-streaming";
 
-// STREME Super Token address on Base
-export const STREME_SUPER_TOKEN = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58" as Address;
+// Re-export for backwards compatibility
+export { STREME_SUPER_TOKEN, tokensPerDayToFlowRate, flowRateToTokensPerDay };
 
 // CFA V1 ABI - minimal functions we need
 export const CFA_ABI = [
@@ -178,24 +181,6 @@ export async function getRealtimeBalance(account: Address) {
     console.error("Error getting realtime balance:", error);
     throw error;
   }
-}
-
-/**
- * Convert flow rate from tokens per day to per second (as required by Superfluid)
- */
-export function tokensPerDayToFlowRate(tokensPerDay: number): bigint {
-  // Convert to tokens per second, then to wei per second
-  const tokensPerSecond = tokensPerDay / (24 * 60 * 60);
-  return parseUnits(tokensPerSecond.toString(), 18);
-}
-
-/**
- * Convert flow rate from per second to tokens per day for display
- */
-export function flowRateToTokensPerDay(flowRate: bigint): number {
-  // Convert from wei per second to tokens per day
-  const tokensPerSecond = parseFloat(formatUnits(flowRate, 18));
-  return tokensPerSecond * 24 * 60 * 60;
 }
 
 /**

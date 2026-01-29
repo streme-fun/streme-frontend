@@ -1,10 +1,13 @@
-import { Address } from "viem";
+import { Address, parseUnits } from "viem";
 import { publicClient } from "./viemClient";
 import { GDA_V1_FORWARDER } from "./superfluid-contracts";
 import { BestFriend } from "./neynar";
+import { STREME_SUPER_TOKEN } from "./superfluid-constants";
+// Import getBestFriendAddress from superfluid-streaming to avoid duplication
+import { getBestFriendAddress } from "./superfluid-streaming";
 
-// STREME Super Token address on Base
-export const STREME_SUPER_TOKEN = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58" as Address;
+// Re-export for backwards compatibility
+export { STREME_SUPER_TOKEN, getBestFriendAddress };
 
 // GDA V1 Forwarder ABI - key functions and events for pool management
 export const GDA_V1_FORWARDER_ABI = [
@@ -143,33 +146,21 @@ export const BEST_FRIENDS_POOL_CONFIG = {
 export const UNITS_PER_FRIEND = 100n;
 
 /**
- * Get the Ethereum address for a best friend (custody or verified address)
- */
-export function getBestFriendAddress(friend: BestFriend): Address | null {
-  // Prefer custody address, fallback to first verified eth address
-  if (friend.custody_address) {
-    return friend.custody_address as Address;
-  }
-  
-  if (friend.verified_addresses.eth_addresses.length > 0) {
-    return friend.verified_addresses.eth_addresses[0] as Address;
-  }
-  
-  return null;
-}
-
-/**
- * Calculate weekly distribution amount based on staking rewards
+ * Calculate weekly distribution amount based on staking rewards.
+ * Uses BigInt arithmetic to avoid precision loss for large values.
+ *
+ * @param dailyFlowRate - Daily flow rate as a string (tokens per day)
+ * @returns Weekly amount in wei as bigint
  */
 export function calculateWeeklyAmount(dailyFlowRate: string): bigint {
   if (!dailyFlowRate || dailyFlowRate === "0") return BigInt(0);
-  
-  // Convert daily flow rate to weekly amount (7 days worth)
-  const dailyAmount = parseFloat(dailyFlowRate);
-  const weeklyAmount = dailyAmount * 7;
-  
-  // Convert to wei (18 decimals)
-  return BigInt(Math.floor(weeklyAmount * 1e18));
+
+  // Use parseUnits to convert to wei with proper precision
+  // This avoids parseFloat precision loss
+  const dailyAmountWei = parseUnits(dailyFlowRate, 18);
+
+  // Multiply by 7 using BigInt arithmetic (no precision loss)
+  return dailyAmountWei * 7n;
 }
 
 /**

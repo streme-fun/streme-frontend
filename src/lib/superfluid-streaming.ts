@@ -1,10 +1,11 @@
-import { Address } from "viem";
+import { Address, formatUnits, parseUnits } from "viem";
 import { publicClient } from "./viemClient";
 import { CFA_V1_FORWARDER } from "./superfluid-contracts";
 import { BestFriend } from "./neynar";
+import { STREME_SUPER_TOKEN, SECONDS_PER_DAY } from "./superfluid-constants";
 
-// STREME Super Token address on Base
-export const STREME_SUPER_TOKEN = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58" as Address;
+// Re-export for backwards compatibility
+export { STREME_SUPER_TOKEN };
 
 // CFAv1Forwarder ABI - functions we need for streaming
 export const CFA_V1_FORWARDER_ABI = [
@@ -43,22 +44,54 @@ export const CFA_V1_FORWARDER_ABI = [
 
 /**
  * Convert tokens per day to flow rate per second (Superfluid format)
+ * Uses BigInt arithmetic to avoid precision loss for large values.
+ *
+ * @param tokensPerDay - Number of tokens per day (as a decimal string for precision)
+ * @returns Flow rate in wei per second as bigint
  */
-export function tokensPerDayToFlowRate(tokensPerDay: number): bigint {
-  const tokensPerSecond = tokensPerDay / (24 * 60 * 60);
-  return BigInt(Math.floor(tokensPerSecond * 1e18));
+export function tokensPerDayToFlowRate(tokensPerDay: number | string): bigint {
+  // Convert to string to use parseUnits for precision
+  const tokensPerDayStr = typeof tokensPerDay === 'number'
+    ? tokensPerDay.toString()
+    : tokensPerDay;
+
+  // Parse as wei (18 decimals) - this gives us tokens per day in wei
+  const tokensPerDayWei = parseUnits(tokensPerDayStr, 18);
+
+  // Divide by seconds per day to get flow rate per second
+  return tokensPerDayWei / SECONDS_PER_DAY;
 }
 
 /**
- * Convert flow rate per second to tokens per day for display
+ * Convert flow rate per second to tokens per day for display.
+ * Returns a string representation to preserve precision.
+ * For display purposes, you can safely convert small values to number.
+ *
+ * @param flowRate - Flow rate in wei per second as bigint
+ * @returns Tokens per day as a string (use parseFloat for display if needed)
  */
 export function flowRateToTokensPerDay(flowRate: bigint): number {
-  const tokensPerSecond = Number(flowRate) / 1e18;
-  return tokensPerSecond * 24 * 60 * 60;
+  // Multiply by seconds per day first (in BigInt to avoid precision loss)
+  const tokensPerDayWei = flowRate * SECONDS_PER_DAY;
+
+  // Format to human-readable tokens (18 decimals)
+  // For typical display values, this conversion to number is safe
+  const formatted = formatUnits(tokensPerDayWei, 18);
+  return parseFloat(formatted);
 }
 
 /**
- * Get the current outgoing flow rate for an account
+ * Convert flow rate per second to tokens per day as a string (full precision).
+ * Use this when you need to preserve precision for large values.
+ */
+export function flowRateToTokensPerDayString(flowRate: bigint): string {
+  const tokensPerDayWei = flowRate * SECONDS_PER_DAY;
+  return formatUnits(tokensPerDayWei, 18);
+}
+
+/**
+ * Get the current outgoing flow rate for an account.
+ * Returns the absolute value of the flow rate (outgoing flows are negative).
  */
 export async function getAccountFlowRate(account: Address): Promise<bigint> {
   try {
@@ -68,7 +101,9 @@ export async function getAccountFlowRate(account: Address): Promise<bigint> {
       functionName: "getAccountFlowrate",
       args: [STREME_SUPER_TOKEN, account],
     });
-    return BigInt(Math.abs(Number(flowRate))); // Convert negative outgoing flow to positive
+    // Use BigInt comparison to get absolute value without Number conversion
+    const flowRateBigInt = flowRate as bigint;
+    return flowRateBigInt < 0n ? -flowRateBigInt : flowRateBigInt;
   } catch (error) {
     console.error("Error getting account flow rate:", error);
     return BigInt(0);

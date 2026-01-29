@@ -15,8 +15,7 @@ export async function GET(request: NextRequest) {
     );
 
     if (!res.ok) {
-      const errorData = await res.text();
-      console.error("0x Gasless API quote error:", res.status, errorData);
+      console.error("0x Gasless API quote error:", res.status);
       return Response.json(
         { error: `0x Gasless API error: ${res.statusText}` },
         { status: res.status }
@@ -24,17 +23,12 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await res.json();
-
-    console.log(
-      "gasless quote api",
-      `https://api.0x.org/gasless/quote?${searchParams}`
-    );
-
-    console.log("gasless quote data", JSON.stringify(data, null, 2));
-
     return Response.json(data);
   } catch (error) {
-    console.error("Gasless quote API error:", error);
+    console.error(
+      "Gasless quote API error:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
     return Response.json(
       { error: "Failed to fetch gasless quote" },
       { status: 500 }
