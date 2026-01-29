@@ -39,12 +39,12 @@ export async function GET(
       { headers }
     );
   } catch (error) {
-    console.error("Error fetching launched tokens:", error);
+    console.error(
+      "Error fetching launched tokens:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
     return Response.json(
-      {
-        error: "Failed to fetch launched tokens",
-        details: error instanceof Error ? error.message : undefined,
-      },
+      { error: "Failed to fetch launched tokens" },
       { status: 500 }
     );
   }

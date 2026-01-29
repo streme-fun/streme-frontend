@@ -4,7 +4,6 @@ import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { MiniAppTopNavbar } from "../components/MiniAppTopNavbar";
 import { MiniAppBottomNavbar } from "../components/MiniAppBottomNavbar";
-// import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal"; // DISABLED
 import { usePathname } from "next/navigation";
 import { FrameProvider } from "../components/providers/FrameProvider";
 import MiniAppWagmiProvider from "../components/providers/MiniAppWagmiProvider";
@@ -16,10 +15,6 @@ import { useAccount } from "wagmi";
 import { useAppFrameLogic } from "../hooks/useAppFrameLogic";
 import { detectEnvironmentForProviders } from "../lib/miniAppDetection";
 import { EnvironmentProvider } from "../components/providers/EnvironmentProvider";
-// import { UnstakedTokensModal } from "../components/UnstakedTokensModal";
-import { formatUnits } from "viem";
-import { publicClient } from "../lib/viemClient";
-import { BLACKLISTED_TOKENS } from "../lib/blacklist";
 
 // Global error handler for wallet provider conflicts
 function WalletProviderErrorHandler() {
@@ -97,19 +92,6 @@ function WalletProviderErrorHandler() {
   return null; // This component doesn't render anything
 }
 
-interface UnstakedToken {
-  tokenAddress: string;
-  symbol: string;
-  balance: number;
-  stakingAddress?: string;
-  logo?: string;
-  marketData?: {
-    marketCap: number;
-    price: number;
-    priceChange24h: number;
-  };
-}
-
 // Client-side function to fetch user data from our API
 const fetchNeynarUser = async (fid: number) => {
   try {
@@ -128,20 +110,10 @@ function AppContent({ children }: { children: React.ReactNode }) {
   const { address: wagmiAddress } = useAccount();
   const {
     isMiniAppView,
-    address: fcAddress,
     isConnected: fcIsConnected,
-    isSDKLoaded: isDetectionComplete,
     farcasterContext,
   } = useAppFrameLogic();
 
-  // const [unstakedTokens, setUnstakedTokens] = useState<UnstakedToken[]>([]);
-  const [mounted, setMounted] = useState(false);
-  const [stableConnectionState, setStableConnectionState] = useState<{
-    isStable: boolean;
-    address: string | undefined;
-    isConnected: boolean;
-  }>({ isStable: false, address: undefined, isConnected: false });
-  
   // Profile picture and user data state for mini-app
   const [miniAppProfileImage, setMiniAppProfileImage] = useState<string>("");
   const [miniAppUserData, setMiniAppUserData] = useState<{
@@ -149,12 +121,8 @@ function AppContent({ children }: { children: React.ReactNode }) {
     username: string;
     profileImage: string;
   } | null>(null);
-  
-  // Tutorial modal state for mini-app
-  const [showTutorialModal, setShowTutorialModal] = useState(false);
 
-  // Get effective address based on context
-  const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
+  // Get effective connection status based on context
   const effectiveIsConnected = isMiniAppView ? fcIsConnected : !!wagmiAddress;
 
   // Initialize theme-change early to prevent timing issues
@@ -185,327 +153,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
           console.warn("Failed to load Eruda:", error);
         });
     }
-
-    setMounted(true);
   }, []);
-
-  // Debounce connection state to prevent rapid changes causing timing issues
-  useEffect(() => {
-    // Only start debouncing after detection is complete and component is mounted
-    if (!isDetectionComplete || !mounted) {
-      return;
-    }
-
-    const debounceTimeout = setTimeout(() => {
-      const currentAddress = effectiveAddress;
-      const currentIsConnected = effectiveIsConnected;
-
-      // Additional validation for mini app context
-      if (isMiniAppView) {
-        // For mini app, ensure we have a valid Ethereum address format
-        if (
-          !currentAddress ||
-          !currentAddress.startsWith("0x") ||
-          currentAddress.length !== 42
-        ) {
-          console.log("Mini app: Invalid address format, waiting...", {
-            currentAddress,
-          });
-          return;
-        }
-      }
-
-      // Only update if the state has actually changed or is being set for the first time
-      if (
-        !stableConnectionState.isStable ||
-        stableConnectionState.address !== currentAddress ||
-        stableConnectionState.isConnected !== currentIsConnected
-      ) {
-        console.log("Updating stable connection state:", {
-          isMiniAppView,
-          currentAddress,
-          currentIsConnected,
-          timestamp: new Date().toISOString(),
-        });
-
-        setStableConnectionState({
-          isStable: true,
-          address: currentAddress,
-          isConnected: currentIsConnected,
-        });
-      }
-    }, 750); // 750ms debounce to allow for state settling
-
-    return () => clearTimeout(debounceTimeout);
-  }, [
-    effectiveAddress,
-    effectiveIsConnected,
-    isDetectionComplete,
-    mounted,
-    isMiniAppView,
-    stableConnectionState,
-  ]);
-
-  // Helper function to safely call toLowerCase on potentially null values
-  const safeToLowerCase = React.useCallback(
-    (value: string | null | undefined): string => {
-      if (!value || typeof value !== "string") {
-        return "";
-      }
-      return value.toLowerCase();
-    },
-    []
-  );
-
-  // Helper function to fetch token data
-  const fetchTokenData = React.useCallback(
-    async (tokenAddress: string) => {
-      if (
-        !tokenAddress ||
-        BLACKLISTED_TOKENS.includes(safeToLowerCase(tokenAddress))
-      ) {
-        return {
-          staking_address: undefined,
-          logo: undefined,
-          marketData: undefined,
-        };
-      }
-
-      try {
-        const response = await fetch(
-          `/api/tokens/single?address=${tokenAddress}`
-        );
-        if (response.ok) {
-          const result = await response.json();
-          return {
-            staking_address: result.data?.staking_address,
-            logo:
-              result.data?.img_url || result.data?.logo || result.data?.image,
-            marketData: result.data?.marketData,
-          };
-        }
-      } catch (error) {
-        console.warn("Could not fetch token data for:", tokenAddress, error);
-      }
-
-      return {
-        staking_address: undefined,
-        logo: undefined,
-        marketData: undefined,
-      };
-    },
-    [safeToLowerCase]
-  );
-
-  // Check for unstaked tokens when stable connection is established
-  useEffect(() => {
-    const checkForUnstakedTokens = async () => {
-      // Wait for stable connection state
-      if (
-        !stableConnectionState.isStable ||
-        !stableConnectionState.address ||
-        !stableConnectionState.isConnected
-      ) {
-        // Only log once when first waiting, not repeatedly
-        if (stableConnectionState.isStable === false) {
-          console.log("Waiting for stable connection state...", {
-            isStable: stableConnectionState.isStable,
-            hasAddress: !!stableConnectionState.address,
-            isConnected: stableConnectionState.isConnected,
-          });
-        }
-        return;
-      }
-
-      // Check if user has dismissed the modal in this session
-      const hasSeenModal = sessionStorage.getItem(
-        "unstakedTokensModalDismissed"
-      );
-      if (hasSeenModal === "true") {
-        console.log("Modal already dismissed this session");
-        return;
-      }
-
-      console.log("Starting unstaked tokens check with stable state:", {
-        address: stableConnectionState.address,
-        isConnected: stableConnectionState.isConnected,
-        isMiniAppView,
-        timestamp: new Date().toISOString(),
-      });
-
-      try {
-        const accountId = safeToLowerCase(stableConnectionState.address);
-
-        const query = `
-          query GetAccountTokens($accountId: ID!) {
-            account(id: $accountId) {
-              accountTokenSnapshots {
-                token {
-                  id
-                  symbol
-                  isNativeAssetSuperToken
-                }
-                balanceUntilUpdatedAt
-              }
-              poolMemberships {
-                units
-                pool {
-                  token {
-                    id
-                  }
-                }
-              }
-            }
-          }
-        `;
-
-        const endpoints = [
-          "https://subgraph-endpoints.superfluid.dev/base-mainnet/protocol-v1",
-          "https://api.thegraph.com/subgraphs/name/superfluid-finance/protocol-v1-base",
-        ];
-
-        for (const endpoint of endpoints) {
-          try {
-            const response = await fetch(endpoint, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                query,
-                variables: { accountId },
-              }),
-            });
-
-            if (!response.ok) continue;
-
-            const data = await response.json();
-            if (data.errors) continue;
-
-            const accountData = data.data?.account;
-            if (accountData?.accountTokenSnapshots) {
-              // Get tokens that have been staked (have pool memberships with units > 0)
-              const stakedTokens = new Set(
-                (accountData.poolMemberships || [])
-                  .filter(
-                    (membership: {
-                      units?: string;
-                      pool?: { token?: { id?: string } };
-                    }) =>
-                      membership.units &&
-                      parseFloat(membership.units) > 0 &&
-                      membership.pool?.token?.id
-                  )
-                  .map((membership: { pool: { token: { id: string } } }) =>
-                    safeToLowerCase(membership.pool.token.id)
-                  )
-              );
-
-              // Filter to only tokens that have NEVER been staked
-              const validSnapshots = accountData.accountTokenSnapshots.filter(
-                (snapshot: {
-                  balanceUntilUpdatedAt?: string;
-                  token: {
-                    isNativeAssetSuperToken?: boolean;
-                    id?: string;
-                    symbol?: string;
-                  };
-                }) =>
-                  snapshot.balanceUntilUpdatedAt &&
-                  parseFloat(snapshot.balanceUntilUpdatedAt) > 0 &&
-                  !snapshot.token.isNativeAssetSuperToken &&
-                  snapshot.token.id &&
-                  !BLACKLISTED_TOKENS.includes(
-                    safeToLowerCase(snapshot.token.id)
-                  ) &&
-                  !stakedTokens.has(safeToLowerCase(snapshot.token.id)) // Only never-staked tokens
-              );
-
-              if (validSnapshots.length > 0) {
-                // Fetch current balances and token data
-                const tokenAddresses = validSnapshots.map(
-                  (snapshot: { token: { id: string } }) => snapshot.token.id
-                );
-
-                const balancePromises = tokenAddresses.map(
-                  async (tokenAddress: string) => {
-                    try {
-                      const balance = await publicClient.readContract({
-                        address: tokenAddress as `0x${string}`,
-                        abi: [
-                          {
-                            inputs: [{ name: "account", type: "address" }],
-                            name: "balanceOf",
-                            outputs: [{ name: "", type: "uint256" }],
-                            stateMutability: "view",
-                            type: "function",
-                          },
-                        ],
-                        functionName: "balanceOf",
-                        args: [stableConnectionState.address as `0x${string}`],
-                      });
-                      return { tokenAddress, balance };
-                    } catch {
-                      return { tokenAddress, balance: BigInt(0) };
-                    }
-                  }
-                );
-
-                const balanceResults = await Promise.all(balancePromises);
-                const balanceMap = new Map(
-                  balanceResults.map((result) => [
-                    result.tokenAddress,
-                    result.balance,
-                  ])
-                );
-
-                // Fetch token data in parallel
-                const tokenDataPromises = tokenAddresses
-                  .slice(0, 5)
-                  .map((tokenAddress: string) => fetchTokenData(tokenAddress));
-                const tokenDataResults = await Promise.all(tokenDataPromises);
-
-                const tokens: UnstakedToken[] = [];
-
-                for (let i = 0; i < Math.min(validSnapshots.length, 5); i++) {
-                  const snapshot = validSnapshots[i];
-                  const tokenAddress = snapshot.token.id;
-                  const currentBalance =
-                    balanceMap.get(tokenAddress) || BigInt(0);
-                  const formattedBalance = Number(
-                    formatUnits(currentBalance, 18)
-                  );
-                  const tokenData = tokenDataResults[i];
-
-                  if (formattedBalance > 0 && tokenData.staking_address) {
-                    tokens.push({
-                      tokenAddress,
-                      symbol: snapshot.token.symbol,
-                      balance: formattedBalance,
-                      stakingAddress: tokenData.staking_address,
-                      logo: tokenData.logo,
-                      marketData: tokenData.marketData,
-                    });
-                  }
-                }
-
-                // setUnstakedTokens(tokens);
-              }
-            }
-            break;
-          } catch (error) {
-            console.warn(`Failed to fetch from ${endpoint}:`, error);
-            continue;
-          }
-        }
-      } catch (error) {
-        console.error("Error checking for unstaked tokens:", error);
-      }
-    };
-
-    // Run immediately when stable connection is available
-    checkForUnstakedTokens();
-  }, [stableConnectionState, isMiniAppView, safeToLowerCase, fetchTokenData]);
 
   // Fetch profile picture and user data for mini-app view
   useEffect(() => {
@@ -545,37 +193,16 @@ function AppContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isHomePage = pathname === '/';
 
-  // Tutorial handlers for mini-app
-  const handleTutorialClick = () => {
-    setShowTutorialModal(true);
-  };
-
-  const handleCloseTutorial = () => {
-    setShowTutorialModal(false);
-    // Save completion state so user doesn't see tutorial again
-    if (typeof window !== "undefined") {
-      localStorage.setItem("streme-tutorial-skipped", "true");
-    }
-  };
-
-  const handleSkipTutorial = () => {
-    setShowTutorialModal(false);
-    // Save to localStorage so user doesn't see tutorial again
-    if (typeof window !== "undefined") {
-      localStorage.setItem("streme-tutorial-skipped", "true");
-    }
-  };
-
   return (
     <>
       <WalletProviderErrorHandler />
       {isMiniAppView ? (
         <>
           {isHomePage && (
-            <MiniAppTopNavbar 
+            <MiniAppTopNavbar
               isConnected={effectiveIsConnected}
-              onLogoClick={() => {}} 
-              onTutorialClick={handleTutorialClick}
+              onLogoClick={() => {}}
+              onTutorialClick={() => {}}
             />
           )}
           <main className={`px-4 ${isHomePage ? "pt-16 pb-20" : "pb-20"}`}>{children}</main>
@@ -583,12 +210,6 @@ function AppContent({ children }: { children: React.ReactNode }) {
             profileImage={miniAppProfileImage}
             userData={miniAppUserData}
           />
-          {/* Tutorial Modal - DISABLED */}
-          {/* <MiniAppTutorialModal
-            isOpen={showTutorialModal}
-            onClose={handleCloseTutorial}
-            onSkip={handleSkipTutorial}
-          /> */}
         </>
       ) : (
         <>
@@ -610,18 +231,6 @@ function AppContent({ children }: { children: React.ReactNode }) {
           },
         }}
       />
-
-      {/* Global Unstaked Tokens Modal */}
-      {/* {mounted && unstakedTokens.length > 0 && (
-        <UnstakedTokensModal
-          unstakedTokens={unstakedTokens}
-          onDismiss={() => {
-            // Store dismissal in sessionStorage to match UnstakedTokensModal
-            sessionStorage.setItem("unstakedTokensModalDismissed", "true");
-            setUnstakedTokens([]);
-          }}
-        />
-      )} */}
     </>
   );
 }

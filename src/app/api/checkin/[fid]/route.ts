@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifySessionToken } from "@/src/lib/siwf-auth";
 
 interface CheckinStatusResponse {
   fid: number;
@@ -19,12 +20,39 @@ export async function GET(
 ) {
   try {
     const { fid } = await params;
-    
+
     // Validate FID
     if (!fid || isNaN(parseInt(fid))) {
       return NextResponse.json(
         { error: "Invalid FID" },
         { status: 400 }
+      );
+    }
+
+    // Verify authentication
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.slice(7); // Remove "Bearer " prefix
+    const verified = verifySessionToken(token);
+
+    if (!verified) {
+      return NextResponse.json(
+        { error: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
+
+    // Ensure user can only access their own check-in data
+    if (verified.fid !== parseInt(fid)) {
+      return NextResponse.json(
+        { error: "Access denied" },
+        { status: 403 }
       );
     }
 

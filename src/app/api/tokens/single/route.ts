@@ -1,4 +1,5 @@
 import { fetchTokenFromStreme, enrichTokensWithData } from "@/src/lib/apiUtils";
+import { isAddress } from "viem";
 
 // Helper function to retry with exponential backoff for network errors only
 async function retryWithBackoff<T>(
@@ -45,6 +46,11 @@ export async function GET(request: Request) {
     if (!address) {
       console.error("[API] Address is required");
       return Response.json({ error: "Address is required" }, { status: 400 });
+    }
+
+    if (!isAddress(address)) {
+      console.error("[API] Invalid address format:", address);
+      return Response.json({ error: "Invalid address format" }, { status: 400 });
     }
 
     // console.log(`[API] Fetching token data for: ${address}`);

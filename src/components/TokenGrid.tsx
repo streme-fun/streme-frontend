@@ -8,9 +8,8 @@ import FarcasterIcon from "@/public/farcaster.svg";
 // import { SearchBar } from "./SearchBar";
 // import { SortMenu } from "./SortMenu";
 import { Token } from "../app/types/token";
-import { calculateRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
+import { calculateBatchRewards, REWARDS_PER_SECOND } from "@/src/lib/rewards";
 import { useRewardCounter } from "@/src/hooks/useStreamingNumber";
-import { CROWDFUND_TOKEN_ADDRESSES } from "@/src/lib/crowdfundTokens";
 import { VERIFIED_TOKENS } from "@/src/lib/constants";
 import { memo } from "react";
 import SafeImage from "@/src/components/SafeImage";
@@ -888,7 +887,7 @@ export function TokenGrid({
       }
 
       // Enrich tokens progressively in smaller batches for better UX
-      const BATCH_SIZE = 6; // Smaller batches for progressive loading
+      const BATCH_SIZE = 12; // Larger batches now that we use batch API
       const enrichedResults: Array<
         Token & { rewards: number; totalStakers: number }
       > = [...alreadyEnriched];
@@ -896,55 +895,58 @@ export function TokenGrid({
       for (let i = 0; i < tokensToEnrich.length; i += BATCH_SIZE) {
         const batch = tokensToEnrich.slice(i, i + BATCH_SIZE);
 
-        // Enrich this batch using individual API calls (more reliable)
-        const enrichedBatch = await Promise.all(
-          batch.map(async (token) => {
-            try {
-              const { totalStreamed, totalStakers } = await calculateRewards(
-                token.created_at,
-                token.contract_address,
-                token.staking_pool
-              );
-              return {
-                ...token,
-                rewards: totalStreamed,
-                totalStakers,
-              };
-            } catch (error) {
-              console.warn(
-                `Failed to enrich token ${token.contract_address}:`,
-                error
-              );
-              return {
-                ...token,
-                rewards: 0,
-                totalStakers: 0,
-              };
-            }
-          })
-        );
-
-        // Update the results array with enriched data
-        enrichedBatch.forEach((enrichedToken) => {
-          const index = enrichedResults.findIndex(
-            (t) => t.contract_address === enrichedToken.contract_address
+        try {
+          // Use batch API to fetch all rewards in a single GraphQL query
+          const batchResults = await calculateBatchRewards(
+            batch.map((t) => ({ stakingPool: t.staking_pool }))
           );
-          if (index !== -1) {
-            enrichedResults[index] = enrichedToken;
-          }
-        });
 
-        // Update the display immediately with this batch
-        setDisplayedTokens([...enrichedResults]);
+          // Map batch results back to tokens
+          const enrichedBatch = batch.map((token, index) => ({
+            ...token,
+            rewards: batchResults[index]?.totalStreamed ?? 0,
+            totalStakers: batchResults[index]?.totalStakers ?? 0,
+          }));
 
-        // Update cache
-        const newCacheEntries = enrichedBatch.filter(
-          (token) => !cachedAddresses.has(token.contract_address)
-        );
-        trendingCacheRef.current = [
-          ...trendingCacheRef.current,
-          ...newCacheEntries,
-        ];
+          // Update the results array with enriched data
+          enrichedBatch.forEach((enrichedToken) => {
+            const index = enrichedResults.findIndex(
+              (t) => t.contract_address === enrichedToken.contract_address
+            );
+            if (index !== -1) {
+              enrichedResults[index] = enrichedToken;
+            }
+          });
+
+          // Update the display immediately with this batch
+          setDisplayedTokens([...enrichedResults]);
+
+          // Update cache
+          const newCacheEntries = enrichedBatch.filter(
+            (token) => !cachedAddresses.has(token.contract_address)
+          );
+          trendingCacheRef.current = [
+            ...trendingCacheRef.current,
+            ...newCacheEntries,
+          ];
+        } catch (error) {
+          console.warn(`Failed to enrich batch:`, error);
+          // Fall back to showing tokens without rewards
+          const fallbackBatch = batch.map((token) => ({
+            ...token,
+            rewards: 0,
+            totalStakers: 0,
+          }));
+          fallbackBatch.forEach((enrichedToken) => {
+            const index = enrichedResults.findIndex(
+              (t) => t.contract_address === enrichedToken.contract_address
+            );
+            if (index !== -1) {
+              enrichedResults[index] = enrichedToken;
+            }
+          });
+          setDisplayedTokens([...enrichedResults]);
+        }
       }
     } catch (error) {
       console.error("Error enriching trending tokens:", error);
@@ -970,35 +972,60 @@ export function TokenGrid({
 
   // Helper to enrich a batch of tokens with rewards and stakers data
   const enrichTokenBatch = async (batch: Token[]) => {
-    return Promise.all(
-      batch.map(async (token) => {
-        // If token already has rewards/stakers, use them
-        if ("rewards" in token && "totalStakers" in token) {
-          return token as Token & { rewards: number; totalStakers: number };
-        }
+    // First, separate tokens that already have data, are cached, or need enrichment
+    const result: Array<Token & { rewards: number; totalStakers: number }> = [];
+    const tokensToEnrich: Array<{ token: Token; resultIndex: number }> = [];
 
-        // Check trending cache first
-        if (sortBy === "trending") {
-          const cached = trendingCacheRef.current.find(
-            (c) => c.contract_address === token.contract_address
-          );
-          if (cached) {
-            return cached;
-          }
-        }
+    batch.forEach((token, index) => {
+      // If token already has rewards/stakers, use them
+      if ("rewards" in token && "totalStakers" in token) {
+        result[index] = token as Token & { rewards: number; totalStakers: number };
+        return;
+      }
 
-        const { totalStreamed, totalStakers } = await calculateRewards(
-          token.created_at,
-          token.contract_address,
-          token.staking_pool
+      // Check trending cache first
+      if (sortBy === "trending") {
+        const cached = trendingCacheRef.current.find(
+          (c) => c.contract_address === token.contract_address
         );
-        return {
-          ...token,
-          rewards: totalStreamed,
-          totalStakers,
-        };
-      })
-    );
+        if (cached) {
+          result[index] = cached;
+          return;
+        }
+      }
+
+      // Mark for enrichment
+      tokensToEnrich.push({ token, resultIndex: index });
+    });
+
+    // If there are tokens to enrich, use batch API
+    if (tokensToEnrich.length > 0) {
+      try {
+        const batchResults = await calculateBatchRewards(
+          tokensToEnrich.map(({ token }) => ({ stakingPool: token.staking_pool }))
+        );
+
+        tokensToEnrich.forEach(({ token, resultIndex }, i) => {
+          result[resultIndex] = {
+            ...token,
+            rewards: batchResults[i]?.totalStreamed ?? 0,
+            totalStakers: batchResults[i]?.totalStakers ?? 0,
+          };
+        });
+      } catch (error) {
+        console.warn("Failed to enrich token batch:", error);
+        // Fall back to default values
+        tokensToEnrich.forEach(({ token, resultIndex }) => {
+          result[resultIndex] = {
+            ...token,
+            rewards: 0,
+            totalStakers: 0,
+          };
+        });
+      }
+    }
+
+    return result;
   };
 
   // Helper to sort tokens by date

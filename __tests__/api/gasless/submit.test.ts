@@ -5,9 +5,27 @@ import { NextRequest } from 'next/server'
 // Mock fetch globally
 const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>
 
+// Valid test data that passes input validation
+const VALID_SIGNATURE = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12'
+const VALID_CHAIN_ID = 8453
+
+const createValidRequestBody = (overrides = {}) => ({
+  trade: {
+    to: '0x1234567890123456789012345678901234567890',
+    data: '0xabcdef',
+    value: '0',
+    gasPrice: '1000000000',
+    gas: '150000'
+  },
+  signature: VALID_SIGNATURE,
+  taker: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e',
+  chainId: VALID_CHAIN_ID,
+  ...overrides
+})
+
 describe('/api/gasless/submit', () => {
   const originalEnv = process.env.ZEROX_API_KEY
-  
+
   beforeEach(() => {
     jest.clearAllMocks()
     process.env.ZEROX_API_KEY = 'test-api-key'
@@ -25,18 +43,7 @@ describe('/api/gasless/submit', () => {
       estimatedGas: '150000'
     }
 
-    const mockRequestBody = {
-      trade: {
-        to: '0x1234567890123456789012345678901234567890',
-        data: '0xabcdef',
-        value: '0',
-        gasPrice: '1000000000',
-        gas: '150000'
-      },
-      signature: '0xsignature123',
-      taker: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e',
-      chainId: 8453
-    }
+    const mockRequestBody = createValidRequestBody()
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -59,7 +66,7 @@ describe('/api/gasless/submit', () => {
 
     expect(response.status).toBe(200)
     expect(data).toEqual(mockSubmitResponse)
-    
+
     // Verify 0x API was called with correct parameters
     expect(mockFetch).toHaveBeenCalledWith(
       'https://api.0x.org/gasless/submit',
@@ -75,7 +82,7 @@ describe('/api/gasless/submit', () => {
     )
   })
 
-  it('handles invalid signature error', async () => {
+  it('handles 0x API returning invalid signature error', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 400,
@@ -83,14 +90,7 @@ describe('/api/gasless/submit', () => {
       text: async () => 'Invalid signature'
     } as Response)
 
-    const mockRequestBody = {
-      trade: {
-        to: '0x1234567890123456789012345678901234567890',
-        data: '0xabcdef'
-      },
-      signature: '0xinvalidsignature',
-      taker: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e'
-    }
+    const mockRequestBody = createValidRequestBody()
 
     const request = new NextRequest('http://localhost:3000/api/gasless/submit', {
       method: 'POST',
@@ -122,7 +122,7 @@ describe('/api/gasless/submit', () => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ trade: {}, signature: '', taker: '' })
+      body: JSON.stringify(createValidRequestBody())
     })
 
     const response = await POST(request)
@@ -145,7 +145,7 @@ describe('/api/gasless/submit', () => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ trade: {}, signature: '', taker: '' })
+      body: JSON.stringify(createValidRequestBody())
     })
 
     const response = await POST(request)
@@ -163,7 +163,7 @@ describe('/api/gasless/submit', () => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ trade: {}, signature: '', taker: '' })
+      body: JSON.stringify(createValidRequestBody())
     })
 
     const response = await POST(request)
@@ -189,9 +189,9 @@ describe('/api/gasless/submit', () => {
     expect(data.error).toBe('Failed to submit gasless transaction')
   })
 
-  it('logs successful submission response', async () => {
+  it('does not log sensitive data on success', async () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
-    
+
     const mockSubmitResponse = {
       tradeHash: '0x123',
       status: 'pending'
@@ -208,22 +208,20 @@ describe('/api/gasless/submit', () => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ trade: {}, signature: '', taker: '' })
+      body: JSON.stringify(createValidRequestBody())
     })
 
     await POST(request)
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'gasless submit response',
-      expect.stringContaining('"tradeHash": "0x123"')
-    )
+    // Should not log response data (security)
+    expect(consoleSpy).not.toHaveBeenCalled()
 
     consoleSpy.mockRestore()
   })
 
-  it('logs error details on API failure', async () => {
+  it('logs minimal error info on API failure', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
-    
+
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 403,
@@ -236,22 +234,22 @@ describe('/api/gasless/submit', () => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ trade: {}, signature: '', taker: '' })
+      body: JSON.stringify(createValidRequestBody())
     })
 
     await POST(request)
 
+    // Should only log status code, not response body (security)
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       '0x Gasless API submit error:',
-      403,
-      'Insufficient balance'
+      403
     )
 
     consoleErrorSpy.mockRestore()
   })
 
   it('preserves all fields from request body', async () => {
-    const complexRequestBody = {
+    const complexRequestBody = createValidRequestBody({
       trade: {
         to: '0x1234567890123456789012345678901234567890',
         data: '0xabcdef',
@@ -260,9 +258,6 @@ describe('/api/gasless/submit', () => {
         gas: '300000',
         nonce: 42
       },
-      signature: '0xsignature123',
-      taker: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD7e',
-      chainId: 8453,
       permit2: {
         eip712: {
           domain: {},
@@ -271,7 +266,7 @@ describe('/api/gasless/submit', () => {
           message: {}
         }
       }
-    }
+    })
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -296,5 +291,98 @@ describe('/api/gasless/submit', () => {
         body: JSON.stringify(complexRequestBody)
       })
     )
+  })
+
+  // New tests for input validation
+  describe('input validation', () => {
+    it('rejects missing trade field', async () => {
+      const request = new NextRequest('http://localhost:3000/api/gasless/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signature: VALID_SIGNATURE,
+          chainId: VALID_CHAIN_ID
+        })
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toContain("'trade'")
+    })
+
+    it('rejects invalid signature format', async () => {
+      const request = new NextRequest('http://localhost:3000/api/gasless/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trade: { to: '0x123' },
+          signature: 'not-a-hex-string',
+          chainId: VALID_CHAIN_ID
+        })
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toContain("'signature'")
+    })
+
+    it('rejects missing chainId', async () => {
+      const request = new NextRequest('http://localhost:3000/api/gasless/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trade: { to: '0x123' },
+          signature: VALID_SIGNATURE
+        })
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toContain("'chainId'")
+    })
+
+    it('rejects invalid approvalSignature format', async () => {
+      const request = new NextRequest('http://localhost:3000/api/gasless/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...createValidRequestBody(),
+          approvalSignature: 'not-valid-hex'
+        })
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toContain("'approvalSignature'")
+    })
+
+    it('accepts valid approvalSignature', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ tradeHash: '0x123' })
+      } as Response)
+
+      const request = new NextRequest('http://localhost:3000/api/gasless/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...createValidRequestBody(),
+          approval: { type: 'permit2' },
+          approvalSignature: '0xabcdef1234567890'
+        })
+      })
+
+      const response = await POST(request)
+      expect(response.status).toBe(200)
+    })
   })
 })
