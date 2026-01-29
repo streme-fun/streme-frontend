@@ -67,9 +67,9 @@ export async function sendNeynarFrameNotification({
       notification,
     });
 
-    if (result.notification_deliveries.length > 0) {
+    if (result.success_count && result.success_count > 0) {
       return { state: "success" };
-    } else if (result.notification_deliveries.length === 0) {
+    } else if (result.not_attempted_count && result.not_attempted_count > 0) {
       return { state: "no_token" };
     } else {
       return { state: "error", error: result || "Unknown error" };
