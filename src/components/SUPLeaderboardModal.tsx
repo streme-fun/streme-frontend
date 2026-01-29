@@ -8,7 +8,6 @@ import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useSafeWalletAuth } from "../hooks/useSafeWallet";
 import { useFarcasterAuth } from "../hooks/useFarcasterAuth";
 import { useSupPoints } from "../hooks/useSupPoints";
-import { useSupEligibility } from "../hooks/useSupEligibility";
 import {
   useAccount,
   useConnect,
@@ -104,14 +103,6 @@ export function SUPLeaderboardModal({
     clearData: clearPointsData,
   } = useSupPoints();
 
-  // SUP Eligibility Data
-  const {
-    eligibilityData,
-    isLoading: isEligibilityLoading,
-    error: eligibilityError,
-    fetchEligibility,
-    getFormattedFlowRate,
-  } = useSupEligibility();
 
   // Wallet connection
   const { isConnected: isWagmiConnected } = useAccount();
@@ -193,26 +184,6 @@ export function SUPLeaderboardModal({
     }
   }, [isAuthenticated, fetchUserData, clearPointsData]);
 
-  // Fetch SUP eligibility when address is available
-  useEffect(() => {
-    if (effectiveAddress && !eligibilityData && !isEligibilityLoading) {
-      console.log(
-        "LeaderboardModal: Fetching SUP eligibility for:",
-        effectiveAddress
-      );
-      fetchEligibility(effectiveAddress).catch((error) => {
-        console.error(
-          "LeaderboardModal: Error fetching SUP eligibility:",
-          error
-        );
-      });
-    }
-  }, [
-    effectiveAddress,
-    eligibilityData,
-    isEligibilityLoading,
-    fetchEligibility,
-  ]);
 
   // Handle successful locker creation
   useEffect(() => {
@@ -691,46 +662,6 @@ export function SUPLeaderboardModal({
     // Authenticated with data - show streamlined claim section
     return (
       <div className="py-4">
-        {/* SUP Eligibility Info */}
-        {eligibilityData && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-blue-900 text-sm">
-                SUP Flow Rate
-              </h4>
-            </div>
-            <p className="text-blue-700 text-sm">
-              <span className="font-mono font-medium">
-                {getFormattedFlowRate()}
-              </span>
-              {eligibilityData.claimNeeded && (
-                <span className="ml-2 text-orange-600">• Claim Available</span>
-              )}
-            </p>
-          </div>
-        )}
-
-        {/* Eligibility Loading State */}
-        {isEligibilityLoading && (
-          <div className="bg-base-200 border border-base-300 rounded-lg p-3 mb-3">
-            <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-              <p className="text-base-content/70 text-sm">
-                Loading SUP eligibility...
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Eligibility Error State */}
-        {eligibilityError && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3">
-            <p className="text-orange-600 text-sm">
-              ⚠️ Could not load SUP eligibility data
-            </p>
-          </div>
-        )}
-
         {/* Claim Error Display */}
         {claimStep === "error" && claimError && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
