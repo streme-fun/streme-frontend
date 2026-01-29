@@ -19,10 +19,9 @@ import { usePostHog } from "posthog-js/react";
 // import { MiniAppTutorialModal } from "../components/MiniAppTutorialModal"; // DISABLED
 import { SPAMMER_BLACKLIST } from "../lib/blacklist";
 import Link from "next/link";
-// DISABLED: Free daily STREME drop feature
-// import { CheckinModal } from "../components/CheckinModal";
-// import { CheckinSuccessModal } from "../components/CheckinSuccessModal";
-// import { useCheckinModal } from "../hooks/useCheckinModal";
+import { CheckinModal } from "../components/CheckinModal";
+import { CheckinSuccessModal } from "../components/CheckinSuccessModal";
+import { useCheckinModal } from "../hooks/useCheckinModal";
 import sdk from "@farcaster/miniapp-sdk";
 import { convertTypesenseTokenToToken, TypesenseToken } from "../lib/typesenseClient";
 
@@ -97,26 +96,26 @@ function App() {
     }
   }, [isMiniAppView]);
 
-  // Checkin modal logic - DISABLED: Free daily STREME drop feature
-  // const {
-  //   checkinData,
-  //   checkinError,
-  //   checkinLoading,
-  //   showSuccessModal,
-  //   showCheckinModal,
-  //   hasCheckedIn,
-  //   hasStakedBalance,
-  //   performCheckin,
-  //   closeSuccessModal,
-  //   handleCloseCheckinModal,
-  //   handleDebugButtonClick,
-  //   showSuccessModalDebug,
-  //   setShowCheckinModal,
-  // } = useCheckinModal({
-  //   isMiniAppView,
-  //   isConnected,
-  //   isOnCorrectNetwork,
-  // });
+  // Checkin modal logic
+  const {
+    checkinData,
+    checkinError,
+    checkinLoading,
+    showSuccessModal,
+    showCheckinModal,
+    hasCheckedIn,
+    hasStakedBalance,
+    performCheckin,
+    closeSuccessModal,
+    handleCloseCheckinModal,
+    handleDebugButtonClick,
+    showSuccessModalDebug,
+    setShowCheckinModal,
+  } = useCheckinModal({
+    isMiniAppView,
+    isConnected,
+    isOnCorrectNetwork,
+  });
 
   // PostHog user identification when wallet connects
   useEffect(() => {
@@ -148,19 +147,19 @@ function App() {
     postHog,
   ]);
 
-  // Log checkin results - DISABLED: Free daily STREME drop feature
-  // useEffect(() => {
-  //   if (checkinData) {
-  //     console.log("Daily checkin successful:", {
-  //       totalCheckins: checkinData.totalCheckins,
-  //       currentStreak: checkinData.currentStreak,
-  //       dropAmount: checkinData.dropAmount,
-  //     });
-  //   }
-  //   if (checkinError) {
-  //     console.log("Checkin error:", checkinError);
-  //   }
-  // }, [checkinData, checkinError]);
+  // Log checkin results
+  useEffect(() => {
+    if (checkinData) {
+      console.log("Daily checkin successful:", {
+        totalCheckins: checkinData.totalCheckins,
+        currentStreak: checkinData.currentStreak,
+        dropAmount: checkinData.dropAmount,
+      });
+    }
+    if (checkinError) {
+      console.log("Checkin error:", checkinError);
+    }
+  }, [checkinData, checkinError]);
 
   // Debug mode activation is now handled directly via handleLogoClick
 
@@ -338,66 +337,65 @@ function App() {
   }, []);
 
   // Check checkin status when miniapp first opens (only after wallet is connected)
-  // DISABLED: Free daily STREME drop feature
-  // useEffect(() => {
-  //   const checkCheckinStatus = async () => {
-  //     if (
-  //       isMiniAppView &&
-  //       isSDKLoaded &&
-  //       farcasterContext &&
-  //       isConnected &&
-  //       !hasCheckedIn
-  //     ) {
-  //       try {
-  //         // Try to get FID from different possible locations
-  //         const userFid =
-  //           farcasterContext?.user?.fid ||
-  //           (
-  //             farcasterContext as unknown as {
-  //               client?: { user?: { fid?: number } };
-  //             }
-  //           )?.client?.user?.fid;
+  useEffect(() => {
+    const checkCheckinStatus = async () => {
+      if (
+        isMiniAppView &&
+        isSDKLoaded &&
+        farcasterContext &&
+        isConnected &&
+        !hasCheckedIn
+      ) {
+        try {
+          // Try to get FID from different possible locations
+          const userFid =
+            farcasterContext?.user?.fid ||
+            (
+              farcasterContext as unknown as {
+                client?: { user?: { fid?: number } };
+              }
+            )?.client?.user?.fid;
 
-  //         if (!userFid) {
-  //           console.log("No FID found in farcasterContext");
-  //           return;
-  //         }
+          if (!userFid) {
+            console.log("No FID found in farcasterContext");
+            return;
+          }
 
-  //         console.log(`Checking checkin status for FID: ${userFid}`);
+          console.log(`Checking checkin status for FID: ${userFid}`);
 
-  //         const response = await fetch(`/api/checkin/${userFid}`);
-  //         if (response.ok) {
-  //           const data = await response.json();
-  //           // console.log("Checkin status:", data);
+          const response = await fetch(`/api/checkin/${userFid}`);
+          if (response.ok) {
+            const data = await response.json();
+            // console.log("Checkin status:", data);
 
-  //           // Only show modal if user hasn't checked in today
-  //           if (!data.checkedInToday) {
-  //             console.log("User hasn't checked in today, showing modal");
-  //             // Show modal immediately since wallet is already connected
-  //             setShowCheckinModal();
-  //           } else {
-  //             console.log("User has already checked in today");
-  //           }
-  //         } else {
-  //           console.error("Failed to fetch checkin status:", response.status);
-  //         }
-  //       } catch (error) {
-  //         console.error("Error checking checkin status:", error);
-  //       }
-  //     }
-  //   };
+            // Only show modal if user hasn't checked in today
+            if (!data.checkedInToday) {
+              console.log("User hasn't checked in today, showing modal");
+              // Show modal immediately since wallet is already connected
+              setShowCheckinModal();
+            } else {
+              console.log("User has already checked in today");
+            }
+          } else {
+            console.error("Failed to fetch checkin status:", response.status);
+          }
+        } catch (error) {
+          console.error("Error checking checkin status:", error);
+        }
+      }
+    };
 
-  //   // Add a small delay to ensure everything is properly initialized, but only after wallet is connected
-  //   const timer = setTimeout(checkCheckinStatus, 1000);
-  //   return () => clearTimeout(timer);
-  // }, [
-  //   isMiniAppView,
-  //   isSDKLoaded,
-  //   farcasterContext,
-  //   isConnected,
-  //   hasCheckedIn,
-  //   setShowCheckinModal,
-  // ]);
+    // Add a small delay to ensure everything is properly initialized, but only after wallet is connected
+    const timer = setTimeout(checkCheckinStatus, 1000);
+    return () => clearTimeout(timer);
+  }, [
+    isMiniAppView,
+    isSDKLoaded,
+    farcasterContext,
+    isConnected,
+    hasCheckedIn,
+    setShowCheckinModal,
+  ]);
 
   // Tutorial modal handlers
   const handleCloseTutorial = () => {
@@ -537,24 +535,23 @@ function App() {
           onSkip={handleSkipTutorial}
         /> */}
 
-        {/* Checkin Modal - DISABLED: Free daily STREME drop feature */}
-        {/* <CheckinModal
+        {/* Checkin Modal */}
+        <CheckinModal
           isOpen={showCheckinModal}
           onClose={handleCloseCheckinModal}
           onCheckin={performCheckin}
           isLoading={checkinLoading}
           hasCheckedIn={hasCheckedIn}
           hasStakedBalance={hasStakedBalance}
-        /> */}
+        />
 
-        {/* Checkin Success Modal - DISABLED: Free daily STREME drop feature */}
-        {/* <CheckinSuccessModal
+        {/* Checkin Success Modal */}
+        <CheckinSuccessModal
           isOpen={showSuccessModal}
           onClose={closeSuccessModal}
-          // dropAmount={checkinData?.dropAmount}
           totalCheckins={checkinData?.totalCheckins}
           currentStreak={checkinData?.currentStreak}
-        /> */}
+        />
       </div>
     );
   }
