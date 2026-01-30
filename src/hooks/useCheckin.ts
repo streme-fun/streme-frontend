@@ -143,6 +143,11 @@ export function useCheckin() {
     setState((prev) => ({ ...prev, showCheckinModal: false }));
   }, []);
 
+  // Mark as checked in (used when API confirms user already checked in today)
+  const markAsCheckedIn = useCallback(() => {
+    setState((prev) => ({ ...prev, hasCheckedIn: true }));
+  }, []);
+
   const showSuccessModalDebug = useCallback(() => {
     const fakeCheckinData: CheckinData = {
       success: true,
@@ -177,6 +182,7 @@ export function useCheckin() {
     closeSuccessModal,
     openCheckinModal,
     closeCheckinModal,
+    markAsCheckedIn,
     showSuccessModalDebug,
   };
 }

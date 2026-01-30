@@ -29,6 +29,7 @@ export function useCheckinModal({
     showCheckinModal,
     openCheckinModal,
     closeCheckinModal,
+    markAsCheckedIn,
     showSuccessModalDebug,
     hasCheckedIn,
   } = useCheckin();
@@ -100,6 +101,7 @@ export function useCheckinModal({
     handleCloseCheckinModal,
     handleDebugButtonClick,
     showSuccessModalDebug,
+    markAsCheckedIn,
     setShowCheckinModal: openCheckinModal,
   };
 }

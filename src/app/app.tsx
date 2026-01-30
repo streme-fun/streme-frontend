@@ -110,6 +110,7 @@ function App() {
     handleCloseCheckinModal,
     handleDebugButtonClick,
     showSuccessModalDebug,
+    markAsCheckedIn,
     setShowCheckinModal,
   } = useCheckinModal({
     isMiniAppView,
@@ -363,7 +364,8 @@ function App() {
 
           console.log(`Checking checkin status for FID: ${userFid}`);
 
-          const response = await fetch(`/api/checkin/${userFid}`);
+          // Use quickAuth.fetch to include Bearer token for authenticated endpoint
+          const response = await sdk.quickAuth.fetch(`/api/checkin/${userFid}`);
           if (response.ok) {
             const data = await response.json();
             // console.log("Checkin status:", data);
@@ -375,6 +377,8 @@ function App() {
               setShowCheckinModal();
             } else {
               console.log("User has already checked in today");
+              // Mark as checked in to prevent auto-show modal from firing
+              markAsCheckedIn();
             }
           } else {
             console.error("Failed to fetch checkin status:", response.status);
@@ -395,6 +399,7 @@ function App() {
     isConnected,
     hasCheckedIn,
     setShowCheckinModal,
+    markAsCheckedIn,
   ]);
 
   // Tutorial modal handlers
