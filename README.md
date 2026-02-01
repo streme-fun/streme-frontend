@@ -73,7 +73,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - **Live App:** [streme.fun](https://streme.fun)
 - **Farcaster:** [@streme](https://warpcast.com/streme)
 - **Superfluid:** [superfluid.finance](https://superfluid.finance)
-
-## License
-
-See [LICENSE](LICENSE) for details.
