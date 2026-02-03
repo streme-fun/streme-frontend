@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifySessionToken } from "@/src/lib/siwf-auth";
+import { createClient, Errors } from "@farcaster/quick-auth";
 
 interface CheckinStatusResponse {
   fid: number;
@@ -29,7 +29,7 @@ export async function GET(
       );
     }
 
-    // Verify authentication
+    // Verify authentication (Quick Auth JWT)
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
@@ -39,17 +39,28 @@ export async function GET(
     }
 
     const token = authHeader.slice(7); // Remove "Bearer " prefix
-    const verified = verifySessionToken(token);
-
-    if (!verified) {
-      return NextResponse.json(
-        { error: "Invalid or expired token" },
-        { status: 401 }
-      );
+    let tokenFid = 0;
+    try {
+      const client = createClient();
+      const payload = await client.verifyJwt({
+        token,
+        domain: request.headers.get("host") || "streme.fun",
+      });
+      const sub = Number(payload.sub);
+      if (!Number.isFinite(sub)) {
+        return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      }
+      tokenFid = sub;
+    } catch (e) {
+      if (e instanceof Errors.InvalidTokenError) {
+        return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      }
+      throw e;
     }
 
+    const fidNumber = parseInt(fid, 10);
     // Ensure user can only access their own check-in data
-    if (verified.fid !== parseInt(fid)) {
+    if (tokenFid !== fidNumber) {
       return NextResponse.json(
         { error: "Access denied" },
         { status: 403 }
@@ -57,7 +68,7 @@ export async function GET(
     }
 
     // Forward the request to the external API
-    const response = await fetch(`https://api.streme.fun/api/checkin/${fid}`, {
+    const response = await fetch(`https://api.streme.fun/api/checkin/${fidNumber}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
