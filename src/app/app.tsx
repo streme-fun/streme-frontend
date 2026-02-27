@@ -24,6 +24,7 @@ import { CheckinSuccessModal } from "../components/CheckinSuccessModal";
 import { useCheckinModal } from "../hooks/useCheckinModal";
 import sdk from "@farcaster/miniapp-sdk";
 import { convertTypesenseTokenToToken, TypesenseToken } from "../lib/typesenseClient";
+import { VoteBanner } from "../components/VoteBanner";
 
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -478,6 +479,9 @@ function App() {
                 </Link>
               </div>
             )}
+
+          {/* Vote Banner */}
+          <VoteBanner />
 
           {/* Trending Carousel - Above filters */}
           {trendingCarouselTokens.length > 0 && !searchQuery && (
