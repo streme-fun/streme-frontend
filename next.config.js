@@ -148,6 +148,7 @@ const nextConfig = {
                 https://*.base-mainnet.superfluid.dev
                 https://metamask-sdk.api.cx.metamask.io
                 https://*.base.superfluid.dev
+                https://seq.snapshot.org
                 https://cloudflareinsights.com;
               frame-src 'self'
                 https://auth.privy.io
