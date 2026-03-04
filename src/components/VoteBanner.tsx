@@ -3,10 +3,16 @@
 import { useState, useEffect } from "react";
 import { useUnifiedWallet } from "../hooks/useUnifiedWallet";
 import { useSnapshotVote } from "../hooks/useSnapshotVote";
+import { SNAPSHOT_CONFIG } from "../lib/snapshotConfig";
 
-const DISMISSED_KEY = "streme-vote-s5-dismissed";
+const DISMISSED_KEY = `${SNAPSHOT_CONFIG.storagePrefix}-dismissed`;
 
 export function VoteBanner() {
+  // Don't render if voting is disabled in config
+  if (!SNAPSHOT_CONFIG.enabled) {
+    return null;
+  }
+
   const {
     isConnected,
     address,
