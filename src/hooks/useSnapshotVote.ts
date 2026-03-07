@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { buildVoteTypedData, submitVote } from "../lib/snapshotVote";
+import { SNAPSHOT_CONFIG } from "../lib/snapshotConfig";
 import sdk from "@farcaster/miniapp-sdk";
 
-const VOTED_KEY = "streme-vote-s5-completed";
+const VOTED_KEY = `${SNAPSHOT_CONFIG.storagePrefix}-completed`;
 
 export function useSnapshotVote(address: string | undefined) {
   const [isVoting, setIsVoting] = useState(false);

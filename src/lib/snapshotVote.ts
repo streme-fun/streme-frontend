@@ -1,5 +1,7 @@
-// Snapshot vote utility for Streme Season 5 SUP rewards
+// Snapshot vote utility for Streme SUP rewards
 // Replicates snapshot.js EIP-712 signing without any dependencies
+
+import { SNAPSHOT_CONFIG } from "./snapshotConfig";
 
 const SNAPSHOT_SEQUENCER_URL = "https://seq.snapshot.org";
 
@@ -22,13 +24,6 @@ const VOTE_STRING_TYPES = {
     { name: "metadata", type: "string" },
   ],
 } as const;
-
-// Hardcoded vote parameters
-const SPACE = "superfluid.eth";
-const PROPOSAL =
-  "0xf3480b2e05aff2d1328c6e36f22cb983fb50d6bb421703fe498beef106d38795";
-const CHOICE = JSON.stringify({ "9": 1 });
-const APP = "streme";
 
 export interface VoteMessage {
   from: string;
@@ -59,12 +54,12 @@ export function buildVoteTypedData(address: string): VoteTypedData {
     primaryType: "Vote",
     message: {
       from: address,
-      space: SPACE,
+      space: SNAPSHOT_CONFIG.space,
       timestamp: Math.floor(Date.now() / 1000),
-      proposal: PROPOSAL,
-      choice: CHOICE,
+      proposal: SNAPSHOT_CONFIG.proposal,
+      choice: JSON.stringify(SNAPSHOT_CONFIG.choice),
       reason: "",
-      app: APP,
+      app: SNAPSHOT_CONFIG.app,
       metadata: "{}",
     },
   };
