@@ -8,11 +8,6 @@ import { SNAPSHOT_CONFIG } from "../lib/snapshotConfig";
 const DISMISSED_KEY = `${SNAPSHOT_CONFIG.storagePrefix}-dismissed`;
 
 export function VoteBanner() {
-  // Don't render if voting is disabled in config
-  if (!SNAPSHOT_CONFIG.enabled) {
-    return null;
-  }
-
   const {
     isConnected,
     address,
@@ -48,6 +43,11 @@ export function VoteBanner() {
       setShowSuccess(true);
     }
   }, [hasVoted]);
+
+  // Don't render if voting is disabled in config
+  if (!SNAPSHOT_CONFIG.enabled) {
+    return null;
+  }
 
   // Don't render if: not mini-app, not connected, already voted, or dismissed
   if (!isMiniApp || !isConnected || dismissed) {
