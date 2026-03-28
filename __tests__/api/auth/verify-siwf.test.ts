@@ -344,26 +344,26 @@ describe('/api/auth/verify-siwf', () => {
       const data = await response.json()
 
       // Verify the token
-      const verified = verifySessionToken(data.token)
+      const verified = await verifySessionToken(data.token)
       expect(verified).not.toBeNull()
       expect(verified?.fid).toBe(99999)
       expect(verified?.address).toBe('0xabc123def456789012345678901234567890abcd')
     })
 
-    it('rejects tokens with invalid signature', () => {
+    it('rejects tokens with invalid signature', async () => {
       const tamperedToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmaWQiOjEyMzQ1LCJhZGRyZXNzIjoiMHgxMjM0IiwiaWF0IjoxNzA0MDYzNjAwLCJleHAiOjE3MDQxNTAwMDB9.invalidsignature'
 
-      const verified = verifySessionToken(tamperedToken)
+      const verified = await verifySessionToken(tamperedToken)
       expect(verified).toBeNull()
     })
 
-    it('rejects malformed tokens', () => {
-      expect(verifySessionToken('not-a-jwt')).toBeNull()
-      expect(verifySessionToken('only.two')).toBeNull()
-      expect(verifySessionToken('')).toBeNull()
+    it('rejects malformed tokens', async () => {
+      expect(await verifySessionToken('not-a-jwt')).toBeNull()
+      expect(await verifySessionToken('only.two')).toBeNull()
+      expect(await verifySessionToken('')).toBeNull()
     })
 
-    it('rejects expired tokens', () => {
+    it('rejects expired tokens', async () => {
       // Create a token that's already expired (in the past)
       const expiredPayload = {
         fid: 12345,
@@ -378,7 +378,7 @@ describe('/api/auth/verify-siwf', () => {
       // This token won't verify anyway due to wrong signature, but tests the expiry check path
       const expiredToken = `${header}.${payload}.wrongsignature`
 
-      const verified = verifySessionToken(expiredToken)
+      const verified = await verifySessionToken(expiredToken)
       expect(verified).toBeNull()
     })
   })

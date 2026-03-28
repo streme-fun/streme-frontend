@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Generate a properly signed JWT token
-      const sessionToken = generateSecureSessionToken(fid, address);
+      const sessionToken = await generateSecureSessionToken(fid, address);
 
       return NextResponse.json({
         token: sessionToken,

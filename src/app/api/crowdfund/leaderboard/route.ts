@@ -54,12 +54,11 @@ async function refreshCacheInBackground(apiUrl: string, contractAddress: string 
       apiUrl,
       {
         signal: controller.signal,
-        next: { revalidate: 30 }
       }
     );
-    
+
     clearTimeout(timeoutId);
-    
+
     if (apiResponse.ok) {
       const data: Contributor[] = await apiResponse.json();
       const mergedContributors = mergeContributorsByUsername(data);
@@ -135,8 +134,6 @@ export async function GET(request: Request) {
         apiUrl,
         {
           signal: controller.signal,
-          // Allow Next.js to cache for 30 seconds
-          next: { revalidate: 30 }
         }
       );
       

@@ -3,8 +3,6 @@ import { fetchTokenFromStreme } from "@/src/lib/apiUtils";
 import { BLACKLISTED_TOKENS } from "@/src/lib/blacklist";
 import { isAddress } from "viem";
 
-export const runtime = "nodejs";
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
