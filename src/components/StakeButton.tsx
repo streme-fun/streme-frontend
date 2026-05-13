@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useWalletClient } from "wagmi";
 import { StakeModal } from "./StakeModal";
-import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
 import { usePostHog } from "posthog-js/react";
@@ -16,6 +15,10 @@ import {
   isStakingDisabled,
   getStakingDisabledMessage,
 } from "@/src/lib/tokenUtils";
+import {
+  encodeConnectPoolData,
+  encodeSuperTokenSendData,
+} from "@/src/lib/abiEncoding";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 //const STAKING_HELPER = "0xE7079CDB11C6ba1339A4BCB40753f4EC0215B364"; OLD
@@ -148,14 +151,11 @@ export function StakeButton({
           throw new Error("Farcaster Ethereum provider not available.");
 
         toast.loading("Staking tokens...", { id: toastId });
-        const sendIface = new Interface([
-          "function send(address recipient, uint256 amount, bytes userData) external",
-        ]);
-        const sendData = sendIface.encodeFunctionData("send", [
+        const sendData = encodeSuperTokenSendData(
           toHex(STAKING_HELPER),
           amount,
-          "0x", // empty userData
-        ]);
+          "0x"
+        );
         const sendDataWithReferral = await appendReferralTag(
           toHex(sendData),
           toHex(address!)
@@ -199,13 +199,10 @@ export function StakeButton({
           });
           if (!connected) {
             toast.loading("Connecting to reward pool...", { id: toastId });
-            const gdaIface = new Interface([
-              "function connectPool(address pool, bytes calldata userData) external returns (bool)",
-            ]);
-            const connectData = gdaIface.encodeFunctionData("connectPool", [
+            const connectData = encodeConnectPoolData(
               toHex(stakingPoolAddress),
-              "0x",
-            ]);
+              "0x"
+            );
             const connectDataWithReferral = await appendReferralTag(
               toHex(connectData),
               toHex(address!)

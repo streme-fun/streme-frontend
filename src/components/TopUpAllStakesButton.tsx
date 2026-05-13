@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useSafeWallets } from "../hooks/useSafeWallet";
 import { useAccount } from "wagmi";
-import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
 import sdk from "@farcaster/miniapp-sdk";
@@ -11,6 +10,7 @@ import { TopUpStakeSelectionModal } from "./TopUpStakeSelectionModal";
 import { usePostHog } from "posthog-js/react";
 import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { isStakingDisabled } from "@/src/lib/tokenUtils";
+import { encodeRunMacroData } from "@/src/lib/abiEncoding";
 
 // Contract addresses
 //const STAKING_MACRO_V2 = "0xFA4f84eEC83786d37C5B904e3631412c3b726a20"; // OLD
@@ -188,13 +188,10 @@ export function TopUpAllStakesButton({
           });
 
           // Execute the macro via MacroForwarder
-          const macroIface = new Interface([
-            "function runMacro(address macro, bytes calldata params) external",
-          ]);
-          const macroData = macroIface.encodeFunctionData("runMacro", [
+          const macroData = encodeRunMacroData(
             toHex(STAKING_MACRO_V2),
-            encodedAddresses,
-          ]);
+            encodedAddresses as `0x${string}`
+          );
 
           const macroTxParams: Record<string, unknown> = {
             to: toHex(MACRO_FORWARDER),

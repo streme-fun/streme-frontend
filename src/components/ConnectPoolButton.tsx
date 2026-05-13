@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useAccount, useWalletClient } from "wagmi";
 import { toast } from "sonner";
-import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { GDA_FORWARDER } from "@/src/lib/contracts";
 import { ensureTxHash } from "@/src/lib/ensureTxHash";
 import sdk from "@farcaster/miniapp-sdk";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useSafeWallets } from "../hooks/useSafeWallet";
+import { encodeConnectPoolData } from "@/src/lib/abiEncoding";
 
 const toHex = (address: string) => address as `0x${string}`;
 
@@ -58,13 +58,10 @@ export function ConnectPoolButton({
     try {
       let txHash: `0x${string}` | undefined;
 
-      const iface = new Interface([
-        "function connectPool(address pool, bytes userData) external returns (bool)",
-      ]);
-      const data = iface.encodeFunctionData("connectPool", [
+      const data = encodeConnectPoolData(
         toHex(stakingPoolAddress),
-        "0x" as const,
-      ]);
+        "0x"
+      );
 
       if (isEffectivelyMiniApp) {
         const ethProvider = await sdk.wallet.getEthereumProvider();

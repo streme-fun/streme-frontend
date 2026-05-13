@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import { useAccount, useWalletClient } from "wagmi";
 import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
-import { Interface } from "@ethersproject/abi";
 import { Modal } from "./Modal";
 import { Zap } from "lucide-react";
 import { publicClient } from "@/src/lib/viemClient";
@@ -20,6 +19,7 @@ import {
   isStakingDisabled,
   getStakingDisabledMessage,
 } from "@/src/lib/tokenUtils";
+import { encodeZapData } from "@/src/lib/abiEncoding";
 
 const WETH = "0x4200000000000000000000000000000000000006";
 const ETHX = "0x46fd5cfb4c12d87acd3a13e92baa53240c661d93";
@@ -180,17 +180,13 @@ export function ZapStakeButton({
       const amountOutMin = amountOut - amountOut / 200n; // 0.5% slippage
 
       const zapContractAddress = ZAP_CONTRACT_ADDRESS;
-      const zapAbi = [
-        "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
-        "function zapETHx(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
-      ];
-      const zapIface = new Interface(zapAbi);
-      const zapData = zapIface.encodeFunctionData(zapMethod, [
+      const zapData = encodeZapData(
+        zapMethod,
         toHex(tokenAddress),
         amountInWei,
         amountOutMin,
-        toHex(stakingAddress),
-      ]) as `0x${string}`;
+        toHex(stakingAddress)
+      );
 
       let txHash: `0x${string}`;
 

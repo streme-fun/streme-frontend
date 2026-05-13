@@ -8,6 +8,12 @@ import {
   STREME_STAKING_REWARDS_FUNDER_ABI,
   ERC20_ABI 
 } from "@/src/lib/contracts/StremeStakingRewardsFunder";
+import {
+  encodeApproveData,
+  encodeDepositData,
+  encodeWithdrawAllData,
+  encodeWithdrawData,
+} from "@/src/lib/abiEncoding";
 
 export const useStremeStakingContract = (overrideAddress?: string, contractAddress?: string) => {
   const { address: wagmiAddress } = useAccount();
@@ -173,12 +179,10 @@ export const useStakingContractActions = (overrideAddress?: string, contractAddr
           throw new Error("Farcaster Ethereum provider not available");
         }
 
-        const { Interface } = await import("@ethersproject/abi");
-        const iface = new Interface(ERC20_ABI);
-        const data = iface.encodeFunctionData("approve", [
+        const data = encodeApproveData(
           currentContract,
-          amountBigInt,
-        ]);
+          amountBigInt
+        );
 
         const txHash = await ethProvider.request({
           method: "eth_sendTransaction",
@@ -238,9 +242,7 @@ export const useStakingContractActions = (overrideAddress?: string, contractAddr
           throw new Error("Farcaster Ethereum provider not available");
         }
 
-        const { Interface } = await import("@ethersproject/abi");
-        const iface = new Interface(STREME_STAKING_REWARDS_FUNDER_ABI);
-        const data = iface.encodeFunctionData("deposit", [amountBigInt]);
+        const data = encodeDepositData(amountBigInt);
 
         const txHash = await ethProvider.request({
           method: "eth_sendTransaction",
@@ -300,9 +302,7 @@ export const useStakingContractActions = (overrideAddress?: string, contractAddr
           throw new Error("Farcaster Ethereum provider not available");
         }
 
-        const { Interface } = await import("@ethersproject/abi");
-        const iface = new Interface(STREME_STAKING_REWARDS_FUNDER_ABI);
-        const data = iface.encodeFunctionData("withdraw", [amountBigInt]);
+        const data = encodeWithdrawData(amountBigInt);
 
         const txHash = await ethProvider.request({
           method: "eth_sendTransaction",
@@ -354,9 +354,7 @@ export const useStakingContractActions = (overrideAddress?: string, contractAddr
           throw new Error("Farcaster Ethereum provider not available");
         }
 
-        const { Interface } = await import("@ethersproject/abi");
-        const iface = new Interface(STREME_STAKING_REWARDS_FUNDER_ABI);
-        const data = iface.encodeFunctionData("withdrawAll", []);
+        const data = encodeWithdrawAllData();
 
         const txHash = await ethProvider.request({
           method: "eth_sendTransaction",

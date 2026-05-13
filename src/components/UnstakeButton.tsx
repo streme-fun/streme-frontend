@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useWalletClient } from "wagmi";
 import { UnstakeModal } from "./UnstakeModal";
 import { publicClient } from "@/src/lib/viemClient";
-import { Interface } from "@ethersproject/abi";
 import { toast } from "sonner";
 import { usePostHog } from "posthog-js/react";
 import { useWallet } from "@/src/hooks/useWallet";
@@ -13,11 +12,7 @@ import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { formatUnits } from "viem";
 import { useSafeWallets } from "../hooks/useSafeWallet";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
-
-const stakingAbiEthers = [
-  "function unstake(address to, uint256 amount)",
-  "function depositTimestamps(address account) view returns (uint256)",
-];
+import { encodeUnstakeData } from "@/src/lib/abiEncoding";
 
 const stakingAbiViem = [
   {
@@ -195,11 +190,10 @@ export function UnstakeButton({
         }
 
         toast.info("Requesting unstake...", { id: toastId });
-        const unstakeIface = new Interface(stakingAbiEthers);
-        const unstakeData = unstakeIface.encodeFunctionData("unstake", [
+        const unstakeData = encodeUnstakeData(
           toHex(address!),
-          amount,
-        ]);
+          amount
+        );
         
         const unstakeDataWithReferral = await appendReferralTag(
           toHex(unstakeData),
@@ -296,11 +290,10 @@ export function UnstakeButton({
           });
         } else {
           // Use connector provider
-          const unstakeIface = new Interface(stakingAbiEthers);
-          const unstakeData = unstakeIface.encodeFunctionData("unstake", [
+          const unstakeData = encodeUnstakeData(
             toHex(address!),
-            amount,
-          ]);
+            amount
+          );
           
           const unstakeDataWithReferral = await appendReferralTag(
             toHex(unstakeData),

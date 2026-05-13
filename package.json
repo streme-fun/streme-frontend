@@ -22,7 +22,6 @@
   "dependencies": {
     "@airstack/node": "^0.0.7",
     "@divvi/referral-sdk": "^2.1.0",
-    "@ethersproject/abi": "^5.7.0",
     "@farcaster/auth-kit": "^0.8.1",
     "@farcaster/frame-node": "^0.1.11",
     "@farcaster/frame-wagmi-connector": "^1.0.0",
@@ -45,7 +44,7 @@
     "eruda": "^3.4.3",
     "i": "^0.3.7",
     "lucide-react": "^0.546.0",
-    "next": "15.5.9",
+    "next": "^15.5.18",
     "next-auth": "^4.24.11",
     "pino-pretty": "^13.1.1",
     "posthog-js": "^1.252.0",
@@ -86,6 +85,7 @@
     "typescript": "^5"
   },
   "overrides": {
-    "graphql": "^16.11.0"
+    "graphql": "^16.11.0",
+    "postcss": "$postcss"
   }
 }
