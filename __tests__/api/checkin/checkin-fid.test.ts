@@ -1,7 +1,7 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals'
 import { NextRequest } from 'next/server'
 import { GET } from '@/src/app/api/checkin/[fid]/route'
-import { _setAppClientForTesting } from '@/src/app/api/auth/verify-siwf/route'
+import { _setAppClientForTesting } from '@/src/lib/siwf-auth'
 
 // Helper to generate a valid test token
 function generateTestToken(fid: number, address: string): string {

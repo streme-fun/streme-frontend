@@ -11,8 +11,8 @@ import { useWalletClient } from "wagmi";
 import confetti from "canvas-confetti";
 import { useWallet } from "@/src/hooks/useWallet";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
-import { Interface } from "@ethersproject/abi";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
+import { encodeApproveData } from "@/src/lib/abiEncoding";
 
 interface SwapButtonProps {
   tokenAddress: string;
@@ -162,13 +162,10 @@ export function SwapButton({
         throw new Error("Farcaster Ethereum provider not available.");
       }
       
-      const approveIface = new Interface([
-        "function approve(address spender, uint256 amount) external returns (bool)",
-      ]);
-      const approveData = approveIface.encodeFunctionData("approve", [
-        spenderAddress,
-        requiredAmountBigInt,
-      ]);
+      const approveData = encodeApproveData(
+        spenderAddress as `0x${string}`,
+        requiredAmountBigInt
+      );
       
       const approveDataWithReferral = await appendReferralTag(
         approveData as `0x${string}`,
@@ -187,25 +184,10 @@ export function SwapButton({
         ],
       });
     } else {
-      const { encodeFunctionData } = await import("viem");
-      const abi = [
-        {
-          inputs: [
-            { name: "spender", type: "address" },
-            { name: "amount", type: "uint256" },
-          ],
-          name: "approve",
-          outputs: [{ name: "", type: "bool" }],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-      ] as const;
-      
-      const approveData = encodeFunctionData({
-        abi,
-        functionName: "approve",
-        args: [spenderAddress as `0x${string}`, requiredAmountBigInt],
-      });
+      const approveData = encodeApproveData(
+        spenderAddress as `0x${string}`,
+        requiredAmountBigInt
+      );
       
       const approveDataWithReferral = await appendReferralTag(
         approveData,

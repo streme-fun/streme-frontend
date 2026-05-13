@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useSafeWallets } from "../hooks/useSafeWallet";
-import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { toast } from "sonner";
 import sdk from "@farcaster/miniapp-sdk";
@@ -11,6 +10,10 @@ import { POSTHOG_EVENTS, ANALYTICS_PROPERTIES } from "@/src/lib/analytics";
 import { formatUnits } from "viem";
 import { useWallet } from "@/src/hooks/useWallet";
 import { isStakingDisabled } from "@/src/lib/tokenUtils";
+import {
+  encodeConnectPoolData,
+  encodeSuperTokenSendData,
+} from "@/src/lib/abiEncoding";
 
 const GDA_FORWARDER = "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08";
 //const STAKING_HELPER = "0xE7079CDB11C6ba1339A4BCB40753f4EC0215B364"; OLD
@@ -119,14 +122,11 @@ export function StakeAllButton({
       // Send all tokens directly to StakingHelper
       toast.loading("Staking tokens...", { id: toastId });
 
-      const sendIface = new Interface([
-        "function send(address recipient, uint256 amount, bytes userData) external",
-      ]);
-      const sendData = sendIface.encodeFunctionData("send", [
+      const sendData = encodeSuperTokenSendData(
         toHex(STAKING_HELPER),
         balance,
-        "0x", // empty userData
-      ]);
+        "0x"
+      );
 
       const stakeTxHash = await provider.request({
         method: "eth_sendTransaction",
@@ -168,13 +168,10 @@ export function StakeAllButton({
         });
         if (!connected) {
           toast.loading("Connecting to reward pool...", { id: toastId });
-          const gdaIface = new Interface([
-            "function connectPool(address pool, bytes calldata userData) external returns (bool)",
-          ]);
-          const connectData = gdaIface.encodeFunctionData("connectPool", [
+          const connectData = encodeConnectPoolData(
             toHex(stakingPoolAddress),
-            "0x",
-          ]);
+            "0x"
+          );
 
           const connectTxParams: Record<string, unknown> = {
             to: toHex(GDA_FORWARDER),

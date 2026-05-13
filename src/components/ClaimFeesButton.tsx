@@ -6,11 +6,11 @@ import { toast } from "sonner";
 import { FEE_COLLECTOR, FEE_COLLECTOR_LETS } from "@/src/lib/contracts";
 import { useAppFrameLogic } from "@/src/hooks/useAppFrameLogic";
 import { useWallet } from "@/src/hooks/useWallet";
-import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { useSafeWallets } from "../hooks/useSafeWallet";
 import { appendReferralTag, submitDivviReferral } from "@/src/lib/divvi";
 import { ensureTxHash } from "@/src/lib/ensureTxHash";
+import { encodeClaimRewardsData } from "@/src/lib/abiEncoding";
 
 interface ClaimFeesButtonProps {
   tokenAddress: string;
@@ -52,12 +52,7 @@ export function ClaimFeesButton({
           throw new Error("Farcaster Ethereum provider not available.");
         }
 
-        const claimIface = new Interface([
-          "function claimRewards(address token) external",
-        ]);
-        const claimData = claimIface.encodeFunctionData("claimRewards", [
-          tokenAddress as `0x${string}`,
-        ]);
+        const claimData = encodeClaimRewardsData(tokenAddress as `0x${string}`);
 
         const claimDataWithReferral = await appendReferralTag(
           claimData as `0x${string}`,
@@ -88,22 +83,7 @@ export function ClaimFeesButton({
         // Get provider from wagmi wallet client or connector fallback
         if (walletClient) {
           // Use wagmi wallet client for claiming fees
-          const { encodeFunctionData } = await import("viem");
-          const abi = [
-            {
-              inputs: [{ name: "token", type: "address" }],
-              name: "claimRewards",
-              outputs: [],
-              stateMutability: "nonpayable",
-              type: "function",
-            },
-          ] as const;
-
-          const claimData = encodeFunctionData({
-            abi,
-            functionName: "claimRewards",
-            args: [tokenAddress as `0x${string}`],
-          });
+          const claimData = encodeClaimRewardsData(tokenAddress as `0x${string}`);
 
           const claimDataWithReferral = await appendReferralTag(
             claimData,
@@ -128,12 +108,7 @@ export function ClaimFeesButton({
             params: [{ chainId: "0x2105" }],
           });
 
-          const claimIface = new Interface([
-            "function claimRewards(address token) external",
-          ]);
-          const claimData = claimIface.encodeFunctionData("claimRewards", [
-            tokenAddress as `0x${string}`,
-          ]);
+          const claimData = encodeClaimRewardsData(tokenAddress as `0x${string}`);
 
           const claimDataWithReferral = await appendReferralTag(
             claimData as `0x${string}`,

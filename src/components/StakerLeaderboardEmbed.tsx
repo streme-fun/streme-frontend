@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useSafeWallets, useSafeWalletAuth } from "../hooks/useSafeWallet";
 import { parseEther, formatEther } from "viem";
 import { toast } from "sonner";
-import { Interface } from "@ethersproject/abi";
 import { publicClient } from "@/src/lib/viemClient";
 import { ensureTxHash } from "@/src/lib/ensureTxHash";
 import sdk from "@farcaster/miniapp-sdk";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
+import { encodeZapData } from "@/src/lib/abiEncoding";
 
 interface TokenStaker {
   address: string;
@@ -224,16 +224,13 @@ export function StakerLeaderboardEmbed({
       const amountOutMin = amountOut - amountOut / 200n; // 0.5% slippage
 
       const zapContractAddress = ZAP_CONTRACT_ADDRESS;
-      const zapAbi = [
-        "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) external payable returns (uint256)",
-      ];
-      const zapIface = new Interface(zapAbi);
-      const zapData = zapIface.encodeFunctionData("zap", [
+      const zapData = encodeZapData(
+        "zap",
         toHex(tokenAddress),
         amountInWei,
         amountOutMin,
-        toHex(stakingAddress),
-      ]) as `0x${string}`;
+        toHex(stakingAddress)
+      );
 
       let txHash: `0x${string}`;
 
