@@ -2,6 +2,15 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
+import {
+  baseAccount,
+  coinbaseWallet,
+  injectedWallet,
+  metaMaskWallet,
+  rainbowWallet,
+  safeWallet,
+  walletConnectWallet,
+} from "@rainbow-me/rainbowkit/wallets";
 import React from "react";
 import { WagmiProvider } from "wagmi";
 import { base } from "wagmi/chains";
@@ -24,6 +33,20 @@ export const browserConfig = getDefaultConfig({
   appName: "Streme Fun",
   projectId: walletConnectProjectId,
   chains: [base],
+  wallets: [
+    {
+      groupName: "Popular",
+      wallets: [
+        safeWallet,
+        coinbaseWallet,
+        injectedWallet,
+        rainbowWallet,
+        baseAccount,
+        metaMaskWallet,
+        walletConnectWallet,
+      ],
+    },
+  ],
   transports: {
     [base.id]: baseTransport,
   },
