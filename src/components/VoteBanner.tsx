@@ -106,7 +106,7 @@ export function VoteBanner() {
               Vote for Streme
             </span>
             <span className="text-xs text-base-content/60 leading-tight">
-              Season 5 $SUP Rewards
+              Season 6 $SUP Rewards
             </span>
           </div>
           <button
