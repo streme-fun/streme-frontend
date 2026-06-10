@@ -6,6 +6,7 @@ import confetti from "canvas-confetti";
 import { Trophy, Volume2, VolumeX, X } from "lucide-react";
 import { useAppFrameLogic } from "../../hooks/useAppFrameLogic";
 import { SurfGameEngine, CoinEvent, CoinSkin } from "./SurfGameEngine";
+import { buildSurfShareIntent } from "../../lib/surfShare";
 
 interface PoolToken {
   image: HTMLImageElement | null;
@@ -44,7 +45,6 @@ type Phase = "ready" | "playing" | "over";
 
 const BEST_KEY = "streme-surf-best";
 const MUTED_KEY = "streme-surf-muted";
-const BASE_SHARE_URL = "https://streme.fun/surf";
 const MAX_POOL_TOKENS = 16;
 
 /** Same-origin proxy via Next's image optimizer keeps canvases untainted. */
@@ -81,6 +81,10 @@ export default function StremeSurfGame({
   const [showBoard, setShowBoard] = useState(false);
   const [board, setBoard] = useState<LeaderboardData | null>(null);
   const [boardLoading, setBoardLoading] = useState(false);
+  const [finishedRun, setFinishedRun] = useState<{
+    distance: number;
+    bubbles: number;
+  } | null>(null);
 
   const { isMiniAppView, isSDKLoaded, farcasterContext } = useAppFrameLogic();
   const isMiniAppRef = useRef(false);
@@ -133,7 +137,7 @@ export default function StremeSurfGame({
   /** Looping synthwave theme; starts on the first run (user gesture). */
   const startMusic = useCallback(() => {
     if (!musicRef.current) {
-      const audio = new Audio("/game/theme.mp3");
+      const audio = new Audio("/surf/theme.mp3");
       audio.loop = true;
       audio.volume = 0.4;
       audio.preload = "auto";
@@ -232,6 +236,9 @@ export default function StremeSurfGame({
 
   const handleGameOver = useCallback(
     (finalDistance: number, finalBubbles: number) => {
+      setDistance(finalDistance);
+      setBubbles(finalBubbles);
+      setFinishedRun({ distance: finalDistance, bubbles: finalBubbles });
       setPhase("over");
       haptic("wipeout");
       playTone(220, 0.25, "sawtooth", 0.06);
@@ -251,7 +258,7 @@ export default function StremeSurfGame({
       const user = fcUserRef.current;
       if (isMiniAppRef.current && user && finalDistance > 0) {
         sdk.quickAuth
-          .fetch("/api/game/leaderboard", {
+          .fetch("/api/surf/leaderboard", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -303,6 +310,7 @@ export default function StremeSurfGame({
         setLastPickup(null);
         setSurgeText(null);
         setChallengeBeaten(false);
+        setFinishedRun(null);
       },
       onProgress: (d) => setDistance(d),
       onCoin: (event) => handleCoinRef.current(event),
@@ -439,7 +447,7 @@ export default function StremeSurfGame({
     try {
       const fid = fcUserRef.current?.fid;
       const res = await fetch(
-        `/api/game/leaderboard${fid ? `?fid=${fid}` : ""}`
+        `/api/surf/leaderboard${fid ? `?fid=${fid}` : ""}`
       );
       if (res.ok) setBoard((await res.json()) as LeaderboardData);
     } catch (error) {
@@ -464,25 +472,16 @@ export default function StremeSurfGame({
   const handleShare = useCallback(async () => {
     const username =
       (isMiniAppView && farcasterContext?.user?.username) || undefined;
-    // Dare friends with your best ride, stamped with your leaderboard rank
-    const shareDistance = Math.max(distance, rankResult?.best ?? 0);
-    const params = new URLSearchParams({ d: String(shareDistance) });
-    if (username) params.set("by", username);
-    if (rankResult) params.set("r", String(rankResult.rank));
-    const shareUrl = `${BASE_SHARE_URL}?${params.toString()}`;
-
-    let opener: string;
-    if (challengeBeaten && challenge) {
-      opener = `I smashed ${
-        challenge.by ? `@${challenge.by}'s` : "the"
-      } ${challenge.distance}m challenge — rode ${distance}m in Streme Surf 🏄🌊`;
-      if (rankResult) opener += `\n\nNow #${rankResult.rank} on the leaderboard 🏆`;
-    } else if (rankResult) {
-      opener = `I'm #${rankResult.rank} of ${rankResult.total} on the Streme Surf leaderboard with a ${rankResult.best}m ride 🏄🌊`;
-    } else {
-      opener = `I rode the stream ${distance}m and popped ${bubbles} bubbles in Streme Surf 🏄🌊`;
-    }
-    const castText = `${opener}\n\nThink you can beat my ride?\n\n${shareUrl}`;
+    const runDistance = finishedRun?.distance ?? distance;
+    const runBubbles = finishedRun?.bubbles ?? bubbles;
+    const { castText, shareUrl } = buildSurfShareIntent({
+      distance: runDistance,
+      bubbles: runBubbles,
+      username,
+      rankResult,
+      challenge,
+      challengeBeaten,
+    });
 
     if (isMiniAppView && isSDKLoaded) {
       try {
@@ -504,6 +503,7 @@ export default function StremeSurfGame({
   }, [
     distance,
     bubbles,
+    finishedRun,
     challenge,
     challengeBeaten,
     rankResult,
@@ -733,7 +733,7 @@ export default function StremeSurfGame({
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pointer-events-none px-8 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/game/monster.png"
+            src="/surf/monster.png"
             alt="Streme surfer"
             className="w-28 h-28 drop-shadow-[0_0_28px_rgba(103,232,249,0.7)]"
             style={{
