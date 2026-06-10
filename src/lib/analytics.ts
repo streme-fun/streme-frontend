@@ -8,6 +8,7 @@ export const POSTHOG_EVENTS = {
   UNSTAKE_SUCCESS: "unstake_success",
   SUP_CLAIM_SUCCESS: "sup_claim_success",
   SUP_LOCKER_CREATED: "sup_locker_created",
+  COPY_TRADE_SUCCESS: "copy_trade_success",
 } as const;
 
 export const ANALYTICS_PROPERTIES = {
@@ -27,6 +28,9 @@ export const ANALYTICS_PROPERTIES = {
   LOCKER_ADDRESS: "locker_address",
   CLAIM_PROGRAM_ID: "claim_program_id",
   CLAIM_NONCE: "claim_nonce",
+  // Agent Floor copy-trades (plan U6)
+  COPY_MODE: "copy_mode",
+  SOURCE_TX_HASH: "source_tx_hash",
 } as const;
 
 export type PostHogEvent = (typeof POSTHOG_EVENTS)[keyof typeof POSTHOG_EVENTS];

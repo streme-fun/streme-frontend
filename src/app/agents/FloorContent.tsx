@@ -9,6 +9,8 @@
 // the FIRST content block in EVERY state — loading, error, cold start, live.
 
 import { useCallback, useEffect, useState } from "react";
+import CopyTradeButton from "@/src/components/floor/CopyTradeButton";
+import { isCopyEligible } from "@/src/components/floor/copyTradeLogic";
 import FeedItem from "@/src/components/floor/FeedItem";
 import FloorCounters from "@/src/components/floor/FloorCounters";
 import ResidentPanel from "@/src/components/floor/ResidentPanel";
@@ -115,7 +117,17 @@ export default function FloorContent() {
         ) : (
           <div className="space-y-3">
             {data.events.map((event) => (
-              <FeedItem key={event.txHash} event={event} />
+              <FeedItem
+                key={event.txHash}
+                event={event}
+                // U6: only tier-1/2 buy+stake items get a copy control —
+                // tier-3 (and unstake/stream/connect/refund) get none at all.
+                copySlot={
+                  isCopyEligible(event) ? (
+                    <CopyTradeButton event={event} />
+                  ) : undefined
+                }
+              />
             ))}
           </div>
         )}

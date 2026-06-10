@@ -34,6 +34,9 @@ export async function POST(
   // (violations throw AgentInputError → 400 below).
   const agentId =
     typeof body.agentId === "string" ? (body.agentId as string) : undefined;
+  // Optional watermark source (plan U6): only the Floor UI's copy-trade
+  // marker is accepted — anything else keeps the default ("agent").
+  const source = body.source === "floor-ui" ? ("floor-ui" as const) : undefined;
 
   try {
     let result;
@@ -46,6 +49,7 @@ export async function POST(
           slippageBps:
             typeof body.slippageBps === "number" ? body.slippageBps : undefined,
           agentId,
+          source,
         });
         break;
       case "stake":
@@ -53,6 +57,7 @@ export async function POST(
           tokenAddress: str("tokenAddress"),
           amount: str("amount"),
           agentId,
+          source,
         });
         break;
       case "unstake":
@@ -61,12 +66,14 @@ export async function POST(
           to: str("to"),
           amount: str("amount"),
           agentId,
+          source,
         });
         break;
       case "connect-pool":
         result = await buildConnectPoolTxForToken({
           tokenAddress: str("tokenAddress"),
           agentId,
+          source,
         });
         break;
       case "stream":
@@ -75,6 +82,7 @@ export async function POST(
           receiver: str("receiver"),
           tokensPerDay: str("tokensPerDay"),
           agentId,
+          source,
         });
         break;
       default:
