@@ -3,8 +3,8 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 
-// Wrap one store read in jest.fn so the degradation test can inject a
-// failure; every other call passes through to the real in-memory store.
+// Wrap two store reads in jest.fn so degradation tests can inject failures;
+// every other call passes through to the real in-memory store.
 jest.mock("@/src/lib/floor/store", () => {
   const actual = jest.requireActual(
     "@/src/lib/floor/store"
@@ -12,19 +12,38 @@ jest.mock("@/src/lib/floor/store", () => {
   return {
     ...actual,
     getRecentEvents: jest.fn(actual.getRecentEvents),
+    getResidentHalt: jest.fn(actual.getResidentHalt),
   };
 });
+
+// The resident section's two network dependencies are mocked at the module
+// boundary: getAccountYield fetches the subgraph + price API, and the viem
+// public client hits RPC. Tests control both.
+jest.mock("@/src/lib/yield", () => ({
+  getAccountYield: jest.fn(),
+}));
+jest.mock("@/src/lib/viemClient", () => ({
+  publicClient: {
+    getBalance: jest.fn(),
+  },
+}));
 
 import { GET } from "@/src/app/api/agents/floor/route";
 import {
   __clearFloorStoreForTests,
+  addResidentSpend,
   bumpVerifiedCounters,
   floorDateKey,
   getRecentEvents,
+  getResidentHalt,
   publishEvents,
   recordToolCall,
+  setResidentHalt,
   type FloorEvent,
 } from "@/src/lib/floor/store";
+import { journalAppend } from "@/src/lib/resident/journal";
+import { getAccountYield } from "@/src/lib/yield";
+import { publicClient } from "@/src/lib/viemClient";
 
 const TOKEN = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
 // First entry of BLACKLISTED_TOKENS in src/lib/blacklist.ts (lowercased)
@@ -58,6 +77,7 @@ beforeEach(() => {
   delete process.env.KV_REST_API_URL;
   delete process.env.KV_REST_API_TOKEN;
   delete process.env.VERCEL_ENV;
+  delete process.env.RESIDENT_ADDRESS;
   __clearFloorStoreForTests();
   jest.clearAllMocks();
   errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
@@ -199,5 +219,100 @@ describe("GET /api/agents/floor — store failure degradation", () => {
     const data = await response.json();
     expect(data.events).toEqual([]);
     expect(data.coldStart).toBe(true);
+  });
+});
+
+describe("GET /api/agents/floor — resident section (U8)", () => {
+  // Mixed case on purpose: the route must lowercase the env address.
+  const RESIDENT_ENV = "0xAbCd000000000000000000000000000000000099";
+  const RESIDENT_LOWER = RESIDENT_ENV.toLowerCase();
+
+  function seedResidentMocks() {
+    (getAccountYield as jest.Mock).mockResolvedValue({
+      address: RESIDENT_LOWER,
+      totalUsdPerDay: 3.5,
+      activeStreams: 2,
+      flows: [],
+      generatedAt: 1,
+    } as never);
+    (publicClient.getBalance as unknown as jest.Mock).mockResolvedValue(
+      50_000_000_000_000_000n as never // 0.05 ETH
+    );
+  }
+
+  it("composes the resident section from journal, halt, spend, yield, balance, and events", async () => {
+    process.env.RESIDENT_ADDRESS = RESIDENT_ENV;
+    seedResidentMocks();
+
+    await journalAppend({
+      id: "j1",
+      at: Date.now(),
+      state: "confirmed",
+      reasoning: "Bought momentum",
+      txHash: `0x${"1".repeat(64)}`,
+    });
+    await setResidentHalt(true);
+    await addResidentSpend(floorDateKey(Date.now()), 0.02);
+    await publishEvents([
+      makeEvent({ wallet: RESIDENT_LOWER }),
+      makeEvent({ wallet: WALLET }),
+    ]);
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    const resident = data.resident;
+    expect(resident).not.toBeNull();
+    expect(resident.address).toBe(RESIDENT_LOWER);
+    expect(resident.halted).toBe(true);
+    expect(resident.journal).toHaveLength(1);
+    expect(resident.journal[0]).toMatchObject({
+      id: "j1",
+      state: "confirmed",
+      reasoning: "Bought momentum",
+    });
+    // Only the display subset of AccountYield is served, nothing more.
+    expect(resident.yield).toEqual({ totalUsdPerDay: 3.5, activeStreams: 2 });
+    expect(resident.ethBalance).toBe("0.05");
+    expect(resident.spentTodayEth).toBeCloseTo(0.02);
+    // verifiedEvents: only the Resident's chain-verified events
+    // (the grounded P&L inputs — the spend ledger is caps-only).
+    expect(resident.verifiedEvents).toHaveLength(1);
+    expect(resident.verifiedEvents[0].wallet).toBe(RESIDENT_LOWER);
+    expect(getAccountYield).toHaveBeenCalledWith(RESIDENT_LOWER);
+  });
+
+  it("degrades a failed resident field to null while the rest survives (still 200)", async () => {
+    process.env.RESIDENT_ADDRESS = RESIDENT_ENV;
+    seedResidentMocks();
+    (getResidentHalt as jest.Mock).mockRejectedValueOnce(
+      new Error("redis down") as never
+    );
+    (getAccountYield as jest.Mock).mockRejectedValueOnce(
+      new Error("subgraph down") as never
+    );
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.resident).not.toBeNull();
+    expect(data.resident.halted).toBeNull();
+    expect(data.resident.yield).toBeNull();
+    // Untouched fields still composed.
+    expect(data.resident.address).toBe(RESIDENT_LOWER);
+    expect(data.resident.ethBalance).toBe("0.05");
+    expect(data.resident.journal).toEqual([]);
+    expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it("returns resident null (and makes no resident reads) when RESIDENT_ADDRESS is unset", async () => {
+    const response = await GET();
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.resident).toBeNull();
+    expect(getAccountYield).not.toHaveBeenCalled();
+    expect(publicClient.getBalance as unknown as jest.Mock).not.toHaveBeenCalled();
   });
 });

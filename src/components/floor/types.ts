@@ -3,6 +3,7 @@
 // server route and client components.
 
 import type { FloorEvent } from "@/src/lib/floor/store";
+import type { ResidentJournalEntry } from "@/src/lib/resident/journal";
 
 /** Verified daily counters shaped for display (plan U5). */
 export interface FloorCountersShape {
@@ -38,8 +39,46 @@ export interface FloorSnapshot {
   };
   /** True when the floor has no events or all counters are zero */
   coldStart: boolean;
-  /** Resident section — null until Phase C fills it (key shaped now) */
-  resident: null;
+  /**
+   * Resident section (plan U8) — null when RESIDENT_ADDRESS is unset.
+   * Individual fields degrade to null on store/RPC failure, never a 500.
+   */
+  resident: ResidentSection | null;
   /** Epoch ms when this snapshot was generated */
   generatedAt: number;
+}
+
+/** Incoming-yield slice of the Resident section (subset of AccountYield). */
+export interface ResidentYieldShape {
+  /**
+   * USD/day over flows with a known price. May be 0/unreliable when
+   * upstream market data is stale — the CLIENT degrades the display
+   * ("price unavailable"), never claims $0.00.
+   */
+  totalUsdPerDay: number;
+  /** Number of active reward streams */
+  activeStreams: number;
+}
+
+/**
+ * The Resident's public state (plan U8). Every nullable field is a
+ * per-field degradation: a failed store/RPC read nulls that field only.
+ */
+export interface ResidentSection {
+  /** The Resident's wallet address, lowercased */
+  address: string;
+  /** Kill-switch flag; null when the store read failed */
+  halted: boolean | null;
+  /** Decision journal, newest first (write-time sanitized plain text) */
+  journal: ResidentJournalEntry[] | null;
+  yield: ResidentYieldShape | null;
+  /** ETH balance as a decimal string (formatEther) */
+  ethBalance: string | null;
+  /** ETH committed today per the spend ledger (caps only, not P&L) */
+  spentTodayEth: number | null;
+  /**
+   * Chain-verified floor events from the Resident's wallet — the
+   * grounded P&L inputs (the spend ledger above is for caps only).
+   */
+  verifiedEvents: FloorEvent[];
 }
