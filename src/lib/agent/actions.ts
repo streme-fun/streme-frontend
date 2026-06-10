@@ -4,6 +4,7 @@
 // self-explanatory.
 
 import { SPAMMER_BLACKLIST, BLACKLISTED_TOKENS } from "@/src/lib/blacklist";
+import { recordBuild, recordToolInvocation } from "@/src/lib/floor/telemetry";
 import { getAccountYield } from "@/src/lib/yield";
 import { computeSnapshot } from "@/src/lib/pulse/engine";
 import { getLatestSnapshot, setLatestSnapshot } from "@/src/lib/pulse/store";
@@ -111,6 +112,8 @@ export async function listTokens(params: {
   query?: string;
   limit?: number;
 }): Promise<AgentToken[]> {
+  // Telemetry is fire-and-forget by contract (never rejects) — don't await.
+  void recordToolInvocation({ tool: "list_streme_tokens", params });
   const limit = Math.min(Math.max(params.limit ?? 10, 1), 50);
   const response = await fetch(TRENDING_URL, {
     headers: { Accept: "application/json", "User-Agent": "Streme-Agent/1.0" },
@@ -137,6 +140,15 @@ export async function listTokens(params: {
 }
 
 export async function getToken(address: string): Promise<AgentToken> {
+  void recordToolInvocation({ tool: "get_streme_token", params: { address } });
+  return resolveToken(address);
+}
+
+/**
+ * Internal single-token resolution shared by getToken and every builder —
+ * uninstrumented so builder calls don't inflate the get_streme_token counter.
+ */
+async function resolveToken(address: string): Promise<AgentToken> {
   const normalized = assertAddress(address, "address");
   // Blacklist enforcement: every single-token lookup and build path funnels
   // through here, so blacklisted tokens never resolve (R18).
@@ -163,6 +175,7 @@ export async function getToken(address: string): Promise<AgentToken> {
 }
 
 export async function getPulse() {
+  void recordToolInvocation({ tool: "get_streme_pulse", params: {} });
   const now = Math.floor(Date.now() / 1000);
   let snapshot = await getLatestSnapshot();
   if (!snapshot || now - snapshot.generatedAt > 30 * 60) {
@@ -188,6 +201,7 @@ export async function getPulse() {
 }
 
 export async function getYield(address: string) {
+  void recordToolInvocation({ tool: "get_wallet_yield", params: { address } });
   const normalized = assertAddress(address, "address");
   const accountYield = await getAccountYield(normalized);
   return {
@@ -209,8 +223,13 @@ export async function buildBuyTxForToken(
     slippageBps?: number;
   } & WatermarkOptions
 ) {
-  const token = await getToken(params.tokenAddress);
-  return buildBuyTx({
+  void recordToolInvocation({
+    tool: "build_buy_transaction",
+    params,
+    agentId: params.agentId,
+  });
+  const token = await resolveToken(params.tokenAddress);
+  const built = await buildBuyTx({
     tokenAddress: token.address,
     ethAmount: params.ethAmount,
     stake: params.stake,
@@ -220,53 +239,96 @@ export async function buildBuyTxForToken(
     agentId: params.agentId,
     source: params.source,
   });
+  void recordBuild({
+    tool: "build_buy_transaction",
+    agentId: params.agentId,
+    to: built.tx.to,
+    data: built.tx.data,
+  });
+  return built;
 }
 
 export async function buildStakeTxForToken(
   params: { tokenAddress: string; amount: string } & WatermarkOptions
 ) {
+  void recordToolInvocation({
+    tool: "build_stake_transaction",
+    params,
+    agentId: params.agentId,
+  });
   // Validate it's a real Streme token before handing out calldata.
-  const token = await getToken(params.tokenAddress);
-  return buildStakeTx({
+  const token = await resolveToken(params.tokenAddress);
+  const built = buildStakeTx({
     tokenAddress: token.address,
     amount: params.amount,
     agentId: params.agentId,
     source: params.source,
   });
+  void recordBuild({
+    tool: "build_stake_transaction",
+    agentId: params.agentId,
+    to: built.tx.to,
+    data: built.tx.data,
+  });
+  return built;
 }
 
 export async function buildUnstakeTxForToken(
   params: { tokenAddress: string; to: string; amount: string } & WatermarkOptions
 ) {
-  const token = await getToken(params.tokenAddress);
+  void recordToolInvocation({
+    tool: "build_unstake_transaction",
+    params,
+    agentId: params.agentId,
+  });
+  const token = await resolveToken(params.tokenAddress);
   if (!token.staking.stakingAddress) {
     throw new AgentInputError(
       `Token ${token.symbol} has no staking contract on record`
     );
   }
-  return buildUnstakeTx({
+  const built = buildUnstakeTx({
     stakingAddress: token.staking.stakingAddress,
     to: params.to,
     amount: params.amount,
     agentId: params.agentId,
     source: params.source,
   });
+  void recordBuild({
+    tool: "build_unstake_transaction",
+    agentId: params.agentId,
+    to: built.tx.to,
+    data: built.tx.data,
+  });
+  return built;
 }
 
 export async function buildConnectPoolTxForToken(
   params: { tokenAddress: string } & WatermarkOptions
 ) {
-  const token = await getToken(params.tokenAddress);
+  void recordToolInvocation({
+    tool: "build_connect_pool_transaction",
+    params,
+    agentId: params.agentId,
+  });
+  const token = await resolveToken(params.tokenAddress);
   if (!token.staking.rewardPoolAddress) {
     throw new AgentInputError(
       `Token ${token.symbol} has no reward pool on record`
     );
   }
-  return buildConnectPoolTx({
+  const built = buildConnectPoolTx({
     poolAddress: token.staking.rewardPoolAddress,
     agentId: params.agentId,
     source: params.source,
   });
+  void recordBuild({
+    tool: "build_connect_pool_transaction",
+    agentId: params.agentId,
+    to: built.tx.to,
+    data: built.tx.data,
+  });
+  return built;
 }
 
 export async function buildStreamTxForToken(
@@ -276,19 +338,32 @@ export async function buildStreamTxForToken(
     tokensPerDay: string;
   } & WatermarkOptions
 ) {
+  void recordToolInvocation({
+    tool: "build_stream_transaction",
+    params,
+    agentId: params.agentId,
+  });
   // Validate it's a real (non-blacklisted) Streme token before streaming it.
-  const token = await getToken(params.tokenAddress);
-  return buildStreamTx({
+  const token = await resolveToken(params.tokenAddress);
+  const built = buildStreamTx({
     tokenAddress: token.address,
     receiver: params.receiver,
     tokensPerDay: params.tokensPerDay,
     agentId: params.agentId,
     source: params.source,
   });
+  void recordBuild({
+    tool: "build_stream_transaction",
+    agentId: params.agentId,
+    to: built.tx.to,
+    data: built.tx.data,
+  });
+  return built;
 }
 
 /** Self-describing capabilities document (GET /api/agent). */
 export function capabilities() {
+  void recordToolInvocation({ tool: "get_streme_capabilities", params: {} });
   const base = appUrl();
   return {
     name: "Streme Agent Gateway",
