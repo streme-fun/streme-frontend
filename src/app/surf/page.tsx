@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import GamePageClient from "./GamePageClient";
+import SurfPageClient from "./SurfPageClient";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://streme.fun";
 
@@ -42,7 +42,7 @@ export async function generateMetadata({
     if (challenge.by) imageParams.set("by", challenge.by);
     if (challenge.rank) imageParams.set("r", String(challenge.rank));
   }
-  const imageUrl = `${baseUrl}/api/game/image${
+  const imageUrl = `${baseUrl}/api/surf/image${
     imageParams.size > 0 ? `?${imageParams.toString()}` : ""
   }`;
 
@@ -86,7 +86,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function GamePage({ searchParams }: Props) {
+export default async function SurfPage({ searchParams }: Props) {
   const challenge = parseChallenge(await searchParams);
-  return <GamePageClient challenge={challenge} />;
+  return <SurfPageClient challenge={challenge} />;
 }

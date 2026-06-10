@@ -593,7 +593,7 @@ export class SurfGameEngine {
     this.rider.position.set(0, 0.92, 0.1);
     this.surfer.add(this.rider);
 
-    new THREE.TextureLoader().load("/game/monster.png", (texture) => {
+    new THREE.TextureLoader().load("/surf/monster.png", (texture) => {
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.magFilter = THREE.NearestFilter; // keep the pixel art crisp
       const material = this.rider.material as THREE.MeshBasicMaterial;

@@ -2,11 +2,11 @@
 
 import dynamic from "next/dynamic";
 import { useAppFrameLogic } from "../../hooks/useAppFrameLogic";
-import type { SurfChallenge } from "../../components/game/StremeSurfGame";
+import type { SurfChallenge } from "../../components/surf/StremeSurfGame";
 
 // Three.js only runs in the browser
 const StremeSurfGame = dynamic(
-  () => import("../../components/game/StremeSurfGame"),
+  () => import("../../components/surf/StremeSurfGame"),
   {
     ssr: false,
     loading: () => (
@@ -23,7 +23,7 @@ const StremeSurfGame = dynamic(
   }
 );
 
-export default function GamePageClient({
+export default function SurfPageClient({
   challenge,
 }: {
   challenge?: SurfChallenge | null;

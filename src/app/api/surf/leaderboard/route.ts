@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, Errors } from "@farcaster/quick-auth";
-import { getLeaderboard, submitScore } from "../../../../lib/gameLeaderboard";
+import { getLeaderboard, submitScore } from "../../../../lib/surfLeaderboard";
 
 const MAX_DISTANCE = 100_000;
 const MAX_BUBBLES = 10_000;
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Game leaderboard GET error:", error);
+    console.error("Surf leaderboard GET error:", error);
     return NextResponse.json(
       { error: "Failed to load leaderboard" },
       { status: 500 }
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Game leaderboard POST error:", error);
+    console.error("Surf leaderboard POST error:", error);
     return NextResponse.json(
       { error: "Failed to submit score" },
       { status: 500 }
