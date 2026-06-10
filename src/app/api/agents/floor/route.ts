@@ -198,6 +198,10 @@ export async function GET() {
   };
 
   return Response.json(payload, {
-    headers: { "Cache-Control": CACHE_CONTROL },
+    headers: {
+      "Cache-Control": CACHE_CONTROL,
+      // Agents read this endpoint cross-origin, same as /api/agent/*.
+      "Access-Control-Allow-Origin": "*",
+    },
   });
 }

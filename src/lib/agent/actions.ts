@@ -387,6 +387,8 @@ export function capabilities() {
       "GET /api/agent/token/{address}": "one token with staking info",
       "GET /api/agent/yield/{address}": "a wallet's live reward streams",
       "GET /api/pulse": "trending snapshot, milestones, bot activity",
+      "GET /api/agents/floor":
+        "chain-verified agent activity: recent events with verification tiers, daily counters, the Resident's journal",
       "POST /api/agent/tx/buy":
         "{tokenAddress, ethAmount, stake?, slippageBps?, agentId?} → unsigned zap tx (ETH→token, optional auto-stake)",
       "POST /api/agent/tx/stake":
