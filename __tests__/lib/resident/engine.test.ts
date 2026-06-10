@@ -32,6 +32,19 @@ jest.mock("@/src/lib/agent/actions", () => ({
   buildConnectPoolTxForToken: (...args: unknown[]) => mockBuildConnect(...args),
 }));
 
+// Wrap the store's spend ledger in jest.fn so individual tests can inject
+// Redis failures; every other call passes through to the real in-memory
+// store (telemetry.test.ts convention).
+jest.mock("@/src/lib/floor/store", () => {
+  const actual = jest.requireActual(
+    "@/src/lib/floor/store"
+  ) as typeof import("@/src/lib/floor/store");
+  return {
+    ...actual,
+    addResidentSpend: jest.fn(actual.addResidentSpend),
+  };
+});
+
 import {
   __clearFloorStoreForTests,
   __setRedisLiveForTests,
@@ -54,6 +67,10 @@ import {
   runResident,
   type ResidentClient,
 } from "@/src/lib/resident/engine";
+
+const actualStore = jest.requireActual(
+  "@/src/lib/floor/store"
+) as typeof import("@/src/lib/floor/store");
 
 const TOKEN = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
 const ZAP: `0x${string}` = "0x4087a4f2dfa64bbed5e76dd44ff97b1e152186fa";
@@ -378,6 +395,100 @@ describe("journal-before-broadcast ordering", () => {
     expect(client.call).not.toHaveBeenCalled();
     expect(report.errors.join(" ")).toContain("journal write failed");
     expect(await getResidentSpend(TODAY)).toBe(0);
+  });
+});
+
+describe("spend-ledger failure handling", () => {
+  it("pre-broadcast spend write failure → skipped before broadcast, no halt, next run clean", async () => {
+    queueDecision(BUY_DECISION);
+    (addResidentSpend as jest.Mock).mockRejectedValueOnce(
+      new Error("redis blip")
+    );
+    const client = makeClient();
+
+    const report = await runResident({ now: NOW, client });
+    expect(client.call).not.toHaveBeenCalled();
+    expect(client.sendTransaction).not.toHaveBeenCalled();
+    expect(report.halted).toBe(false);
+    expect(await getResidentHalt()).toBe(false);
+    expect(report.errors.join(" ")).toContain(
+      "spend ledger write failed — skipped before broadcast"
+    );
+    expect(await getResidentSpend(TODAY)).toBe(0);
+
+    const journal = await getJournal();
+    expect(journal[0].state).toBe("skipped");
+    expect(journal[0].error).toContain("spend ledger write failed");
+
+    // Next-run reconciliation sees a terminal `skipped` entry, not a
+    // dangling intention — a transient Redis blip must not escalate to a
+    // global halt.
+    queueDecision({ action: "none", reasoning: "Resting." });
+    const report2 = await runResident({
+      now: NOW + 60_000,
+      client: makeClient(),
+    });
+    expect(report2.halted).toBe(false);
+    expect(await getResidentHalt()).toBe(false);
+    expect(report2.reconciled).toBe(0);
+  });
+
+  it("refund failure after a simulation revert → run completes, loud distinguishable error, entry still skipped", async () => {
+    queueDecision(BUY_DECISION);
+    const spend = addResidentSpend as jest.Mock;
+    spend.mockImplementationOnce(actualStore.addResidentSpend); // pre-broadcast write lands
+    spend.mockRejectedValueOnce(new Error("redis blip on refund")); // negative increment throws
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const client = makeClient({
+      call: jest.fn(async () => {
+        throw new Error("execution reverted: slippage");
+      }),
+    });
+
+    try {
+      const report = await runResident({ now: NOW, client });
+      expect(client.sendTransaction).not.toHaveBeenCalled();
+      expect(report.halted).toBe(false);
+      expect(await getResidentHalt()).toBe(false);
+      expect(report.errors.join(" ")).toContain(
+        "spend refund failed — daily cap overstated by 0.005 ETH"
+      );
+      expect(errorSpy.mock.calls.flat().join(" ")).toContain(
+        "SPEND REFUND FAILED"
+      );
+
+      const journal = await getJournal();
+      expect(journal[0].state).toBe("skipped");
+      expect(journal[0].error).toContain("Simulation revert");
+      // The pessimistic spend stays counted (overstated) until its TTL.
+      expect(await getResidentSpend(TODAY)).toBeCloseTo(0.005);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("refund failure after a build failure is also non-fatal (second refund site)", async () => {
+    queueDecision(BUY_DECISION);
+    const spend = addResidentSpend as jest.Mock;
+    spend.mockImplementationOnce(actualStore.addResidentSpend);
+    spend.mockRejectedValueOnce(new Error("redis blip on refund"));
+    mockBuildBuy.mockRejectedValueOnce(new Error("quote revert"));
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const client = makeClient();
+
+    try {
+      const report = await runResident({ now: NOW, client });
+      expect(client.sendTransaction).not.toHaveBeenCalled();
+      expect(report.halted).toBe(false);
+      expect(report.errors.join(" ")).toContain(
+        "spend refund failed — daily cap overstated by 0.005 ETH"
+      );
+      const journal = await getJournal();
+      expect(journal[0].state).toBe("skipped");
+      expect(journal[0].error).toContain("Build failed");
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });
 

@@ -13,6 +13,7 @@ import {
   formatPercentChange,
   formatUsdCompact,
 } from "@/src/lib/pulse/format";
+import { relativeTime } from "@/src/components/floor/format";
 
 const REFRESH_INTERVAL_MS = 60_000;
 
@@ -20,14 +21,6 @@ interface PulseData {
   snapshot: PulseSnapshot;
   milestones: Milestone[];
   casts: CastRecord[];
-}
-
-function relativeTime(unixSeconds: number): string {
-  const seconds = Math.max(0, Math.floor(Date.now() / 1000) - unixSeconds);
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
 }
 
 function formatPrice(price: number): string {
@@ -106,7 +99,8 @@ export default function PulseContent() {
         </div>
         <p className="mt-2 opacity-70">
           What&apos;s streaming right now — live rankings, milestones, and the
-          automated @streme broadcast log. Updated {relativeTime(snapshot.generatedAt)}.
+          automated @streme broadcast log. Updated{" "}
+          {relativeTime(snapshot.generatedAt * 1000)}.
         </p>
       </div>
 
@@ -251,7 +245,7 @@ export default function PulseContent() {
                       </span>
                     </div>
                     <div className="text-xs opacity-50 mt-1">
-                      {relativeTime(milestone.detectedAt)}
+                      {relativeTime(milestone.detectedAt * 1000)}
                     </div>
                   </Link>
                 ))}
@@ -287,7 +281,7 @@ export default function PulseContent() {
                       {cast.text}
                     </p>
                     <div className="text-xs opacity-50 mt-1">
-                      {relativeTime(cast.createdAt)}
+                      {relativeTime(cast.createdAt * 1000)}
                     </div>
                   </div>
                 ))}

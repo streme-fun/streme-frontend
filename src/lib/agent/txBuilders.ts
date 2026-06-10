@@ -12,7 +12,10 @@ import {
   encodeConnectPoolData,
 } from "@/src/lib/abiEncoding";
 import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
-import { CFA_V1_FORWARDER } from "@/src/lib/superfluid-contracts";
+import {
+  CFA_V1_FORWARDER,
+  GDA_V1_FORWARDER,
+} from "@/src/lib/superfluid-contracts";
 import { publicClient } from "@/src/lib/viemClient";
 import { encodeWatermark, type WatermarkSource } from "./watermark";
 
@@ -257,7 +260,7 @@ export function buildConnectPoolTx(
   return {
     description: "Connect to the token's reward pool (GDA forwarder)",
     tx: {
-      to: "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08", // GDA v1 forwarder (Base)
+      to: GDA_V1_FORWARDER,
       // Watermark rides in the GDA userData (surfaces in PoolConnectionUpdated).
       data: encodeConnectPoolData(pool, encodeWatermark(params)),
       chainId: BASE_CHAIN_ID,
@@ -295,6 +298,11 @@ export function buildStreamTx(
   if (perDay < 0n) throw new AgentInputError("tokensPerDay must be >= 0");
 
   const flowrate = perDay / 86400n; // wei per second
+  if (perDay > 0n && flowrate === 0n) {
+    throw new AgentInputError(
+      "tokensPerDay is too small to stream (less than 1 wei per second)"
+    );
+  }
 
   const data = withWatermarkSuffix(
     encodeFunctionData({

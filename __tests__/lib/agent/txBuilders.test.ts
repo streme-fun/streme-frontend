@@ -156,6 +156,17 @@ describe("buildStreamTx", () => {
     expect(decodeWatermark(watermark)).not.toBeNull();
   });
 
+  it("rejects a tokensPerDay too small to stream (would truncate to 0 wei/second)", () => {
+    expect(() =>
+      buildStreamTx({
+        tokenAddress: TOKEN,
+        receiver: WALLET,
+        // 5e-14 tokens/day = 50,000 wei/day < 86,400 wei/day → 0n wei/second
+        tokensPerDay: "0.00000000000005",
+      })
+    ).toThrow(AgentInputError);
+  });
+
   it("stops the stream at zero", () => {
     const built = buildStreamTx({
       tokenAddress: TOKEN,

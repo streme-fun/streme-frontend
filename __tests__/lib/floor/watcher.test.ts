@@ -4,6 +4,21 @@
 // helpers so the watcher's decoders see production-shaped bytes.
 
 import { beforeEach, describe, expect, it } from "@jest/globals";
+
+// Wrap bumpVerifiedCounters in jest.fn so the publish-vs-counters failure
+// test can inject a one-shot rejection; every other call passes through to
+// the real (in-memory) store. Uses the global `jest` so the transform
+// hoists this above the module imports.
+jest.mock("@/src/lib/floor/store", () => {
+  const actual = jest.requireActual(
+    "@/src/lib/floor/store"
+  ) as typeof import("@/src/lib/floor/store");
+  return {
+    ...actual,
+    bumpVerifiedCounters: jest.fn(actual.bumpVerifiedCounters),
+  };
+});
+
 import {
   decodeFunctionData,
   encodeAbiParameters,
@@ -16,16 +31,23 @@ import {
 import { encodeZapData } from "@/src/lib/abiEncoding";
 import {
   buildBuyTx,
+  buildConnectPoolTx,
   buildStakeTx,
   STAKING_HELPER,
 } from "@/src/lib/agent/txBuilders";
-import { findWatermark, fingerprint } from "@/src/lib/agent/watermark";
+import {
+  findWatermark,
+  fingerprint,
+  WATERMARK_LENGTH,
+} from "@/src/lib/agent/watermark";
 import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
 import {
   __clearFloorStoreForTests,
   acquireLock,
+  bumpVerifiedCounters,
   floorDateKey,
   getCursor,
+  getNonceIndex,
   getRecentEvents,
   getVerifiedCounters,
   putFingerprint,
@@ -50,6 +72,7 @@ const STAKING_CONTRACT: Address = "0x93419f1c0f73b278c73085c17407794a6580deff";
 const WALLET: Address = "0x1111111111111111111111111111111111111111";
 const ENTRYPOINT: Address = "0x4337433743374337433743374337433743374337";
 const ZERO: Address = "0x0000000000000000000000000000000000000000";
+const POOL: Address = "0x2222222222222222222222222222222222222222";
 
 /** All fake blocks share one timestamp → one UTC counter date. */
 const BLOCK_TS_SEC = 1_900_000_000n;
@@ -60,6 +83,7 @@ function txHashOf(i: number): Hex {
 }
 const TX1 = txHashOf(1);
 const TX2 = txHashOf(2);
+const TX3 = txHashOf(3);
 
 // ---------------------------------------------------------------------------
 // Fake client factory
@@ -76,6 +100,8 @@ interface FakeChain {
   txs: Map<string, WatcherTx>;
   /** txHash (lowercase) → receipt logs */
   receipts: Map<string, WatcherReceiptLog[]>;
+  /** txHashes (lowercase) whose receipts report status "reverted" */
+  reverted: Set<string>;
   /** StakedToken contract (lowercase) → stakeableToken() answer */
   stakeableTokens: Map<string, string>;
   /** When true, getLogs respects fromBlock/toBlock (default: re-deliver all) */
@@ -93,6 +119,7 @@ function makeChain(overrides: Partial<FakeChain> = {}): FakeChain {
     blocks: new Map(),
     txs: new Map(),
     receipts: new Map(),
+    reverted: new Set(),
     stakeableTokens: new Map([[STAKING_CONTRACT, TOKEN]]),
     filterLogsByRange: false,
     failGetLogsAtOrAbove: null,
@@ -131,7 +158,12 @@ function makeClient(chain: FakeChain): WatcherClient {
       return tx;
     },
     async getTransactionReceipt({ hash }) {
-      return { logs: chain.receipts.get(hash.toLowerCase()) ?? [] };
+      return {
+        status: chain.reverted.has(hash.toLowerCase())
+          ? ("reverted" as const)
+          : ("success" as const),
+        logs: chain.receipts.get(hash.toLowerCase()) ?? [],
+      };
     },
     async readContract({ address, functionName }) {
       if (functionName !== "stakeableToken") {
@@ -485,6 +517,68 @@ describe("watcher buys and verification tiers", () => {
     expect(counters.volumeEth).toBeCloseTo(0.01);
   });
 
+  it("denies tier 2 to a harvested nonce in fresh direct calldata and consumes the nonce on first wrapped match", async () => {
+    const chain = makeChain();
+    const built = await buildBuy();
+    const nonce = findWatermark(built.tx.data)!.nonce;
+    const builtFp = fingerprint(built.tx.to, built.tx.data);
+    await putFingerprint(builtFp, {
+      tool: "build_buy_transaction",
+      agentId: "alice-bot",
+      builtAt: Date.now(),
+      nonce,
+    });
+    await putNonceIndex(nonce, builtFp);
+
+    // Attacker harvests the watermark (the built tx's trailing 18 bytes)
+    // and pastes it onto FRESH direct-to-zap calldata. The fingerprint
+    // misses, and the nonce join must NOT rescue a direct tx → tier 3.
+    const harvestedWatermark = built.tx.data.slice(-WATERMARK_LENGTH * 2);
+    const harvested = (encodeZapData("zap", TOKEN, 10n ** 16n, 1n, ZERO) +
+      harvestedWatermark) as Hex;
+    addBuyTx(chain, {
+      txHash: TX1,
+      block: 1000n,
+      to: ZAP_CONTRACT_ADDRESS,
+      input: harvested,
+      valueWei: 10n ** 16n,
+    });
+
+    // The legitimate wrapped (4337-style) tx earns tier 2 — and consumes.
+    const wrapped = ("0xdeadbeef" + built.tx.data.slice(2)) as Hex;
+    addBuyTx(chain, {
+      txHash: TX2,
+      block: 1001n,
+      to: ENTRYPOINT,
+      input: wrapped,
+      valueWei: 10n ** 16n,
+    });
+
+    // Replay: the same watermark wrapped again in a later tx → nonce gone.
+    const replay = ("0xfeedface" + built.tx.data.slice(2)) as Hex;
+    addBuyTx(chain, {
+      txHash: TX3,
+      block: 1002n,
+      to: ENTRYPOINT,
+      input: replay,
+      valueWei: 10n ** 16n,
+    });
+
+    const report = asReport(await runWatcher({ client: makeClient(chain) }));
+
+    expect(report.published).toBe(3); // all publish — only one verifies
+    expect(report.counterBumps).toBe(1); // only the legit wrapped tx counts
+
+    const events = await getRecentEvents(10);
+    const byHash = new Map(events.map((event) => [event.txHash, event]));
+    expect(byHash.get(TX1)).toMatchObject({ tier: 3, agentId: null });
+    expect(byHash.get(TX2)).toMatchObject({ tier: 2, agentId: "alice-bot" });
+    expect(byHash.get(TX3)).toMatchObject({ tier: 3, agentId: null });
+
+    expect(await getNonceIndex(nonce)).toBeNull(); // single-use: consumed
+    expect((await getVerifiedCounters(DATE)).byKind.buy).toBe(1);
+  });
+
   it("reconciles a zap auto-stake (buy + interior Sent/Deposit) to exactly one buy event", async () => {
     const chain = makeChain();
     const built = await buildBuy({ ethAmount: "0.05" });
@@ -536,11 +630,95 @@ describe("watcher buys and verification tiers", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Receipt status: reverted txs never publish
+// ---------------------------------------------------------------------------
+
+describe("watcher reverted transactions", () => {
+  it("never publishes a reverted zap buy", async () => {
+    const chain = makeChain();
+    const built = await buildBuy();
+    await recordBuild({
+      tool: "build_buy_transaction",
+      agentId: "alice-bot",
+      to: built.tx.to,
+      data: built.tx.data,
+    });
+    addBuyTx(chain, {
+      txHash: TX1,
+      block: 1000n,
+      to: ZAP_CONTRACT_ADDRESS,
+      input: built.tx.data,
+      valueWei: 10n ** 16n,
+    });
+    chain.reverted.add(TX1);
+
+    const report = asReport(await runWatcher({ client: makeClient(chain) }));
+
+    expect(report.published).toBe(0);
+    expect(report.counterBumps).toBe(0);
+    expect(await getRecentEvents(10)).toEqual([]);
+  });
+
+  it("publishes a successful connect but never a reverted one", async () => {
+    const chain = makeChain();
+    // Two distinct builds (fresh nonces) for the same pool — both recorded.
+    const ok = buildConnectPoolTx({ poolAddress: POOL, agentId: "alice-bot" });
+    const fail = buildConnectPoolTx({
+      poolAddress: POOL,
+      agentId: "alice-bot",
+    });
+    await recordBuild({
+      tool: "build_connect_pool_transaction",
+      agentId: "alice-bot",
+      to: ok.tx.to,
+      data: ok.tx.data,
+    });
+    await recordBuild({
+      tool: "build_connect_pool_transaction",
+      agentId: "alice-bot",
+      to: fail.tx.to,
+      data: fail.tx.data,
+    });
+    // addBuyTx is a generic put-tx-in-block helper despite the name.
+    addBuyTx(chain, {
+      txHash: TX1,
+      block: 1000n,
+      to: ok.tx.to,
+      input: ok.tx.data,
+      valueWei: 0n,
+    });
+    addBuyTx(chain, {
+      txHash: TX2,
+      block: 1001n,
+      to: fail.tx.to,
+      input: fail.tx.data,
+      valueWei: 0n,
+    });
+    chain.reverted.add(TX2);
+
+    const report = asReport(await runWatcher({ client: makeClient(chain) }));
+
+    expect(report.published).toBe(1);
+    expect(report.counterBumps).toBe(1);
+
+    const events = await getRecentEvents(10);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      kind: "connect",
+      tier: 1,
+      txHash: TX1,
+      token: POOL,
+    });
+    expect((await getVerifiedCounters(DATE)).byKind.connect).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Run mechanics: dedupe, cursor on failure, lock, dry run
 // ---------------------------------------------------------------------------
 
 describe("watcher run mechanics", () => {
-  it("dedupes the same log delivered across two runs (wasSeen guard)", async () => {
+  it("dedupes the same log delivered across two runs (seen barrier)", async () => {
     const chain = makeChain();
     await seedTier1Stake(chain);
     const client = makeClient(chain);
@@ -609,6 +787,61 @@ describe("watcher run mechanics", () => {
     expect(await getCursor()).toBe("999");
     expect((await getVerifiedCounters(DATE)).byKind.stake).toBe(0);
   });
+
+  it("undercounts but never double-publishes when the counter bump fails after publish", async () => {
+    const chain = makeChain();
+    await seedTier1Stake(chain);
+    const client = makeClient(chain);
+    (bumpVerifiedCounters as unknown as jest.Mock).mockRejectedValueOnce(
+      new Error("redis down")
+    );
+
+    const first = asReport(await runWatcher({ client }));
+    expect(first.errors).toHaveLength(1);
+    expect(first.errors[0]).toContain("redis down");
+    expect(first.published).toBe(1); // the event went out before the crash
+    expect(first.counterBumps).toBe(0);
+    expect(await getRecentEvents(10)).toHaveLength(1);
+    expect(await getCursor()).toBe("999"); // failed chunk not committed
+
+    // Healthy rerun reprocesses the same range; the seen barrier holds.
+    const second = asReport(await runWatcher({ client }));
+    expect(second.errors).toEqual([]);
+    expect(second.published).toBe(0);
+    expect(await getRecentEvents(10)).toHaveLength(1); // no duplicate event
+    // The missed bump is never retried: counters may undercount (benign,
+    // visible) but can never double-count.
+    expect((await getVerifiedCounters(DATE)).byKind.stake).toBe(0);
+    expect(await getCursor()).toBe("1002");
+  });
+
+  it("orders one chunk's feed newest-block-first across discovery sources", async () => {
+    const chain = makeChain();
+    // Stake in block 1000 — log-anchored, discovered AFTER the block scan.
+    await seedTier1Stake(chain, { txHash: TX1, block: 1000n });
+    // Buy in block 1001 — block-scanned, discovered FIRST despite being newer.
+    const built = await buildBuy();
+    await recordBuild({
+      tool: "build_buy_transaction",
+      agentId: "alice-bot",
+      to: built.tx.to,
+      data: built.tx.data,
+    });
+    addBuyTx(chain, {
+      txHash: TX2,
+      block: 1001n,
+      to: ZAP_CONTRACT_ADDRESS,
+      input: built.tx.data,
+      valueWei: 10n ** 16n,
+    });
+
+    const report = asReport(await runWatcher({ client: makeClient(chain) }));
+    expect(report.published).toBe(2);
+
+    const events = await getRecentEvents(10);
+    expect(events.map((event) => event.block)).toEqual(["1001", "1000"]);
+    expect(events.map((event) => event.kind)).toEqual(["buy", "stake"]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -649,6 +882,47 @@ describe("watcher counter eligibility", () => {
     expect(report.published).toBe(21); // feed still shows everything
     expect(report.counterBumps).toBe(20); // counters stop at the cap
     expect((await getVerifiedCounters(DATE)).byKind.stake).toBe(20);
+  });
+
+  it("publishes a floor-ui copy-trade with its source label but never counts it (plan AE8)", async () => {
+    const chain = makeChain();
+    // A human copy-trade: built through the real builder with the floor-ui
+    // source byte and recorded — tier 1, above the buy floor.
+    const built = await buildBuyTx({
+      tokenAddress: TOKEN,
+      ethAmount: "0.01",
+      quotedAmountOut: parseEther("1000"),
+      source: "floor-ui",
+    });
+    await recordBuild({
+      tool: "build_buy_transaction",
+      to: built.tx.to,
+      data: built.tx.data,
+    });
+    addBuyTx(chain, {
+      txHash: TX1,
+      block: 1000n,
+      to: ZAP_CONTRACT_ADDRESS,
+      input: built.tx.data,
+      valueWei: 10n ** 16n, // would count if agent-sourced
+    });
+
+    const report = asReport(await runWatcher({ client: makeClient(chain) }));
+
+    expect(report.published).toBe(1);
+    expect(report.counterBumps).toBe(0);
+
+    const events = await getRecentEvents(10);
+    expect(events[0]).toMatchObject({
+      kind: "buy",
+      tier: 1,
+      source: "floor-ui",
+    });
+
+    const counters = await getVerifiedCounters(DATE);
+    expect(counters.byKind.buy).toBe(0);
+    expect(counters.volumeEth).toBe(0);
+    expect(counters.activeWallets).toBe(0);
   });
 
   it("routes resident buys to the resident volume key, never the external one", async () => {

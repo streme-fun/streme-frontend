@@ -15,6 +15,7 @@
 
 import type { ReactNode } from "react";
 import type { FloorEvent } from "@/src/lib/floor/store";
+import { relativeTime, truncateHex } from "./format";
 
 const KIND_META: Record<
   FloorEvent["kind"],
@@ -27,19 +28,6 @@ const KIND_META: Record<
   stream: { label: "Stream opened", badgeClass: "badge-info" },
   connect: { label: "Pool connect", badgeClass: "badge-accent" },
 };
-
-function relativeTime(epochMs: number): string {
-  const seconds = Math.max(0, Math.floor((Date.now() - epochMs) / 1000));
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
-
-function truncateAddress(address: string): string {
-  if (address.length <= 12) return address;
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
 
 interface FeedItemProps {
   event: FloorEvent;
@@ -101,12 +89,12 @@ export default function FeedItem({ event, copySlot }: FeedItemProps) {
                 </span>
               </div>
               <div className="text-xs font-mono opacity-60">
-                {truncateAddress(event.wallet)}
+                {truncateHex(event.wallet)}
               </div>
             </div>
           ) : (
             <span className="text-sm font-mono opacity-70">
-              {truncateAddress(event.wallet)}
+              {truncateHex(event.wallet)}
             </span>
           )}
           {copySlot}

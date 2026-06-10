@@ -28,6 +28,7 @@ import type {
   ResidentJournalState,
 } from "@/src/lib/resident/journal";
 import type { FloorSnapshot } from "./types";
+import { relativeTime, truncateHex } from "./format";
 
 const STATE_META: Record<
   ResidentJournalState,
@@ -40,19 +41,6 @@ const STATE_META: Record<
   skipped: { label: "skipped", badgeClass: "badge-ghost" },
   halted: { label: "halted", badgeClass: "badge-warning" },
 };
-
-function relativeTime(epochMs: number): string {
-  const seconds = Math.max(0, Math.floor((Date.now() - epochMs) / 1000));
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
-
-function truncateHex(value: string): string {
-  if (value.length <= 12) return value;
-  return `${value.slice(0, 6)}…${value.slice(-4)}`;
-}
 
 /** "0.0200" → "0.02", "1.0000" → "1"; non-finite → null. */
 function formatEthAmount(value: number): string | null {

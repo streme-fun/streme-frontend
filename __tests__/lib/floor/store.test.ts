@@ -1,15 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 
+// Fake Upstash client for the redis-path getVerifiedCounters test — only
+// the commands that path uses. The store's dynamic import("@upstash/redis")
+// resolves to this mock once the env vars are set.
+const mockRedis = {
+  mget: jest.fn(),
+  scard: jest.fn(),
+};
+
+jest.mock("@upstash/redis", () => ({
+  Redis: jest.fn(() => mockRedis),
+}));
+
 import {
   __clearFloorStoreForTests,
+  bumpVerifiedCounters,
+  consumeNonceIndex,
   floorDateKey,
   getDailyCallCount,
   getFingerprint,
   getNonceIndex,
   getRecentTelemetry,
+  getVerifiedCounters,
+  markSeenIfNew,
   putFingerprint,
   putNonceIndex,
   recordToolCall,
+  wasSeen,
   type FloorTelemetryEntry,
 } from "@/src/lib/floor/store";
 
@@ -89,6 +106,108 @@ describe("floor store fingerprints and nonce index", () => {
     await putNonceIndex("0xDEADBEEF", "0xABCD1234");
     expect(await getNonceIndex("0xdeadbeef")).toBe("0xabcd1234");
     expect(await getNonceIndex("0x00000000")).toBeNull();
+  });
+
+  it("consumeNonceIndex deletes the entry — a consumed nonce never resolves again", async () => {
+    await putNonceIndex("0xDEADBEEF", "0xABCD1234");
+    await consumeNonceIndex("0xdeadbeef");
+    expect(await getNonceIndex("0xdeadbeef")).toBeNull();
+    // Consuming an absent nonce is a no-op, not an error.
+    await expect(consumeNonceIndex("0xdeadbeef")).resolves.toBeUndefined();
+  });
+});
+
+describe("floor store seen barrier", () => {
+  it("markSeenIfNew returns true exactly once per key", async () => {
+    expect(await markSeenIfNew("0xAAA")).toBe(true);
+    expect(await markSeenIfNew("0xaaa")).toBe(false); // case-insensitive key
+    expect(await markSeenIfNew("0xbbb")).toBe(true);
+    expect(await wasSeen("0xaaa")).toBe(true);
+    expect(await wasSeen("0xccc")).toBe(false);
+  });
+});
+
+describe("floor store getVerifiedCounters", () => {
+  const date = "2026-06-11";
+
+  it("aggregates in-memory counters into the snapshot", async () => {
+    await bumpVerifiedCounters({ kind: "buy", wallet: "0xA", volumeEth: 0.5, date });
+    await bumpVerifiedCounters({ kind: "stake", wallet: "0xB", date });
+    await bumpVerifiedCounters({
+      kind: "buy",
+      wallet: "0xA",
+      volumeEth: 0.25,
+      isResident: true,
+      date,
+    });
+
+    const snapshot = await getVerifiedCounters(date);
+    expect(snapshot.byKind).toEqual({
+      buy: 2,
+      stake: 1,
+      unstake: 0,
+      stream: 0,
+      connect: 0,
+    });
+    expect(snapshot.volumeEth).toBe(0.5);
+    expect(snapshot.residentVolumeEth).toBe(0.25);
+    expect(snapshot.activeWallets).toBe(2);
+  });
+
+  it("redis path reads all counters with ONE mget, mapping values by key order", async () => {
+    process.env.KV_REST_API_URL = "https://fake.upstash.example";
+    process.env.KV_REST_API_TOKEN = "token";
+    __clearFloorStoreForTests(); // reset the cached client promise
+
+    const prefix = "streme:floor";
+    // Distinct value per key — any key-order mix-up misassigns a field.
+    const data = new Map<string, number>([
+      [`${prefix}:counters:verified:buy:${date}`, 1],
+      [`${prefix}:counters:verified:stake:${date}`, 2],
+      [`${prefix}:counters:verified:unstake:${date}`, 3],
+      [`${prefix}:counters:verified:stream:${date}`, 4],
+      [`${prefix}:counters:verified:connect:${date}`, 5],
+      [`${prefix}:counters:volume:${date}`, 0.5],
+      [`${prefix}:counters:volume:resident:${date}`, 0.25],
+    ]);
+    mockRedis.mget.mockImplementation(async (...keys: string[]) =>
+      keys.map((key) => data.get(key) ?? null)
+    );
+    mockRedis.scard.mockResolvedValue(7);
+
+    try {
+      const snapshot = await getVerifiedCounters(date);
+
+      expect(mockRedis.mget).toHaveBeenCalledTimes(1);
+      expect(mockRedis.mget).toHaveBeenCalledWith(
+        `${prefix}:counters:verified:buy:${date}`,
+        `${prefix}:counters:verified:stake:${date}`,
+        `${prefix}:counters:verified:unstake:${date}`,
+        `${prefix}:counters:verified:stream:${date}`,
+        `${prefix}:counters:verified:connect:${date}`,
+        `${prefix}:counters:volume:${date}`,
+        `${prefix}:counters:volume:resident:${date}`
+      );
+      expect(mockRedis.scard).toHaveBeenCalledWith(
+        `${prefix}:wallets:${date}`
+      );
+      expect(snapshot.byKind).toEqual({
+        buy: 1,
+        stake: 2,
+        unstake: 3,
+        stream: 4,
+        connect: 5,
+      });
+      expect(snapshot.volumeEth).toBe(0.5);
+      expect(snapshot.residentVolumeEth).toBe(0.25);
+      expect(snapshot.activeWallets).toBe(7);
+    } finally {
+      delete process.env.KV_REST_API_URL;
+      delete process.env.KV_REST_API_TOKEN;
+      __clearFloorStoreForTests();
+      mockRedis.mget.mockReset();
+      mockRedis.scard.mockReset();
+    }
   });
 });
 

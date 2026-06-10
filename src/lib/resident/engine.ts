@@ -608,11 +608,43 @@ export async function runResident(
     }
     report.journaled.push(entry.id);
 
-    // Spend counted pessimistically BEFORE broadcast.
-    if (approved.spendEth > 0) await addResidentSpend(today, approved.spendEth);
+    // Spend counted pessimistically BEFORE broadcast. A failed ledger write
+    // is a graceful skip, not a halt: nothing has been broadcast, so the
+    // journal-before-broadcast and ledger-before-broadcast invariants hold
+    // and a transient Redis blip must not escalate to a global halt via the
+    // dangling-intended reconciliation path.
+    if (approved.spendEth > 0) {
+      try {
+        await addResidentSpend(today, approved.spendEth);
+      } catch (error) {
+        await journalUpdateState(entry.id, "skipped", {
+          error: "spend ledger write failed — skipped before broadcast",
+        });
+        report.errors.push(
+          `spend ledger write failed — skipped before broadcast: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+        return report;
+      }
+    }
 
     const refundSpend = async () => {
-      if (approved.spendEth > 0) await addResidentSpend(today, -approved.spendEth);
+      if (approved.spendEth <= 0) return;
+      try {
+        await addResidentSpend(today, -approved.spendEth);
+      } catch (error) {
+        // Never rethrow: the action itself was already skipped safely. The
+        // only damage is an overstated daily cap until the spend key's TTL
+        // lapses — make that loud and distinguishable in logs + report.
+        console.error(
+          `[resident] SPEND REFUND FAILED — daily cap overstated by ${approved.spendEth} ETH for ${today}:`,
+          error
+        );
+        report.errors.push(
+          `spend refund failed — daily cap overstated by ${approved.spendEth} ETH`
+        );
+      }
     };
 
     let built: Awaited<ReturnType<typeof buildApproved>>;

@@ -295,6 +295,19 @@ export async function getNonceIndex(nonce: string): Promise<string | null> {
   return memValues.get(key) ?? null;
 }
 
+/**
+ * Delete a nonce → fingerprint index entry. The watcher consumes a nonce on
+ * its first validated tier-2 match, making the join single-use: replaying
+ * the same watermark in a later transaction can never re-earn tier 2.
+ */
+export async function consumeNonceIndex(nonce: string): Promise<void> {
+  if (productionGuardTripped()) return;
+  const key = `${KEY_PREFIX}:nonce:${nonce.toLowerCase()}`;
+  const redis = await getRedis();
+  if (redis) await redis.del(key);
+  else memValues.delete(key);
+}
+
 // ---------------------------------------------------------------------------
 // Watcher cursor + lock
 // ---------------------------------------------------------------------------
@@ -350,7 +363,13 @@ export async function releaseLock(name: string): Promise<void> {
 // Published events + seen-tx dedupe
 // ---------------------------------------------------------------------------
 
-/** Publish verified events to the feed list (newest first, capped at 200). */
+/**
+ * Publish verified events to the feed list (newest first, capped at 200).
+ * Callers pass events in ascending block order: LPUSH semantics put the
+ * LAST array element at index 0, so the newest block heads the feed. The
+ * in-memory unshift-of-reversed mirrors LPUSH exactly (LPUSH a b c →
+ * [c, b, a]) so tests see production ordering.
+ */
 export async function publishEvents(events: FloorEvent[]): Promise<void> {
   if (productionGuardTripped() || events.length === 0) return;
   const serialized = events.map((event) => JSON.stringify(event));
@@ -413,6 +432,29 @@ export async function markSeen(key: string): Promise<void> {
   const redis = await getRedis();
   if (redis) await redis.set(fullKey, "1", { ex: SEEN_TTL_SECONDS });
   else memValues.set(fullKey, "1");
+}
+
+/**
+ * Atomic check-and-mark for the seen set (Redis SET NX + EX). Returns true
+ * only when this call newly marked the key — the watcher's dedupe barrier,
+ * taken BEFORE any other side effect so a re-delivered log can never
+ * double-publish or double-count. In production with no Redis the guard
+ * no-ops and returns false (nothing publishes — fail closed).
+ */
+export async function markSeenIfNew(key: string): Promise<boolean> {
+  if (productionGuardTripped()) return false;
+  const fullKey = `${KEY_PREFIX}:seen:${key.toLowerCase()}`;
+  const redis = await getRedis();
+  if (redis) {
+    const result = await redis.set(fullKey, "1", {
+      nx: true,
+      ex: SEEN_TTL_SECONDS,
+    });
+    return result === "OK";
+  }
+  if (memValues.has(fullKey)) return false;
+  memValues.set(fullKey, "1");
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -486,17 +528,30 @@ export async function getVerifiedCounters(
 
   const redis = await getRedis();
   if (redis) {
-    for (const kind of COUNTABLE_KINDS) {
-      const value = await redis.get<number>(
-        `${KEY_PREFIX}:counters:verified:${kind}:${date}`
-      );
-      byKind[kind] = value ?? 0;
-    }
-    snapshot.volumeEth = parseFloat(String((await redis.get(volumeKey)) ?? 0));
-    snapshot.residentVolumeEth = parseFloat(
-      String((await redis.get(residentVolumeKey)) ?? 0)
+    // One mget for all counter keys + one scard, instead of 8 sequential
+    // round-trips. mget returns values in key order: COUNTABLE_KINDS first,
+    // then volume, then resident volume.
+    const counterKeys = [
+      ...COUNTABLE_KINDS.map(
+        (kind) => `${KEY_PREFIX}:counters:verified:${kind}:${date}`
+      ),
+      volumeKey,
+      residentVolumeKey,
+    ];
+    const [values, activeWallets] = await Promise.all([
+      redis.mget<(number | string | null)[]>(...counterKeys),
+      redis.scard(walletsKey),
+    ]);
+    COUNTABLE_KINDS.forEach((kind, i) => {
+      byKind[kind] = Number(values[i] ?? 0);
+    });
+    snapshot.volumeEth = parseFloat(
+      String(values[COUNTABLE_KINDS.length] ?? 0)
     );
-    snapshot.activeWallets = await redis.scard(walletsKey);
+    snapshot.residentVolumeEth = parseFloat(
+      String(values[COUNTABLE_KINDS.length + 1] ?? 0)
+    );
+    snapshot.activeWallets = activeWallets;
   } else {
     for (const kind of COUNTABLE_KINDS) {
       byKind[kind] =

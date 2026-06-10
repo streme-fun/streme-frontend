@@ -18,10 +18,12 @@
 //             a wrong address.
 //
 // Verification tiers per event: (1) fingerprint(tx.to, tx.input) hit,
-// (2) watermark nonce → telemetry record, (3) valid watermark only.
+// (2) watermark nonce → telemetry record (wrapped calldata only; exact
+// tool↔kind match; single-use — see resolveTier), (3) valid watermark only.
 // No watermark and no fingerprint → not a floor event. Counters bump only
-// for tier 1/2. One event per txHash (zap buy wins over its interior
-// Deposit; stake wins over its interior transfer).
+// for tier 1/2 agent events — floor-ui copy-trades publish but never count
+// (plan AE8). One event per txHash (zap buy wins over its interior Deposit;
+// stake wins over its interior transfer).
 
 import {
   decodeEventLog,
@@ -42,17 +44,19 @@ import {
   fingerprint,
   type DecodedWatermark,
 } from "@/src/lib/agent/watermark";
-import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
+import { GDA_FORWARDER, ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
+import { CFA_V1_FORWARDER } from "@/src/lib/superfluid-contracts";
 import { publicClient } from "@/src/lib/viemClient";
 import {
   acquireLock,
   bumpVerifiedCounters,
+  consumeNonceIndex,
   floorDateKey,
   getCursor,
   getFingerprint,
   getNonceIndex,
   incrWalletDailyEvents,
-  markSeen,
+  markSeenIfNew,
   publishEvents,
   releaseLock,
   setCursor,
@@ -85,11 +89,13 @@ const WALLET_DAILY_EVENT_CAP = 20;
 
 /** CFA agreement contract on Base — emits FlowUpdated. */
 const CFA_AGREEMENT: Address = "0x19ba78b9cdb05a877718841c574325fdb53601bb";
-/** GDA v1 forwarder on Base — connect-pool txs target it. */
-const GDA_FORWARDER: Address = "0x6da13bde224a05a288748d857b9e7ddeffd1de08";
 
 const ZAP_ADDRESS = ZAP_CONTRACT_ADDRESS.toLowerCase();
 const HELPER_ADDRESS = STAKING_HELPER.toLowerCase();
+/** GDA v1 forwarder (canonical, checksummed in contracts.ts) — connect-pool txs target it. */
+const GDA_FORWARDER_ADDRESS = GDA_FORWARDER.toLowerCase();
+/** CFA forwarder — gateway-built stream txs target it. */
+const CFA_FORWARDER_ADDRESS = CFA_V1_FORWARDER.toLowerCase();
 
 const SENT_EVENT = parseAbiItem(
   "event Sent(address indexed operator, address indexed from, address indexed to, uint256 amount, bytes data, bytes operatorData)"
@@ -173,9 +179,11 @@ export interface WatcherClient {
     includeTransactions: true;
   }): Promise<{ timestamp: bigint; transactions: WatcherTx[] }>;
   getTransaction(args: { hash: Hex }): Promise<WatcherTx>;
-  getTransactionReceipt(args: {
-    hash: Hex;
-  }): Promise<{ logs: WatcherReceiptLog[] }>;
+  getTransactionReceipt(args: { hash: Hex }): Promise<{
+    /** Undefined is treated as success (back-compat with narrow fakes). */
+    status?: "success" | "reverted";
+    logs: WatcherReceiptLog[];
+  }>;
   readContract(args: {
     address: Address;
     abi: Abi;
@@ -218,6 +226,15 @@ interface Candidate {
   watermark: DecodedWatermark | null;
   txTo: string | null;
   txInput: Hex | null;
+  /**
+   * Canonical direct-call target (lowercase) for this kind — the contract a
+   * gateway-built tx of this kind targets when NOT wrapped (zap for buys,
+   * the token for stakes, the staking contract for unstakes, the CFA
+   * forwarder for streams, the GDA forwarder for connects). When txTo equals
+   * it, the calldata is unwrapped and tier 2 via the nonce join is denied:
+   * a direct tx must match its own fingerprint (tier 1) or stay tier 3.
+   */
+  directTarget?: string;
   staked?: boolean;
   /** Stream flow rate (0 = closed) */
   flowRate?: bigint;
@@ -298,24 +315,19 @@ async function receiptHasValidDeposit(
   return false;
 }
 
-/** Rough tool↔kind cross-check for tier-2 (nonce-joined) records. */
-function toolRoughlyMatches(tool: string, kind: FloorEventKind): boolean {
-  switch (kind) {
-    case "buy":
-      return tool.includes("buy");
-    case "stake":
-    case "stake_refunded":
-      // Buy-with-auto-stake interiors reconcile to "buy", so a stake event
-      // should come from the stake tool — not the unstake one.
-      return tool.includes("stake") && !tool.includes("unstake");
-    case "unstake":
-      return tool.includes("unstake");
-    case "stream":
-      return tool.includes("stream");
-    case "connect":
-      return tool.includes("connect");
-  }
-}
+/**
+ * Exact tool↔kind binding for tier-2 (nonce-joined) records. Buy-with-auto-
+ * stake interiors reconcile to "buy", so a stake event must come from the
+ * stake tool specifically — never a substring coincidence.
+ */
+const TOOL_FOR_KIND: Record<FloorEventKind, string> = {
+  buy: "build_buy_transaction",
+  stake: "build_stake_transaction",
+  stake_refunded: "build_stake_transaction",
+  unstake: "build_unstake_transaction",
+  stream: "build_stream_transaction",
+  connect: "build_connect_pool_transaction",
+};
 
 interface TierResolution {
   tier: 1 | 2 | 3;
@@ -324,26 +336,47 @@ interface TierResolution {
 
 /**
  * Verification tiers: fingerprint(tx.to, tx.input) hit → 1; watermark nonce
- * resolving through the nonce index to a plausible record → 2; valid
+ * resolving through the nonce index to a matching record → 2; valid
  * watermark only → 3; neither → null (not a floor event).
+ *
+ * Tier-2 binding rules: the nonce join exists ONLY for wrapped calldata
+ * (4337 userOps, smart-wallet batching) where the outer tx target differs
+ * from the kind's canonical contract, so a tier-1 fingerprint match is
+ * structurally impossible. Three checks bind the join to the original build:
+ *
+ *   1. wrapped-only — a candidate whose tx targets the canonical contract
+ *      directly (txTo === directTarget) must match its own fingerprint;
+ *      a harvested nonce pasted into fresh direct calldata stays tier 3;
+ *   2. exact tool↔kind — the recorded build tool must map exactly to the
+ *      candidate kind (TOOL_FOR_KIND), not a rough substring;
+ *   3. single-use — a granted join consumes the nonce index, so replaying
+ *      the same watermark in a later tx can never re-earn tier 2. Dry runs
+ *      never consume (`consumeNonce` false — dry runs write nothing).
  */
-async function resolveTier(candidate: Candidate): Promise<TierResolution | null> {
+async function resolveTier(
+  candidate: Candidate,
+  consumeNonce: boolean
+): Promise<TierResolution | null> {
   if (candidate.txTo && candidate.txInput) {
     const fp = fingerprint(candidate.txTo, candidate.txInput);
     const record = await getFingerprint(fp);
     if (record) return { tier: 1, agentId: record.agentId };
   }
-  if (candidate.watermark) {
+  if (!candidate.watermark) return null;
+  const wrapped =
+    candidate.directTarget !== undefined &&
+    candidate.txTo !== candidate.directTarget;
+  if (wrapped) {
     const fp = await getNonceIndex(candidate.watermark.nonce);
     if (fp) {
       const record = await getFingerprint(fp);
-      if (record && toolRoughlyMatches(record.tool, candidate.kind)) {
+      if (record && record.tool === TOOL_FOR_KIND[candidate.kind]) {
+        if (consumeNonce) await consumeNonceIndex(candidate.watermark.nonce);
         return { tier: 2, agentId: record.agentId };
       }
     }
-    return { tier: 3, agentId: null };
   }
-  return null;
+  return { tier: 3, agentId: null };
 }
 
 function describe(candidate: Candidate): string {
@@ -400,6 +433,9 @@ async function getTx(ctx: ChunkContext, hash: Hex): Promise<WatcherTx> {
   return tx;
 }
 
+/** Blocks fetched concurrently per group within a scan range. */
+const BLOCK_FETCH_BATCH = 10;
+
 /** Block scan: zap buys (fast path + wrapped-calldata watermark) + connects. */
 async function scanBlocks(
   ctx: ChunkContext,
@@ -407,86 +443,110 @@ async function scanBlocks(
   to: bigint
 ): Promise<Candidate[]> {
   const candidates: Candidate[] = [];
-  for (let n = from; n <= to; n++) {
-    const block = await ctx.client.getBlock({
-      blockNumber: n,
-      includeTransactions: true,
-    });
-    ctx.blockTimestamps.set(n.toString(), Number(block.timestamp) * 1000);
+  const numbers: bigint[] = [];
+  for (let n = from; n <= to; n++) numbers.push(n);
 
-    for (const tx of block.transactions) {
-      const to = tx.to?.toLowerCase() ?? null;
-      const input = (tx.input ?? "0x").toLowerCase() as Hex;
-      ctx.txCache.set(tx.hash.toLowerCase(), tx);
+  for (let i = 0; i < numbers.length; i += BLOCK_FETCH_BATCH) {
+    // Fetch blocks in concurrent groups (sequential fetches burn most of the
+    // run budget); per-tx processing stays sequential and in block order.
+    const batch = numbers.slice(i, i + BLOCK_FETCH_BATCH);
+    const blocks = await Promise.all(
+      batch.map((blockNumber) =>
+        ctx.client.getBlock({ blockNumber, includeTransactions: true })
+      )
+    );
 
-      const isZapTarget = to === ZAP_ADDRESS;
-      const watermark = findWatermark(input);
-      if (!isZapTarget && !watermark) continue;
+    for (let j = 0; j < batch.length; j++) {
+      const n = batch[j];
+      const block = blocks[j];
+      ctx.blockTimestamps.set(n.toString(), Number(block.timestamp) * 1000);
 
-      if (isZapTarget || ZAP_SELECTORS.some((sel) => input.includes(sel.slice(2)))) {
-        // Buy — direct zap call, or wrapped calldata whose embedded call
-        // targets the zap (selector appears before the watermark suffix).
-        let token: string | undefined;
-        if (isZapTarget) {
-          try {
-            const decoded = decodeFunctionData({ abi: ZAP_ABI, data: input });
-            token = (decoded.args[0] as string).toLowerCase();
-          } catch {
-            token = undefined;
+      for (const tx of block.transactions) {
+        const to = tx.to?.toLowerCase() ?? null;
+        const input = (tx.input ?? "0x").toLowerCase() as Hex;
+        ctx.txCache.set(tx.hash.toLowerCase(), tx);
+
+        const isZapTarget = to === ZAP_ADDRESS;
+        const watermark = findWatermark(input);
+        if (!isZapTarget && !watermark) continue;
+
+        if (
+          isZapTarget ||
+          ZAP_SELECTORS.some((sel) => input.includes(sel.slice(2)))
+        ) {
+          // Buy — direct zap call, or wrapped calldata whose embedded call
+          // targets the zap (selector appears before the watermark suffix).
+          let token: string | undefined;
+          if (isZapTarget) {
+            try {
+              const decoded = decodeFunctionData({ abi: ZAP_ABI, data: input });
+              token = (decoded.args[0] as string).toLowerCase();
+            } catch {
+              token = undefined;
+            }
           }
-        }
-        const receipt = await ctx.client.getTransactionReceipt({
-          hash: tx.hash,
-        });
-        const staked = await receiptHasValidDeposit(
-          ctx.client,
-          receipt,
-          ctx.emitterCache
-        );
-        candidates.push({
-          txHash: tx.hash.toLowerCase(),
-          blockNumber: n,
-          kind: "buy",
-          wallet: tx.from.toLowerCase(),
-          token,
-          valueWei: tx.value,
-          watermark,
-          txTo: to,
-          txInput: input,
-          staked,
-        });
-        continue;
-      }
-
-      if (to === GDA_FORWARDER) {
-        // Connect — derived from calldata (see header note on why we don't
-        // anchor on PoolConnectionUpdated in v1).
-        let pool: string | undefined;
-        try {
-          const decoded = decodeFunctionData({
-            abi: CONNECT_POOL_ABI,
-            data: input,
+          const receipt = await ctx.client.getTransactionReceipt({
+            hash: tx.hash,
           });
-          pool = (decoded.args[0] as string).toLowerCase();
-        } catch {
-          pool = undefined;
+          // Reverted txs never publish (undefined = success, for narrow fakes).
+          if (receipt.status === "reverted") continue;
+          const staked = await receiptHasValidDeposit(
+            ctx.client,
+            receipt,
+            ctx.emitterCache
+          );
+          candidates.push({
+            txHash: tx.hash.toLowerCase(),
+            blockNumber: n,
+            kind: "buy",
+            wallet: tx.from.toLowerCase(),
+            token,
+            valueWei: tx.value,
+            watermark,
+            txTo: to,
+            txInput: input,
+            directTarget: ZAP_ADDRESS,
+            staked,
+          });
+          continue;
         }
-        candidates.push({
-          txHash: tx.hash.toLowerCase(),
-          blockNumber: n,
-          kind: "connect",
-          wallet: tx.from.toLowerCase(),
-          token: pool,
-          watermark,
-          txTo: to,
-          txInput: input,
-        });
-        continue;
-      }
 
-      // Watermarked but neither zap-targeted nor a GDA connect: stake,
-      // unstake, and stream are log-anchored (their events fire even under
-      // calldata wrapping), so the scan skips them rather than double-count.
+        if (to === GDA_FORWARDER_ADDRESS) {
+          // Connect — derived from calldata (see header note on why we don't
+          // anchor on PoolConnectionUpdated in v1). No event anchor means no
+          // implicit success signal, so check the receipt status explicitly.
+          const receipt = await ctx.client.getTransactionReceipt({
+            hash: tx.hash,
+          });
+          if (receipt.status === "reverted") continue;
+          let pool: string | undefined;
+          try {
+            const decoded = decodeFunctionData({
+              abi: CONNECT_POOL_ABI,
+              data: input,
+            });
+            pool = (decoded.args[0] as string).toLowerCase();
+          } catch {
+            pool = undefined;
+          }
+          candidates.push({
+            txHash: tx.hash.toLowerCase(),
+            blockNumber: n,
+            kind: "connect",
+            wallet: tx.from.toLowerCase(),
+            token: pool,
+            watermark,
+            txTo: to,
+            txInput: input,
+            directTarget: GDA_FORWARDER_ADDRESS,
+          });
+          continue;
+        }
+
+        // Watermarked but neither zap-targeted nor a GDA connect: stake,
+        // unstake, and stream are log-anchored (their events fire even under
+        // calldata wrapping), so the scan skips them rather than double-count.
+      }
     }
   }
   return candidates;
@@ -537,6 +597,8 @@ async function discoverStakes(
       watermark,
       txTo: tx.to?.toLowerCase() ?? null,
       txInput: tx.input,
+      // A direct stake is a send() ON the token contract.
+      directTarget: log.address.toLowerCase(),
     });
   }
   return candidates;
@@ -574,6 +636,8 @@ async function discoverUnstakes(
       watermark: findWatermark(tx.input),
       txTo: tx.to?.toLowerCase() ?? null,
       txInput: tx.input,
+      // A direct unstake targets the StakedToken contract that emitted it.
+      directTarget: log.address.toLowerCase(),
     });
   }
   return candidates;
@@ -609,6 +673,8 @@ async function discoverStreams(
       watermark: findWatermark(tx.input),
       txTo: tx.to?.toLowerCase() ?? null,
       txInput: tx.input,
+      // Gateway-built streams target the CFA forwarder directly.
+      directTarget: CFA_FORWARDER_ADDRESS,
     });
   }
   return candidates;
@@ -700,13 +766,28 @@ export async function runWatcher(
         }
         report.skippedCandidates += candidates.length - byTx.size;
 
-        const toPublish: FloorEvent[] = [];
+        // Side-effect order per candidate batch: (1) atomic seen barrier,
+        // (2) publish, (3) counter bumps. A crash between publish and the
+        // bumps leaves counters UNDERcounting (benign, recoverable) — never
+        // double-counting on retry, and never a marked-seen event that was
+        // dropped before publishing.
+        const pending: Array<{
+          event: FloorEvent;
+          candidate: Candidate;
+          countable: boolean;
+          date: string;
+        }> = [];
         for (const candidate of byTx.values()) {
-          if (await wasSeen(candidate.txHash)) {
+          // Dedupe barrier FIRST (SET NX): a re-delivered log can never
+          // double-publish or double-count. Dry runs stay read-only.
+          const isNew = dryRun
+            ? !(await wasSeen(candidate.txHash))
+            : await markSeenIfNew(candidate.txHash);
+          if (!isNew) {
             report.skippedCandidates++;
             continue;
           }
-          const resolution = await resolveTier(candidate);
+          const resolution = await resolveTier(candidate, !dryRun);
           if (!resolution) {
             // No watermark and no fingerprint — not a floor event.
             report.skippedCandidates++;
@@ -742,44 +823,58 @@ export async function runWatcher(
             belowFloor: belowFloor || undefined,
             description: describe(candidate),
           };
-          toPublish.push(event);
 
           // Counters: tier 1/2 only, countable kinds only, above the value
-          // floor, and within the per-wallet daily cap.
+          // floor, and never human copy-trades — floor-ui events publish
+          // with their source label but do NOT count (plan AE8).
           const countable =
             resolution.tier <= 2 &&
             candidate.kind !== "stake_refunded" &&
+            candidate.watermark?.source !== "floor-ui" &&
             !belowFloor;
-          if (countable) {
-            const date = floorDateKey(at);
-            const walletEvents = dryRun
-              ? 1
-              : await incrWalletDailyEvents(candidate.wallet, date);
-            if (walletEvents <= WALLET_DAILY_EVENT_CAP) {
-              const isResident =
-                !!residentAddress && candidate.wallet === residentAddress;
-              if (!dryRun) {
-                await bumpVerifiedCounters({
-                  kind: candidate.kind as CountableKind,
-                  wallet: candidate.wallet,
-                  volumeEth:
-                    candidate.kind === "buy" &&
-                    candidate.valueWei !== undefined
-                      ? Number(formatEther(candidate.valueWei))
-                      : undefined,
-                  isResident,
-                  date,
-                });
-              }
-              report.counterBumps++;
-            }
-          }
-
-          if (!dryRun) await markSeen(candidate.txHash);
+          pending.push({ event, candidate, countable, date: floorDateKey(at) });
         }
 
-        if (!dryRun && toPublish.length > 0) await publishEvents(toPublish);
-        report.published += toPublish.length;
+        // Chronological feed order: publishEvents LPUSHes in array order,
+        // so ascending blocks leave the newest block at index 0.
+        pending.sort((a, b) =>
+          a.candidate.blockNumber < b.candidate.blockNumber
+            ? -1
+            : a.candidate.blockNumber > b.candidate.blockNumber
+              ? 1
+              : 0
+        );
+
+        if (!dryRun && pending.length > 0) {
+          await publishEvents(pending.map((entry) => entry.event));
+        }
+        report.published += pending.length;
+
+        // Counter bumps AFTER publish (see ordering note above). The
+        // per-wallet daily cap increments here too — it is a write.
+        for (const { candidate, countable, date } of pending) {
+          if (!countable) continue;
+          const walletEvents = dryRun
+            ? 1
+            : await incrWalletDailyEvents(candidate.wallet, date);
+          if (walletEvents <= WALLET_DAILY_EVENT_CAP) {
+            const isResident =
+              !!residentAddress && candidate.wallet === residentAddress;
+            if (!dryRun) {
+              await bumpVerifiedCounters({
+                kind: candidate.kind as CountableKind,
+                wallet: candidate.wallet,
+                volumeEth:
+                  candidate.kind === "buy" && candidate.valueWei !== undefined
+                    ? Number(formatEther(candidate.valueWei))
+                    : undefined,
+                isResident,
+                date,
+              });
+            }
+            report.counterBumps++;
+          }
+        }
       } catch (error) {
         // Never advance the cursor past a failed range — stop here; the
         // next run reprocesses from the last fully-processed chunk.
