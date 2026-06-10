@@ -37,10 +37,27 @@ export async function GET(request: NextRequest) {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "60px 80px",
-          background: "linear-gradient(135deg, #0a0f24 0%, #1b1340 55%, #2b1854 100%)",
+          background: "#0a0f24",
           fontFamily: "sans-serif",
+          position: "relative",
         }}
       >
+        {/* In-game vista as the backdrop: dark sky left, river right */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`${baseUrl}/game/og-bg.jpg`}
+          width={1200}
+          height={800}
+          alt=""
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
         <div
           style={{
             display: "flex",
