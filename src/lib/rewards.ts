@@ -104,7 +104,7 @@ async function fetchPoolData(poolId: string, stakingPool: string, retries = 3) {
 }
 
 // Batch fetch multiple pool data in a single GraphQL query for better performance
-async function fetchBatchPoolData(
+export async function fetchBatchPoolData(
   stakingPools: string[],
   retries = 3
 ): Promise<
