@@ -1452,9 +1452,16 @@ export default function TokensPage() {
         <HeroAnimationMini />
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="mb-8">
+        <div className="mb-8 flex items-center justify-between gap-4">
           <h1 className="text-3xl font-bold mb-2">My Tokens</h1>
-          {/* <p className="text-gray-600">Manage your Streme tokens</p> */}
+          {mounted && effectiveAddress && (
+            <Link
+              href={`/yield/${effectiveAddress.toLowerCase()}`}
+              className="btn btn-outline btn-primary btn-sm"
+            >
+              Share My Stream 🌊
+            </Link>
+          )}
         </div>
 
         {!mounted ? (
