@@ -171,6 +171,10 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-6">
+            <Link href="/pulse" className="btn btn-ghost">
+              Pulse
+            </Link>
+
             {/* link to create page */}
             <Link href="/launch" className="btn btn-primary">
               Launch a Token
@@ -280,6 +284,14 @@ export function Navbar() {
               className="btn btn-primary w-full justify-start"
             >
               Launch a Token
+            </Link>
+
+            <Link
+              href="/pulse"
+              className="btn btn-ghost w-full justify-start"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Pulse
             </Link>
 
             {isConnected && (
