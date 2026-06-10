@@ -1,7 +1,7 @@
 ---
 title: "feat: The Agent Floor — live chain-verified agent activity on /agents"
 type: feat
-status: active
+status: completed
 date: 2026-06-10
 origin: docs/brainstorms/2026-06-10-agent-floor-requirements.md
 ---
