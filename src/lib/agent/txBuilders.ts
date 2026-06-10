@@ -4,7 +4,7 @@
 // the agent's OWN wallet to sign and broadcast — the same transactions the
 // UI buttons produce, expressed as data. chainId is always Base (8453).
 
-import { encodeFunctionData, parseAbi, parseEther } from "viem";
+import { encodeFunctionData, parseAbi, parseEther, type Hex } from "viem";
 import {
   encodeSuperTokenSendData,
   encodeUnstakeData,
@@ -14,8 +14,26 @@ import {
 import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
 import { CFA_V1_FORWARDER } from "@/src/lib/superfluid-contracts";
 import { publicClient } from "@/src/lib/viemClient";
+import { encodeWatermark, type WatermarkSource } from "./watermark";
 
 type Address = `0x${string}`;
+
+/**
+ * Attribution options every builder accepts. The watermark rides in ERC777/
+ * GDA `userData` where the call has one (stake, connect-pool) and as inert
+ * trailing calldata otherwise (buy, unstake, stream) — see watermark.ts.
+ */
+export interface WatermarkOptions {
+  /** Self-declared agent identifier; sanitized, hashed into the watermark */
+  agentId?: string;
+  /** Who built this tx (default "agent") */
+  source?: WatermarkSource;
+}
+
+/** Append the watermark after ABI-encoded calldata (trailing bytes are inert). */
+function withWatermarkSuffix(data: Hex, params: WatermarkOptions): Hex {
+  return (data + encodeWatermark(params).slice(2)) as Hex;
+}
 
 // Same helper the UI StakeButton uses (auto-stakes on ERC777 receipt).
 export const STAKING_HELPER: Address =
@@ -120,15 +138,17 @@ export async function quoteBuyAmountOut(
  * Buy a token with ETH via the Streme zap (optionally auto-staking in the
  * same transaction). `quotedAmountOut` is injectable for tests.
  */
-export async function buildBuyTx(params: {
-  tokenAddress: string;
-  ethAmount: string;
-  stake?: boolean;
-  stakingAddress?: string;
-  lpType?: "uniswap" | "aero";
-  slippageBps?: number;
-  quotedAmountOut?: bigint;
-}): Promise<BuiltTransaction> {
+export async function buildBuyTx(
+  params: {
+    tokenAddress: string;
+    ethAmount: string;
+    stake?: boolean;
+    stakingAddress?: string;
+    lpType?: "uniswap" | "aero";
+    slippageBps?: number;
+    quotedAmountOut?: bigint;
+  } & WatermarkOptions
+): Promise<BuiltTransaction> {
   const token = assertAddress(params.tokenAddress, "tokenAddress");
   const ethWei = parseAmount(params.ethAmount, "ethAmount");
   const slippageBps = params.slippageBps ?? 50;
@@ -149,7 +169,10 @@ export async function buildBuyTx(params: {
     (await quoteBuyAmountOut(token, ethWei, params.lpType ?? "uniswap"));
   const amountOutMin = amountOut - (amountOut * BigInt(slippageBps)) / 10_000n;
 
-  const data = encodeZapData("zap", token, ethWei, amountOutMin, stakingAddress);
+  const data = withWatermarkSuffix(
+    encodeZapData("zap", token, ethWei, amountOutMin, stakingAddress),
+    params
+  );
 
   return {
     description: `Buy ${params.ethAmount} ETH worth of the token via Streme zap${
@@ -174,10 +197,9 @@ export async function buildBuyTx(params: {
  * Stake tokens by sending them to the StakingHelper (ERC777 `send` — no
  * approval needed; the helper auto-stakes back to the sender).
  */
-export function buildStakeTx(params: {
-  tokenAddress: string;
-  amount: string;
-}): BuiltTransaction {
+export function buildStakeTx(
+  params: { tokenAddress: string; amount: string } & WatermarkOptions
+): BuiltTransaction {
   const token = assertAddress(params.tokenAddress, "tokenAddress");
   const amount = parseAmount(params.amount, "amount");
 
@@ -185,7 +207,9 @@ export function buildStakeTx(params: {
     description: `Stake ${params.amount} tokens — a single send() to the StakingHelper, no approval needed`,
     tx: {
       to: token,
-      data: encodeSuperTokenSendData(STAKING_HELPER, amount),
+      // Watermark rides in the ERC777 userData (the helper ignores it; it
+      // surfaces in the Sent event log, surviving calldata wrapping).
+      data: encodeSuperTokenSendData(STAKING_HELPER, amount, encodeWatermark(params)),
       chainId: BASE_CHAIN_ID,
     },
     notes: [
@@ -196,11 +220,9 @@ export function buildStakeTx(params: {
 }
 
 /** Unstake from a token's staking contract back to the wallet. */
-export function buildUnstakeTx(params: {
-  stakingAddress: string;
-  to: string;
-  amount: string;
-}): BuiltTransaction {
+export function buildUnstakeTx(
+  params: { stakingAddress: string; to: string; amount: string } & WatermarkOptions
+): BuiltTransaction {
   const staking = assertAddress(params.stakingAddress, "stakingAddress");
   const to = assertAddress(params.to, "to");
   const amount = parseAmount(params.amount, "amount");
@@ -209,7 +231,7 @@ export function buildUnstakeTx(params: {
     description: `Unstake ${params.amount} staked tokens back to ${params.to}`,
     tx: {
       to: staking,
-      data: encodeUnstakeData(to, amount),
+      data: withWatermarkSuffix(encodeUnstakeData(to, amount), params),
       chainId: BASE_CHAIN_ID,
     },
     notes: ["Reverts while the deposit lock (typically 24h) is active"],
@@ -220,16 +242,17 @@ const CONNECT_POOL_ABI_NOTE =
   "Connecting a GDA pool makes already-earned streaming rewards show up in the wallet's token balance";
 
 /** Connect the wallet to a token's GDA reward pool (one-time per token). */
-export function buildConnectPoolTx(params: {
-  poolAddress: string;
-}): BuiltTransaction {
+export function buildConnectPoolTx(
+  params: { poolAddress: string } & WatermarkOptions
+): BuiltTransaction {
   const pool = assertAddress(params.poolAddress, "poolAddress");
 
   return {
     description: "Connect to the token's reward pool (GDA forwarder)",
     tx: {
       to: "0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08", // GDA v1 forwarder (Base)
-      data: encodeConnectPoolData(pool),
+      // Watermark rides in the GDA userData (surfaces in PoolConnectionUpdated).
+      data: encodeConnectPoolData(pool, encodeWatermark(params)),
       chainId: BASE_CHAIN_ID,
     },
     notes: [CONNECT_POOL_ABI_NOTE],
@@ -244,11 +267,13 @@ const CFA_SET_FLOWRATE_ABI = parseAbi([
  * Open, update, or close a continuous money stream (Superfluid CFA).
  * tokensPerDay = "0" closes the stream.
  */
-export function buildStreamTx(params: {
-  tokenAddress: string;
-  receiver: string;
-  tokensPerDay: string;
-}): BuiltTransaction {
+export function buildStreamTx(
+  params: {
+    tokenAddress: string;
+    receiver: string;
+    tokensPerDay: string;
+  } & WatermarkOptions
+): BuiltTransaction {
   const token = assertAddress(params.tokenAddress, "tokenAddress");
   const receiver = assertAddress(params.receiver, "receiver");
 
@@ -264,11 +289,14 @@ export function buildStreamTx(params: {
 
   const flowrate = perDay / 86400n; // wei per second
 
-  const data = encodeFunctionData({
-    abi: CFA_SET_FLOWRATE_ABI,
-    functionName: "setFlowrate",
-    args: [token, receiver, flowrate],
-  });
+  const data = withWatermarkSuffix(
+    encodeFunctionData({
+      abi: CFA_SET_FLOWRATE_ABI,
+      functionName: "setFlowrate",
+      args: [token, receiver, flowrate],
+    }),
+    params
+  );
 
   return {
     description:

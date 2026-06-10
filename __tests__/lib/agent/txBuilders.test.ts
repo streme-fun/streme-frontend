@@ -1,5 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
-import { decodeFunctionData, parseAbi, parseEther } from "viem";
+import {
+  decodeFunctionData,
+  encodeFunctionData,
+  keccak256,
+  parseAbi,
+  parseEther,
+  stringToHex,
+  type Hex,
+} from "viem";
 import {
   AgentInputError,
   BASE_CHAIN_ID,
@@ -10,11 +18,26 @@ import {
   buildStreamTx,
   buildUnstakeTx,
 } from "@/src/lib/agent/txBuilders";
+import {
+  WATERMARK_LENGTH,
+  decodeWatermark,
+} from "@/src/lib/agent/watermark";
 
 const TOKEN = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58";
 const STAKING = "0x93419f1c0f73b278c73085c17407794a6580deff";
 const POOL = "0xa040a8564c433970d7919c441104b1d25b9eaa1c";
 const WALLET = "0x09a900eb2ff6e9aca12d4d1a396ddc9be0307661";
+
+const WATERMARK_HEX_CHARS = WATERMARK_LENGTH * 2;
+const ZERO_AGENT_ID_HASH = "0x0000000000000000";
+
+/** Split suffix-watermarked calldata into the ABI-encoded core + watermark. */
+function splitWatermark(data: Hex): { core: Hex; watermark: Hex } {
+  return {
+    core: data.slice(0, -WATERMARK_HEX_CHARS) as Hex,
+    watermark: `0x${data.slice(-WATERMARK_HEX_CHARS)}` as Hex,
+  };
+}
 
 describe("buildStakeTx", () => {
   it("encodes an ERC777 send to the StakingHelper", () => {
@@ -35,7 +58,30 @@ describe("buildStakeTx", () => {
       STAKING_HELPER.toLowerCase()
     );
     expect(decoded.args[1]).toBe(parseEther("1000"));
-    expect(decoded.args[2]).toBe("0x");
+
+    // userData carries a valid watermark (no agentId → zero hash)
+    const watermark = decodeWatermark(decoded.args[2] as Hex);
+    expect(watermark).not.toBeNull();
+    expect(watermark!.source).toBe("agent");
+    expect(watermark!.agentIdHash).toBe(ZERO_AGENT_ID_HASH);
+  });
+
+  it("embeds the agentId hash in the userData watermark", () => {
+    const built = buildStakeTx({
+      tokenAddress: TOKEN,
+      amount: "1000",
+      agentId: "pulse-hunter",
+    });
+    const decoded = decodeFunctionData({
+      abi: parseAbi([
+        "function send(address recipient, uint256 amount, bytes userData)",
+      ]),
+      data: built.tx.data,
+    });
+    const watermark = decodeWatermark(decoded.args[2] as Hex);
+    expect(watermark!.agentIdHash).toBe(
+      keccak256(stringToHex("pulse-hunter")).slice(0, 18)
+    );
   });
 
   it("rejects bad addresses and amounts", () => {
@@ -60,12 +106,14 @@ describe("buildUnstakeTx", () => {
     });
 
     expect(built.tx.to).toBe(STAKING);
+    const { core, watermark } = splitWatermark(built.tx.data);
     const decoded = decodeFunctionData({
       abi: parseAbi(["function unstake(address to, uint256 amount)"]),
-      data: built.tx.data,
+      data: core,
     });
     expect((decoded.args[0] as string).toLowerCase()).toBe(WALLET);
     expect(decoded.args[1]).toBe(parseEther("50.5"));
+    expect(decodeWatermark(watermark)).not.toBeNull();
   });
 });
 
@@ -81,6 +129,8 @@ describe("buildConnectPoolTx", () => {
       data: built.tx.data,
     });
     expect((decoded.args[0] as string).toLowerCase()).toBe(POOL);
+    // userData carries the watermark (surfaces in PoolConnectionUpdated)
+    expect(decodeWatermark(decoded.args[1] as Hex)).not.toBeNull();
   });
 });
 
@@ -96,12 +146,14 @@ describe("buildStreamTx", () => {
       tokensPerDay: "86400",
     });
 
+    const { core, watermark } = splitWatermark(built.tx.data);
     const decoded = decodeFunctionData({
       abi: STREAM_ABI,
-      data: built.tx.data,
+      data: core,
     });
     // 86400 tokens/day = 1 token/second = 1e18 wei/second
     expect(decoded.args[2]).toBe(10n ** 18n);
+    expect(decodeWatermark(watermark)).not.toBeNull();
   });
 
   it("stops the stream at zero", () => {
@@ -112,7 +164,7 @@ describe("buildStreamTx", () => {
     });
     const decoded = decodeFunctionData({
       abi: STREAM_ABI,
-      data: built.tx.data,
+      data: splitWatermark(built.tx.data).core,
     });
     expect(decoded.args[2]).toBe(0n);
     expect(built.description).toContain("Stop");
@@ -120,6 +172,10 @@ describe("buildStreamTx", () => {
 });
 
 describe("buildBuyTx", () => {
+  const ZAP_ABI = parseAbi([
+    "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) payable returns (uint256)",
+  ]);
+
   it("encodes a zap with slippage from the injected quote", async () => {
     const built = await buildBuyTx({
       tokenAddress: TOKEN,
@@ -131,17 +187,27 @@ describe("buildBuyTx", () => {
     expect(built.tx.value).toBe(`0x${parseEther("0.01").toString(16)}`);
     expect(built.tx.chainId).toBe(BASE_CHAIN_ID);
 
-    const decoded = decodeFunctionData({
-      abi: parseAbi([
-        "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) payable returns (uint256)",
-      ]),
-      data: built.tx.data,
-    });
+    const { core, watermark } = splitWatermark(built.tx.data);
+    // The calldata is the exact ABI encoding plus the watermark suffix —
+    // trailing bytes the zap contract never inspects.
+    expect(core).toBe(
+      encodeFunctionData({
+        abi: ZAP_ABI,
+        functionName: "zap",
+        args: [
+          TOKEN,
+          parseEther("0.01"),
+          990_000n * 10n ** 18n, // 1% slippage off 1M tokens
+          "0x0000000000000000000000000000000000000000", // no stake
+        ],
+      })
+    );
+    expect(decodeWatermark(watermark)).not.toBeNull();
+
+    const decoded = decodeFunctionData({ abi: ZAP_ABI, data: core });
     expect((decoded.args[0] as string).toLowerCase()).toBe(TOKEN);
     expect(decoded.args[1]).toBe(parseEther("0.01"));
-    // 1% slippage off 1M tokens
     expect(decoded.args[2]).toBe(990_000n * 10n ** 18n);
-    // no stake → zero staking contract
     expect(decoded.args[3]).toBe("0x0000000000000000000000000000000000000000");
   });
 
@@ -154,12 +220,23 @@ describe("buildBuyTx", () => {
       quotedAmountOut: 10n ** 18n,
     });
     const decoded = decodeFunctionData({
-      abi: parseAbi([
-        "function zap(address tokenOut, uint256 amountIn, uint256 amountOutMin, address stakingContract) payable returns (uint256)",
-      ]),
-      data: built.tx.data,
+      abi: ZAP_ABI,
+      data: splitWatermark(built.tx.data).core,
     });
     expect((decoded.args[3] as string).toLowerCase()).toBe(STAKING);
+  });
+
+  it("round-trips the agentId hash through the calldata suffix", async () => {
+    const built = await buildBuyTx({
+      tokenAddress: TOKEN,
+      ethAmount: "0.01",
+      quotedAmountOut: 10n ** 18n,
+      agentId: "pulse-hunter",
+    });
+    const watermark = decodeWatermark(splitWatermark(built.tx.data).watermark);
+    expect(watermark!.agentIdHash).toBe(
+      keccak256(stringToHex("pulse-hunter")).slice(0, 18)
+    );
   });
 
   it("requires a staking address when stake=true", async () => {

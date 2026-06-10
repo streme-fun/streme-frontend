@@ -13,7 +13,7 @@ import {
   buildBuyTxForToken,
   buildConnectPoolTxForToken,
   buildStakeTxForToken,
-  buildStreamTx,
+  buildStreamTxForToken,
   buildUnstakeTxForToken,
   capabilities,
   getPulse,
@@ -30,6 +30,12 @@ const ADDRESS = z
 const AMOUNT = z
   .string()
   .regex(/^\d+(\.\d+)?$/, 'decimal token amount string, e.g. "1000" or "0.5"');
+const AGENT_ID = z
+  .string()
+  .optional()
+  .describe(
+    "Optional self-declared agent identifier (lowercase [a-z0-9-_.], max 32 chars) embedded in the transaction watermark for attribution on the Agent Floor"
+  );
 
 function json(data: unknown) {
   return {
@@ -130,6 +136,7 @@ const handler = createMcpHandler(
           .optional()
           .describe("Auto-stake the purchased tokens in the same transaction"),
         slippageBps: z.number().int().min(1).max(5000).optional(),
+        agentId: AGENT_ID,
       },
       async (args) => {
         try {
@@ -143,7 +150,7 @@ const handler = createMcpHandler(
     server.tool(
       "build_stake_transaction",
       "Build an UNSIGNED transaction that stakes a Streme token (single ERC777 send to the StakingHelper — no approval step). Staked tokens earn a per-second reward stream.",
-      { tokenAddress: ADDRESS, amount: AMOUNT },
+      { tokenAddress: ADDRESS, amount: AMOUNT, agentId: AGENT_ID },
       async (args) => {
         try {
           return json(await buildStakeTxForToken(args));
@@ -160,6 +167,7 @@ const handler = createMcpHandler(
         tokenAddress: ADDRESS,
         to: ADDRESS.describe("Wallet to receive the unstaked tokens"),
         amount: AMOUNT,
+        agentId: AGENT_ID,
       },
       async (args) => {
         try {
@@ -173,7 +181,7 @@ const handler = createMcpHandler(
     server.tool(
       "build_connect_pool_transaction",
       "Build an UNSIGNED transaction that connects a wallet to a token's reward pool (one-time per token; makes streamed rewards appear in the wallet balance).",
-      { tokenAddress: ADDRESS },
+      { tokenAddress: ADDRESS, agentId: AGENT_ID },
       async (args) => {
         try {
           return json(await buildConnectPoolTxForToken(args));
@@ -193,10 +201,11 @@ const handler = createMcpHandler(
           .string()
           .regex(/^\d+(\.\d+)?$/)
           .describe('Tokens per day, e.g. "100". "0" stops the stream.'),
+        agentId: AGENT_ID,
       },
       async (args) => {
         try {
-          return json(buildStreamTx(args));
+          return json(await buildStreamTxForToken(args));
         } catch (error) {
           return errorResult(error);
         }

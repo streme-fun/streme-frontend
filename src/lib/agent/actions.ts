@@ -15,6 +15,7 @@ import {
   buildStakeTx,
   buildStreamTx,
   buildUnstakeTx,
+  type WatermarkOptions,
 } from "./txBuilders";
 
 export { AgentInputError };
@@ -137,6 +138,11 @@ export async function listTokens(params: {
 
 export async function getToken(address: string): Promise<AgentToken> {
   const normalized = assertAddress(address, "address");
+  // Blacklist enforcement: every single-token lookup and build path funnels
+  // through here, so blacklisted tokens never resolve (R18).
+  if (BLACKLISTED_TOKENS.includes(normalized)) {
+    throw new AgentInputError(`No Streme token found at ${normalized}`);
+  }
   const response = await fetch(`${TOKEN_URL}/${normalized}`, {
     headers: { Accept: "application/json", "User-Agent": "Streme-Agent/1.0" },
     signal: AbortSignal.timeout(10_000),
@@ -147,7 +153,11 @@ export async function getToken(address: string): Promise<AgentToken> {
   if (!response.ok) throw new Error(`Token API error: ${response.status}`);
 
   const payload = await response.json();
-  const token = toAgentToken(payload?.data ?? payload);
+  const upstream: UpstreamToken = payload?.data ?? payload;
+  if (blacklisted(upstream)) {
+    throw new AgentInputError(`No Streme token found at ${normalized}`);
+  }
+  const token = toAgentToken(upstream);
   if (!token) throw new AgentInputError(`No Streme token found at ${normalized}`);
   return token;
 }
@@ -191,12 +201,14 @@ export async function getYield(address: string) {
  * Buy helper that resolves the token's staking address + LP type when the
  * caller wants auto-stake but only knows the token address.
  */
-export async function buildBuyTxForToken(params: {
-  tokenAddress: string;
-  ethAmount: string;
-  stake?: boolean;
-  slippageBps?: number;
-}) {
+export async function buildBuyTxForToken(
+  params: {
+    tokenAddress: string;
+    ethAmount: string;
+    stake?: boolean;
+    slippageBps?: number;
+  } & WatermarkOptions
+) {
   const token = await getToken(params.tokenAddress);
   return buildBuyTx({
     tokenAddress: token.address,
@@ -205,23 +217,27 @@ export async function buildBuyTxForToken(params: {
     stakingAddress: token.staking.stakingAddress,
     lpType: token.staking.lpType,
     slippageBps: params.slippageBps,
+    agentId: params.agentId,
+    source: params.source,
   });
 }
 
-export async function buildStakeTxForToken(params: {
-  tokenAddress: string;
-  amount: string;
-}) {
+export async function buildStakeTxForToken(
+  params: { tokenAddress: string; amount: string } & WatermarkOptions
+) {
   // Validate it's a real Streme token before handing out calldata.
   const token = await getToken(params.tokenAddress);
-  return buildStakeTx({ tokenAddress: token.address, amount: params.amount });
+  return buildStakeTx({
+    tokenAddress: token.address,
+    amount: params.amount,
+    agentId: params.agentId,
+    source: params.source,
+  });
 }
 
-export async function buildUnstakeTxForToken(params: {
-  tokenAddress: string;
-  to: string;
-  amount: string;
-}) {
+export async function buildUnstakeTxForToken(
+  params: { tokenAddress: string; to: string; amount: string } & WatermarkOptions
+) {
   const token = await getToken(params.tokenAddress);
   if (!token.staking.stakingAddress) {
     throw new AgentInputError(
@@ -232,22 +248,44 @@ export async function buildUnstakeTxForToken(params: {
     stakingAddress: token.staking.stakingAddress,
     to: params.to,
     amount: params.amount,
+    agentId: params.agentId,
+    source: params.source,
   });
 }
 
-export async function buildConnectPoolTxForToken(params: {
-  tokenAddress: string;
-}) {
+export async function buildConnectPoolTxForToken(
+  params: { tokenAddress: string } & WatermarkOptions
+) {
   const token = await getToken(params.tokenAddress);
   if (!token.staking.rewardPoolAddress) {
     throw new AgentInputError(
       `Token ${token.symbol} has no reward pool on record`
     );
   }
-  return buildConnectPoolTx({ poolAddress: token.staking.rewardPoolAddress });
+  return buildConnectPoolTx({
+    poolAddress: token.staking.rewardPoolAddress,
+    agentId: params.agentId,
+    source: params.source,
+  });
 }
 
-export { buildStreamTx };
+export async function buildStreamTxForToken(
+  params: {
+    tokenAddress: string;
+    receiver: string;
+    tokensPerDay: string;
+  } & WatermarkOptions
+) {
+  // Validate it's a real (non-blacklisted) Streme token before streaming it.
+  const token = await getToken(params.tokenAddress);
+  return buildStreamTx({
+    tokenAddress: token.address,
+    receiver: params.receiver,
+    tokensPerDay: params.tokensPerDay,
+    agentId: params.agentId,
+    source: params.source,
+  });
+}
 
 /** Self-describing capabilities document (GET /api/agent). */
 export function capabilities() {
@@ -270,20 +308,22 @@ export function capabilities() {
       "GET /api/agent/yield/{address}": "a wallet's live reward streams",
       "GET /api/pulse": "trending snapshot, milestones, bot activity",
       "POST /api/agent/tx/buy":
-        "{tokenAddress, ethAmount, stake?, slippageBps?} → unsigned zap tx (ETH→token, optional auto-stake)",
+        "{tokenAddress, ethAmount, stake?, slippageBps?, agentId?} → unsigned zap tx (ETH→token, optional auto-stake)",
       "POST /api/agent/tx/stake":
-        "{tokenAddress, amount} → unsigned ERC777 send to StakingHelper (no approval needed)",
+        "{tokenAddress, amount, agentId?} → unsigned ERC777 send to StakingHelper (no approval needed)",
       "POST /api/agent/tx/unstake":
-        "{tokenAddress, to, amount} → unsigned unstake tx",
+        "{tokenAddress, to, amount, agentId?} → unsigned unstake tx",
       "POST /api/agent/tx/connect-pool":
-        "{tokenAddress} → unsigned GDA connectPool tx (one-time per token; makes rewards visible)",
+        "{tokenAddress, agentId?} → unsigned GDA connectPool tx (one-time per token; makes rewards visible)",
       "POST /api/agent/tx/stream":
-        "{tokenAddress, receiver, tokensPerDay} → unsigned Superfluid stream tx (0 stops the stream)",
+        "{tokenAddress, receiver, tokensPerDay, agentId?} → unsigned Superfluid stream tx (0 stops the stream)",
     },
     txContract: {
       shape: "{ description, tx: { to, data, value?, chainId }, notes[] }",
       signing:
         "Sign and broadcast tx with the agent's own wallet on Base (chainId 8453). Always include chainId.",
+      agentId:
+        "Optional self-declared identifier (lowercase [a-z0-9-_.], max 32 chars) embedded in the transaction's watermark for attribution on the Agent Floor.",
     },
   };
 }
