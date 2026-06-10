@@ -60,6 +60,8 @@ export default function StremeSurfGame({
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<SurfGameEngine | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
+  const musicStartedRef = useRef(false);
   const mutedRef = useRef(false);
   const bestRef = useRef(0);
   const poolRef = useRef<PoolToken[]>([]);
@@ -126,6 +128,43 @@ export default function StremeSurfGame({
       if (Ctor) audioCtxRef.current = new Ctor();
     }
     audioCtxRef.current?.resume().catch(() => {});
+  }, []);
+
+  /** Looping synthwave theme; starts on the first run (user gesture). */
+  const startMusic = useCallback(() => {
+    if (!musicRef.current) {
+      const audio = new Audio("/game/theme.mp3");
+      audio.loop = true;
+      audio.volume = 0.4;
+      audio.preload = "auto";
+      musicRef.current = audio;
+    }
+    musicRef.current.muted = mutedRef.current;
+    musicRef.current
+      .play()
+      .then(() => {
+        musicStartedRef.current = true;
+      })
+      .catch(() => {
+        // Autoplay blocked or file missing — SFX still work
+      });
+  }, []);
+
+  // Pause the theme when the app is backgrounded, resume on return
+  useEffect(() => {
+    const onVisibility = () => {
+      const music = musicRef.current;
+      if (!music || !musicStartedRef.current) return;
+      if (document.hidden) music.pause();
+      else music.play().catch(() => {});
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      musicRef.current?.pause();
+      if (musicRef.current) musicRef.current.src = "";
+      musicRef.current = null;
+    };
   }, []);
 
   // ------------------------------------------------------------- haptics
@@ -370,10 +409,11 @@ export default function StremeSurfGame({
     (e: React.PointerEvent) => {
       ensureAudio();
       if (phase === "over") return; // overlay buttons handle themselves
+      if (phase === "ready") startMusic();
       steerFromEvent(e.clientX);
       engineRef.current?.tap();
     },
-    [phase, ensureAudio, steerFromEvent]
+    [phase, ensureAudio, startMusic, steerFromEvent]
   );
 
   const handlePointerMove = useCallback(
@@ -389,8 +429,9 @@ export default function StremeSurfGame({
     if (!engine) return;
     engine.reset();
     setIsNewBest(false);
+    startMusic();
     engine.tap(); // straight back into the water
-  }, []);
+  }, [startMusic]);
 
   const openBoard = useCallback(async () => {
     setShowBoard(true);
@@ -412,6 +453,7 @@ export default function StremeSurfGame({
     setMuted((prev) => {
       const next = !prev;
       mutedRef.current = next;
+      if (musicRef.current) musicRef.current.muted = next;
       try {
         localStorage.setItem(MUTED_KEY, String(next));
       } catch {}
