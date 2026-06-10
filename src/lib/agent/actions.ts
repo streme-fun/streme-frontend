@@ -238,6 +238,7 @@ export async function buildBuyTxForToken(
     slippageBps: params.slippageBps,
     agentId: params.agentId,
     source: params.source,
+    internalAgentId: params.internalAgentId,
   });
   void recordBuild({
     tool: "build_buy_transaction",
@@ -263,6 +264,7 @@ export async function buildStakeTxForToken(
     amount: params.amount,
     agentId: params.agentId,
     source: params.source,
+    internalAgentId: params.internalAgentId,
   });
   void recordBuild({
     tool: "build_stake_transaction",
@@ -293,6 +295,7 @@ export async function buildUnstakeTxForToken(
     amount: params.amount,
     agentId: params.agentId,
     source: params.source,
+    internalAgentId: params.internalAgentId,
   });
   void recordBuild({
     tool: "build_unstake_transaction",
@@ -321,6 +324,7 @@ export async function buildConnectPoolTxForToken(
     poolAddress: token.staking.rewardPoolAddress,
     agentId: params.agentId,
     source: params.source,
+    internalAgentId: params.internalAgentId,
   });
   void recordBuild({
     tool: "build_connect_pool_transaction",
@@ -351,6 +355,7 @@ export async function buildStreamTxForToken(
     tokensPerDay: params.tokensPerDay,
     agentId: params.agentId,
     source: params.source,
+    internalAgentId: params.internalAgentId,
   });
   void recordBuild({
     tool: "build_stream_transaction",

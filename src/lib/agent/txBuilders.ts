@@ -28,6 +28,13 @@ export interface WatermarkOptions {
   agentId?: string;
   /** Who built this tx (default "agent") */
   source?: WatermarkSource;
+  /**
+   * Server-only: a pre-approved reserved identity (the Resident engine's
+   * `streme-resident`) that bypasses the reserved-prefix rejection. Never
+   * exposed through any API schema — the REST/MCP edges map explicit fields
+   * and cannot set it. See encodeWatermark.
+   */
+  internalAgentId?: string;
 }
 
 /** Append the watermark after ABI-encoded calldata (trailing bytes are inert). */

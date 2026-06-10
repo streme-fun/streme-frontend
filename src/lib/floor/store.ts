@@ -17,6 +17,10 @@
 //
 // Watcher state (U4): block cursor, run lock, published events, the
 // seen-tx dedupe set, and chain-verified daily counters.
+//
+// Resident state (U7): decision journal (capped list), halt flag, daily
+// ETH spend ledger, and the isRedisLive() probe the Resident's fail-closed
+// gate requires — the in-memory fallback never counts as "live" (plan R22).
 
 import type { Redis } from "@upstash/redis";
 
@@ -528,6 +532,148 @@ export async function incrWalletDailyEvents(
 }
 
 // ---------------------------------------------------------------------------
+// Resident state (U7): journal list, halt flag, spend ledger, liveness probe
+// ---------------------------------------------------------------------------
+
+const RESIDENT_JOURNAL_KEY = `${KEY_PREFIX}:resident:journal`;
+/** Journal entries kept (newest first). */
+export const RESIDENT_JOURNAL_CAP = 200;
+const RESIDENT_HALT_KEY = `${KEY_PREFIX}:resident:halt`;
+/** Spend ledger entries outlive the day they bound by a comfortable margin. */
+const RESIDENT_SPEND_TTL_SECONDS = 3 * 86400;
+
+/**
+ * Push a serialized journal entry (newest first, capped). Unlike telemetry,
+ * journal writes are NOT fire-and-forget: a Redis failure propagates so the
+ * engine can abort before broadcasting (journal-before-broadcast guarantee).
+ */
+export async function residentJournalPush(serialized: string): Promise<void> {
+  if (productionGuardTripped()) return;
+  const redis = await getRedis();
+  if (redis) {
+    await redis.lpush(RESIDENT_JOURNAL_KEY, serialized);
+    await redis.ltrim(RESIDENT_JOURNAL_KEY, 0, RESIDENT_JOURNAL_CAP - 1);
+  } else {
+    const list = memLists.get(RESIDENT_JOURNAL_KEY) ?? [];
+    list.unshift(serialized);
+    if (list.length > RESIDENT_JOURNAL_CAP) list.length = RESIDENT_JOURNAL_CAP;
+    memLists.set(RESIDENT_JOURNAL_KEY, list);
+  }
+}
+
+/**
+ * Raw journal entries, newest first. Items may be strings or (Upstash
+ * auto-deserialized) objects — callers parse tolerantly. Indexes align with
+ * `residentJournalSet`.
+ */
+export async function residentJournalList(limit: number): Promise<unknown[]> {
+  if (productionGuardTripped()) return [];
+  const redis = await getRedis();
+  if (redis) return await redis.lrange(RESIDENT_JOURNAL_KEY, 0, limit - 1);
+  return (memLists.get(RESIDENT_JOURNAL_KEY) ?? []).slice(0, limit);
+}
+
+/**
+ * Overwrite one journal entry by list index (LSET). Read-modify-write is
+ * acceptable here: the Resident is the journal's single writer, and it only
+ * runs under the "resident" lock.
+ */
+export async function residentJournalSet(
+  index: number,
+  serialized: string
+): Promise<void> {
+  if (productionGuardTripped()) return;
+  const redis = await getRedis();
+  if (redis) {
+    await redis.lset(RESIDENT_JOURNAL_KEY, index, serialized);
+  } else {
+    const list = memLists.get(RESIDENT_JOURNAL_KEY) ?? [];
+    if (index >= 0 && index < list.length) list[index] = serialized;
+  }
+}
+
+/** Kill-switch flag — set/cleared by the authed admin endpoint. No TTL. */
+export async function getResidentHalt(): Promise<boolean> {
+  if (productionGuardTripped()) return false;
+  const redis = await getRedis();
+  if (redis) return (await redis.get(RESIDENT_HALT_KEY)) !== null;
+  return memValues.has(RESIDENT_HALT_KEY);
+}
+
+export async function setResidentHalt(halted: boolean): Promise<void> {
+  if (productionGuardTripped()) return;
+  const redis = await getRedis();
+  if (redis) {
+    if (halted) await redis.set(RESIDENT_HALT_KEY, "1");
+    else await redis.del(RESIDENT_HALT_KEY);
+  } else {
+    if (halted) memValues.set(RESIDENT_HALT_KEY, "1");
+    else memValues.delete(RESIDENT_HALT_KEY);
+  }
+}
+
+/** ETH the Resident has committed on a UTC date ("YYYY-MM-DD"). */
+export async function getResidentSpend(date: string): Promise<number> {
+  if (productionGuardTripped()) return 0;
+  const key = `${KEY_PREFIX}:resident:spend:${date}`;
+  const redis = await getRedis();
+  if (redis) return parseFloat(String((await redis.get(key)) ?? 0));
+  return memCounters.get(key) ?? 0;
+}
+
+/**
+ * Add to (or, with a negative amount, refund from) the day's spend ledger.
+ * The engine counts spend pessimistically at broadcast time. Returns the new
+ * total.
+ */
+export async function addResidentSpend(
+  date: string,
+  amountEth: number
+): Promise<number> {
+  if (productionGuardTripped()) return 0;
+  const key = `${KEY_PREFIX}:resident:spend:${date}`;
+  const redis = await getRedis();
+  if (redis) {
+    const total = parseFloat(String(await redis.incrbyfloat(key, amountEth)));
+    await redis.expire(key, RESIDENT_SPEND_TTL_SECONDS);
+    return total;
+  }
+  const total = (memCounters.get(key) ?? 0) + amountEth;
+  memCounters.set(key, total);
+  return total;
+}
+
+// Test seam for the Resident's Redis-liveness gate: the in-memory fallback
+// must never count as "live" (plan R22), so tests opt in explicitly instead
+// of the gate silently accepting memory.
+let redisLiveOverride: boolean | null = null;
+
+/** Force isRedisLive() for tests (null restores real probing). */
+export function __setRedisLiveForTests(value: boolean | null): void {
+  redisLiveOverride = value;
+}
+
+/**
+ * True only when a real Redis round-trip (write + read of a probe key)
+ * succeeds. The in-memory fallback does NOT count — the Resident fails
+ * closed to dry-run without live persistence (plan R22).
+ */
+export async function isRedisLive(): Promise<boolean> {
+  if (redisLiveOverride !== null) return redisLiveOverride;
+  if (!redisEnv()) return false;
+  try {
+    const redis = await getRedis();
+    if (!redis) return false;
+    const key = `${KEY_PREFIX}:probe`;
+    const value = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    await redis.set(key, value, { ex: 60 });
+    return (await redis.get<string>(key)) === value;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Test helper
 // ---------------------------------------------------------------------------
 
@@ -540,4 +686,5 @@ export function __clearFloorStoreForTests(): void {
   memLocks.clear();
   warnedMissingRedisInProd = false;
   redisPromise = null;
+  redisLiveOverride = null;
 }

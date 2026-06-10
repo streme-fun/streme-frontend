@@ -9,6 +9,10 @@
     {
       "path": "/api/cron/floor",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/resident",
+      "schedule": "0 */4 * * *"
     }
   ]
 }

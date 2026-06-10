@@ -83,12 +83,23 @@ function randomNonceHex(): string {
 export function encodeWatermark(params: {
   source?: WatermarkSource;
   agentId?: string;
+  /**
+   * Server-only identity escape hatch (the Resident's reserved
+   * `streme-resident`): hashed as-is, skipping the reserved-prefix check.
+   * Unreachable from the public surfaces — both the REST route and the MCP
+   * zod schemas map explicit fields and never forward this one. Public
+   * callers self-declaring a reserved id still get the AgentInputError.
+   */
+  internalAgentId?: string;
 }): Hex {
   const source = SOURCE_BYTES[params.source ?? "agent"];
+  const idHash = params.internalAgentId
+    ? keccak256(stringToHex(params.internalAgentId)).slice(2, 18)
+    : agentIdHashHex(params.agentId);
   return (WATERMARK_MAGIC +
     WATERMARK_VERSION.toString(16).padStart(2, "0") +
     source.toString(16).padStart(2, "0") +
-    agentIdHashHex(params.agentId) +
+    idHash +
     randomNonceHex()) as Hex;
 }
 
