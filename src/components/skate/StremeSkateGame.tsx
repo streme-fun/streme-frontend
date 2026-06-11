@@ -1230,14 +1230,6 @@ export default function StremeSkateGame({
 
           {/* all menu content — layered above the scrim so it stays readable */}
           <div className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
-          {/* tagline */}
-          <div
-            className="rounded-full border border-cyan-300/30 bg-white/5 px-3 py-1 text-[10px] font-bold tracking-[0.34em] text-cyan-200/90"
-            style={{ animation: "skRise 0.5s ease-out both" }}
-          >
-            ENDLESS NEON SKATER
-          </div>
-
           {/* character on a spotlight — tap me 7× for a secret */}
           <div
             className="relative pointer-events-auto"
@@ -1322,19 +1314,9 @@ export default function StremeSkateGame({
             ▶ PLAY
           </div>
 
-          {/* control hints */}
-          <div className="flex flex-col items-center gap-0.5 text-[11px] font-medium text-indigo-100/90">
-            <span>Tap = jump · hold in the air to flip</span>
-            <span>
-              Release to land clean →{" "}
-              <span className="font-semibold text-amber-200">SPEED BOOST</span>
-            </span>
-            <span className="text-cyan-200/80">Keep tricking — the sun is your clock ☀</span>
-          </div>
-
-          {/* option chips — interactive, must not start the run */}
+          {/* option chips — interactive, must not start the run. Stacked. */}
           <div
-            className="mt-0.5 flex items-center gap-2 pointer-events-auto"
+            className="mt-0.5 flex flex-col items-center gap-2 pointer-events-auto"
             onPointerDown={(e) => e.stopPropagation()}
             onPointerUp={(e) => e.stopPropagation()}
             onPointerMove={(e) => e.stopPropagation()}
@@ -1353,7 +1335,13 @@ export default function StremeSkateGame({
               onClick={() => setShowPicker(true)}
               className="rounded-full border border-amber-300/40 bg-amber-300/10 px-3.5 py-1.5 text-xs font-bold text-amber-100"
             >
-              {selectedWarplet ? "✨ Warplet" : "🛹 Skater"}
+              {selectedWarplet ? "✨" : "🛹"} Choose your skater
+            </button>
+            <button
+              onClick={openBoard}
+              className="rounded-full border border-cyan-300/40 bg-white/5 px-3.5 py-1.5 text-xs font-bold text-cyan-100"
+            >
+              🏆 Leaderboard
             </button>
           </div>
           </div>
