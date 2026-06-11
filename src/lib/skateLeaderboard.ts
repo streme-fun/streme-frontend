@@ -56,11 +56,16 @@ export async function submitSkateScore(
       });
       await redis.hset(playerKey(entry.fid), { ...entry, updatedAt: now });
     } else {
-      // Keep profile fresh even when the score doesn't improve
-      await redis.hset(playerKey(entry.fid), {
-        username: entry.username,
-        pfpUrl: entry.pfpUrl,
-      });
+      // Keep the profile fresh even when the score doesn't improve — but never
+      // blank out good data: a run can arrive with an empty username/pfp (e.g.
+      // the Warplet image didn't resolve), and overwriting with "" would make a
+      // ranked player render nameless/avatarless ("disappear").
+      const profile: Record<string, string> = {};
+      if (entry.username) profile.username = entry.username;
+      if (entry.pfpUrl) profile.pfpUrl = entry.pfpUrl;
+      if (Object.keys(profile).length > 0) {
+        await redis.hset(playerKey(entry.fid), profile);
+      }
     }
     const [rank, total] = await Promise.all([
       redis.zrevrank(BOARD_KEY, String(entry.fid)),
@@ -89,7 +94,7 @@ export async function submitSkateScore(
 }
 
 export async function getSkateLeaderboard(
-  limit = 10,
+  limit = 25,
   fid?: number
 ): Promise<{
   entries: SkateEntry[];
@@ -97,27 +102,37 @@ export async function getSkateLeaderboard(
   total: number;
 }> {
   if (redis) {
-    const members = await redis.zrange<string[]>(BOARD_KEY, 0, limit - 1, {
-      rev: true,
-    });
+    // Pull members WITH their sorted-set scores. The zset is the source of truth
+    // for both ranking and the displayed score, so a missing/stale profile hash
+    // can never drop a ranked player off the board (the old code skipped any
+    // member whose hgetall came back empty, leaving gaps).
+    const ranked = (await redis.zrange<(string | number)[]>(
+      BOARD_KEY,
+      0,
+      limit - 1,
+      { rev: true, withScores: true }
+    )) as (string | number)[];
+    const members: { fid: number; score: number }[] = [];
+    for (let i = 0; i < ranked.length; i += 2) {
+      members.push({ fid: Number(ranked[i]), score: Number(ranked[i + 1]) });
+    }
     const entries: SkateEntry[] = [];
     if (members.length > 0) {
       const pipeline = redis.pipeline();
-      for (const member of members) {
-        pipeline.hgetall(playerKey(Number(member)));
+      for (const m of members) {
+        pipeline.hgetall(playerKey(m.fid));
       }
       const rows = await pipeline.exec<(Record<string, unknown> | null)[]>();
-      rows.forEach((row, i) => {
-        if (row) {
-          entries.push({
-            fid: Number(members[i]),
-            username: String(row.username ?? ""),
-            pfpUrl: String(row.pfpUrl ?? ""),
-            score: Number(row.score ?? 0),
-            combo: Number(row.combo ?? 0),
-            updatedAt: Number(row.updatedAt ?? 0),
-          });
-        }
+      members.forEach((m, i) => {
+        const row = rows[i] ?? {};
+        entries.push({
+          fid: m.fid,
+          username: String(row.username ?? ""),
+          pfpUrl: String(row.pfpUrl ?? ""),
+          score: m.score, // zset score is authoritative
+          combo: Number(row.combo ?? 0),
+          updatedAt: Number(row.updatedAt ?? 0),
+        });
       });
     }
     const total = await redis.zcard(BOARD_KEY);
