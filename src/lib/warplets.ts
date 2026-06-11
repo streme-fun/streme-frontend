@@ -3,7 +3,13 @@ import { publicClient } from "./viemClient";
 // The Warplets (Farcaster) — opensea.io/collection/the-warplets-farcaster
 export const WARPLET_NFT = "0x699727f9e01a822efdcf7333073f0461e5914b4e" as const;
 const STREME = "0x3b3cd21242ba44e9865b066e5ef5d1cc1030cc58" as const;
-const STAKE_POOL = "0xa040a8564c433970d7919c441104b1d25b9eaa1c" as const;
+// stToken contract — balanceOf returns the wallet-held staked STREME (18 decimals),
+// exactly what the token page reads as "My Staked Balance". NOTE: the GDA staking
+// *pool* (0xa040…aa1c) is NOT this — its balanceOf returns unscaled reward units
+// (~staked-tokens with no 18 decimals), so reading it here under-reported stakers
+// by ~1e18× and made heavy stakers look like they held nothing.
+const STAKED_STREME = "0x93419f1c0f73b278c73085c17407794a6580deff" as const;
+// Crowdfund deposits: staked STREME parked in the rewards funder (also 18 decimals)
 const STAKE_FUNDER = "0xceaCfbB5A17b6914051D12D8c91d3461382d503b" as const;
 const MIN_HOLD = 10_000_000n * 10n ** 18n; // 10,000,000 STREME (18 decimals)
 const MAX_WARPLETS = 24;
@@ -196,18 +202,19 @@ export async function getWarpletEligibility(
   let stakedBal = 0n;
   let nftBal = 0n;
   try {
-    const [streme, pool, funder, nft] = await publicClient.multicall({
+    const [streme, staked, funder, nft] = await publicClient.multicall({
       contracts: [
         { address: STREME, abi: erc20Abi, functionName: "balanceOf", args: [addr] },
-        { address: STAKE_POOL, abi: erc20Abi, functionName: "balanceOf", args: [addr] },
+        { address: STAKED_STREME, abi: erc20Abi, functionName: "balanceOf", args: [addr] },
         { address: STAKE_FUNDER, abi: erc20Abi, functionName: "balanceOf", args: [addr] },
         { address: WARPLET_NFT, abi: enumerableAbi, functionName: "balanceOf", args: [addr] },
       ],
     });
     stremeBal = streme.status === "success" ? (streme.result as bigint) : 0n;
-    const poolBal = pool.status === "success" ? (pool.result as bigint) : 0n;
-    const funderBal = funder.status === "success" ? (funder.result as bigint) : 0n;
-    stakedBal = poolBal > funderBal ? poolBal : funderBal;
+    const directStake = staked.status === "success" ? (staked.result as bigint) : 0n;
+    const funderStake = funder.status === "success" ? (funder.result as bigint) : 0n;
+    // wallet-held stToken + crowdfund-deposited stToken (both 18 decimals)
+    stakedBal = directStake + funderStake;
     nftBal = nft.status === "success" ? (nft.result as bigint) : 0n;
   } catch (e) {
     console.error("warplet eligibility multicall failed:", e);
