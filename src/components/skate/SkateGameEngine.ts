@@ -2,9 +2,11 @@
 // arcade juice borrowed from the greats. The warplet bombs a neon street; TAP
 // to jump (hold for bigger air), HOLD IN THE AIR to backflip, then RELEASE to
 // stomp the landing upright — a clean landing pays out the combo AND kicks a
-// speed boost (the rush). Grind rails, grab $STREME, snag a Magnet or Rocket,
-// nail near-misses over the gaps, and just don't fall in. Endless, ramping
-// speed, chase a high score. Everything draws to one <canvas>; React owns HUD.
+// speed boost (the rush). Grind rails (the longer you hold the more it pays),
+// grab $STREME, snag a Magnet or Rocket, nail near-misses over the gaps, ride
+// the Sonic loop. TRUE ENDLESS, ONE LIFE — one bad gap and you're done — with a
+// research-driven difficulty curve that ramps relentlessly. Cycling neon zones,
+// chase a high score. Everything draws to one <canvas>; React owns the HUD.
 
 export type SwipeDir = "up" | "down" | "left" | "right";
 export type SfxType =
@@ -43,16 +45,17 @@ export interface SkateResult {
   bubbles: number;
   tricks: number;
   distance: number;
-  finished: boolean; // crossed the finish line vs wiped out
+  finished: boolean; // always false — endless run, you go till you wipe out
 }
 
 export interface SkateCallbacks {
   onStart?: () => void;
   onScore?: (total: number) => void;
   onDistance?: (metres: number) => void;
-  onProgress?: (fraction: number) => void; // 0..1 to the finish line
+  onProgress?: (fraction: number) => void; // 0..1 through the current zone (loops)
   onZone?: (name: string, index: number, accent: string) => void;
   onLives?: (lives: number) => void;
+  onGrindTick?: (level: number) => void; // rising grind audio (seconds on the rail)
   onCombo?: (info: ComboInfo | null) => void;
   onBank?: (amount: number) => void;
   onBail?: (lostCombo: number) => void;
@@ -84,6 +87,7 @@ interface Ramp {
 interface Loop {
   x: number; // entry x (bottom of the loop)
   r: number;
+  done?: boolean; // already ridden — don't re-trigger (we exit at its centre)
 }
 type PowerKind = "magnet" | "rocket";
 interface Collectible {
@@ -124,13 +128,18 @@ const GHOST_DT = 0.15; // seconds between recorded ghost samples
 const GHOST_COLORS = ["#fb7185", "#a78bfa", "#34d399", "#fbbf24", "#38bdf8"];
 
 const BASE_SPEED = 300;
-const MAX_SPEED = 640;
+const MAX_SPEED = 680;
 const GRAVITY = 2150;
 const JUMP_V = 820;
 const JUMP_HOLD_G = 1150; // lighter gravity while holding + rising → bigger air
 const RAIL_POP = 720;
 const RAIL_END_POP = 360;
 const METRES = 9;
+
+// grind (the longer you hold, the faster the score climbs — OlliOlli/THPS)
+const GRIND_BASE = 16; // base points per 50px of rail at multiplier 1
+const GRIND_RAMP = 1.5; // multiplier growth per second on the rail
+const COYOTE = 0.1; // grace window to still jump after rolling off an edge (Celeste)
 
 const SPIN_MAX = 13; // rad/s when flipping
 const SPIN_ACCEL = 46;
@@ -157,10 +166,11 @@ const FLOW_COLORS = [C_GOLD, C_PINK, C_CYAN, "#a855f7", C_TEAL];
 const STREME_LETTERS = ["S", "T", "R", "E", "M", "E"];
 const FLIP_NAMES = ["KICKFLIP", "360 FLIP", "BACKFLIP", "VARIAL", "HARDFLIP"];
 
-// One finite level, split into themed zones. Each zone has its own sky/sun
-// palette (visual variety) and a set-piece weight mix (gameplay variety).
-const LEVEL_LEN = 34000; // world px to the finish line (~3800m, ~70s)
-const START_LIVES = 3;
+// Endless — themed zones cycle forever (~ZONE_LEN px each), each with its own
+// sky/sun palette (visual variety) and set-piece weight mix (gameplay variety).
+// Later cycles are harder because difficulty rides the run clock, not position.
+const ZONE_LEN = 7200; // world px per zone before it transitions to the next
+const START_LIVES = 1; // one life — endless, you go till you wipe out
 
 type RGB = [number, number, number];
 interface ZonePalette {
@@ -181,7 +191,7 @@ const ZONES: Zone[] = [
       sky: [[12, 6, 38], [36, 17, 96], [109, 31, 158], [122, 42, 134]],
       sun: [[253, 230, 138], [251, 146, 60], [236, 72, 153], [168, 85, 247]],
     },
-    mix: { flat: 1.4, kickerAir: 1.4, rail: 1.4, gap: 0.6, doubleKicker: 0.5 },
+    mix: { flat: 1.4, kickerAir: 1.4, rail: 1.4, rhythm: 1.1, gap: 0.6, doubleKicker: 0.5 },
   },
   {
     name: "GRIND DISTRICT",
@@ -190,7 +200,7 @@ const ZONES: Zone[] = [
       sky: [[5, 16, 28], [8, 36, 52], [14, 92, 110], [20, 74, 92]],
       sun: [[165, 243, 252], [45, 212, 191], [56, 189, 248], [99, 102, 241]],
     },
-    mix: { rail: 2.0, railGap: 1.4, kickerRail: 1.4, kickerAir: 0.8, gap: 0.7, flat: 0.8 },
+    mix: { rail: 2.0, stairs: 1.6, railGap: 1.4, kickerRail: 1.4, kickerAir: 0.8, gap: 0.7, flat: 0.8 },
   },
   {
     name: "GAP CITY",
@@ -208,16 +218,16 @@ const ZONES: Zone[] = [
       sky: [[12, 6, 38], [42, 13, 84], [122, 31, 174], [192, 38, 160]],
       sun: [[244, 114, 182], [219, 39, 119], [168, 85, 247], [88, 28, 135]],
     },
-    mix: { quarter: 1.6, kickerAir: 1.6, kickerRail: 1.4, doubleKicker: 1.2, kickerGap: 1.0, loop: 1.0, flat: 0.6 },
+    mix: { quarter: 1.6, kickerAir: 1.6, kickerRail: 1.4, stairs: 1.2, doubleKicker: 1.2, kickerGap: 1.0, loop: 1.0, flat: 0.6 },
   },
   {
-    name: "THE FINISH RUSH",
+    name: "OVERDRIVE",
     accent: "#fbbf24",
     pal: {
       sky: [[22, 8, 38], [90, 18, 64], [236, 72, 153], [251, 191, 36]],
       sun: [[253, 230, 138], [244, 114, 182], [239, 68, 68], [124, 28, 92]],
     },
-    mix: { quarter: 1.4, kickerGap: 1.4, kickerAir: 1.3, doubleKicker: 1.2, rail: 1.0, gap: 1.2, kickerRail: 1.2, loop: 1.1 },
+    mix: { quarter: 1.4, kickerGap: 1.4, kickerAir: 1.3, rhythm: 1.2, doubleKicker: 1.2, rail: 1.0, gap: 1.2, kickerRail: 1.2, loop: 1.1 },
   },
 ];
 
@@ -288,14 +298,15 @@ export class SkateGameEngine {
   private currentRail: Rail | null = null;
   private jumpedGap: Gap | null = null;
   private rampUnder: Ramp | null = null; // ramp we're riding (for lip-launch)
-  // pacing state (designed level flow)
+  private coyoteT = 0; // grace window to still jump after rolling off an edge
+  // pacing state (designed level flow — warm-up → challenge clusters → rest)
   private chunkCount = 0;
   private lastChunk = "";
   private restoreBreather = false;
-  private finishX = LEVEL_LEN;
+  private challengeRun = 0; // consecutive HARD chunks (force a breather after a few)
+  private chunksSinceReward = 0; // periodic reward corridor cadence
   private lastProgressSent = -1;
   private lastZone = -1;
-  private finishLaid = false;
   private lives = START_LIVES;
 
   // air / trick
@@ -308,6 +319,9 @@ export class SkateGameEngine {
   private comboBase = 0;
   private lastTrickName = "";
   private grindAccrual = 0;
+  private grindTime = 0; // seconds on the current rail (drives the escalating payout)
+  private grindTier = 0; // 0..3 → GRINDING / ON FIRE / LEGENDARY callout thresholds
+  private grindTickT = 0; // countdown to the next rising grind audio tick
   private bankedPoints = 0;
   private bestCombo = 0;
   private trickCount = 0;
@@ -398,6 +412,7 @@ export class SkateGameEngine {
       // a deliberate jump off a ramp lip launches even bigger (but on-screen)
       const rampBoost = this.rampUnder ? this.rampUnder.launch * 0.4 : 0;
       this.rampUnder = null;
+      this.coyoteT = 0;
       this.vy = Math.min(JUMP_V + rampBoost, 960);
       this.py = Math.max(this.py, 0.1);
       this.state = "airborne";
@@ -409,10 +424,32 @@ export class SkateGameEngine {
       this.trickCount++;
       this.emitCombo();
       this.sfx("jump");
+    } else if (this.state === "airborne" && this.coyoteT > 0) {
+      // coyote time — a late tap after rolling off an edge still jumps, so a
+      // one-life death never feels like the button was ignored (Celeste)
+      this.coyoteT = 0;
+      this.vy = JUMP_V;
+      this.comboTricks.push("AIR");
+      this.comboBase += 40;
+      this.trickCount++;
+      this.emitCombo();
+      this.sfx("jump");
     } else if (this.state === "grinding") {
+      const rail = this.currentRail;
+      // perfect-exit: pop off in the last slice of the rail to bank a fat
+      // bonus on the whole grind (OlliOlli's perfect dismount)
+      if (rail && rail.x1 - this.px < 70 && this.grindTime > 0.25) {
+        this.comboBase *= 1.8;
+        this.cb.onCallout?.("PERFECT EXIT!", "perfect");
+        this.sfx("perfect");
+        this.shake = 0.4;
+        this.flashT = 0.2;
+        this.emitCombo();
+      }
       this.vy = RAIL_POP;
       this.state = "airborne";
       this.currentRail = null;
+      this.grindTier = 0;
       this.spinV = 0;
       this.rotAccum = 0;
       this.sfx("jump");
@@ -465,11 +502,12 @@ export class SkateGameEngine {
     this.chunkCount = 0;
     this.lastChunk = "";
     this.restoreBreather = false;
-    this.finishX = LEVEL_LEN;
+    this.challengeRun = 0;
+    this.chunksSinceReward = 0;
     this.lastProgressSent = -1;
     this.lastZone = -1;
-    this.finishLaid = false;
     this.lives = START_LIVES;
+    this.coyoteT = 0;
     this.px = 0;
     this.py = 0;
     this.vy = 0;
@@ -493,6 +531,9 @@ export class SkateGameEngine {
     this.comboBase = 0;
     this.lastTrickName = "";
     this.grindAccrual = 0;
+    this.grindTime = 0;
+    this.grindTier = 0;
+    this.grindTickT = 0;
     this.bankedPoints = 0;
     this.bestCombo = 0;
     this.trickCount = 0;
@@ -666,24 +707,29 @@ export class SkateGameEngine {
   private waveSeed = 20240611;
 
   private difficulty(): number {
-    // ramps with progress through the finite level (gentle at the start)
-    return Math.min(this.px / this.finishX, 1);
+    // endless: difficulty rides the run clock, not position. Gentle for the
+    // first ~80s, then holds near max while speed + pacing keep ramping.
+    return Math.min(this.runTime / 80, 1);
   }
 
   private zoneIndexAt(worldX: number): number {
-    const t = worldX / this.finishX;
-    return Math.max(0, Math.min(ZONES.length - 1, Math.floor(t * ZONES.length)));
+    // zones cycle forever; later laps are harder because difficulty() climbs
+    return Math.floor(Math.max(0, worldX) / ZONE_LEN) % ZONES.length;
+  }
+
+  /** Extra runway before a hazard, scaled by speed so fast = more warning. */
+  private lead(base: number): number {
+    return base + this.effSpeed() * 0.16;
   }
 
   private primeCourse() {
     this.waveSeed = 20240611;
     this.cursorX = 760;
-    this.finishLaid = false;
     while (this.cursorX < this.px + this.W * 2.5) this.addChunk();
   }
 
   private generateAhead() {
-    while (this.cursorX < this.px + this.W * 2.5 && !this.finishLaid) {
+    while (this.cursorX < this.px + this.W * 2.5) {
       this.addChunk();
     }
     const cull = this.px - this.W;
@@ -762,7 +808,7 @@ export class SkateGameEngine {
     const x = this.cursorX;
     const d = this.difficulty();
     const w = 90 + d * 80 + this.rand(50);
-    const gx = x + 140 + this.rand(60);
+    const gx = x + this.lead(120) + this.rand(60);
     this.gaps.push({ x0: gx, x1: gx + w });
     this.bubbleArc(gx + w / 2, 120, 70, 5, 34);
     this.maybeLetter(gx + w / 2, 170);
@@ -774,7 +820,7 @@ export class SkateGameEngine {
     // WIDE gap — always fronted by a ramp so it's clearable (solvability rule)
     const x = this.cursorX;
     const d = this.difficulty();
-    const r = this.addRamp(x + 120 + this.rand(40), "med");
+    const r = this.addRamp(x + this.lead(110) + this.rand(40), "med");
     const w = 170 + d * 200 + this.rand(70);
     const gx = r.xLip + 6;
     this.gaps.push({ x0: gx, x1: gx + w });
@@ -800,7 +846,7 @@ export class SkateGameEngine {
     const x = this.cursorX;
     const len = 240 + this.rand(140);
     const h = 64 + this.rand(20);
-    const rx = x + 130 + this.rand(50);
+    const rx = x + this.lead(110) + this.rand(50);
     this.rails.push({ x0: rx, x1: rx + len, height: h });
     const gx = rx + len * 0.32;
     this.gaps.push({ x0: gx, x1: gx + Math.min(len * 0.36, 140) });
@@ -857,6 +903,63 @@ export class SkateGameEngine {
     this.cursorX = lx + 2 * LOOP_R + 300;
   }
 
+  private spRhythm() {
+    // a cadence of evenly spaced little kickers — muscle-memory bouncing, the
+    // "rhythm game" beat OlliOlli leans on. No gaps, just flow + coins.
+    const x = this.cursorX;
+    let rx = x + 110;
+    const n = 3 + Math.floor(this.rand(1.6));
+    for (let i = 0; i < n; i++) {
+      const r = this.addRamp(rx, "small");
+      this.bubbleArc(r.xLip + 48, r.height + 34, 64, 3, 30);
+      rx = r.xLip + 150;
+    }
+    this.maybeLetter(x + 200, 150);
+    this.cursorX = rx + 130;
+  }
+
+  private spStairs() {
+    // a descending grind staircase — chain three rails stepping down, each
+    // landing on solid ground (a satisfying grind line, no pit risk)
+    const x = this.cursorX;
+    let rx = x + 130;
+    let h = 124 + this.rand(20);
+    for (let i = 0; i < 3; i++) {
+      const len = 116 + this.rand(40);
+      this.rails.push({ x0: rx, x1: rx + len, height: h });
+      this.coinLine(rx + 16, h + 18, 3, len / 3);
+      rx += len + 42;
+      h = Math.max(40, h - 34);
+    }
+    this.maybeLetter(x + 220, 170);
+    this.cursorX = rx + 150;
+  }
+
+  private spRest() {
+    // a forced breather after a challenge cluster — long, safe, coins to grab
+    const x = this.cursorX;
+    const len = 320 + this.rand(120);
+    this.coinLine(x + 50, 44, 8, 52);
+    this.maybeLetter(x + len / 2, 110);
+    this.cursorX = x + len;
+  }
+
+  private spReward() {
+    // a no-risk reward corridor before the difficulty climbs (positive surprise)
+    const x = this.cursorX;
+    const len = 300;
+    this.bubbleArc(x + len / 2, 80, 92, 7, 38);
+    this.powers.push({
+      x: x + len / 2,
+      y: 120,
+      kind: this.powerIdx++ % 2 === 0 ? "magnet" : "rocket",
+      taken: false,
+    });
+    this.chunksSincePower = 0;
+    this.maybeLetter(x + len * 0.82, 150);
+    this.cursorX = x + len + 120;
+  }
+
   private readonly HARD = new Set(["kickerGap", "railGap", "kickerRail", "quarter"]);
 
   private buildChunk(name: string, d: number) {
@@ -871,39 +974,76 @@ export class SkateGameEngine {
       case "railGap": this.spRailGap(); break;
       case "quarter": this.spQuarter(); break;
       case "loop": this.spLoop(); break;
+      case "rhythm": this.spRhythm(); break;
+      case "stairs": this.spStairs(); break;
       default: this.spFlat();
     }
   }
 
+  /** Which set pieces are unlocked yet — gradual mechanic introduction. */
+  private unlocked(name: string, t: number): boolean {
+    switch (name) {
+      case "gap": return t > 16;
+      case "doubleKicker": return t > 20;
+      case "rhythm": return t > 18;
+      case "stairs": return t > 26;
+      case "railGap": return t > 28;
+      case "kickerRail": return t > 30;
+      case "kickerGap": return t > 38;
+      case "quarter": return t > 46;
+      case "loop": return t > 58;
+      default: return true; // flat, kickerAir, rail — always available
+    }
+  }
+
+  /** Bias the weighted pick by difficulty: hard/dense late, flat early. */
+  private chunkBias(name: string, d: number): number {
+    if (this.HARD.has(name)) return 0.45 + d * 1.25; // rare early → common late
+    if (name === "flat") return Math.max(0.25, 1.3 - d * 0.9); // common early
+    return 1;
+  }
+
   private addChunk() {
-    if (this.finishLaid) return;
     this.chunkCount++;
     const d = this.difficulty();
+    const t = this.runTime;
 
-    // reached the end → lay a calm run-in and the finish gate
-    if (this.cursorX >= this.finishX - 700) {
-      this.coinLine(this.cursorX + 40, 44, 8, 56);
-      this.cursorX = this.finishX + 200;
-      this.finishLaid = true;
-      this.lastChunk = "finish";
+    // --- opening: orient to speed + teach the mechanics on safe ground ---
+    if (this.chunkCount <= 2) { this.spFlat(); this.lastChunk = "flat"; return; }
+    if (this.chunkCount <= 4) { this.spKickerAir("small"); this.lastChunk = "kickerAir"; return; }
+    if (this.chunkCount === 5) { this.spRail(); this.lastChunk = "rail"; return; }
+
+    // --- forced REST after a challenge cluster (tension → release) ---
+    if (this.restoreBreather) {
+      this.restoreBreather = false;
+      this.challengeRun = 0;
+      this.spRest();
+      this.lastChunk = "flat";
       return;
     }
 
-    // opening grace: orient to speed + controls on flat ground (no hazards)
-    if (this.chunkCount <= 3) { this.spFlat(); this.lastChunk = "flat"; return; }
-    // teach the ramp in isolation — air with no hazard after it
-    if (this.chunkCount <= 5) { this.spKickerAir("small"); this.lastChunk = "kickerAir"; return; }
-    // mandatory breather after a hard set piece (tension → release)
-    if (this.restoreBreather) { this.restoreBreather = false; this.spFlat(); this.lastChunk = "flat"; return; }
+    // --- periodic REWARD corridor before the difficulty climbs ---
+    if (this.chunksSinceReward >= 6 && this.rand(1) < 0.6) {
+      this.chunksSinceReward = 0;
+      this.spReward();
+      this.lastChunk = "reward";
+      return;
+    }
 
-    // pick from THIS ZONE's weighted mix — no immediate repeats
+    // --- pick from this zone's mix: unlocked, no repeat, no two HARD in a row,
+    //     weighted toward harder pieces as difficulty climbs ---
     const zone = ZONES[this.zoneIndexAt(this.cursorX)];
+    const lastHard = this.HARD.has(this.lastChunk);
     const choices: [string, number][] = [];
     for (const name in zone.mix) {
       const w = zone.mix[name];
-      if (w > 0 && name !== this.lastChunk) choices.push([name, w]);
+      if (w <= 0) continue;
+      if (name === this.lastChunk) continue;
+      if (!this.unlocked(name, t)) continue;
+      if (lastHard && this.HARD.has(name)) continue;
+      choices.push([name, w * this.chunkBias(name, d)]);
     }
-    if (choices.length === 0) choices.push(["flat", 1]);
+    if (choices.length === 0) { this.spFlat(); this.lastChunk = "flat"; return; }
 
     const total = choices.reduce((s, [, w]) => s + w, 0);
     let r = this.rand(total);
@@ -914,7 +1054,14 @@ export class SkateGameEngine {
     }
 
     this.buildChunk(pick, d);
-    if (this.HARD.has(pick)) this.restoreBreather = true;
+    this.chunksSinceReward++;
+    if (this.HARD.has(pick)) {
+      this.challengeRun++;
+      // breather after 2 hard chunks early, 3 once the player is warmed up
+      if (this.challengeRun >= (d > 0.55 ? 3 : 2)) this.restoreBreather = true;
+    } else {
+      this.challengeRun = 0;
+    }
     this.lastChunk = pick;
   }
 
@@ -1022,7 +1169,10 @@ export class SkateGameEngine {
         const l = this.loopActive;
         this.loopActive = null;
         this.state = "running";
-        if (l) this.px = l.x + 2 * l.r + 30;
+        // exit at the ring's centre (where the skater already is at the bottom
+        // of the loop) so running resumes seamlessly — no forward snap. phi at
+        // loopT=1 is 2π ≡ 0, so boardRot=0 is continuous too.
+        if (l) { l.done = true; this.px = l.x + l.r; }
         this.py = 0;
         this.vy = 0;
         this.boardRot = 0;
@@ -1037,27 +1187,16 @@ export class SkateGameEngine {
     }
 
     if (this.state === "crash") {
+      // plunge straight down into the pit (world frozen so the hole stays put
+      // under the falling rider), tumbling, until off-screen → game over
       this.crashT += dt;
-      this.boardRot += 8 * dt;
-      this.py += this.vy * dt;
+      this.boardRot += 9 * dt;
       this.vy -= GRAVITY * dt;
-      this.advanceVisuals(dt, this.speed * 0.4);
+      this.py += this.vy * dt;
+      this.advanceVisuals(dt, 0);
       if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 2.5);
-      if (this.crashT > 0.85) {
-        if (this.lives <= 0) {
-          this.gameOver(false);
-        } else {
-          // get back up past the pit and keep skating
-          const g = this.gaps.find((gp) => this.px > gp.x0 - 30 && this.px < gp.x1 + 30);
-          if (g) this.px = g.x1 + 40;
-          this.py = 0;
-          this.vy = 0;
-          this.boardRot = 0;
-          this.spinV = 0;
-          this.rampUnder = null;
-          this.speed = BASE_SPEED;
-          this.state = "running";
-        }
+      if (this.py < -this.groundY - 80 || this.crashT > 1.3) {
+        this.gameOver(false);
       }
       return;
     }
@@ -1075,9 +1214,11 @@ export class SkateGameEngine {
     }
     this.refreshScore();
 
-    // ---- finite-level progress, zone changes, and the finish line
-    const frac = Math.min(this.px / this.finishX, 1);
-    if (frac - this.lastProgressSent >= 0.004) {
+    // ---- endless progress: a looping bar that fills across each zone, plus a
+    //      name callout when a new biome begins
+    const zp = this.px / ZONE_LEN;
+    const frac = zp - Math.floor(zp); // 0..1 through the current zone
+    if (Math.abs(frac - this.lastProgressSent) >= 0.01 || frac < this.lastProgressSent) {
       this.lastProgressSent = frac;
       this.cb.onProgress?.(frac);
     }
@@ -1091,19 +1232,18 @@ export class SkateGameEngine {
         this.sfx("milestone");
       }
     }
-    if (this.px >= this.finishX) {
-      this.finish();
-      return;
-    }
 
-    // enter a Sonic loop when we roll onto one (grounded, not in a rocket)
+    // enter a Sonic loop when we reach its centre (grounded, not in a rocket).
+    // Triggering at the centre — where we also exit — keeps entry/exit smooth.
     if (this.state === "running" && this.py < 12 && this.rocketT <= 0) {
-      const loop = this.loops.find((l) => this.px >= l.x && this.px < l.x + 50);
+      const loop = this.loops.find(
+        (l) => !l.done && this.px >= l.x + l.r - 30 && this.px <= l.x + l.r + 30
+      );
       if (loop) {
         this.state = "loop";
         this.loopActive = loop;
         this.loopT = 0;
-        this.px = loop.x;
+        this.px = loop.x + loop.r;
         this.rampUnder = null;
         this.sfx("grind");
         this.advanceVisuals(dt, 0);
@@ -1130,6 +1270,7 @@ export class SkateGameEngine {
           this.rampUnder = null;
           this.state = "airborne";
           this.vy = -40;
+          this.coyoteT = COYOTE; // brief grace to still pop a jump after the edge
         } else if (this.rampUnder && this.px < this.rampUnder.xLip + 90) {
           // crossed the lip (even if a fast frame skipped the exact window) —
           // launch up + forward instead of snapping straight down to the street
@@ -1143,6 +1284,7 @@ export class SkateGameEngine {
         }
       }
     } else if (this.state === "airborne") {
+      if (this.coyoteT > 0) this.coyoteT = Math.max(0, this.coyoteT - dt);
       const g = this.holding && this.vy > 0 ? JUMP_HOLD_G : GRAVITY;
       this.vy -= g * dt;
       this.py += this.vy * dt;
@@ -1178,6 +1320,10 @@ export class SkateGameEngine {
           this.spinV = 0;
           this.state = "grinding";
           this.grindAccrual = 0;
+          this.grindTime = 0;
+          this.grindTier = 0;
+          this.grindTickT = 0;
+          this.coyoteT = 0;
           this.boardRot = 0;
           this.addTrick("50-50 GRIND", 120);
           this.sfx("grind");
@@ -1195,19 +1341,44 @@ export class SkateGameEngine {
     } else if (this.state === "grinding") {
       const rail = this.currentRail;
       if (!rail || this.px > rail.x1) {
+        // rode off the end without popping — small hop back to skating
         this.currentRail = null;
         this.state = "airborne";
         this.vy = RAIL_END_POP;
+        this.grindTier = 0;
       } else {
         this.py = rail.height;
+        this.grindTime += dt;
+        // the longer you hold, the faster the score climbs (THPS multiplier)
+        const gmult = 1 + this.grindTime * GRIND_RAMP;
         this.grindAccrual += eff * dt;
-        while (this.grindAccrual >= 60) {
-          this.grindAccrual -= 60;
-          this.comboBase += 24;
+        while (this.grindAccrual >= 50) {
+          this.grindAccrual -= 50;
+          this.comboBase += Math.round(GRIND_BASE * gmult);
           this.bumpSpecial(0.012);
           this.emitCombo();
         }
-        if (this.rand(1) < 0.6) this.spark(this.skaterX, this.groundY - this.py, 1);
+        // sparks get denser as the grind builds; audio ticks rise in pitch
+        const sparkN = this.grindTime > 2.5 ? 2 : 1;
+        if (this.rand(1) < Math.min(1, 0.45 + this.grindTime * 0.35)) {
+          this.spark(this.skaterX, this.groundY - this.py, sparkN);
+        }
+        this.grindTickT -= dt;
+        if (this.grindTickT <= 0) {
+          this.grindTickT = Math.max(0.07, 0.2 - this.grindTime * 0.03);
+          this.cb.onGrindTick?.(this.grindTime);
+        }
+        // threshold callouts ratchet the tension
+        const tier =
+          this.grindTime >= 4 ? 3 : this.grindTime >= 2.5 ? 2 : this.grindTime >= 1 ? 1 : 0;
+        if (tier > this.grindTier) {
+          this.grindTier = tier;
+          this.cb.onCallout?.(
+            tier === 3 ? "LEGENDARY!" : tier === 2 ? "ON FIRE!" : "GRINDING!",
+            "combo"
+          );
+          this.shake = Math.max(this.shake, 0.15 + tier * 0.1);
+        }
       }
     }
 
@@ -1323,22 +1494,25 @@ export class SkateGameEngine {
   }
 
   private crash() {
+    // missed the gap — plunge into the pit. vy is set negative so the rider
+    // drops *down* (not the old upward pop); the crash state finishes the fall.
     const lost = this.loseCombo() ?? 0;
     this.lives = Math.max(0, this.lives - 1);
     this.cb.onLives?.(this.lives);
     this.state = "crash";
     this.crashT = 0;
-    this.vy = 240;
-    this.shake = 1;
+    this.vy = -80;
+    this.shake = 0.9;
     this.sfx("crash");
     this.cb.onBail?.(lost);
+    // debris kicks up from the lip even as the rider drops away
     const sy = this.groundY - this.py;
     for (let i = 0; i < 18; i++) {
       this.particles.push({
         x: this.skaterX,
         y: sy,
         vx: this.rand(260) - 130,
-        vy: -this.rand(260),
+        vy: -this.rand(240),
         life: 0.7,
         maxLife: 0.7,
         color: i % 2 ? C_PINK : "#ffffff",
@@ -1438,17 +1612,6 @@ export class SkateGameEngine {
     });
   }
 
-  private finish() {
-    // crossed the finish line — bank the run, completion bonus, celebrate
-    this.bankCombo(1);
-    this.cb.onProgress?.(1);
-    this.addScore(10000);
-    this.cb.onBank?.(10000);
-    this.cb.onCallout?.("LEVEL COMPLETE!", "combo");
-    this.flashT = 0.6;
-    this.gameOver(true);
-  }
-
   // ----------------------------------------------------------- visuals
 
   private advanceVisuals(dt: number, speed: number) {
@@ -1497,7 +1660,6 @@ export class SkateGameEngine {
     this.drawRamps(ctx);
     this.drawLoops(ctx);
     this.drawRails(ctx);
-    this.drawFinish(ctx);
     this.drawCollectibles(ctx);
     this.drawGhosts(ctx);
     this.drawTrail(ctx);
@@ -1542,16 +1704,18 @@ export class SkateGameEngine {
     )},${Math.round(a[2] + (b[2] - a[2]) * t)})`;
   }
 
-  /** Interpolated zone palette slot (0..3) by progress through the level. */
+  /** Interpolated zone palette slot (0..3), cycling smoothly between biomes. */
   private skyCol(slot: number): string {
-    const t = Math.min(this.px / this.finishX, 1) * (ZONES.length - 1);
-    const i = Math.min(ZONES.length - 2, Math.max(0, Math.floor(t)));
-    return this.lerpRGB(ZONES[i].pal.sky[slot], ZONES[i + 1].pal.sky[slot], t - i);
+    const p = Math.max(0, this.px) / ZONE_LEN;
+    const i = Math.floor(p) % ZONES.length;
+    const j = (i + 1) % ZONES.length;
+    return this.lerpRGB(ZONES[i].pal.sky[slot], ZONES[j].pal.sky[slot], p - Math.floor(p));
   }
   private sunCol(slot: number): string {
-    const t = Math.min(this.px / this.finishX, 1) * (ZONES.length - 1);
-    const i = Math.min(ZONES.length - 2, Math.max(0, Math.floor(t)));
-    return this.lerpRGB(ZONES[i].pal.sun[slot], ZONES[i + 1].pal.sun[slot], t - i);
+    const p = Math.max(0, this.px) / ZONE_LEN;
+    const i = Math.floor(p) % ZONES.length;
+    const j = (i + 1) % ZONES.length;
+    return this.lerpRGB(ZONES[i].pal.sun[slot], ZONES[j].pal.sun[slot], p - Math.floor(p));
   }
 
   private drawSky(ctx: CanvasRenderingContext2D, W: number, H: number) {
@@ -1712,38 +1876,6 @@ export class SkateGameEngine {
       ctx.fillRect(xL - 5, this.groundY - r.height - 3, 7, 5);
       ctx.shadowBlur = 0;
     }
-  }
-
-  private drawFinish(ctx: CanvasRenderingContext2D) {
-    const fx = this.sx(this.finishX);
-    if (fx < -90 || fx > this.W + 90) return;
-    const base = this.groundY;
-    const top = base - 170;
-    const cw = 9;
-    // checkered banner
-    for (let row = 0; row < 3; row++) {
-      for (let c = 0; c < 6; c++) {
-        ctx.fillStyle = (row + c) % 2 ? "#ffffff" : "#0c0626";
-        ctx.fillRect(fx + c * cw, top + row * cw, cw, cw);
-      }
-    }
-    // glowing posts
-    ctx.strokeStyle = C_GOLD;
-    ctx.shadowColor = C_GOLD;
-    ctx.shadowBlur = 12;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(fx, top);
-    ctx.lineTo(fx, base);
-    ctx.moveTo(fx + 54, top);
-    ctx.lineTo(fx + 54, base);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = C_GOLD;
-    ctx.font = "bold 13px ui-monospace, monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("FINISH", fx + 27, top - 10);
-    ctx.textAlign = "left";
   }
 
   private drawLoops(ctx: CanvasRenderingContext2D) {

@@ -144,7 +144,13 @@ interface WarpletInfo {
   warplets: WarpletItem[];
 }
 
-const ZONE_COLORS = ["#67e8f9", "#2dd4bf", "#fb923c", "#c084fc", "#fbbf24"];
+const ZONE_NAMES = [
+  "NEON DOWNTOWN",
+  "GRIND DISTRICT",
+  "GAP CITY",
+  "VERT HEIGHTS",
+  "OVERDRIVE",
+];
 
 const CALLOUT_COLORS: Record<CalloutKind, string> = {
   perfect: "#fde68a",
@@ -180,7 +186,6 @@ export default function StremeSkateGame({
   const [zone, setZone] = useState<{ name: string; index: number; accent: string }>(
     { name: "NEON DOWNTOWN", index: 0, accent: "#67e8f9" }
   );
-  const [lives, setLives] = useState(3);
   const [special, setSpecial] = useState(0);
   const [flow, setFlow] = useState(false);
   const [letters, setLetters] = useState<boolean[]>([
@@ -373,6 +378,15 @@ export default function StremeSkateGame({
     [playTone, haptic]
   );
 
+  // grind audio rises in pitch the longer you hold the rail (THPS/OlliOlli feel)
+  const handleGrindTick = useCallback(
+    (level: number) => {
+      const f = Math.min(170 + level * 62, 560);
+      playTone(f, 0.06, "sawtooth", 0.035);
+    },
+    [playTone]
+  );
+
   const showToast = useCallback((text: string, ms = 1600) => {
     setToast(text);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -473,6 +487,7 @@ export default function StremeSkateGame({
     handleAllLetters,
     handleGameOver,
     handleSfx,
+    handleGrindTick,
     showToast,
     showCallout,
   });
@@ -481,6 +496,7 @@ export default function StremeSkateGame({
     handleAllLetters,
     handleGameOver,
     handleSfx,
+    handleGrindTick,
     showToast,
     showCallout,
   };
@@ -501,7 +517,6 @@ export default function StremeSkateGame({
         setBank(null);
         setDistance(0);
         setProgress(0);
-        setLives(3);
         setSpecial(0);
         setFlow(false);
         setLetters([false, false, false, false, false, false]);
@@ -529,7 +544,7 @@ export default function StremeSkateGame({
       onDistance: (d) => setDistance(d),
       onProgress: (p) => setProgress(p),
       onZone: (name, index, accent) => setZone({ name, index, accent }),
-      onLives: (n) => setLives(n),
+      onGrindTick: (lvl) => cbRef.current.handleGrindTick(lvl),
       onCallout: (text, kind) => cbRef.current.showCallout(text, kind),
       onPower: (kind) => setPower(kind),
       onSfx: (t) => cbRef.current.handleSfx(t),
@@ -901,19 +916,11 @@ export default function StremeSkateGame({
             <div className="font-mono text-xs font-semibold text-cyan-300">
               {distance.toLocaleString()}m
             </div>
-            <div className="mt-0.5 flex gap-0.5">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <span
-                  key={i}
-                  className="text-xs leading-none"
-                  style={{
-                    color: i < lives ? "#fb7185" : "rgba(255,255,255,0.18)",
-                    textShadow: i < lives ? "0 0 6px rgba(244,63,94,0.8)" : "none",
-                  }}
-                >
-                  ♥
-                </span>
-              ))}
+            <div
+              className="mt-0.5 font-mono text-[9px] font-bold tracking-[0.18em] text-rose-300/90"
+              style={{ textShadow: "0 0 6px rgba(244,63,94,0.7)" }}
+            >
+              ♥ ONE LIFE
             </div>
           </div>
 
@@ -1011,26 +1018,23 @@ export default function StremeSkateGame({
             </div>
           )}
 
-          {/* level progress meter (start → 🏁 finish), with zone segments */}
+          {/* zone meter — fills across the current biome, then loops to the
+              next one (endless). The current zone name rides above it. */}
           <div className="absolute bottom-1.5 left-3 right-3 pointer-events-none">
-            <div className="mb-0.5 flex items-center justify-center">
+            <div className="mb-0.5 flex items-center justify-between">
               <span
                 className="font-mono text-[10px] font-bold tracking-[0.2em]"
                 style={{ color: zone.accent, textShadow: `0 0 8px ${zone.accent}` }}
               >
                 {zone.name}
               </span>
+              <span className="font-mono text-[9px] font-semibold tracking-[0.16em] text-white/40">
+                NEXT: {ZONE_NAMES[(zone.index + 1) % ZONE_NAMES.length]}
+              </span>
             </div>
-            <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/40 flex">
-              {ZONE_COLORS.map((c, i) => (
-                <div
-                  key={i}
-                  className="h-full flex-1"
-                  style={{ background: c, opacity: 0.22 }}
-                />
-              ))}
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/40">
               <div
-                className="absolute inset-y-0 left-0 transition-[width] duration-150"
+                className="absolute inset-y-0 left-0"
                 style={{
                   width: `${Math.min(progress * 100, 100)}%`,
                   background: zone.accent,
@@ -1043,9 +1047,6 @@ export default function StremeSkateGame({
                 style={{ left: `calc(${Math.min(progress * 100, 100)}% - 7px)` }}
               >
                 🛹
-              </div>
-              <div className="absolute top-1/2 right-0.5 -translate-y-1/2 text-[10px] leading-none">
-                🏁
               </div>
             </div>
           </div>
@@ -1243,14 +1244,8 @@ export default function StremeSkateGame({
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div className="w-full max-w-sm rounded-2xl bg-base-100/95 p-6 shadow-2xl text-center">
-            <div
-              className={`text-sm font-bold uppercase tracking-widest ${
-                finishedRun.finished ? "text-success" : "opacity-60"
-              }`}
-            >
-              {finishedRun.finished
-                ? "🏁 Level complete!"
-                : `Out of lives · ${Math.round(progress * 100)}% there`}
+            <div className="text-sm font-bold uppercase tracking-widest opacity-60">
+              💥 Wipeout · {finishedRun.distance.toLocaleString()}m
             </div>
             <div className="mt-2 font-mono text-5xl font-bold text-primary">
               {finishedRun.score.toLocaleString()}
