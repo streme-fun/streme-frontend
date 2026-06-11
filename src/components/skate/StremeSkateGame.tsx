@@ -225,7 +225,12 @@ export default function StremeSkateGame({
   const [finishedRun, setFinishedRun] = useState<SkateResult | null>(null);
 
   const { isMiniAppView, isSDKLoaded, farcasterContext } = useAppFrameLogic();
-  const { address: walletAddress } = useUnifiedWallet();
+  const {
+    address: walletAddress,
+    isEffectivelyMiniApp,
+    connect: connectWallet,
+  } = useUnifiedWallet();
+  const autoConnectTriedRef = useRef(false);
   const isMiniAppRef = useRef(false);
   isMiniAppRef.current = isMiniAppView && isSDKLoaded;
   const fcUserRef = useRef<{
@@ -639,6 +644,23 @@ export default function StremeSkateGame({
     };
   }, [isSDKLoaded]);
 
+  // Auto-connect the Farcaster wallet in the mini-app (like the rest of the
+  // app) so Warplet skaters resolve without the user tapping connect. The
+  // connector attaches to the host wallet; we only nudge it once.
+  useEffect(() => {
+    if (autoConnectTriedRef.current) return;
+    if (isEffectivelyMiniApp && isSDKLoaded && !walletAddress) {
+      autoConnectTriedRef.current = true;
+      try {
+        connectWallet();
+      } catch (e) {
+        console.error("Skate auto-connect failed:", e);
+      }
+    }
+    // connectWallet is recreated each render; deliberately excluded to avoid loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEffectivelyMiniApp, isSDKLoaded, walletAddress]);
+
   // Check Warplet eligibility for the connected wallet
   useEffect(() => {
     let cancelled = false;
@@ -781,6 +803,17 @@ export default function StremeSkateGame({
     startMusic();
     engine.reset();
   }, [startMusic]);
+
+  // back to the title menu (change skater, toggle ghosts, RAD mode, etc.)
+  const handleBackToMenu = useCallback(() => {
+    setPhase("ready");
+    setFinishedRun(null);
+    setIsNewBest(false);
+    setRankResult(null);
+    setChallengeBeaten(false);
+    setCombo(null);
+    engineRef.current?.toTitle();
+  }, []);
 
   const openBoard = useCallback(async () => {
     setShowBoard(true);
@@ -1175,12 +1208,13 @@ export default function StremeSkateGame({
       {/* ---------- start screen (title menu) ---------- */}
       {phase === "ready" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center pointer-events-none">
-          {/* legibility scrim */}
+          {/* legibility scrim — keep it dark all the way to the edges so the
+              menu text reads cleanly over the moving course behind it */}
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 backdrop-blur-[2px]"
             style={{
               background:
-                "radial-gradient(78% 52% at 50% 42%, rgba(8,4,22,0.82) 0%, rgba(8,4,22,0.5) 58%, transparent 100%)",
+                "radial-gradient(125% 90% at 50% 42%, rgba(6,3,18,0.92) 0%, rgba(6,3,18,0.82) 55%, rgba(6,3,18,0.74) 100%)",
             }}
           />
 
@@ -1235,7 +1269,8 @@ export default function StremeSkateGame({
                 WebkitBackgroundClip: "text",
                 backgroundClip: "text",
                 color: "transparent",
-                filter: "drop-shadow(0 0 18px rgba(103,232,249,0.45))",
+                filter:
+                  "drop-shadow(0 2px 5px rgba(0,0,0,0.85)) drop-shadow(0 0 18px rgba(103,232,249,0.5))",
                 animation: "skShine 3.2s linear infinite",
               }}
             >
@@ -1275,12 +1310,13 @@ export default function StremeSkateGame({
           </div>
 
           {/* control hints */}
-          <div className="flex flex-col items-center gap-0.5 text-[11px] text-indigo-200/70">
+          <div className="flex flex-col items-center gap-0.5 text-[11px] font-medium text-indigo-100/90">
             <span>Tap = jump · hold in the air to flip</span>
             <span>
               Release to land clean →{" "}
               <span className="font-semibold text-amber-200">SPEED BOOST</span>
             </span>
+            <span className="text-cyan-200/80">Keep tricking — the sun is your clock ☀</span>
           </div>
 
           {/* option chips — interactive, must not start the run */}
@@ -1356,9 +1392,20 @@ export default function StremeSkateGame({
               <button className="btn btn-outline w-full" onClick={handleRestart}>
                 Drop in again
               </button>
-              <button className="btn btn-ghost btn-sm w-full" onClick={openBoard}>
-                <Trophy size={14} /> Leaderboard
-              </button>
+              <div className="flex gap-2">
+                <button
+                  className="btn btn-ghost btn-sm flex-1"
+                  onClick={handleBackToMenu}
+                >
+                  🏠 Menu
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm flex-1"
+                  onClick={openBoard}
+                >
+                  <Trophy size={14} /> Leaderboard
+                </button>
+              </div>
             </div>
           </div>
         </div>
