@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     const fidParam = Number(searchParams.get("fid"));
     const fid =
       Number.isInteger(fidParam) && fidParam > 0 ? fidParam : undefined;
-    const data = await getSkateLeaderboard(10, fid);
+    const data = await getSkateLeaderboard(25, fid);
     return NextResponse.json(data, {
       headers: {
         "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",

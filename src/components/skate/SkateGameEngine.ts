@@ -126,8 +126,13 @@ interface Ghost {
   samples: number[];
   color: string;
   name?: string;
+  spin: number; // flip direction (±1) for inferred trick playback
 }
 const GHOST_DT = 0.15; // seconds between recorded ghost samples
+// Ghost recordings only store [px,py], so we infer tricks: once a ghost rises
+// clearly above the rails (~64-88px) it's mid-jump, so spin it through whole
+// rotations (landing flat) instead of just floating up and down.
+const GHOST_AIR_SPIN = 95;
 const GHOST_COLORS = ["#fb7185", "#a78bfa", "#34d399", "#fbbf24", "#38bdf8"];
 
 const BASE_SPEED = 300;
@@ -597,6 +602,7 @@ export class SkateGameEngine {
       samples: g.samples,
       color: g.color || GHOST_COLORS[i % GHOST_COLORS.length],
       name: g.name,
+      spin: i % 2 === 0 ? -1 : 1, // alternate back/front flips for variety
     }));
   }
 
@@ -2209,9 +2215,42 @@ export class SkateGameEngine {
       const px = this.sx(gx);
       if (px < -40 || px > this.W + 40) continue;
       const py = this.groundY - gy;
+
+      // Infer a trick: while a ghost is well above the rails it's mid-jump, so
+      // spin it through whole rotations and land it flat. Progress is measured
+      // across the contiguous airborne segment, so rot hits 0 at both ends
+      // (continuous with the flat ground/grind sections). Grinds stay flat.
+      let rot = 0;
+      if (gy > GHOST_AIR_SPIN) {
+        // Bound the airborne run, then find the exact times gy crosses the
+        // threshold so the spin starts and ends flat (a whole number of
+        // rotations) — no snap as the ghost touches down.
+        const sy = (k: number) => g.samples[k * 2 + 1];
+        let a = sy(ia) > GHOST_AIR_SPIN ? ia : ib;
+        let b = a;
+        while (a > 0 && sy(a - 1) > GHOST_AIR_SPIN) a--;
+        while (b < n - 1 && sy(b + 1) > GHOST_AIR_SPIN) b++;
+        let tEnter = a;
+        if (a > 0)
+          tEnter = a - 1 + (GHOST_AIR_SPIN - sy(a - 1)) / (sy(a) - sy(a - 1));
+        let tExit = b;
+        if (b < n - 1)
+          tExit = b + (sy(b) - GHOST_AIR_SPIN) / (sy(b) - sy(b + 1));
+        const dur = tExit - tEnter;
+        if (dur > 1e-3) {
+          const prog = Math.min(Math.max((t - tEnter) / dur, 0), 1);
+          const flips = Math.max(
+            1,
+            Math.min(3, Math.round((dur * GHOST_DT) / 0.45))
+          );
+          rot = g.spin * prog * flips * Math.PI * 2;
+        }
+      }
+
       ctx.save();
       ctx.translate(px, py);
       ctx.globalAlpha = 0.4;
+      // ground glow — stays flat beneath the trick
       ctx.shadowColor = g.color;
       ctx.shadowBlur = 8;
       ctx.fillStyle = g.color;
@@ -2219,12 +2258,18 @@ export class SkateGameEngine {
       ctx.ellipse(0, 6, 15, 5, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
+      // rider + board, flipped around the body's middle
+      ctx.save();
+      ctx.translate(0, -10);
+      ctx.rotate(rot);
+      ctx.translate(0, 10);
       ctx.fillStyle = "#cbd5e1";
       ctx.fillRect(-15, 4, 30, 4);
       if (this.monster) {
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(this.monster, -16, -28, 32, 32);
       }
+      ctx.restore();
       ctx.globalAlpha = 1;
       if (g.name) {
         ctx.globalAlpha = 0.85;

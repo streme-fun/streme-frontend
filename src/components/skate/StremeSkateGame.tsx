@@ -1604,7 +1604,7 @@ export default function StremeSkateGame({
                 </p>
               )}
             </div>
-            {board?.player && board.player.rank > 10 && (
+            {board?.player && board.player.rank > board.entries.length && (
               <div className="mt-2 rounded-lg bg-primary/10 px-3 py-2 text-center font-mono text-sm">
                 You: #{board.player.rank} · {board.player.best.toLocaleString()}
               </div>
