@@ -6,7 +6,10 @@ import { NextRequest } from "next/server";
 import { SKATE_DISPLAY_URL } from "../../../../lib/skateShare";
 
 export const runtime = "edge";
-export const dynamic = "force-dynamic";
+// The render is a pure function of the query params (s / by / r / v), and the
+// page meta stamps a per-deploy `v` token onto the URL, so a given URL is stable
+// within a deploy. Let the CDN cache each URL (see Cache-Control below) instead
+// of forcing a fresh ~1200×800 Satori render on every Farcaster / link scrape.
 
 export async function GET(request: NextRequest) {
   const host = request.headers.get("host");
@@ -172,6 +175,16 @@ export async function GET(request: NextRequest) {
         </div>
       </div>
     ),
-    { width: 1200, height: 800 }
+    {
+      width: 1200,
+      height: 800,
+      headers: {
+        // Cache hard at the CDN (each URL is deploy-stable thanks to the `v`
+        // token) and serve stale while revalidating, so a deploy that changes
+        // the card art naturally rolls in with the next scrape.
+        "Cache-Control":
+          "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+      },
+    }
   );
 }
