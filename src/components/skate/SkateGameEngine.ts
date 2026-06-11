@@ -356,6 +356,7 @@ export class SkateGameEngine {
   private flashT = 0;
   private hitstop = 0;
   private waveT = 0;
+  private groundSparkT = 0; // cadence for the rolling-wheel sparkle
   private trail: { x: number; y: number }[] = [];
   private particles: Particle[] = [];
   private speedLines: { y: number; len: number; sp: number }[] = [];
@@ -1441,6 +1442,17 @@ export class SkateGameEngine {
       }
     }
 
+    // rolling-wheel sparkle so the skater never looks static on the ground
+    // (denser/brighter the faster you go); skipped on ramps and mid-air
+    if (this.state === "running" && this.py < 8) {
+      const sn = Math.max(0, Math.min(1, (eff - BASE_SPEED) / (MAX_SPEED - BASE_SPEED)));
+      this.groundSparkT -= dt;
+      if (this.groundSparkT <= 0) {
+        this.groundSparkT = 0.085 - 0.055 * sn;
+        this.rollSparkle(sn);
+      }
+    }
+
     this.collect();
     this.generateAhead();
     this.advanceVisuals(dt, eff);
@@ -1707,6 +1719,27 @@ export class SkateGameEngine {
       this.particles.push({
         x, y, vx: -this.rand(140) - 40, vy: -this.rand(160),
         life: 0.35, maxLife: 0.35, color: this.rand(1) > 0.5 ? C_CYAN : C_PINK, size: 2,
+      });
+    }
+  }
+
+  /** A little sparkle off the rear wheels so the grounded skater feels alive. */
+  private rollSparkle(sn: number) {
+    const sy = this.groundY - this.py;
+    const rad = this.flow || this.rocketT > 0 || this.rainbow;
+    const palette = rad ? FLOW_COLORS : [C_CYAN, C_TEAL, "#e2f6ff"];
+    const n = sn > 0.5 ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      const life = 0.32 + this.rand(0.22);
+      this.particles.push({
+        x: this.skaterX - 12 + this.rand(10),
+        y: sy + 1 - this.rand(3),
+        vx: -55 - this.rand(150) * (0.5 + sn), // flick back, faster at speed
+        vy: -25 - this.rand(85),
+        life,
+        maxLife: life,
+        color: palette[Math.floor(this.rand(palette.length))],
+        size: 1 + Math.floor(this.rand(2)),
       });
     }
   }
