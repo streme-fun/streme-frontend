@@ -502,6 +502,13 @@ export class SkateGameEngine {
     this.cb.onStart?.();
   }
 
+  /** Return to the title/attract screen (idle auto-scroll), e.g. after a run. */
+  toTitle() {
+    this.resetRun();
+    this.state = "idle";
+    this.holding = false;
+  }
+
   private resetRun() {
     this.gaps = [];
     this.rails = [];
@@ -610,12 +617,17 @@ export class SkateGameEngine {
   resize(width: number, height: number) {
     if (width <= 0 || height <= 0) return;
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.W = width;
-    this.H = height;
-    this.canvas.width = Math.floor(width * this.dpr);
-    this.canvas.height = Math.floor(height * this.dpr);
-    this.groundY = Math.round(height * 0.78);
-    this.skaterX = Math.round(width * 0.28);
+    // Zoom OUT on small screens so the course isn't cramped: render into a
+    // larger logical space and let the (100%-sized) canvas scale it down to the
+    // container, so more of the course is visible and the sprites/obstacles are
+    // smaller — more room to read and react. Desktop (≥520px) renders 1:1.
+    const zoom = Math.max(0.68, Math.min(1, width / 520));
+    this.W = Math.round(width / zoom);
+    this.H = Math.round(height / zoom);
+    this.canvas.width = Math.floor(this.W * this.dpr);
+    this.canvas.height = Math.floor(this.H * this.dpr);
+    this.groundY = Math.round(this.H * 0.78);
+    this.skaterX = Math.round(this.W * 0.28);
   }
 
   dispose() {
