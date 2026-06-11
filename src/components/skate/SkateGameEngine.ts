@@ -46,6 +46,7 @@ export interface SkateResult {
   tricks: number;
   distance: number;
   finished: boolean; // always false — endless run, you go till you wipe out
+  timedOut: boolean; // ran the countdown clock to zero (vs. wiped out in a pit)
 }
 
 export interface SkateCallbacks {
@@ -56,6 +57,8 @@ export interface SkateCallbacks {
   onZone?: (name: string, index: number, accent: string) => void;
   onLives?: (lives: number) => void;
   onGrindTick?: (level: number) => void; // rising grind audio (seconds on the rail)
+  onTime?: (seconds: number) => void; // countdown clock remaining
+  onTimeBonus?: (amount: number) => void; // recharge pop (+X.Xs)
   onCombo?: (info: ComboInfo | null) => void;
   onBank?: (amount: number) => void;
   onBail?: (lostCombo: number) => void;
@@ -140,6 +143,12 @@ const METRES = 9;
 const GRIND_BASE = 16; // base points per 50px of rail at multiplier 1
 const GRIND_RAMP = 1.5; // multiplier growth per second on the rail
 const COYOTE = 0.1; // grace window to still jump after rolling off an edge (Celeste)
+
+// run timer — drains in real time (a touch faster as it gets harder), and
+// RECHARGES when you pull off something great (Crazy Taxi / OutRun urgency).
+// Hitting zero ends the run, so you must keep skating well, not just survive.
+const START_TIME = 18; // seconds on the clock at drop-in
+const TIME_CAP = 26; // most time you can ever bank
 
 const SPIN_MAX = 13; // rad/s when flipping
 const SPIN_ACCEL = 46;
@@ -335,6 +344,10 @@ export class SkateGameEngine {
   private magnetT = 0;
   private rocketT = 0;
 
+  // run timer
+  private timeLeft = START_TIME;
+  private lastTimeSent = -1;
+
   // visuals
   private boardRot = 0;
   private crashT = 0;
@@ -445,6 +458,7 @@ export class SkateGameEngine {
         this.shake = 0.4;
         this.flashT = 0.2;
         this.emitCombo();
+        this.addTime(2);
       }
       this.vy = RAIL_POP;
       this.state = "airborne";
@@ -544,6 +558,8 @@ export class SkateGameEngine {
     this.flowT = 0;
     this.magnetT = 0;
     this.rocketT = 0;
+    this.timeLeft = START_TIME;
+    this.lastTimeSent = -1;
     this.boardRot = 0;
     this.crashT = 0;
     this.shake = 0;
@@ -557,6 +573,7 @@ export class SkateGameEngine {
     this.cb.onProgress?.(0);
     this.cb.onZone?.(ZONES[0].name, 0, ZONES[0].accent);
     this.cb.onLives?.(this.lives);
+    this.cb.onTime?.(this.timeLeft);
     this.cb.onCombo?.(null);
     this.cb.onSpecial?.(0);
     this.cb.onFlow?.(false);
@@ -656,6 +673,22 @@ export class SkateGameEngine {
   private addScore(points: number) {
     this.bankedPoints += points;
     this.refreshScore();
+  }
+
+  /** Recharge the run clock for a great play (clamped, fires a +Xs pop). */
+  private addTime(sec: number) {
+    if (this.state === "over" || sec <= 0) return;
+    this.timeLeft = Math.min(TIME_CAP, this.timeLeft + sec);
+    this.cb.onTimeBonus?.(sec);
+    this.emitTime();
+  }
+
+  private emitTime() {
+    const v = Math.max(0, this.timeLeft);
+    if (Math.abs(v - this.lastTimeSent) >= 0.1 || (v === 0 && this.lastTimeSent !== 0)) {
+      this.lastTimeSent = v;
+      this.cb.onTime?.(v);
+    }
   }
 
   private refreshScore() {
@@ -1181,6 +1214,7 @@ export class SkateGameEngine {
         this.cb.onCallout?.("LOOP!", "combo");
         this.flashT = 0.3;
         this.sfx("perfect");
+        this.addTime(3);
       }
       this.advanceVisuals(dt, 0);
       return;
@@ -1214,6 +1248,18 @@ export class SkateGameEngine {
     }
     this.refreshScore();
 
+    // ---- countdown clock: drains in real time (faster as it gets harder),
+    //      recharged by great plays. Zero = the run is over.
+    this.timeLeft -= (1 + this.difficulty() * 0.35) * dt;
+    if (this.timeLeft <= 0) {
+      this.timeLeft = 0;
+      this.emitTime();
+      this.cb.onCallout?.("TIME UP!", "sloppy");
+      this.gameOver(false, true);
+      return;
+    }
+    this.emitTime();
+
     // ---- endless progress: a looping bar that fills across each zone, plus a
     //      name callout when a new biome begins
     const zp = this.px / ZONE_LEN;
@@ -1233,9 +1279,9 @@ export class SkateGameEngine {
       }
     }
 
-    // enter a Sonic loop when we reach its centre (grounded, not in a rocket).
-    // Triggering at the centre — where we also exit — keeps entry/exit smooth.
-    if (this.state === "running" && this.py < 12 && this.rocketT <= 0) {
+    // enter a Sonic loop when we reach its centre (grounded). Triggering at the
+    // centre — where we also exit — keeps entry/exit smooth.
+    if (this.state === "running" && this.py < 12) {
       const loop = this.loops.find(
         (l) => !l.done && this.px >= l.x + l.r - 30 && this.px <= l.x + l.r + 30
       );
@@ -1252,36 +1298,32 @@ export class SkateGameEngine {
     }
 
     if (this.state === "running") {
-      if (this.rocketT > 0) {
+      // turbo (rocket) is pure speed now — you still ride ramps and fall in pits
+      const ramp = this.rampAt(this.px);
+      if (ramp) {
+        // riding up the ramp face
+        this.rampUnder = ramp;
+        this.py = this.rampSurface(ramp, this.px);
+        const slope =
+          (this.rampSurface(ramp, this.px + 5) -
+            this.rampSurface(ramp, this.px - 5)) /
+          10;
+        this.boardRot = -Math.atan(slope);
+      } else if (this.overGap(this.px)) {
+        this.rampUnder = null;
+        this.state = "airborne";
+        this.vy = -40;
+        this.coyoteT = COYOTE; // brief grace to still pop a jump after the edge
+      } else if (this.rampUnder && this.px < this.rampUnder.xLip + 90) {
+        // crossed the lip (even if a fast frame skipped the exact window) —
+        // launch up + forward instead of snapping straight down to the street
+        const r = this.rampUnder;
+        this.rampUnder = null;
+        this.launchFromRamp(r);
+      } else {
+        this.rampUnder = null;
         this.py = 0;
         this.boardRot *= Math.max(0, 1 - dt * 12);
-      } else {
-        const ramp = this.rampAt(this.px);
-        if (ramp) {
-          // riding up the ramp face
-          this.rampUnder = ramp;
-          this.py = this.rampSurface(ramp, this.px);
-          const slope =
-            (this.rampSurface(ramp, this.px + 5) -
-              this.rampSurface(ramp, this.px - 5)) /
-            10;
-          this.boardRot = -Math.atan(slope);
-        } else if (this.overGap(this.px)) {
-          this.rampUnder = null;
-          this.state = "airborne";
-          this.vy = -40;
-          this.coyoteT = COYOTE; // brief grace to still pop a jump after the edge
-        } else if (this.rampUnder && this.px < this.rampUnder.xLip + 90) {
-          // crossed the lip (even if a fast frame skipped the exact window) —
-          // launch up + forward instead of snapping straight down to the street
-          const r = this.rampUnder;
-          this.rampUnder = null;
-          this.launchFromRamp(r);
-        } else {
-          this.rampUnder = null;
-          this.py = 0;
-          this.boardRot *= Math.max(0, 1 - dt * 12);
-        }
       }
     } else if (this.state === "airborne") {
       if (this.coyoteT > 0) this.coyoteT = Math.max(0, this.coyoteT - dt);
@@ -1311,7 +1353,7 @@ export class SkateGameEngine {
         this.boardRot += (target - this.boardRot) * Math.min(dt * 11, 1);
       }
 
-      if (this.vy <= 40 && this.rocketT <= 0) {
+      if (this.vy <= 40) {
         const rail = this.railCaptureAt(this.px, this.py);
         if (rail) {
           this.currentRail = rail;
@@ -1333,7 +1375,7 @@ export class SkateGameEngine {
       if (this.state === "airborne" && this.vy <= 0) {
         const surf = this.surfaceAt(this.px);
         if (Number.isNaN(surf)) {
-          if (this.py <= -10 && this.rocketT <= 0) this.crash();
+          if (this.py <= -10) this.crash();
         } else if (this.py <= surf) {
           this.resolveLanding(surf);
         }
@@ -1444,9 +1486,11 @@ export class SkateGameEngine {
         this.shake = 0.7;
         this.hitstop = 0.05;
         this.flashT = 0.25;
+        this.addTime(2.5); // a stomped flip buys you serious time
       } else {
         this.sfx("land");
         this.shake = 0.3;
+        this.addTime(1.4);
       }
       this.landBurst(banked > 800 ? 16 : 9, C_GOLD);
     } else if (off < 0.95) {
@@ -1458,6 +1502,7 @@ export class SkateGameEngine {
       this.sfx("land");
       this.shake = 0.35;
       this.landBurst(8, C_CYAN);
+      this.addTime(0.9);
     } else {
       // SLOPPY — landed mid-flip: keep some points, lose speed, no boost
       this.boardRot = 0;
@@ -1474,6 +1519,7 @@ export class SkateGameEngine {
       this.cb.onBank?.(400);
       this.cb.onCallout?.("CLOSE!", "close");
       this.boost = Math.min(BOOST_CAP, this.boost + 70);
+      this.addTime(1.5); // threading a gap is exactly the kind of "great" we reward
     }
   }
 
@@ -1539,6 +1585,7 @@ export class SkateGameEngine {
         this.bumpSpecial(0.05);
         this.emitCombo();
         this.sfx("bubble");
+        this.addTime(0.25); // sips of time keep you alive while you collect
         const sy = this.groundY - b.y;
         for (let i = 0; i < 5; i++) {
           this.particles.push({
@@ -1554,6 +1601,7 @@ export class SkateGameEngine {
         p.taken = true;
         this.sfx("power");
         this.flashT = 0.35;
+        this.addTime(1.5);
         if (p.kind === "magnet") {
           this.magnetT = MAGNET_T;
           this.cb.onPower?.("magnet");
@@ -1582,6 +1630,7 @@ export class SkateGameEngine {
         this.emitCombo();
         this.sfx("letter");
         this.flashT = 0.4;
+        this.addTime(1.2);
         if (this.lettersGot.every(Boolean)) {
           this.addScore(5000);
           this.cb.onBank?.(5000);
@@ -1589,6 +1638,7 @@ export class SkateGameEngine {
           this.cb.onCallout?.("S-T-R-E-M-E!", "combo");
           this.lettersGot = [false, false, false, false, false, false];
           this.cb.onLetters?.([...this.lettersGot]);
+          this.addTime(5); // spelling STREME is a big recharge
           this.enterFlow();
         }
       }
@@ -1599,7 +1649,7 @@ export class SkateGameEngine {
     }
   }
 
-  private gameOver(finished: boolean) {
+  private gameOver(finished: boolean, timedOut = false) {
     this.state = "over";
     this.cb.onGameOver?.({
       score: this.score,
@@ -1609,6 +1659,7 @@ export class SkateGameEngine {
       tricks: this.trickCount,
       distance: Math.floor(this.distance),
       finished,
+      timedOut,
     });
   }
 

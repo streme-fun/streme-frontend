@@ -152,6 +152,9 @@ const ZONE_NAMES = [
   "OVERDRIVE",
 ];
 
+const START_TIME = 18; // mirrors engine START_TIME (initial clock display)
+const TIME_CAP = 26; // mirrors engine TIME_CAP (timer bar is scaled to this)
+
 const CALLOUT_COLORS: Record<CalloutKind, string> = {
   perfect: "#fde68a",
   sick: "#34d399",
@@ -187,6 +190,9 @@ export default function StremeSkateGame({
     { name: "NEON DOWNTOWN", index: 0, accent: "#67e8f9" }
   );
   const [special, setSpecial] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(START_TIME);
+  const [timeBonus, setTimeBonus] = useState<{ id: number; amount: number } | null>(null);
+  const timeBonusId = useRef(0);
   const [flow, setFlow] = useState(false);
   const [letters, setLetters] = useState<boolean[]>([
     false, false, false, false, false, false,
@@ -387,6 +393,21 @@ export default function StremeSkateGame({
     [playTone]
   );
 
+  // a great play recharged the clock — pop "+X.Xs" and chirp a reward chime
+  const handleTimeBonus = useCallback(
+    (amount: number) => {
+      const id = ++timeBonusId.current;
+      setTimeBonus({ id, amount });
+      playTone(720, 0.05, "sine", 0.045);
+      playTone(1080, 0.08, "sine", 0.04, 0.05);
+      setTimeout(
+        () => setTimeBonus((prev) => (prev && prev.id === id ? null : prev)),
+        850
+      );
+    },
+    [playTone]
+  );
+
   const showToast = useCallback((text: string, ms = 1600) => {
     setToast(text);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -488,6 +509,7 @@ export default function StremeSkateGame({
     handleGameOver,
     handleSfx,
     handleGrindTick,
+    handleTimeBonus,
     showToast,
     showCallout,
   });
@@ -497,6 +519,7 @@ export default function StremeSkateGame({
     handleGameOver,
     handleSfx,
     handleGrindTick,
+    handleTimeBonus,
     showToast,
     showCallout,
   };
@@ -518,6 +541,8 @@ export default function StremeSkateGame({
         setDistance(0);
         setProgress(0);
         setSpecial(0);
+        setTimeLeft(START_TIME);
+        setTimeBonus(null);
         setFlow(false);
         setLetters([false, false, false, false, false, false]);
         setToast(null);
@@ -545,6 +570,8 @@ export default function StremeSkateGame({
       onProgress: (p) => setProgress(p),
       onZone: (name, index, accent) => setZone({ name, index, accent }),
       onGrindTick: (lvl) => cbRef.current.handleGrindTick(lvl),
+      onTime: (s) => setTimeLeft(s),
+      onTimeBonus: (a) => cbRef.current.handleTimeBonus(a),
       onCallout: (text, kind) => cbRef.current.showCallout(text, kind),
       onPower: (kind) => setPower(kind),
       onSfx: (t) => cbRef.current.handleSfx(t),
@@ -922,6 +949,43 @@ export default function StremeSkateGame({
             >
               ♥ ONE LIFE
             </div>
+            {/* countdown clock — drains in real time, recharges on great plays */}
+            {(() => {
+              const low = timeLeft <= 4;
+              const mid = timeLeft <= 7;
+              const col = low ? "#f87171" : mid ? "#fbbf24" : "#34d399";
+              const pct = Math.max(0, Math.min(100, (timeLeft / TIME_CAP) * 100));
+              return (
+                <div className="mt-1 flex flex-col items-center">
+                  <div className="relative h-2.5 w-40 overflow-hidden rounded-full border border-white/10 bg-black/45">
+                    <div
+                      className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-100 ${
+                        low ? "animate-pulse" : ""
+                      }`}
+                      style={{ width: `${pct}%`, background: col, boxShadow: `0 0 8px ${col}` }}
+                    />
+                  </div>
+                  <div
+                    className={`mt-0.5 font-mono text-xs font-bold ${low ? "animate-pulse" : ""}`}
+                    style={{ color: col, textShadow: `0 0 8px ${col}` }}
+                  >
+                    ⏱ {timeLeft.toFixed(1)}s
+                  </div>
+                  {timeBonus && (
+                    <div
+                      key={timeBonus.id}
+                      className="font-mono text-sm font-extrabold text-emerald-300"
+                      style={{
+                        textShadow: "0 0 10px rgba(16,185,129,0.85)",
+                        animation: "skBankPop 0.85s ease-out forwards",
+                      }}
+                    >
+                      +{timeBonus.amount.toFixed(1)}s
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* STREME letters + special meter (top-left) */}
@@ -1245,7 +1309,8 @@ export default function StremeSkateGame({
         >
           <div className="w-full max-w-sm rounded-2xl bg-base-100/95 p-6 shadow-2xl text-center">
             <div className="text-sm font-bold uppercase tracking-widest opacity-60">
-              💥 Wipeout · {finishedRun.distance.toLocaleString()}m
+              {finishedRun.timedOut ? "⏱ Time up" : "💥 Wipeout"} ·{" "}
+              {finishedRun.distance.toLocaleString()}m
             </div>
             <div className="mt-2 font-mono text-5xl font-bold text-primary">
               {finishedRun.score.toLocaleString()}
