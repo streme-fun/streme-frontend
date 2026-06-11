@@ -59,28 +59,111 @@ export interface WarpletEligibility {
   warplets: WarpletItem[];
 }
 
-/** ipfs://CID (and /ipfs/CID) → a public gateway URL. */
-export function resolveIpfs(uri: string): string {
-  if (!uri) return "";
-  if (uri.startsWith("ipfs://")) {
-    return `https://ipfs.io/ipfs/${uri.slice(7).replace(/^ipfs\//, "")}`;
-  }
-  return uri;
+// Public IPFS gateways, RACED in parallel (first OK wins) so a slow or dead host
+// never blocks a Warplet's image. (cloudflare-ipfs.com is intentionally gone —
+// it was shut down; ipfs.io is kept but often slow, hence the race.)
+const IPFS_GATEWAYS = [
+  "https://gateway.pinata.cloud/ipfs/",
+  "https://dweb.link/ipfs/",
+  "https://ipfs.io/ipfs/",
+  "https://w3s.link/ipfs/",
+  "https://4everland.io/ipfs/",
+];
+
+/** Pull the CID(+path) out of an ipfs://… or …/ipfs/… URL, else null. */
+function ipfsPath(uri: string): string | null {
+  if (uri.startsWith("ipfs://")) return uri.slice(7).replace(/^ipfs\//, "");
+  const m = uri.match(/\/ipfs\/(.+)$/);
+  return m ? m[1] : null;
 }
 
-/** Decode an on-chain `data:application/json;base64,...` tokenURI. */
-function decodeDataUri(uri: string): { name?: string; image?: string } | null {
-  const m = uri.match(/^data:application\/json;base64,(.*)$/);
-  if (!m) return null;
+/** ipfs://CID (and /ipfs/CID) → a public gateway URL (first gateway). */
+export function resolveIpfs(uri: string): string {
+  const path = ipfsPath(uri);
+  return path ? `${IPFS_GATEWAYS[0]}${path}` : uri;
+}
+
+/**
+ * Fetch an asset that may live on IPFS, trying each gateway in turn; `data:` and
+ * plain http(s) URLs are fetched directly. Returns the first OK response, or null.
+ */
+export async function fetchAsset(
+  uri: string,
+  accept: string
+): Promise<Response | null> {
+  const path = ipfsPath(uri);
+  const urls = path ? IPFS_GATEWAYS.map((g) => g + path) : [uri];
+  const attempts = urls.map((url) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 9000);
+    return fetch(url, { headers: { Accept: accept }, signal: ctrl.signal })
+      .then((res) => {
+        clearTimeout(timer);
+        if (!res.ok) throw new Error(`${res.status}`);
+        return res;
+      })
+      .catch((e) => {
+        clearTimeout(timer);
+        throw e;
+      });
+  });
   try {
-    const json = Buffer.from(m[1], "base64").toString("utf-8");
-    return JSON.parse(json);
+    // first gateway to return OK wins; the slow/dead ones are abandoned
+    return await Promise.any(attempts);
   } catch {
     return null;
   }
 }
 
-/** Read & decode a single Warplet's metadata (used by the image proxy). */
+/** Best-effort SYNC decode of an inline JSON tokenURI (base64 or plain). */
+function decodeDataUri(uri: string): { name?: string; image?: string } | null {
+  const b64 = uri.match(/^data:application\/json;base64,(.*)$/);
+  if (b64) {
+    try {
+      return JSON.parse(Buffer.from(b64[1], "base64").toString("utf-8"));
+    } catch {
+      return null;
+    }
+  }
+  const plain = uri.match(/^data:application\/json(?:;[^,]*)?,([\s\S]*)$/);
+  if (plain) {
+    try {
+      return JSON.parse(decodeURIComponent(plain[1]));
+    } catch {
+      try {
+        return JSON.parse(plain[1]);
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Load a Warplet's metadata from ANY tokenURI shape: on-chain base64 JSON,
+ * on-chain plain/url-encoded JSON, or an off-chain ipfs://… / https://… URL.
+ */
+async function loadMetadata(
+  uri: string
+): Promise<{ name?: string; image?: string } | null> {
+  if (!uri) return null;
+  const inline = decodeDataUri(uri);
+  if (inline) return inline;
+  if (uri.startsWith("ipfs://") || uri.startsWith("http")) {
+    const res = await fetchAsset(uri, "application/json");
+    if (res) {
+      try {
+        return (await res.json()) as { name?: string; image?: string };
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+/** Read & decode a single Warplet's image URI (used by the image proxy). */
 export async function getWarpletImageUri(tokenId: bigint): Promise<string | null> {
   try {
     const uri = (await publicClient.readContract({
@@ -89,8 +172,9 @@ export async function getWarpletImageUri(tokenId: bigint): Promise<string | null
       functionName: "tokenURI",
       args: [tokenId],
     })) as string;
-    const meta = decodeDataUri(uri);
-    return meta?.image ? resolveIpfs(meta.image) : null;
+    const meta = await loadMetadata(uri);
+    // raw image — may be ipfs://, https://, or a data: URI; the proxy resolves it
+    return meta?.image || null;
   } catch {
     return null;
   }

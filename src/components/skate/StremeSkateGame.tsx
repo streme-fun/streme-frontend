@@ -88,9 +88,14 @@ function removeWarpletBg(url: string): Promise<HTMLImageElement> {
           bg += p[o + 1];
           bb += p[o + 2];
         }
+        let ba = 0;
+        for (const o of corners) ba += p[o + 3];
         br /= 4;
         bg /= 4;
         bb /= 4;
+        ba /= 4;
+        // already has a transparent background — leave it as-is
+        if (ba < 32) return resolve(img);
         const TOL = 66 * 66;
         const near = (o: number) => {
           const dr = p[o] - br,
@@ -100,6 +105,7 @@ function removeWarpletBg(url: string): Promise<HTMLImageElement> {
         };
         const visited = new Uint8Array(S * S);
         const stack: number[] = [];
+        let cleared = 0;
         const push = (x: number, y: number) => {
           if (x < 0 || y < 0 || x >= S || y >= S) return;
           const i = y * S + x;
@@ -108,6 +114,7 @@ function removeWarpletBg(url: string): Promise<HTMLImageElement> {
           const o = i * 4;
           if (near(o)) {
             p[o + 3] = 0;
+            cleared++;
             stack.push(x, y);
           }
         };
@@ -123,6 +130,9 @@ function removeWarpletBg(url: string): Promise<HTMLImageElement> {
           push(x, y + 1);
           push(x, y - 1);
         }
+        // if the key matched most of the sprite, the bg wasn't a clean colour —
+        // keep the original rather than show a near-empty rider
+        if (cleared > S * S * 0.92) return resolve(img);
         ctx.putImageData(data, 0, 0);
         const out = new Image();
         out.onload = () => resolve(out);
@@ -1207,17 +1217,19 @@ export default function StremeSkateGame({
 
       {/* ---------- start screen (title menu) ---------- */}
       {phase === "ready" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center pointer-events-none">
-          {/* legibility scrim — keep it dark all the way to the edges so the
-              menu text reads cleanly over the moving course behind it */}
+        <div className="absolute inset-0 pointer-events-none">
+          {/* legibility scrim — sits BEHIND the menu content (the relative z-10
+              wrapper below), so it darkens the moving course, never the text */}
           <div
             className="absolute inset-0 backdrop-blur-[2px]"
             style={{
               background:
-                "radial-gradient(125% 90% at 50% 42%, rgba(6,3,18,0.92) 0%, rgba(6,3,18,0.82) 55%, rgba(6,3,18,0.74) 100%)",
+                "radial-gradient(130% 95% at 50% 42%, rgba(6,3,18,0.85) 0%, rgba(6,3,18,0.7) 60%, rgba(6,3,18,0.6) 100%)",
             }}
           />
 
+          {/* all menu content — layered above the scrim so it stays readable */}
+          <div className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
           {/* tagline */}
           <div
             className="rounded-full border border-cyan-300/30 bg-white/5 px-3 py-1 text-[10px] font-bold tracking-[0.34em] text-cyan-200/90"
@@ -1261,8 +1273,9 @@ export default function StremeSkateGame({
           {/* title */}
           <div className="relative" style={{ animation: "skRise 0.55s ease-out both" }}>
             <h1
-              className="text-5xl font-black italic leading-none tracking-tighter"
+              className="whitespace-nowrap font-black italic leading-none tracking-tighter"
               style={{
+                fontSize: "clamp(1.9rem, 9vw, 3rem)",
                 backgroundImage:
                   "linear-gradient(90deg,#67e8f9,#ec4899,#fde68a,#67e8f9)",
                 backgroundSize: "200% auto",
@@ -1342,6 +1355,7 @@ export default function StremeSkateGame({
             >
               {selectedWarplet ? "✨ Warplet" : "🛹 Skater"}
             </button>
+          </div>
           </div>
         </div>
       )}
