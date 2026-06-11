@@ -347,6 +347,7 @@ export class SkateGameEngine {
   // run timer
   private timeLeft = START_TIME;
   private lastTimeSent = -1;
+  private sunGlide = START_TIME / TIME_CAP; // eased sun height = time remaining
 
   // visuals
   private boardRot = 0;
@@ -560,6 +561,7 @@ export class SkateGameEngine {
     this.rocketT = 0;
     this.timeLeft = START_TIME;
     this.lastTimeSent = -1;
+    this.sunGlide = START_TIME / TIME_CAP;
     this.boardRot = 0;
     this.crashT = 0;
     this.shake = 0;
@@ -1666,6 +1668,10 @@ export class SkateGameEngine {
   // ----------------------------------------------------------- visuals
 
   private advanceVisuals(dt: number, speed: number) {
+    // the sun rides the clock — ease its height toward time-remaining so it
+    // drifts down as time runs out and lifts back up when you bank a recharge
+    const sunTarget = Math.max(0, Math.min(1, this.timeLeft / TIME_CAP));
+    this.sunGlide += (sunTarget - this.sunGlide) * Math.min(1, dt * 2.2);
     const feetY = this.groundY - this.py;
     this.trail.unshift({ x: this.skaterX, y: feetY });
     if (this.trail.length > 16) this.trail.pop();
@@ -1790,8 +1796,10 @@ export class SkateGameEngine {
     ctx.globalAlpha = 1;
 
     const sunX = W * 0.62;
-    const sunY = this.groundY - H * 0.2;
     const sunR = Math.min(W, H) * 0.16;
+    // sun-as-clock: high (near noon) when time is full, sinking below the
+    // horizon as it runs out. Smoothed via sunGlide so it glides, not jumps.
+    const sunY = this.groundY + sunR - this.sunGlide * (H * 0.42 + sunR);
     const sg = ctx.createLinearGradient(0, sunY - sunR, 0, sunY + sunR);
     sg.addColorStop(0, this.sunCol(0));
     sg.addColorStop(0.45, this.sunCol(1));

@@ -153,7 +153,7 @@ const ZONE_NAMES = [
 ];
 
 const START_TIME = 18; // mirrors engine START_TIME (initial clock display)
-const TIME_CAP = 26; // mirrors engine TIME_CAP (timer bar is scaled to this)
+const STREME_TOKEN = "0x3B3Cd21242BA44e9865B066e5EF5d1cC1030CC58";
 
 const CALLOUT_COLORS: Record<CalloutKind, string> = {
   perfect: "#fde68a",
@@ -843,6 +843,23 @@ export default function StremeSkateGame({
     }
   }, [ensureAudio, playTone, showToast]);
 
+  // send a user who's short on $STREME to buy it. In the Farcaster mini-app
+  // this opens the native swap sheet (no leaving the game); on the web we fall
+  // back to the canonical token page where the full buy UI lives.
+  const handleBuyStreme = useCallback(async () => {
+    if (isMiniAppView && isSDKLoaded) {
+      try {
+        await sdk.actions.swapToken({
+          buyToken: `eip155:8453/erc20:${STREME_TOKEN}`,
+        });
+        return;
+      } catch (e) {
+        console.error("swapToken failed, falling back to token page:", e);
+      }
+    }
+    window.open(`/token/${STREME_TOKEN}`, "_blank");
+  }, [isMiniAppView, isSDKLoaded]);
+
   const handleShare = useCallback(async () => {
     const username =
       (isMiniAppView && farcasterContext?.user?.username) || undefined;
@@ -949,27 +966,19 @@ export default function StremeSkateGame({
             >
               ♥ ONE LIFE
             </div>
-            {/* countdown clock — drains in real time, recharges on great plays */}
+            {/* the sun (in-canvas) IS the clock; this is just a compact readout
+                that flashes red as it runs out, plus the +Xs recharge pop */}
             {(() => {
               const low = timeLeft <= 4;
               const mid = timeLeft <= 7;
-              const col = low ? "#f87171" : mid ? "#fbbf24" : "#34d399";
-              const pct = Math.max(0, Math.min(100, (timeLeft / TIME_CAP) * 100));
+              const col = low ? "#f87171" : mid ? "#fbbf24" : "#fcd34d";
               return (
-                <div className="mt-1 flex flex-col items-center">
-                  <div className="relative h-2.5 w-40 overflow-hidden rounded-full border border-white/10 bg-black/45">
-                    <div
-                      className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-100 ${
-                        low ? "animate-pulse" : ""
-                      }`}
-                      style={{ width: `${pct}%`, background: col, boxShadow: `0 0 8px ${col}` }}
-                    />
-                  </div>
+                <div className="mt-0.5 flex flex-col items-center">
                   <div
-                    className={`mt-0.5 font-mono text-xs font-bold ${low ? "animate-pulse" : ""}`}
+                    className={`font-mono text-xs font-bold ${low ? "animate-pulse" : ""}`}
                     style={{ color: col, textShadow: `0 0 8px ${col}` }}
                   >
-                    ⏱ {timeLeft.toFixed(1)}s
+                    ☀ {timeLeft.toFixed(1)}s
                   </div>
                   {timeBonus && (
                     <div
@@ -1465,6 +1474,14 @@ export default function StremeSkateGame({
                       {Math.max(warplet.streme, warplet.staked).toLocaleString()})
                     </span>
                   </div>
+                  {warplet.streme < 10_000_000 && warplet.staked < 10_000_000 && (
+                    <button
+                      onClick={handleBuyStreme}
+                      className="btn btn-primary btn-sm mt-3 w-full"
+                    >
+                      💰 Buy $STREME
+                    </button>
+                  )}
                 </div>
               ) : null}
             </div>
