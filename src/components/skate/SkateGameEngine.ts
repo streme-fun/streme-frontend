@@ -1250,9 +1250,12 @@ export class SkateGameEngine {
     }
     this.refreshScore();
 
-    // ---- countdown clock: drains in real time (faster as it gets harder),
-    //      recharged by great plays. Zero = the run is over.
-    this.timeLeft -= (1 + this.difficulty() * 0.35) * dt;
+    // ---- countdown clock: drains in real time and SPEEDS UP the longer you
+    //      last (1× at the drop-in → up to 3.5× deep into a run), so late runs
+    //      demand constant trick-chaining — a natural soft cap for an endless
+    //      game. Recharged by great plays; zero = the run is over.
+    const drainRate = Math.min(3.5, 1 + this.runTime / 90);
+    this.timeLeft -= drainRate * dt;
     if (this.timeLeft <= 0) {
       this.timeLeft = 0;
       this.emitTime();
