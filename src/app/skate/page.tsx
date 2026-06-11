@@ -3,6 +3,16 @@ import SkatePageClient from "./SkatePageClient";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://streme.fun";
 
+// Cache-busting token appended to the OG image URL. Vercel sets
+// VERCEL_GIT_COMMIT_SHA per deploy, so every deploy yields a fresh image URL —
+// Farcaster / CDN scrapers re-fetch the new render instead of serving a stale
+// one when the card art changes. Set NEXT_PUBLIC_OG_VERSION to force a bust
+// without a deploy (e.g. after swapping the background asset).
+const OG_VERSION =
+  process.env.NEXT_PUBLIC_OG_VERSION ||
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ||
+  "dev";
+
 interface Props {
   searchParams: Promise<{ s?: string; by?: string; r?: string }>;
 }
@@ -42,9 +52,8 @@ export async function generateMetadata({
     if (challenge.by) imageParams.set("by", challenge.by);
     if (challenge.rank) imageParams.set("r", String(challenge.rank));
   }
-  const imageUrl = `${baseUrl}/api/skate/image${
-    imageParams.size > 0 ? `?${imageParams.toString()}` : ""
-  }`;
+  imageParams.set("v", OG_VERSION);
+  const imageUrl = `${baseUrl}/api/skate/image?${imageParams.toString()}`;
 
   const pageParams = new URLSearchParams();
   if (challenge) {
