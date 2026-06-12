@@ -86,6 +86,14 @@ interface Ramp {
   xLip: number;
   height: number;
   launch: number;
+  vcap?: number; // per-ramp launch velocity ceiling (vert walls fire higher)
+}
+interface Slope {
+  // a descending landing wedge — drops from `height` at x0 to street level at
+  // x1. Land on its face for a HILL BOMB momentum surge; riding it adds speed.
+  x0: number;
+  x1: number;
+  height: number;
 }
 interface Loop {
   x: number; // entry x (bottom of the loop)
@@ -170,6 +178,12 @@ const BOOST_SICK = 90;
 const BOOST_DECAY = 150;
 const BOOST_CAP = 300;
 
+// terrain momentum (Tiny Wings / Alto): riding a downslope pulls you faster,
+// and stomping a landing ONTO a downslope face pays a HILL BOMB surge
+const SLOPE_GRAVITY = 190; // extra accel (px/s²) while riding a downslope
+const SLOPE_BOMB_BOOST = 120;
+const SLOPE_BOMB_SPEED = 60;
+
 const MAGNET_T = 6;
 const MAGNET_R = 175;
 const ROCKET_T = 3.2;
@@ -189,6 +203,10 @@ const FLIP_NAMES = ["KICKFLIP", "360 FLIP", "BACKFLIP", "VARIAL", "HARDFLIP"];
 // Endless — themed zones cycle forever (~ZONE_LEN px each), each with its own
 // sky/sun palette (visual variety) and set-piece weight mix (gameplay variety).
 // Later cycles are harder because difficulty rides the run clock, not position.
+// Zones also carry SIGNATURE set pieces so each biome plays differently, not
+// just looks different: GAP CITY runs mega-ramps (kicker → gap → landing
+// slope), VERT HEIGHTS runs sky-high vert walls, OVERDRIVE runs flowlines
+// (kicker → downslope momentum cadence).
 const ZONE_LEN = 7200; // world px per zone before it transitions to the next
 const START_LIVES = 1; // one life — endless, you go till you wipe out
 
@@ -229,7 +247,7 @@ const ZONES: Zone[] = [
       sky: [[26, 8, 38], [74, 18, 48], [209, 69, 58], [240, 138, 42]],
       sun: [[254, 240, 138], [251, 146, 60], [239, 68, 68], [136, 19, 55]],
     },
-    mix: { gap: 1.8, kickerGap: 1.8, doubleKicker: 1.2, kickerAir: 0.9, rail: 0.7, flat: 0.7 },
+    mix: { gap: 1.8, kickerGap: 1.4, megaRamp: 1.7, doubleKicker: 1.2, kickerAir: 0.9, rail: 0.7, flat: 0.7 },
   },
   {
     name: "VERT HEIGHTS",
@@ -238,7 +256,7 @@ const ZONES: Zone[] = [
       sky: [[12, 6, 38], [42, 13, 84], [122, 31, 174], [192, 38, 160]],
       sun: [[244, 114, 182], [219, 39, 119], [168, 85, 247], [88, 28, 135]],
     },
-    mix: { quarter: 1.6, kickerAir: 1.6, kickerRail: 1.4, stairs: 1.2, doubleKicker: 1.2, kickerGap: 1.0, loop: 1.0, flat: 0.6 },
+    mix: { vertWall: 1.8, quarter: 1.2, kickerAir: 1.6, kickerRail: 1.4, stairs: 1.2, doubleKicker: 1.2, kickerGap: 1.0, loop: 1.0, flat: 0.6 },
   },
   {
     name: "OVERDRIVE",
@@ -247,7 +265,7 @@ const ZONES: Zone[] = [
       sky: [[22, 8, 38], [90, 18, 64], [236, 72, 153], [251, 191, 36]],
       sun: [[253, 230, 138], [244, 114, 182], [239, 68, 68], [124, 28, 92]],
     },
-    mix: { quarter: 1.4, kickerGap: 1.4, kickerAir: 1.3, rhythm: 1.2, doubleKicker: 1.2, rail: 1.0, gap: 1.2, kickerRail: 1.2, loop: 1.1 },
+    mix: { flowline: 1.5, quarter: 1.4, kickerGap: 1.4, kickerAir: 1.3, rhythm: 1.2, doubleKicker: 1.2, rail: 1.0, gap: 1.2, kickerRail: 1.2, loop: 1.1 },
   },
 ];
 
@@ -307,6 +325,7 @@ export class SkateGameEngine {
   private letters: Letter[] = [];
   private powers: Power[] = [];
   private ramps: Ramp[] = [];
+  private slopes: Slope[] = [];
   private loops: Loop[] = [];
   private loopActive: Loop | null = null;
   private loopT = 0;
@@ -525,6 +544,7 @@ export class SkateGameEngine {
     this.gaps = [];
     this.rails = [];
     this.ramps = [];
+    this.slopes = [];
     this.loops = [];
     this.loopActive = null;
     this.loopT = 0;
@@ -760,16 +780,54 @@ export class SkateGameEngine {
 
   // ----------------------------------------------------------- course gen
 
+  // TWO RNG streams. The course stream is reset to `baseSeed` on every prime,
+  // so a given seed always lays the SAME line — which is what makes the DAILY
+  // LINE (one shared seed for everyone) and ghost-course alignment work. The
+  // FX stream feeds particles/shake and is never reset: visuals must not be
+  // able to perturb the course.
   private rand(n: number): number {
-    this.waveSeed = (this.waveSeed * 1103515245 + 12345) & 0x7fffffff;
-    return (this.waveSeed / 0x7fffffff) * n;
+    this.fxSeed = (this.fxSeed * 1103515245 + 12345) & 0x7fffffff;
+    return (this.fxSeed / 0x7fffffff) * n;
   }
-  private waveSeed = 20240611;
+  private fxSeed = 987654321;
+
+  private crand(n: number): number {
+    this.courseSeed = (this.courseSeed * 1103515245 + 12345) & 0x7fffffff;
+    return (this.courseSeed / 0x7fffffff) * n;
+  }
+  private courseSeed = 20240611;
+  private baseSeed = 20240611;
+  private deterministicGen = false;
+
+  /**
+   * Point the course generator at a seed (takes effect on the next reset /
+   * toTitle). Deterministic mode — the DAILY LINE — additionally derives
+   * difficulty, unlocks and hazard lead from POSITION instead of run time, so
+   * the generated course is a pure function of the seed: every player skates
+   * the same line regardless of pace.
+   */
+  setCourse(seed: number, deterministic = false) {
+    this.baseSeed = (seed & 0x7fffffff) || 1;
+    this.deterministicGen = deterministic;
+  }
+
+  /** Course-gen clock: real run time normally; position-equivalent in daily. */
+  private genTime(): number {
+    return this.deterministicGen ? this.cursorX / 430 : this.runTime;
+  }
+
+  /** Speed estimate for hazard lead — deterministic in daily mode. */
+  private genSpeed(): number {
+    return this.deterministicGen
+      ? Math.min(740, BASE_SPEED + this.genTime() * 7)
+      : this.effSpeed();
+  }
 
   private difficulty(): number {
-    // endless: difficulty rides the run clock, not position. Gentle for the
-    // first ~80s, then holds near max while speed + pacing keep ramping.
-    return Math.min(this.runTime / 80, 1);
+    // endless: difficulty rides the run clock (position-equivalent time in
+    // daily mode). Gentle for the first ~80s, then holds near max while speed
+    // + pacing keep ramping.
+    return Math.min(this.genTime() / 80, 1);
   }
 
   private zoneIndexAt(worldX: number): number {
@@ -779,11 +837,11 @@ export class SkateGameEngine {
 
   /** Extra runway before a hazard, scaled by speed so fast = more warning. */
   private lead(base: number): number {
-    return base + this.effSpeed() * 0.16;
+    return base + this.genSpeed() * 0.16;
   }
 
   private primeCourse() {
-    this.waveSeed = 20240611;
+    this.courseSeed = this.baseSeed;
     this.cursorX = 760;
     while (this.cursorX < this.px + this.W * 2.5) this.addChunk();
   }
@@ -796,6 +854,7 @@ export class SkateGameEngine {
     this.gaps = this.gaps.filter((g) => g.x1 > cull);
     this.rails = this.rails.filter((r) => r.x1 > cull);
     this.ramps = this.ramps.filter((r) => r.xLip > cull);
+    this.slopes = this.slopes.filter((s) => s.x1 > cull);
     this.loops = this.loops.filter((l) => l.x + 2 * l.r > cull);
     this.bubbles = this.bubbles.filter((b) => b.x > cull && !b.taken);
     this.letters = this.letters.filter((l) => l.x > cull && !l.taken);
@@ -815,28 +874,34 @@ export class SkateGameEngine {
     const slot = this.letterIdx % STREME_LETTERS.length;
     this.letters.push({ x, y, ch: STREME_LETTERS[slot], slot, taken: false });
     this.letterIdx = (this.letterIdx + 1) % STREME_LETTERS.length;
-    this.nextLetterAt = this.cursorX + 2400 + this.rand(800);
+    this.nextLetterAt = this.cursorX + 2400 + this.crand(800);
   }
 
   private maybePower(x: number, y: number) {
     this.chunksSincePower++;
     if (this.chunksSincePower < 7) return;
-    if (this.rand(1) < 0.55) return;
+    if (this.crand(1) < 0.55) return;
     this.chunksSincePower = 0;
     const kind: PowerKind = this.powerIdx++ % 2 === 0 ? "magnet" : "rocket";
     this.powers.push({ x, y, kind, taken: false });
   }
 
-  private addRamp(x0: number, size: "small" | "med" | "big"): Ramp {
+  private addRamp(x0: number, size: "small" | "med" | "big", vcap?: number): Ramp {
     const d = this.difficulty();
     let len: number, h: number, launch: number;
     // exaggerated size range: little kickers vs huge launch ramps
     if (size === "small") { len = 76; h = 40 + d * 10; launch = 600 + d * 60; }
     else if (size === "med") { len = 116; h = 84 + d * 16; launch = 880 + d * 90; }
     else { len = 168; h = 150 + d * 26; launch = 1180 + d * 130; }
-    const r: Ramp = { x0, xLip: x0 + len, height: h, launch };
+    const r: Ramp = { x0, xLip: x0 + len, height: h, launch, vcap };
     this.ramps.push(r);
     return r;
+  }
+
+  private addSlope(x0: number, height: number, len: number): Slope {
+    const s: Slope = { x0, x1: x0 + len, height };
+    this.slopes.push(s);
+    return s;
   }
 
   private coinLine(x: number, y: number, n: number, step = 44) {
@@ -847,9 +912,9 @@ export class SkateGameEngine {
 
   private spFlat() {
     const x = this.cursorX;
-    const len = 230 + this.rand(120);
+    const len = 230 + this.crand(120);
     this.coinLine(x + 50, 44, 6);
-    if (this.rand(1) < 0.4) this.bubbleArc(x + len / 2, 90, 80, 5, 36);
+    if (this.crand(1) < 0.4) this.bubbleArc(x + len / 2, 90, 80, 5, 36);
     this.maybeLetter(x + len / 2, 120);
     this.maybePower(x + len / 2, 150);
     this.cursorX = x + len;
@@ -857,90 +922,90 @@ export class SkateGameEngine {
 
   private spKickerAir(size: "small" | "med") {
     const x = this.cursorX;
-    const r = this.addRamp(x + 110 + this.rand(50), size);
+    const r = this.addRamp(x + 110 + this.crand(50), size);
     this.bubbleArc(r.xLip + 90, r.height + 50, 120, 5, 38);
     this.maybeLetter(r.xLip + 90, r.height + 150);
-    this.cursorX = r.xLip + 320 + this.rand(60);
+    this.cursorX = r.xLip + 320 + this.crand(60);
   }
 
   private spGap() {
     // narrow, jumpable-without-a-ramp gap; coin arc traces the jump
     const x = this.cursorX;
     const d = this.difficulty();
-    const w = 90 + d * 80 + this.rand(50);
-    const gx = x + this.lead(120) + this.rand(60);
+    const w = 90 + d * 80 + this.crand(50);
+    const gx = x + this.lead(120) + this.crand(60);
     this.gaps.push({ x0: gx, x1: gx + w });
     this.bubbleArc(gx + w / 2, 120, 70, 5, 34);
     this.maybeLetter(gx + w / 2, 170);
     this.maybePower(gx + w / 2, 200);
-    this.cursorX = gx + w + 220 + this.rand(70);
+    this.cursorX = gx + w + 220 + this.crand(70);
   }
 
   private spKickerGap() {
     // WIDE gap — always fronted by a ramp so it's clearable (solvability rule)
     const x = this.cursorX;
     const d = this.difficulty();
-    const r = this.addRamp(x + this.lead(110) + this.rand(40), "med");
-    const w = 170 + d * 200 + this.rand(70);
+    const r = this.addRamp(x + this.lead(110) + this.crand(40), "med");
+    const w = 170 + d * 200 + this.crand(70);
     const gx = r.xLip + 6;
     this.gaps.push({ x0: gx, x1: gx + w });
     this.bubbleArc(gx + w / 2, r.height + 30, 110, 6, 36);
     this.maybeLetter(gx + w / 2, r.height + 170);
-    this.cursorX = gx + w + 260 + this.rand(80);
+    this.cursorX = gx + w + 260 + this.crand(80);
   }
 
   private spRail() {
     const x = this.cursorX;
-    const len = 220 + this.rand(160);
-    const h = 66 + this.rand(22);
-    const rx = x + 130 + this.rand(60);
+    const len = 220 + this.crand(160);
+    const h = 66 + this.crand(22);
+    const rx = x + 130 + this.crand(60);
     this.rails.push({ x0: rx, x1: rx + len, height: h });
     this.coinLine(rx + 26, h + 20, 6, len / 6);
     this.maybeLetter(rx + len / 2, h + 52);
     this.maybePower(rx + len / 2, h + 90);
-    this.cursorX = rx + len + 200 + this.rand(70);
+    this.cursorX = rx + len + 200 + this.crand(70);
   }
 
   private spRailGap() {
     // a gap under a rail — grind across, or jump it from the ground
     const x = this.cursorX;
-    const len = 240 + this.rand(140);
-    const h = 64 + this.rand(20);
-    const rx = x + this.lead(110) + this.rand(50);
+    const len = 240 + this.crand(140);
+    const h = 64 + this.crand(20);
+    const rx = x + this.lead(110) + this.crand(50);
     this.rails.push({ x0: rx, x1: rx + len, height: h });
     const gx = rx + len * 0.32;
     this.gaps.push({ x0: gx, x1: gx + Math.min(len * 0.36, 140) });
     this.coinLine(rx + 26, h + 20, 6, len / 6);
     this.maybeLetter(rx + len / 2, h + 52);
-    this.cursorX = rx + len + 220 + this.rand(70);
+    this.cursorX = rx + len + 220 + this.crand(70);
   }
 
   private spKickerRail() {
     // high line: ramp launches you up to an elevated rail; ground stays clear
     const x = this.cursorX;
-    const r = this.addRamp(x + 120 + this.rand(40), "med");
+    const r = this.addRamp(x + 120 + this.crand(40), "med");
     const rx = r.xLip + 110;
-    const len = 200 + this.rand(120);
+    const len = 200 + this.crand(120);
     const railH = r.height + 58;
     this.rails.push({ x0: rx, x1: rx + len, height: railH });
     this.coinLine(rx + 20, railH + 18, 5, len / 5);
     this.maybeLetter(rx + len / 2, railH + 50);
-    this.cursorX = rx + len + 220 + this.rand(70);
+    this.cursorX = rx + len + 220 + this.crand(70);
   }
 
   private spDoubleKicker() {
     const x = this.cursorX;
-    const r1 = this.addRamp(x + 120 + this.rand(40), "small");
+    const r1 = this.addRamp(x + 120 + this.crand(40), "small");
     this.bubbleArc(r1.xLip + 70, r1.height + 40, 90, 4, 34);
     const r2 = this.addRamp(r1.xLip + 220, "small");
     this.bubbleArc(r2.xLip + 70, r2.height + 40, 90, 4, 34);
-    this.cursorX = r2.xLip + 280 + this.rand(60);
+    this.cursorX = r2.xLip + 280 + this.crand(60);
   }
 
   private spQuarter() {
     // crescendo set piece — big quarterpipe, huge air, sky-high reward
     const x = this.cursorX;
-    const r = this.addRamp(x + 140 + this.rand(40), "big");
+    const r = this.addRamp(x + 140 + this.crand(40), "big");
     this.bubbleArc(r.xLip + 100, r.height + 60, 160, 6, 40);
     this.maybeLetter(r.xLip + 100, r.height + 220);
     this.powers.push({
@@ -950,7 +1015,7 @@ export class SkateGameEngine {
       taken: false,
     });
     this.chunksSincePower = 0;
-    this.cursorX = r.xLip + 440 + this.rand(80);
+    this.cursorX = r.xLip + 440 + this.crand(80);
   }
 
   private spLoop() {
@@ -968,7 +1033,7 @@ export class SkateGameEngine {
     // "rhythm game" beat OlliOlli leans on. No gaps, just flow + coins.
     const x = this.cursorX;
     let rx = x + 110;
-    const n = 3 + Math.floor(this.rand(1.6));
+    const n = 3 + Math.floor(this.crand(1.6));
     for (let i = 0; i < n; i++) {
       const r = this.addRamp(rx, "small");
       this.bubbleArc(r.xLip + 48, r.height + 34, 64, 3, 30);
@@ -983,9 +1048,9 @@ export class SkateGameEngine {
     // landing on solid ground (a satisfying grind line, no pit risk)
     const x = this.cursorX;
     let rx = x + 130;
-    let h = 124 + this.rand(20);
+    let h = 124 + this.crand(20);
     for (let i = 0; i < 3; i++) {
-      const len = 116 + this.rand(40);
+      const len = 116 + this.crand(40);
       this.rails.push({ x0: rx, x1: rx + len, height: h });
       this.coinLine(rx + 16, h + 18, 3, len / 3);
       rx += len + 42;
@@ -995,10 +1060,62 @@ export class SkateGameEngine {
     this.cursorX = rx + 150;
   }
 
+  private spMegaRamp() {
+    // GAP CITY signature — kicker, a yawning gap, then a landing slope: clear
+    // the gap and stomp the downhill face for a HILL BOMB momentum surge
+    // (Tiny Wings / Alto: read the terrain, ride it)
+    const x = this.cursorX;
+    const d = this.difficulty();
+    const r = this.addRamp(x + this.lead(120) + this.crand(40), "med");
+    const w = 150 + d * 150 + this.crand(60);
+    const gx = r.xLip + 6;
+    this.gaps.push({ x0: gx, x1: gx + w });
+    const s = this.addSlope(gx + w, 64 + this.crand(18), 190 + this.crand(50));
+    this.bubbleArc(gx + w / 2, r.height + 40, 110, 6, 38);
+    this.maybeLetter(s.x1 + 60, 120);
+    this.cursorX = s.x1 + 240 + this.crand(70);
+  }
+
+  private spVertWall() {
+    // VERT HEIGHTS signature — a towering quarter with a raised launch ceiling
+    // (every other ramp caps lower): real hang-time for multi-flip airs, with
+    // a coin ladder climbing to a letter at the apex
+    const x = this.cursorX;
+    const r = this.addRamp(x + this.lead(130) + this.crand(40), "big", 920);
+    for (let i = 0; i < 5; i++) {
+      this.bubbles.push({
+        x: r.xLip + 70 + i * 26,
+        y: r.height + 90 + i * 44,
+        taken: false,
+      });
+    }
+    this.maybeLetter(r.xLip + 190, r.height + 260);
+    this.cursorX = r.xLip + 430 + this.crand(80);
+  }
+
+  private spFlowline() {
+    // OVERDRIVE signature — kicker → downslope cadence: launch, match the
+    // downhill, surge, repeat. Pure momentum reading, no pit risk.
+    const x = this.cursorX;
+    let cx = x + 110;
+    const n = 2 + (this.crand(1) < 0.5 ? 0 : 1);
+    for (let i = 0; i < n; i++) {
+      const r = this.addRamp(cx, "small");
+      const s = this.addSlope(
+        r.xLip + 86,
+        Math.max(34, r.height - 6),
+        150 + this.crand(40)
+      );
+      this.bubbleArc(r.xLip + 50, r.height + 36, 70, 3, 30);
+      cx = s.x1 + 120;
+    }
+    this.cursorX = cx + 120;
+  }
+
   private spRest() {
     // a forced breather after a challenge cluster — long, safe, coins to grab
     const x = this.cursorX;
-    const len = 320 + this.rand(120);
+    const len = 320 + this.crand(120);
     this.coinLine(x + 50, 44, 8, 52);
     this.maybeLetter(x + len / 2, 110);
     this.cursorX = x + len;
@@ -1020,7 +1137,7 @@ export class SkateGameEngine {
     this.cursorX = x + len + 120;
   }
 
-  private readonly HARD = new Set(["kickerGap", "railGap", "kickerRail", "quarter"]);
+  private readonly HARD = new Set(["kickerGap", "railGap", "kickerRail", "quarter", "megaRamp"]);
 
   private buildChunk(name: string, d: number) {
     switch (name) {
@@ -1036,6 +1153,9 @@ export class SkateGameEngine {
       case "loop": this.spLoop(); break;
       case "rhythm": this.spRhythm(); break;
       case "stairs": this.spStairs(); break;
+      case "megaRamp": this.spMegaRamp(); break;
+      case "vertWall": this.spVertWall(); break;
+      case "flowline": this.spFlowline(); break;
       default: this.spFlat();
     }
   }
@@ -1050,6 +1170,9 @@ export class SkateGameEngine {
       case "railGap": return t > 28;
       case "kickerRail": return t > 30;
       case "kickerGap": return t > 38;
+      case "flowline": return t > 22;
+      case "megaRamp": return t > 34;
+      case "vertWall": return t > 42;
       case "quarter": return t > 46;
       case "loop": return t > 58;
       default: return true; // flat, kickerAir, rail — always available
@@ -1066,7 +1189,7 @@ export class SkateGameEngine {
   private addChunk() {
     this.chunkCount++;
     const d = this.difficulty();
-    const t = this.runTime;
+    const t = this.genTime();
 
     // --- opening: orient to speed + teach the mechanics on safe ground ---
     if (this.chunkCount <= 2) { this.spFlat(); this.lastChunk = "flat"; return; }
@@ -1083,7 +1206,7 @@ export class SkateGameEngine {
     }
 
     // --- periodic REWARD corridor before the difficulty climbs ---
-    if (this.chunksSinceReward >= 6 && this.rand(1) < 0.6) {
+    if (this.chunksSinceReward >= 6 && this.crand(1) < 0.6) {
       this.chunksSinceReward = 0;
       this.spReward();
       this.lastChunk = "reward";
@@ -1106,7 +1229,7 @@ export class SkateGameEngine {
     if (choices.length === 0) { this.spFlat(); this.lastChunk = "flat"; return; }
 
     const total = choices.reduce((s, [, w]) => s + w, 0);
-    let r = this.rand(total);
+    let r = this.crand(total);
     let pick = choices[0][0];
     for (const [name, w] of choices) {
       if (r < w) { pick = name; break; }
@@ -1141,11 +1264,24 @@ export class SkateGameEngine {
     return r.height * t * t;
   }
 
+  private slopeAt(worldX: number): Slope | null {
+    for (const s of this.slopes) if (worldX >= s.x0 && worldX < s.x1) return s;
+    return null;
+  }
+
+  /** Eased downslope surface (steep drop-in, mellow runout) above baseline. */
+  private slopeSurface(s: Slope, worldX: number): number {
+    const t = Math.min(Math.max((worldX - s.x0) / (s.x1 - s.x0), 0), 1);
+    return s.height * (1 - t) * (1 - t);
+  }
+
   /** Ground height at a world x — ramp surface, 0 flat, or NaN over a gap. */
   private surfaceAt(worldX: number): number {
     for (const g of this.gaps) if (worldX > g.x0 && worldX < g.x1) return NaN;
     const r = this.rampAt(worldX);
     if (r) return this.rampSurface(r, worldX);
+    const s = this.slopeAt(worldX);
+    if (s) return this.slopeSurface(s, worldX);
     return 0;
   }
 
@@ -1355,9 +1491,25 @@ export class SkateGameEngine {
         this.rampUnder = null;
         this.launchFromRamp(r);
       } else {
-        this.rampUnder = null;
-        this.py = 0;
-        this.boardRot *= Math.max(0, 1 - dt * 12);
+        const slope = this.slopeAt(this.px);
+        if (slope) {
+          // bombing a downhill — gravity pulls you faster while you ride it
+          this.rampUnder = null;
+          this.py = this.slopeSurface(slope, this.px);
+          const grad =
+            (this.slopeSurface(slope, this.px + 5) -
+              this.slopeSurface(slope, this.px - 5)) /
+            10;
+          this.boardRot = -Math.atan(grad);
+          this.speed = Math.min(MAX_SPEED, this.speed + SLOPE_GRAVITY * dt);
+          if (this.rand(1) < 0.3) {
+            this.spark(this.skaterX - 8, this.groundY - this.py + 4, 1);
+          }
+        } else {
+          this.rampUnder = null;
+          this.py = 0;
+          this.boardRot *= Math.max(0, 1 - dt * 12);
+        }
       }
     } else if (this.state === "airborne") {
       if (this.coyoteT > 0) this.coyoteT = Math.max(0, this.coyoteT - dt);
@@ -1493,8 +1645,9 @@ export class SkateGameEngine {
       0,
       Math.min(1, (this.effSpeed() - BASE_SPEED) / (MAX_SPEED - BASE_SPEED))
     );
-    // cap so even the big ramps keep you on screen (height still varies the feel)
-    this.vy = Math.min(700, r.launch * (0.85 + 0.3 * norm));
+    // cap so even the big ramps keep you on screen (height still varies the
+    // feel) — vert walls carry their own raised ceiling for real hang-time
+    this.vy = Math.min(r.vcap ?? 700, r.launch * (0.85 + 0.3 * norm));
     this.boost = Math.min(BOOST_CAP, this.boost + 55); // ramps fling you forward
     this.spinV = 0;
     this.rotAccum = 0;
@@ -1577,6 +1730,16 @@ export class SkateGameEngine {
       this.cb.onCallout?.("CLOSE!", "close");
       this.boost = Math.min(BOOST_CAP, this.boost + 70);
       this.addTime(1.5); // threading a gap is exactly the kind of "great" we reward
+    }
+
+    // terrain momentum: stomping a (non-sloppy) landing onto a downslope face
+    // converts the drop into speed — the Tiny Wings slope-match made tactile
+    if (off < 0.95 && this.slopeAt(this.px)) {
+      this.speed = Math.min(MAX_SPEED, this.speed + SLOPE_BOMB_SPEED);
+      this.boost = Math.min(BOOST_CAP, this.boost + SLOPE_BOMB_BOOST);
+      this.cb.onCallout?.("HILL BOMB!", "power");
+      this.addTime(1.0);
+      this.landBurst(10, C_TEAL);
     }
   }
 
@@ -1819,6 +1982,7 @@ export class SkateGameEngine {
     this.drawSpeedLines(ctx, W);
     this.drawStreet(ctx, W, H);
     this.drawRamps(ctx);
+    this.drawSlopes(ctx);
     this.drawLoops(ctx);
     this.drawRails(ctx);
     this.drawCollectibles(ctx);
@@ -2037,6 +2201,45 @@ export class SkateGameEngine {
       ctx.shadowBlur = 12;
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(xL - 5, this.groundY - r.height - 3, 7, 5);
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  private drawSlopes(ctx: CanvasRenderingContext2D) {
+    for (const s of this.slopes) {
+      const x0 = this.sx(s.x0);
+      const x1 = this.sx(s.x1);
+      if (x1 < -40 || x0 > this.W + 40) continue;
+      const STEPS = 10;
+      const pts: [number, number][] = [];
+      for (let i = 0; i <= STEPS; i++) {
+        const wx = s.x0 + (s.x1 - s.x0) * (i / STEPS);
+        pts.push([this.sx(wx), this.groundY - this.slopeSurface(s, wx)]);
+      }
+      // body
+      ctx.beginPath();
+      ctx.moveTo(x0, this.groundY);
+      for (const [px, py] of pts) ctx.lineTo(px, py);
+      ctx.lineTo(x1, this.groundY);
+      ctx.closePath();
+      const rg = ctx.createLinearGradient(0, this.groundY - s.height, 0, this.groundY);
+      rg.addColorStop(0, "#4a2391");
+      rg.addColorStop(1, "#241552");
+      ctx.fillStyle = rg;
+      ctx.fill();
+      // glowing downhill face — teal (vs cyan kickers) signals "ride me down"
+      ctx.strokeStyle = C_TEAL;
+      ctx.shadowColor = C_TEAL;
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (const [px, py] of pts) ctx.lineTo(px, py);
+      ctx.stroke();
+      // bright crest cap (the drop-in edge)
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x0 - 2, this.groundY - s.height - 3, 7, 5);
       ctx.shadowBlur = 0;
     }
   }

@@ -15,12 +15,17 @@ import {
   SkateResult,
   SwipeDir,
 } from "./SkateGameEngine";
-import { buildSkateShareIntent } from "../../lib/skateShare";
+import {
+  buildDailyShareIntent,
+  buildSkateShareIntent,
+} from "../../lib/skateShare";
+import { FREE_SKATE_SEED, formatTimeLeft } from "../../lib/skateDaily";
 
 export interface SkateChallenge {
   score: number;
   by?: string;
   rank?: number;
+  day?: string; // present on DAILY LINE dares — only live while that day runs
 }
 
 interface LeaderboardEntry {
@@ -29,6 +34,7 @@ interface LeaderboardEntry {
   pfpUrl: string;
   score: number;
   combo: number;
+  rank?: number; // 1-based, present on daily "nearby" rows
 }
 
 interface LeaderboardData {
@@ -44,7 +50,34 @@ interface RankResult {
   improved: boolean;
 }
 
+interface DailyStatus {
+  day: string;
+  name: string;
+  seed: number;
+  endsAt: number;
+  attemptUsed: boolean;
+  me: { rank: number; score: number } | null;
+  streak: { count: number; best: number };
+  total: number;
+  entries: LeaderboardEntry[];
+  nearby: LeaderboardEntry[];
+  ghosts: { fid: number; username: string; samples: number[] }[];
+}
+
+interface DailySubmitResult {
+  rank: number;
+  total: number;
+  streak: { count: number; best: number };
+  alreadyPlayed: boolean;
+}
+
 type Phase = "ready" | "playing" | "over";
+type SkateMode = "free" | "daily";
+type RunKind = "free" | "practice" | "counted";
+
+// In local dev (browser, no Farcaster host) submit with the API's x-dev-fid
+// escape hatch so the whole daily flow is testable; never set in production.
+const DEV_FID = process.env.NODE_ENV === "development" ? 6841 : null;
 
 const BEST_KEY = "streme-skate-best";
 const MUTED_KEY = "streme-skate-muted";
@@ -232,7 +265,19 @@ export default function StremeSkateGame({
   const [showBoard, setShowBoard] = useState(false);
   const [board, setBoard] = useState<LeaderboardData | null>(null);
   const [boardLoading, setBoardLoading] = useState(false);
+  const [boardTab, setBoardTab] = useState<"daily" | "alltime">("daily");
   const [finishedRun, setFinishedRun] = useState<SkateResult | null>(null);
+
+  // ----- DAILY LINE: one shared seed per UTC day, one counted run each -----
+  const [mode, setMode] = useState<SkateMode>("free");
+  const modeRef = useRef<SkateMode>("free");
+  const [daily, setDaily] = useState<DailyStatus | null>(null);
+  const dailyRef = useRef<DailyStatus | null>(null);
+  const [dailyResult, setDailyResult] = useState<DailySubmitResult | null>(null);
+  const [runKind, setRunKind] = useState<RunKind>("free");
+  const runKindRef = useRef<RunKind>("free");
+  const autoDailyRef = useRef(false); // default to the daily once it loads
+  const [nowTs, setNowTs] = useState(() => Date.now()); // reset countdown tick
 
   const { isMiniAppView, isSDKLoaded, farcasterContext } = useAppFrameLogic();
   const {
@@ -249,8 +294,15 @@ export default function StremeSkateGame({
     pfpUrl?: string;
   } | null>(null);
   fcUserRef.current = farcasterContext?.user ?? null;
-  const challengeRef = useRef(challenge);
-  challengeRef.current = challenge;
+  // a DAILY LINE dare is only a live target while that day's line is open —
+  // once it rolls over, the course is different and the score isn't comparable
+  const liveChallenge =
+    challenge && (!challenge.day || !daily || challenge.day === daily.day)
+      ? challenge
+      : null;
+  const staleDailyDare = Boolean(challenge?.day && daily && !liveChallenge);
+  const challengeRef = useRef(liveChallenge);
+  challengeRef.current = liveChallenge;
 
   // --------------------------------------------------------------- sound fx
 
@@ -456,6 +508,39 @@ export default function StremeSkateGame({
     });
   }, [showToast]);
 
+  // Authenticated fetch: Quick Auth inside the mini-app, x-dev-fid in local
+  // dev so the daily flow is end-to-end testable in a plain browser.
+  const authedFetch = useCallback(
+    (url: string, init?: RequestInit): Promise<Response> | null => {
+      if (isMiniAppRef.current) return sdk.quickAuth.fetch(url, init);
+      if (DEV_FID) {
+        return fetch(url, {
+          ...init,
+          headers: {
+            ...(init?.headers as Record<string, string> | undefined),
+            "x-dev-fid": String(DEV_FID),
+          },
+        });
+      }
+      return null;
+    },
+    []
+  );
+
+  // Today's line: status + board + rival ghosts in one read
+  const loadDaily = useCallback(async () => {
+    try {
+      const fid = fcUserRef.current?.fid ?? DEV_FID ?? undefined;
+      const res = await fetch(`/api/skate/daily${fid ? `?fid=${fid}` : ""}`);
+      if (!res.ok) return;
+      const data = (await res.json()) as DailyStatus;
+      setDaily(data);
+      dailyRef.current = data;
+    } catch {
+      // daily unavailable — free skate still works
+    }
+  }, []);
+
   const handleGameOver = useCallback((result: SkateResult) => {
     setFinishedRun(result);
     setPhase("over");
@@ -473,49 +558,96 @@ export default function StremeSkateGame({
     playTone(392, 0.18, "square", 0.06, 0.12);
 
     setRankResult(null);
-    const user = fcUserRef.current;
-    if (isMiniAppRef.current && user && result.score > 0) {
+    setDailyResult(null);
+    const user =
+      fcUserRef.current ??
+      (DEV_FID ? { fid: DEV_FID, username: "dev", pfpUrl: "" } : null);
+    if (user && result.score > 0) {
       // a held Warplet becomes your leaderboard PFP too
       const pfpUrl = warpletPfpRef.current
         ? `${window.location.origin}${warpletPfpRef.current}`
         : user.pfpUrl ?? "";
-      sdk.quickAuth
-        .fetch("/api/skate/leaderboard", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            score: result.score,
-            combo: result.bestCombo,
-            username: user.username ?? "",
-            pfpUrl,
-          }),
-        })
-        .then((res) => (res.ok ? res.json() : null))
+      authedFetch("/api/skate/leaderboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          score: result.score,
+          combo: result.bestCombo,
+          username: user.username ?? "",
+          pfpUrl,
+        }),
+      })
+        ?.then((res) => (res.ok ? res.json() : null))
         .then((r: RankResult | null) => {
           if (r) setRankResult(r);
         })
         .catch((e) => console.error("Leaderboard submit failed:", e));
 
-      // submit this run as a ghost for others to race
       const samples = engineRef.current?.getRecording() ?? [];
-      if (samples.length >= 8) {
-        sdk.quickAuth
-          .fetch("/api/skate/ghosts", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              score: result.score,
-              username: user.username ?? "",
-              samples,
-            }),
+
+      if (modeRef.current === "daily" && runKindRef.current === "counted") {
+        // THE counted run of the day — board rank, streak, and the recording
+        // becomes a rival ghost on today's line. Lock the attempt locally
+        // right away so an instant restart can't race the in-flight submit.
+        const day = dailyRef.current?.day;
+        setDaily((prev) => {
+          const next = prev ? { ...prev, attemptUsed: true } : prev;
+          dailyRef.current = next;
+          return next;
+        });
+        authedFetch("/api/skate/daily", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            day,
+            score: result.score,
+            combo: result.bestCombo,
+            username: user.username ?? "",
+            pfpUrl,
+            samples,
+          }),
+        })
+          ?.then(async (res) => {
+            const r = (await res.json().catch(() => null)) as
+              | (DailySubmitResult & { error?: string })
+              | null;
+            if (res.ok && r) {
+              setDailyResult(r);
+              setDaily((prev) => {
+                const next = prev
+                  ? {
+                      ...prev,
+                      attemptUsed: true,
+                      me: { rank: r.rank, score: result.score },
+                      streak: r.streak,
+                      total: r.total,
+                    }
+                  : prev;
+                dailyRef.current = next;
+                return next;
+              });
+            }
+            // refresh the board + rivals either way (409 = raced a double-submit)
+            loadDaily();
           })
-          .catch((e) => console.error("Ghost submit failed:", e));
+          .catch((e) => console.error("Daily submit failed:", e));
+      } else if (modeRef.current === "free" && samples.length >= 8) {
+        // global ghosts replay on the free-skate course — only aligned runs
+        authedFetch("/api/skate/ghosts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            score: result.score,
+            username: user.username ?? "",
+            samples,
+          }),
+        })?.catch((e) => console.error("Ghost submit failed:", e));
       }
     }
     // challenge check
     const ch = challengeRef.current;
     if (ch && result.score >= ch.score) setChallengeBeaten(true);
-  }, [playTone]);
+  }, [playTone, authedFetch, loadDaily]);
 
   // keep latest callbacks in refs for the stable engine wiring
   const cbRef = useRef({
@@ -545,10 +677,20 @@ export default function StremeSkateGame({
 
     const engine = new SkateGameEngine(container, {
       onStart: () => {
-        engineRef.current?.setGhosts(
-          ghostsOnRef.current ? ghostsRef.current : []
-        );
+        // rivals on the daily are recordings of TODAY'S line (same course, so
+        // the replays align); free skate races the global ghost pool
+        const pool =
+          modeRef.current === "daily"
+            ? (dailyRef.current?.ghosts ?? []).map((g, i) => ({
+                samples: g.samples,
+                color: GHOST_TINTS[i % GHOST_TINTS.length],
+                name: g.username ? `@${g.username}` : "rival",
+              }))
+            : ghostsRef.current;
+        engineRef.current?.setGhosts(ghostsOnRef.current ? pool : []);
         engineRef.current?.setRainbow(radModeRef.current);
+        setRunKind(runKindRef.current);
+        setDailyResult(null);
         setPhase("playing");
         setScore(0);
         setCombo(null);
@@ -654,6 +796,44 @@ export default function StremeSkateGame({
     };
   }, [isSDKLoaded]);
 
+  useEffect(() => {
+    loadDaily();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSDKLoaded]);
+
+  // Point the engine at the selected course (takes effect via toTitle re-prime)
+  const applyMode = useCallback((m: SkateMode) => {
+    setMode(m);
+    modeRef.current = m;
+    const engine = engineRef.current;
+    if (!engine) return;
+    if (m === "daily" && dailyRef.current) {
+      engine.setCourse(dailyRef.current.seed, true);
+    } else {
+      engine.setCourse(FREE_SKATE_SEED, false);
+    }
+    engine.toTitle();
+  }, []);
+
+  // Once the daily loads, make it the default selection (the event), and let
+  // a daily dare link land directly on today's line.
+  useEffect(() => {
+    if (!daily || autoDailyRef.current || phase !== "ready") return;
+    autoDailyRef.current = true;
+    applyMode("daily");
+  }, [daily, phase, applyMode]);
+
+  // tick the "resets in…" countdown while the menu is up; refetch on rollover
+  useEffect(() => {
+    if (phase !== "ready") return;
+    const id = setInterval(() => {
+      setNowTs(Date.now());
+      const d = dailyRef.current;
+      if (d && Date.now() >= d.endsAt) loadDaily();
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [phase, loadDaily]);
+
   // Auto-connect the Farcaster wallet in the mini-app (like the rest of the
   // app) so Warplet skaters resolve without the user tapping connect. The
   // connector attaches to the host wallet; we only nudge it once.
@@ -743,15 +923,32 @@ export default function StremeSkateGame({
     null
   );
 
+  // Every start is just "play" — on the daily, the FIRST run of the day is
+  // the counted one; anything after is an uncounted lap (no separate buttons)
+  const stampRunKind = useCallback(() => {
+    if (modeRef.current !== "daily") {
+      runKindRef.current = "free";
+      return;
+    }
+    const canSubmit = isMiniAppRef.current || Boolean(DEV_FID);
+    runKindRef.current =
+      canSubmit && dailyRef.current && !dailyRef.current.attemptUsed
+        ? "counted"
+        : "practice";
+  }, []);
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       ensureAudio();
       if (phase === "over") return;
-      if (phase === "ready") startMusic();
+      if (phase === "ready") {
+        startMusic();
+        stampRunKind();
+      }
       engineRef.current?.holdStart();
       gestureRef.current = { x: e.clientX, y: e.clientY, fired: false };
     },
-    [phase, ensureAudio, startMusic]
+    [phase, ensureAudio, startMusic, stampRunKind]
   );
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -782,7 +979,10 @@ export default function StremeSkateGame({
         e.preventDefault();
         if (e.repeat) return;
         ensureAudio();
-        if (phase === "ready") startMusic();
+        if (phase === "ready") {
+          startMusic();
+          stampRunKind();
+        }
         engine.holdStart();
       } else if (e.key === "ArrowUp" || e.key === "w") {
         engine.swipe("up");
@@ -803,16 +1003,17 @@ export default function StremeSkateGame({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [phase, ensureAudio, startMusic]);
+  }, [phase, ensureAudio, startMusic, stampRunKind]);
 
   const handleRestart = useCallback(() => {
     const engine = engineRef.current;
     if (!engine) return;
     setIsNewBest(false);
     setChallengeBeaten(false);
+    stampRunKind();
     startMusic();
     engine.reset();
-  }, [startMusic]);
+  }, [startMusic, stampRunKind]);
 
   // back to the title menu (change skater, toggle ghosts, RAD mode, etc.)
   const handleBackToMenu = useCallback(() => {
@@ -828,8 +1029,9 @@ export default function StremeSkateGame({
   const openBoard = useCallback(async () => {
     setShowBoard(true);
     setBoardLoading(true);
+    loadDaily(); // freshen today's board + rivals alongside the all-time list
     try {
-      const fid = fcUserRef.current?.fid;
+      const fid = fcUserRef.current?.fid ?? DEV_FID ?? undefined;
       const res = await fetch(
         `/api/skate/leaderboard${fid ? `?fid=${fid}` : ""}`
       );
@@ -839,7 +1041,7 @@ export default function StremeSkateGame({
     } finally {
       setBoardLoading(false);
     }
-  }, []);
+  }, [loadDaily]);
 
   const toggleMute = useCallback(() => {
     setMuted((prev) => {
@@ -905,17 +1107,32 @@ export default function StremeSkateGame({
 
   const handleShare = useCallback(async () => {
     const username =
-      (isMiniAppView && farcasterContext?.user?.username) || undefined;
+      (isMiniAppView && farcasterContext?.user?.username) ||
+      (DEV_FID ? "dev" : undefined);
     const runScore = finishedRun?.score ?? score;
     const runCombo = finishedRun?.bestCombo ?? 0;
-    const { castText, shareUrl } = buildSkateShareIntent({
-      score: runScore,
-      combo: runCombo,
-      username,
-      rankResult,
-      challenge,
-      challengeBeaten,
-    });
+    // a counted daily run shares the DAILY LINE dare — everyone in the feed is
+    // on the same course today, so the cast is directly comparable
+    const isDailyShare =
+      mode === "daily" && daily && (dailyResult || daily.me) ? daily : null;
+    const { castText, shareUrl } = isDailyShare
+      ? buildDailyShareIntent({
+          score: isDailyShare.me?.score ?? runScore,
+          day: isDailyShare.day,
+          name: isDailyShare.name,
+          username,
+          rank: dailyResult?.rank ?? isDailyShare.me?.rank,
+          total: dailyResult?.total ?? isDailyShare.total,
+          streak: (dailyResult?.streak ?? isDailyShare.streak)?.count,
+        })
+      : buildSkateShareIntent({
+          score: runScore,
+          combo: runCombo,
+          username,
+          rankResult,
+          challenge: liveChallenge,
+          challengeBeaten,
+        });
 
     if (isMiniAppView && isSDKLoaded) {
       try {
@@ -934,9 +1151,12 @@ export default function StremeSkateGame({
   }, [
     score,
     finishedRun,
-    challenge,
+    liveChallenge,
     challengeBeaten,
     rankResult,
+    mode,
+    daily,
+    dailyResult,
     isMiniAppView,
     isSDKLoaded,
     farcasterContext,
@@ -944,11 +1164,14 @@ export default function StremeSkateGame({
 
   // ----------------------------------------------------------------- UI
 
-  const challengeLabel = challenge
-    ? `${challenge.score.toLocaleString()}${
-        challenge.by ? ` · @${challenge.by}` : ""
+  const challengeLabel = liveChallenge
+    ? `${liveChallenge.score.toLocaleString()}${
+        liveChallenge.by ? ` · @${liveChallenge.by}` : ""
       }`
     : null;
+  const canCount = (isMiniAppView && isSDKLoaded) || Boolean(DEV_FID);
+  const dailyCounted = mode === "daily" && runKind === "counted";
+  const dailyPractice = mode === "daily" && runKind === "practice";
 
   return (
     <div
@@ -1070,6 +1293,11 @@ export default function StremeSkateGame({
             {flow && (
               <span className="font-mono text-[10px] font-bold text-amber-300 animate-pulse">
                 ⚡ FLOW STATE ×2
+              </span>
+            )}
+            {dailyCounted && (
+              <span className="font-mono text-[9px] font-bold tracking-[0.14em] text-amber-200">
+                ⚡ DAILY · 1 SHOT
               </span>
             )}
           </div>
@@ -1288,9 +1516,52 @@ export default function StremeSkateGame({
             )}
           </div>
 
-          {/* stat chips */}
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {best > 0 && (
+          {/* mode select — the DAILY LINE is the event, free skate the gym */}
+          <div
+            className="flex w-72 items-center gap-1 rounded-full border border-white/15 bg-white/5 p-1 pointer-events-auto"
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onPointerMove={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => applyMode("daily")}
+              className={`flex-1 rounded-full px-2 py-1.5 text-xs font-black tracking-wide transition ${
+                mode === "daily"
+                  ? "bg-amber-300 text-[#0c0626]"
+                  : "text-white/60"
+              }`}
+            >
+              ⚡ DAILY LINE
+            </button>
+            <button
+              onClick={() => applyMode("free")}
+              className={`flex-1 rounded-full px-2 py-1.5 text-xs font-black tracking-wide transition ${
+                mode === "free" ? "bg-cyan-300 text-[#0c0626]" : "text-white/60"
+              }`}
+            >
+              🛹 FREE SKATE
+            </button>
+          </div>
+
+          {/* stat chips — same column width as everything else */}
+          <div className="flex w-72 flex-col items-stretch gap-1.5 text-center empty:hidden">
+            {mode === "daily" && daily && (
+              <div className="rounded-full border border-amber-300/40 bg-amber-300/10 px-3 py-1 font-mono text-xs text-amber-100">
+                {daily.name} · resets in {formatTimeLeft(daily.endsAt, nowTs)}
+              </div>
+            )}
+            {mode === "daily" && daily && daily.streak.count >= 2 && (
+              <div className="rounded-full border border-orange-300/40 bg-orange-400/10 px-3 py-1 font-mono text-xs text-orange-200">
+                🔥 {daily.streak.count}-day streak
+              </div>
+            )}
+            {mode === "daily" && daily?.attemptUsed && daily.me && (
+              <div className="rounded-full border border-cyan-300/40 bg-cyan-400/15 px-3 py-1 font-mono text-xs text-cyan-100">
+                Today: {daily.me.score.toLocaleString()} · #{daily.me.rank} of{" "}
+                {daily.total}
+              </div>
+            )}
+            {mode === "free" && best > 0 && (
               <div className="rounded-full border border-amber-300/25 bg-white/8 px-3 py-1 font-mono text-xs text-amber-200">
                 🏆 Best {best.toLocaleString()}
               </div>
@@ -1298,21 +1569,45 @@ export default function StremeSkateGame({
             {challengeLabel && (
               <div className="rounded-full border border-cyan-300/40 bg-cyan-400/15 px-3 py-1 font-mono text-xs text-cyan-100">
                 🎯 Beat {challengeLabel}
+                {liveChallenge?.day ? " today" : ""}
+              </div>
+            )}
+            {staleDailyDare && (
+              <div className="rounded-full border border-white/15 bg-white/5 px-3 py-1 font-mono text-xs text-white/60">
+                ⏰ That dare expired — fresh line today
               </div>
             )}
           </div>
 
-          {/* PLAY (visual — tapping anywhere drops you in) */}
-          <div
-            className="mt-1 inline-flex items-center gap-2 rounded-full px-10 py-3 text-xl font-black text-[#0c0626]"
-            style={{
-              background: "linear-gradient(90deg,#67e8f9,#34d399,#fbbf24)",
-              boxShadow: "0 0 34px rgba(103,232,249,0.55)",
-              animation: "skGlow 1.5s ease-in-out infinite",
-            }}
-          >
-            ▶ PLAY
-          </div>
+          {/* PLAY (visual — tapping anywhere drops you in). On the daily the
+              first run of the day counts; the pill burns amber to say so. */}
+          {(() => {
+            const countsNext =
+              mode === "daily" && !!daily && !daily.attemptUsed && canCount;
+            return (
+              <div className="flex flex-col items-center gap-1.5">
+                <div
+                  className="mt-1 flex w-72 items-center justify-center gap-2 rounded-full py-3 text-xl font-black text-[#0c0626]"
+                  style={{
+                    background: countsNext
+                      ? "linear-gradient(90deg,#fde68a,#fb923c,#ec4899)"
+                      : "linear-gradient(90deg,#67e8f9,#34d399,#fbbf24)",
+                    boxShadow: countsNext
+                      ? "0 0 34px rgba(253,230,138,0.55)"
+                      : "0 0 34px rgba(103,232,249,0.55)",
+                    animation: "skGlow 1.5s ease-in-out infinite",
+                  }}
+                >
+                  ▶ PLAY
+                </div>
+                {countsNext && (
+                  <span className="font-mono text-[10px] font-bold text-amber-200/90">
+                    ⚡ one shot a day — this run counts
+                  </span>
+                )}
+              </div>
+            );
+          })()}
 
           {/* option chips — interactive, must not start the run. Stacked. */}
           <div
@@ -1323,7 +1618,7 @@ export default function StremeSkateGame({
           >
             <button
               onClick={toggleGhosts}
-              className={`rounded-full border px-3.5 py-1.5 text-xs font-bold transition ${
+              className={`w-72 rounded-full border px-3.5 py-1.5 text-xs font-bold transition ${
                 ghostsOn
                   ? "border-cyan-300/50 bg-cyan-400/20 text-cyan-100"
                   : "border-white/15 bg-white/5 text-white/60"
@@ -1333,13 +1628,13 @@ export default function StremeSkateGame({
             </button>
             <button
               onClick={() => setShowPicker(true)}
-              className="rounded-full border border-amber-300/40 bg-amber-300/10 px-3.5 py-1.5 text-xs font-bold text-amber-100"
+              className="w-72 rounded-full border border-amber-300/40 bg-amber-300/10 px-3.5 py-1.5 text-xs font-bold text-amber-100"
             >
               {selectedWarplet ? "✨" : "🛹"} Choose your skater
             </button>
             <button
               onClick={openBoard}
-              className="rounded-full border border-cyan-300/40 bg-white/5 px-3.5 py-1.5 text-xs font-bold text-cyan-100"
+              className="w-72 rounded-full border border-cyan-300/40 bg-white/5 px-3.5 py-1.5 text-xs font-bold text-cyan-100"
             >
               🏆 Leaderboard
             </button>
@@ -1355,6 +1650,17 @@ export default function StremeSkateGame({
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div className="w-full max-w-sm rounded-2xl bg-base-100/95 p-6 shadow-2xl text-center">
+            {dailyCounted && daily && (
+              <div className="mb-1 font-mono text-xs font-black tracking-[0.18em] text-amber-500">
+                ⚡ DAILY LINE · {daily.name}
+              </div>
+            )}
+            {dailyPractice && daily?.me && (
+              <div className="mb-1 font-mono text-xs font-bold tracking-[0.14em] opacity-50">
+                ⚡ TODAY&apos;S RUN: {daily.me.score.toLocaleString()} · #
+                {daily.me.rank}
+              </div>
+            )}
             <div className="text-sm font-bold uppercase tracking-widest opacity-60">
               {finishedRun.timedOut ? "⏱ Time up" : "💥 Wipeout"} ·{" "}
               {finishedRun.distance.toLocaleString()}m
@@ -1367,7 +1673,46 @@ export default function StremeSkateGame({
               <span>🏆 combo {finishedRun.bestCombo.toLocaleString()}</span>
               <span>🫧 {finishedRun.bubbles.toLocaleString()}</span>
             </div>
-            {rankResult && (
+            {dailyCounted && dailyResult && (
+              <div className="mt-2 flex flex-wrap justify-center gap-2">
+                <button
+                  className="rounded-full bg-amber-400/15 px-3 py-1 font-mono text-sm font-bold text-amber-600"
+                  onClick={openBoard}
+                >
+                  ⚡ #{dailyResult.rank} of {dailyResult.total} today
+                </button>
+                {dailyResult.streak.count >= 2 && (
+                  <span className="rounded-full bg-orange-400/15 px-3 py-1 font-mono text-sm font-bold text-orange-500">
+                    🔥 {dailyResult.streak.count}-day streak
+                  </span>
+                )}
+              </div>
+            )}
+            {dailyCounted && daily && daily.nearby.length > 0 && (
+              <div className="mt-2 rounded-lg bg-base-200 px-3 py-2 text-left">
+                <div className="mb-1 text-center font-mono text-[10px] font-bold tracking-widest opacity-50">
+                  RIVALS ON TODAY&apos;S LINE
+                </div>
+                {daily.nearby.map((e) => {
+                  const isMe = fcUserRef.current?.fid === e.fid;
+                  return (
+                    <div
+                      key={e.fid}
+                      className={`flex items-center justify-between font-mono text-xs ${
+                        isMe ? "font-bold text-primary" : "opacity-70"
+                      }`}
+                    >
+                      <span className="truncate">
+                        {e.username ? `@${e.username}` : `fid ${e.fid}`}
+                        {isMe ? " (you)" : ""}
+                      </span>
+                      <span>{e.score.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {rankResult && !dailyCounted && (
               <button
                 className="mt-1 font-mono text-sm font-semibold text-primary underline-offset-2 hover:underline"
                 onClick={openBoard}
@@ -1376,10 +1721,10 @@ export default function StremeSkateGame({
               </button>
             )}
             <div className="mt-2 text-sm opacity-70">
-              {challengeBeaten && challenge ? (
+              {challengeBeaten && liveChallenge ? (
                 <span className="font-bold text-success">
                   🏆 Challenge smashed
-                  {challenge.by ? ` — sorry @${challenge.by}` : ""}!
+                  {liveChallenge.by ? ` — sorry @${liveChallenge.by}` : ""}!
                 </span>
               ) : isNewBest ? (
                 <span className="font-bold text-success">🏆 New best run!</span>
@@ -1389,10 +1734,10 @@ export default function StremeSkateGame({
             </div>
             <div className="mt-5 flex flex-col gap-2">
               <button className="btn btn-primary w-full" onClick={handleShare}>
-                Challenge your friends
+                {dailyCounted ? "⚡ Dare the feed" : "Challenge your friends"}
               </button>
               <button className="btn btn-outline w-full" onClick={handleRestart}>
-                Drop in again
+                ▶ Play again
               </button>
               <div className="flex gap-2">
                 <button
@@ -1538,7 +1883,7 @@ export default function StremeSkateGame({
         </div>
       )}
 
-      {/* ---------- leaderboard overlay ---------- */}
+      {/* ---------- leaderboard overlay (TODAY / ALL-TIME) ---------- */}
       {showBoard && (
         <div
           className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
@@ -1547,7 +1892,8 @@ export default function StremeSkateGame({
           <div className="w-full max-w-sm rounded-2xl bg-base-100/95 p-5 shadow-2xl">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Trophy size={18} className="text-warning" /> Top Skaters
+                <Trophy size={18} className="text-warning" />
+                {boardTab === "daily" ? "Daily Line" : "Top Skaters"}
               </h2>
               <button
                 className="btn btn-circle btn-ghost btn-sm"
@@ -1557,57 +1903,140 @@ export default function StremeSkateGame({
                 <X size={16} />
               </button>
             </div>
-            <div className="mt-3 max-h-80 overflow-y-auto">
-              {boardLoading ? (
-                <div className="flex justify-center py-8">
-                  <span className="loading loading-spinner loading-md" />
-                </div>
-              ) : board && board.entries.length > 0 ? (
-                <ul className="flex flex-col gap-1">
-                  {board.entries.map((entry, i) => {
-                    const isMe = fcUserRef.current?.fid === entry.fid;
-                    return (
-                      <li
-                        key={entry.fid}
-                        className={`flex items-center gap-3 rounded-lg px-2 py-1.5 ${
-                          isMe ? "bg-primary/10 ring-1 ring-primary" : ""
-                        }`}
-                      >
-                        <span className="w-6 text-right font-mono text-sm opacity-60">
-                          {i + 1}
-                        </span>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={entry.pfpUrl || "/icon-transparent.png"}
-                          alt=""
-                          className="w-7 h-7 rounded-full object-cover bg-base-300"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              "/icon-transparent.png";
-                          }}
-                        />
-                        <span className="flex-1 truncate text-sm font-medium">
-                          {entry.username
-                            ? `@${entry.username}`
-                            : `fid ${entry.fid}`}
-                        </span>
-                        <span className="font-mono text-sm font-semibold text-primary">
-                          {entry.score.toLocaleString()}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="py-8 text-center text-sm opacity-60">
-                  No skaters yet — be the first on the board!
-                </p>
-              )}
+
+            <div className="mt-2 flex gap-1 rounded-full bg-base-200 p-1">
+              <button
+                onClick={() => setBoardTab("daily")}
+                className={`flex-1 rounded-full py-1 text-xs font-bold ${
+                  boardTab === "daily" ? "bg-warning text-warning-content" : "opacity-60"
+                }`}
+              >
+                ⚡ TODAY
+              </button>
+              <button
+                onClick={() => setBoardTab("alltime")}
+                className={`flex-1 rounded-full py-1 text-xs font-bold ${
+                  boardTab === "alltime" ? "bg-primary text-primary-content" : "opacity-60"
+                }`}
+              >
+                🏆 ALL-TIME
+              </button>
             </div>
-            {board?.player && board.player.rank > board.entries.length && (
-              <div className="mt-2 rounded-lg bg-primary/10 px-3 py-2 text-center font-mono text-sm">
-                You: #{board.player.rank} · {board.player.best.toLocaleString()}
+
+            {boardTab === "daily" && daily && (
+              <div className="mt-2 text-center font-mono text-[11px] opacity-60">
+                {daily.name} · resets in {formatTimeLeft(daily.endsAt, nowTs)} ·{" "}
+                {daily.total} dropped in
               </div>
+            )}
+
+            <div className="mt-2 max-h-80 overflow-y-auto">
+              {(() => {
+                const entries =
+                  boardTab === "daily" ? daily?.entries ?? [] : board?.entries ?? [];
+                const loading = boardTab === "alltime" && boardLoading;
+                if (loading) {
+                  return (
+                    <div className="flex justify-center py-8">
+                      <span className="loading loading-spinner loading-md" />
+                    </div>
+                  );
+                }
+                if (entries.length === 0) {
+                  return (
+                    <p className="py-8 text-center text-sm opacity-60">
+                      {boardTab === "daily"
+                        ? "Nobody's dropped in yet — set today's line!"
+                        : "No skaters yet — be the first on the board!"}
+                    </p>
+                  );
+                }
+                const medal = (i: number) =>
+                  i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`;
+                const row = (entry: LeaderboardEntry, label: string) => {
+                  const isMe = fcUserRef.current?.fid === entry.fid;
+                  return (
+                    <li
+                      key={`${label}-${entry.fid}`}
+                      className={`flex items-center gap-3 rounded-lg px-2 py-1.5 ${
+                        isMe ? "bg-primary/10 ring-1 ring-primary" : ""
+                      }`}
+                    >
+                      <span className="w-6 text-right font-mono text-sm opacity-60">
+                        {label}
+                      </span>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={entry.pfpUrl || "/icon-transparent.png"}
+                        alt=""
+                        className="w-7 h-7 rounded-full object-cover bg-base-300"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            "/icon-transparent.png";
+                        }}
+                      />
+                      <span className="flex-1 truncate text-sm font-medium">
+                        {entry.username
+                          ? `@${entry.username}`
+                          : `fid ${entry.fid}`}
+                      </span>
+                      <span className="font-mono text-sm font-semibold text-primary">
+                        {entry.score.toLocaleString()}
+                      </span>
+                    </li>
+                  );
+                };
+                const nearby =
+                  boardTab === "daily" && daily?.me
+                    ? daily.nearby.filter(
+                        (e) =>
+                          (e.rank ?? 0) > entries.length &&
+                          !entries.some((t) => t.fid === e.fid)
+                      )
+                    : [];
+                return (
+                  <ul className="flex flex-col gap-1">
+                    {entries.map((e, i) => row(e, medal(i)))}
+                    {nearby.length > 0 && (
+                      <>
+                        <li className="py-0.5 text-center font-mono text-xs opacity-40">
+                          ···
+                        </li>
+                        {nearby.map((e) => row(e, String(e.rank)))}
+                      </>
+                    )}
+                  </ul>
+                );
+              })()}
+            </div>
+
+            {boardTab === "alltime" &&
+              board?.player &&
+              board.player.rank > (board?.entries.length ?? 0) && (
+                <div className="mt-2 rounded-lg bg-primary/10 px-3 py-2 text-center font-mono text-sm">
+                  You: #{board.player.rank} ·{" "}
+                  {board.player.best.toLocaleString()}
+                </div>
+              )}
+            {boardTab === "daily" && daily?.me && (
+              <div className="mt-2 flex items-center justify-between rounded-lg bg-warning/10 px-3 py-2 font-mono text-sm">
+                <span>
+                  You: #{daily.me.rank} · {daily.me.score.toLocaleString()}
+                </span>
+                {daily.streak.count >= 2 && (
+                  <span className="text-orange-500">
+                    🔥 {daily.streak.count}d
+                  </span>
+                )}
+              </div>
+            )}
+            {boardTab === "daily" && daily?.me && (
+              <button
+                className="btn btn-warning btn-sm mt-2 w-full font-bold"
+                onClick={handleShare}
+              >
+                ⚡ Dare the feed with your rank
+              </button>
             )}
             {!isMiniAppView && (
               <p className="mt-3 text-center text-xs opacity-60">

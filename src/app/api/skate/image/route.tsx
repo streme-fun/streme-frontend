@@ -4,6 +4,11 @@
 import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
 import { SKATE_DISPLAY_URL } from "../../../../lib/skateShare";
+import {
+  dailyName,
+  formatDailyDate,
+  isDailyKey,
+} from "../../../../lib/skateDaily";
 
 export const runtime = "edge";
 // The render is a pure function of the query params (s / by / r / v), and the
@@ -28,6 +33,13 @@ export async function GET(request: NextRequest) {
   const rank =
     Number.isInteger(rankParam) && rankParam > 0 && rankParam <= 10_000
       ? rankParam
+      : null;
+  const dayRaw = searchParams.get("d") ?? "";
+  const day = isDailyKey(dayRaw) ? dayRaw : null;
+  const streakParam = Number(searchParams.get("st"));
+  const streak =
+    day && Number.isInteger(streakParam) && streakParam > 1 && streakParam <= 999
+      ? streakParam
       : null;
 
   return new ImageResponse(
@@ -102,6 +114,26 @@ export async function GET(request: NextRequest) {
             >
               STREME SKATE
             </div>
+            {day && (
+              <div
+                style={{
+                  display: "flex",
+                  alignSelf: "flex-start",
+                  alignItems: "center",
+                  marginTop: 4,
+                  padding: "8px 22px",
+                  borderRadius: 999,
+                  background: "rgba(253, 230, 138, 0.16)",
+                  border: "2px solid #fde68a",
+                  fontSize: 30,
+                  fontWeight: 800,
+                  letterSpacing: 2,
+                  color: "#fde68a",
+                }}
+              >
+                ⚡ DAILY LINE · {dailyName(day)} · {formatDailyDate(day)}
+              </div>
+            )}
             {score ? (
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <div
@@ -124,24 +156,46 @@ export async function GET(request: NextRequest) {
                     marginTop: 6,
                   }}
                 >
-                  {by ? `@${by} dares you to beat it` : "Can you beat this line?"}
+                  {day
+                    ? `${by ? `@${by}` : "Someone"} dares you — one shot a day`
+                    : by
+                    ? `@${by} dares you to beat it`
+                    : "Can you beat this line?"}
                 </div>
-                {rank && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignSelf: "flex-start",
-                      marginTop: 18,
-                      padding: "10px 26px",
-                      borderRadius: 999,
-                      background: "rgba(103, 232, 249, 0.15)",
-                      border: "2px solid #67e8f9",
-                      fontSize: 34,
-                      fontWeight: 700,
-                      color: "#67e8f9",
-                    }}
-                  >
-                    #{rank} on the leaderboard
+                {(rank || streak) && (
+                  <div style={{ display: "flex", marginTop: 18, gap: 14 }}>
+                    {rank && (
+                      <div
+                        style={{
+                          display: "flex",
+                          padding: "10px 26px",
+                          borderRadius: 999,
+                          background: "rgba(103, 232, 249, 0.15)",
+                          border: "2px solid #67e8f9",
+                          fontSize: 34,
+                          fontWeight: 700,
+                          color: "#67e8f9",
+                        }}
+                      >
+                        #{rank} {day ? "today" : "on the leaderboard"}
+                      </div>
+                    )}
+                    {streak && (
+                      <div
+                        style={{
+                          display: "flex",
+                          padding: "10px 26px",
+                          borderRadius: 999,
+                          background: "rgba(251, 146, 60, 0.15)",
+                          border: "2px solid #fb923c",
+                          fontSize: 34,
+                          fontWeight: 700,
+                          color: "#fb923c",
+                        }}
+                      >
+                        🔥 {streak}-day streak
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
