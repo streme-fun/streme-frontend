@@ -136,7 +136,7 @@ const GHOST_AIR_SPIN = 95;
 const GHOST_COLORS = ["#fb7185", "#a78bfa", "#34d399", "#fbbf24", "#38bdf8"];
 
 const BASE_SPEED = 300;
-const MAX_SPEED = 680;
+const MAX_SPEED = 800;
 const GRAVITY = 2150;
 const JUMP_V = 820;
 const JUMP_HOLD_G = 1150; // lighter gravity while holding + rising → bigger air
@@ -147,17 +147,23 @@ const METRES = 9;
 // grind (the longer you hold, the faster the score climbs — OlliOlli/THPS)
 const GRIND_BASE = 16; // base points per 50px of rail at multiplier 1
 const GRIND_RAMP = 1.5; // multiplier growth per second on the rail
+const RAIL_LOCK_OFF = 0.4; // board must be this upright (rad) to lock a grind — stomp it clean
 const COYOTE = 0.1; // grace window to still jump after rolling off an edge (Celeste)
 
 // run timer — drains in real time (a touch faster as it gets harder), and
 // RECHARGES when you pull off something great (Crazy Taxi / OutRun urgency).
 // Hitting zero ends the run, so you must keep skating well, not just survive.
-const START_TIME = 18; // seconds on the clock at drop-in
+const START_TIME = 16; // seconds on the clock at drop-in
 const TIME_CAP = 26; // most time you can ever bank
 
 const SPIN_MAX = 13; // rad/s when flipping
 const SPIN_ACCEL = 46;
 const FLIP_BASE = 130; // points per completed rotation
+// how hard the board auto-levels when you release a flip: 0 = fully manual
+// (you must let go exactly as it comes upright), ~11 = the old auto-stomp snap.
+// 5 = a gentle drift that rewards a good release but pulls near-misses upright
+// (you can't spin the board back to fix an over-rotation, so it needs some help)
+const FLIP_SETTLE = 5;
 
 const BOOST_PERFECT = 230;
 const BOOST_SICK = 90;
@@ -1270,10 +1276,14 @@ export class SkateGameEngine {
     this.refreshScore();
 
     // ---- countdown clock: drains in real time and SPEEDS UP the longer you
-    //      last (1× at the drop-in → up to 3.5× deep into a run), so late runs
-    //      demand constant trick-chaining — a natural soft cap for an endless
-    //      game. Recharged by great plays; zero = the run is over.
-    const drainRate = Math.min(3.5, 1 + this.runTime / 90);
+    //      last (1.2× at the drop-in → up to 2.5× by ~100s in), so the run gets
+    //      tenser the longer you survive. The ceiling is deliberately low enough
+    //      that elite, trick-chaining play can roughly break even — and FLOW
+    //      eases the drain to 0.7×, so when you're genuinely on fire the clock
+    //      relents and lets a great player push on. Recharged by great plays;
+    //      zero = the run is over.
+    const drainRamp = Math.min(2.5, 1.2 + this.runTime / 80);
+    const drainRate = this.flow ? drainRamp * 0.7 : drainRamp;
     this.timeLeft -= drainRate * dt;
     if (this.timeLeft <= 0) {
       this.timeLeft = 0;
@@ -1372,13 +1382,23 @@ export class SkateGameEngine {
           this.sfx("trick");
         }
       } else {
+        // release stops the spin but no longer snaps the board level for you —
+        // you have to let go exactly as it comes upright to stomp a clean
+        // landing or lock a grind (FLIP_SETTLE tunes how much help you get)
         this.spinV = 0;
-        const target = Math.round(this.boardRot / (Math.PI * 2)) * (Math.PI * 2);
-        this.boardRot += (target - this.boardRot) * Math.min(dt * 11, 1);
+        if (FLIP_SETTLE > 0) {
+          const target = Math.round(this.boardRot / (Math.PI * 2)) * (Math.PI * 2);
+          this.boardRot += (target - this.boardRot) * Math.min(dt * FLIP_SETTLE, 1);
+        }
       }
 
-      if (this.vy <= 40) {
-        const rail = this.railCaptureAt(this.px, this.py);
+      // a grind only locks if you stomp the board down clean (near-upright) as
+      // you meet the rail — mid-flip or tilted and you blow right past it, so a
+      // rail is a "perfect landing" check, not a freebie
+      if (this.vy <= 40 && !this.holding) {
+        let off = Math.abs(((this.boardRot % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2));
+        off = Math.min(off, Math.PI * 2 - off);
+        const rail = off < RAIL_LOCK_OFF ? this.railCaptureAt(this.px, this.py) : null;
         if (rail) {
           this.currentRail = rail;
           this.py = rail.height;
@@ -1424,10 +1444,11 @@ export class SkateGameEngine {
           this.bumpSpecial(0.012);
           this.emitCombo();
         }
-        // sparks get denser as the grind builds; audio ticks rise in pitch
-        const sparkN = this.grindTime > 2.5 ? 2 : 1;
-        if (this.rand(1) < Math.min(1, 0.45 + this.grindTime * 0.35)) {
-          this.spark(this.skaterX, this.groundY - this.py, sparkN);
+        // sparks fountain off the rail — denser, hotter and bigger as the grind
+        // builds (audio ticks rise in pitch in step)
+        const gi = Math.min(1, this.grindTime / 4);
+        if (this.rand(1) < Math.min(1, 0.6 + this.grindTime * 0.4)) {
+          this.grindSpark(this.skaterX - 6, this.groundY - this.py, gi);
         }
         this.grindTickT -= dt;
         if (this.grindTickT <= 0) {
@@ -1539,10 +1560,11 @@ export class SkateGameEngine {
       this.landBurst(8, C_CYAN);
       this.addTime(0.9);
     } else {
-      // SLOPPY — landed mid-flip: keep some points, lose speed, no boost
+      // SLOPPY — landed mid-flip: keep some points, no boost, and shed a big
+      // chunk of speed so a botched landing costs you a long climb back up
       this.boardRot = 0;
       this.bankCombo(0.4);
-      this.speed = Math.max(BASE_SPEED, this.speed * 0.8);
+      this.speed = Math.max(BASE_SPEED, this.speed * 0.55);
       this.cb.onCallout?.("SLOPPY", "sloppy");
       this.sfx("land");
       this.shake = 0.4;
@@ -1725,6 +1747,34 @@ export class SkateGameEngine {
       this.particles.push({
         x, y, vx: -this.rand(140) - 40, vy: -this.rand(160),
         life: 0.35, maxLife: 0.35, color: this.rand(1) > 0.5 ? C_CYAN : C_PINK, size: 2,
+      });
+    }
+  }
+
+  /**
+   * A bright shower off the grinding wheels — scales from a modest spray to a
+   * roaring fan of hot white/gold cores as `intensity` (0..1, time on the rail)
+   * climbs. Particles spray back and arc down under the shared gravity.
+   */
+  private grindSpark(x: number, y: number, intensity: number) {
+    const n = 3 + Math.round(intensity * 4); // 3 → 7 as the grind heats up
+    const hot = [C_GOLD, "#ffffff", C_GOLD, C_CYAN]; // weighted toward hot tones
+    for (let i = 0; i < n; i++) {
+      const core = this.rand(1) < 0.35 + intensity * 0.35; // hotter, bigger fleck
+      const life = 0.3 + this.rand(0.28);
+      this.particles.push({
+        x: x + this.rand(6) - 3,
+        y: y + this.rand(4) - 2,
+        vx: -55 - this.rand(210) * (0.6 + intensity), // spray back, faster when hot
+        vy: -this.rand(200) - 30, // kick up; gravity arcs them back down
+        life,
+        maxLife: life,
+        color: core
+          ? hot[Math.floor(this.rand(hot.length))]
+          : this.rand(1) > 0.5
+          ? C_CYAN
+          : C_PINK,
+        size: core ? 3 : 2,
       });
     }
   }

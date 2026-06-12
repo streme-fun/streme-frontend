@@ -175,6 +175,10 @@ export function Navbar() {
               Pulse
             </Link>
 
+            <Link href="/skate" className="btn btn-ghost">
+              🛹 Skate
+            </Link>
+
             {/* link to create page */}
             <Link href="/launch" className="btn btn-primary">
               Launch a Token
@@ -292,6 +296,14 @@ export function Navbar() {
               onClick={() => setIsMenuOpen(false)}
             >
               Pulse
+            </Link>
+
+            <Link
+              href="/skate"
+              className="btn btn-ghost w-full justify-start"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              🛹 Skate
             </Link>
 
             {isConnected && (
