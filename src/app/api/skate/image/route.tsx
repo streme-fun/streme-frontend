@@ -9,6 +9,7 @@ import {
   formatDailyDate,
   isDailyKey,
 } from "../../../../lib/skateDaily";
+import { FLAIR_META, isFlairTier } from "../../../../lib/skateFlair";
 
 export const runtime = "edge";
 // The render is a pure function of the query params (s / by / r / v), and the
@@ -41,6 +42,8 @@ export async function GET(request: NextRequest) {
     day && Number.isInteger(streakParam) && streakParam > 1 && streakParam <= 999
       ? streakParam
       : null;
+  const flairRaw = searchParams.get("f");
+  const flair = isFlairTier(flairRaw) ? flairRaw : null;
 
   return new ImageResponse(
     (
@@ -162,7 +165,7 @@ export async function GET(request: NextRequest) {
                     ? `@${by} dares you to beat it`
                     : "Can you beat this line?"}
                 </div>
-                {(rank || streak) && (
+                {(rank || streak || flair) && (
                   <div style={{ display: "flex", marginTop: 18, gap: 14 }}>
                     {rank && (
                       <div
@@ -194,6 +197,24 @@ export async function GET(request: NextRequest) {
                         }}
                       >
                         🔥 {streak}-day streak
+                      </div>
+                    )}
+                    {/* crew flair — the holder badge does its selling right in
+                        the feed, where non-holders see it */}
+                    {flair && (
+                      <div
+                        style={{
+                          display: "flex",
+                          padding: "10px 26px",
+                          borderRadius: 999,
+                          background: `${FLAIR_META[flair].color}26`,
+                          border: `2px solid ${FLAIR_META[flair].color}`,
+                          fontSize: 34,
+                          fontWeight: 700,
+                          color: FLAIR_META[flair].color,
+                        }}
+                      >
+                        {FLAIR_META[flair].icon} $STREME {FLAIR_META[flair].label}
                       </div>
                     )}
                   </div>

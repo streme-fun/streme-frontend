@@ -1,9 +1,11 @@
 import { Redis } from "@upstash/redis";
+import { FlairTier } from "./skateFlair";
 
 export interface GhostRecord {
   fid: number;
   username: string;
   score: number;
+  flair?: FlairTier | null; // $STREME crew badge, resolved server-side
   samples: number[]; // flat [px,py] pairs, sampled every 0.15s by the engine
 }
 

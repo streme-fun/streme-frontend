@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { FlairTier, isFlairTier } from "./skateFlair";
 
 export interface SkateEntry {
   fid: number;
@@ -6,6 +7,7 @@ export interface SkateEntry {
   pfpUrl: string;
   score: number;
   combo: number; // best single combo of the run
+  flair?: FlairTier | null; // $STREME crew badge, resolved server-side
   updatedAt: number;
 }
 
@@ -54,18 +56,24 @@ export async function submitSkateScore(
         score: entry.score,
         member: String(entry.fid),
       });
-      await redis.hset(playerKey(entry.fid), { ...entry, updatedAt: now });
+      await redis.hset(playerKey(entry.fid), {
+        ...entry,
+        flair: entry.flair ?? "",
+        updatedAt: now,
+      });
     } else {
       // Keep the profile fresh even when the score doesn't improve — but never
       // blank out good data: a run can arrive with an empty username/pfp (e.g.
       // the Warplet image didn't resolve), and overwriting with "" would make a
-      // ranked player render nameless/avatarless ("disappear").
-      const profile: Record<string, string> = {};
+      // ranked player render nameless/avatarless ("disappear"). Flair is the
+      // exception: it's server-derived truth, so always write it — a player who
+      // sold down SHOULD lose the badge on their next run.
+      const profile: Record<string, string> = {
+        flair: entry.flair ?? "",
+      };
       if (entry.username) profile.username = entry.username;
       if (entry.pfpUrl) profile.pfpUrl = entry.pfpUrl;
-      if (Object.keys(profile).length > 0) {
-        await redis.hset(playerKey(entry.fid), profile);
-      }
+      await redis.hset(playerKey(entry.fid), profile);
     }
     const [rank, total] = await Promise.all([
       redis.zrevrank(BOARD_KEY, String(entry.fid)),
@@ -131,6 +139,7 @@ export async function getSkateLeaderboard(
           pfpUrl: String(row.pfpUrl ?? ""),
           score: m.score, // zset score is authoritative
           combo: Number(row.combo ?? 0),
+          flair: isFlairTier(row.flair) ? row.flair : null,
           updatedAt: Number(row.updatedAt ?? 0),
         });
       });

@@ -12,6 +12,7 @@ import {
   getDailyBoard,
   submitDailyRun,
 } from "../../../../lib/skateDailyBoard";
+import { getFlairForFid } from "../../../../lib/skateFlairServer";
 
 const MAX_SCORE = 100_000_000;
 const MAX_COMBO = 50_000_000;
@@ -126,13 +127,16 @@ export async function POST(request: NextRequest) {
           .filter((n) => Number.isFinite(n))
       : [];
 
+    // server-derived crew flair — rides on the board entry AND the rival ghost
+    const flair = await getFlairForFid(fid);
+
     const result = await submitDailyRun(
       claimedDay,
-      { fid, username, pfpUrl, score, combo },
+      { fid, username, pfpUrl, score, combo, flair },
       samples
     );
     return NextResponse.json(
-      { day: claimedDay, name: dailyName(claimedDay), ...result },
+      { day: claimedDay, name: dailyName(claimedDay), ...result, flair },
       { status: result.alreadyPlayed ? 409 : 200 }
     );
   } catch (error) {

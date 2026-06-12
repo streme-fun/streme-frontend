@@ -4,6 +4,7 @@ import {
   getSkateLeaderboard,
   submitSkateScore,
 } from "../../../../lib/skateLeaderboard";
+import { getFlairForFid } from "../../../../lib/skateFlairServer";
 
 const MAX_SCORE = 100_000_000;
 const MAX_COMBO = 50_000_000;
@@ -89,14 +90,19 @@ export async function POST(request: NextRequest) {
         ? body.pfpUrl.slice(0, 300)
         : "";
 
+    // crew flair is server-derived (fid → verified wallets → balances) and
+    // cached, so a submit can never claim a badge the wallet doesn't back
+    const flair = await getFlairForFid(fid);
+
     const result = await submitSkateScore({
       fid,
       username,
       pfpUrl,
       score,
       combo,
+      flair,
     });
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, flair });
   } catch (error) {
     console.error("Skate leaderboard POST error:", error);
     return NextResponse.json(

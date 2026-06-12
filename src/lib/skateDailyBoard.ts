@@ -1,5 +1,6 @@
 import { Redis } from "@upstash/redis";
 import { prevDailyKey } from "./skateDaily";
+import { FlairTier, isFlairTier } from "./skateFlair";
 
 // DAILY LINE storage — a day-keyed leaderboard where each player gets exactly
 // ONE counted run (board membership IS the used attempt), plus play streaks
@@ -13,6 +14,7 @@ export interface DailyEntry {
   pfpUrl: string;
   score: number;
   combo: number;
+  flair?: FlairTier | null; // $STREME crew badge, resolved server-side
   updatedAt: number;
   rank?: number; // 1-based, set on `nearby` entries (they sit off the top list)
 }
@@ -33,6 +35,7 @@ export interface DailyGhostRecord {
   fid: number;
   username: string;
   score: number;
+  flair?: FlairTier | null;
   samples: number[]; // flat [px,py] pairs, sampled every 0.15s by the engine
 }
 
@@ -140,6 +143,7 @@ export async function submitDailyRun(
     fid: entry.fid,
     username: entry.username,
     score: entry.score,
+    flair: entry.flair ?? null,
     samples: sanitizeSamples(samples),
   };
 
@@ -159,7 +163,11 @@ export async function submitDailyRun(
     });
     await Promise.all([
       redis.expire(boardKey(day), BOARD_TTL),
-      redis.hset(playerKey(day, entry.fid), { ...entry, updatedAt: now }),
+      redis.hset(playerKey(day, entry.fid), {
+        ...entry,
+        flair: entry.flair ?? "",
+        updatedAt: now,
+      }),
       redis.expire(playerKey(day, entry.fid), BOARD_TTL),
       ghost.samples.length >= 8
         ? redis.set(ghostKey(day, entry.fid), JSON.stringify(ghost), {
@@ -217,6 +225,7 @@ function entryFromRow(
     pfpUrl: String(row?.pfpUrl ?? ""),
     score,
     combo: Number(row?.combo ?? 0),
+    flair: isFlairTier(row?.flair) ? row?.flair : null,
     updatedAt: Number(row?.updatedAt ?? 0),
   };
 }

@@ -3,7 +3,35 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import sdk from "@farcaster/miniapp-sdk";
 import confetti from "canvas-confetti";
-import { Trophy, Volume2, VolumeX, X } from "lucide-react";
+import {
+  Circle,
+  CircleCheck,
+  Coins,
+  Crown,
+  Flame,
+  Heart,
+  Home,
+  Hourglass,
+  Infinity as InfinityIcon,
+  Magnet,
+  Medal,
+  Play,
+  Rainbow,
+  Rocket,
+  RotateCcw,
+  Skull,
+  Sparkles,
+  Sticker,
+  Sun,
+  Swords,
+  Target,
+  Timer,
+  Trophy,
+  Volume2,
+  VolumeX,
+  X,
+  Zap,
+} from "lucide-react";
 import { useAppFrameLogic } from "../../hooks/useAppFrameLogic";
 import { useUnifiedWallet } from "../../hooks/useUnifiedWallet";
 import {
@@ -20,6 +48,7 @@ import {
   buildSkateShareIntent,
 } from "../../lib/skateShare";
 import { FREE_SKATE_SEED, formatTimeLeft } from "../../lib/skateDaily";
+import { FLAIR_META, FlairTier } from "../../lib/skateFlair";
 
 export interface SkateChallenge {
   score: number;
@@ -34,6 +63,7 @@ interface LeaderboardEntry {
   pfpUrl: string;
   score: number;
   combo: number;
+  flair?: FlairTier | null; // $STREME crew badge, resolved server-side
   rank?: number; // 1-based, present on daily "nearby" rows
 }
 
@@ -48,6 +78,7 @@ interface RankResult {
   rank: number;
   total: number;
   improved: boolean;
+  flair?: FlairTier | null;
 }
 
 interface DailyStatus {
@@ -61,7 +92,12 @@ interface DailyStatus {
   total: number;
   entries: LeaderboardEntry[];
   nearby: LeaderboardEntry[];
-  ghosts: { fid: number; username: string; samples: number[] }[];
+  ghosts: {
+    fid: number;
+    username: string;
+    flair?: FlairTier | null;
+    samples: number[];
+  }[];
 }
 
 interface DailySubmitResult {
@@ -69,6 +105,7 @@ interface DailySubmitResult {
   total: number;
   streak: { count: number; best: number };
   alreadyPlayed: boolean;
+  flair?: FlairTier | null;
 }
 
 type Phase = "ready" | "playing" | "over";
@@ -81,10 +118,18 @@ const DEV_FID = process.env.NODE_ENV === "development" ? 6841 : null;
 
 const BEST_KEY = "streme-skate-best";
 const MUTED_KEY = "streme-skate-muted";
-const GHOSTS_KEY = "streme-skate-ghosts";
 const WARPLET_KEY = "streme-skate-warplet";
 const LETTERS = ["S", "T", "R", "E", "M", "E"];
 const GHOST_TINTS = ["#fb7185", "#a78bfa", "#34d399", "#fbbf24", "#38bdf8"];
+
+// lucide equivalents of the flair emoji for React UI (the emoji in FLAIR_META
+// still serve the canvas ghost name tags and the OG card, where SVG can't go)
+const FLAIR_ICONS = { deck: Sticker, sponsored: Zap, pro: Crown } as const;
+const FLAIR_TEXT = {
+  deck: "text-cyan-500",
+  sponsored: "text-violet-500",
+  pro: "text-amber-500",
+} as const;
 
 interface WarpletItem {
   tokenId: string;
@@ -249,10 +294,8 @@ export default function StremeSkateGame({
   const [best, setBest] = useState(0);
   const [isNewBest, setIsNewBest] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [ghostsOn, setGhostsOn] = useState(true);
-  const [ghostCount, setGhostCount] = useState(0);
+  // ghosts are always on — racing rivals is the game's social heartbeat
   const ghostsRef = useRef<GhostInput[]>([]);
-  const ghostsOnRef = useRef(true);
   const [warplet, setWarplet] = useState<WarpletInfo | null>(null);
   const [selectedWarplet, setSelectedWarplet] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -684,10 +727,12 @@ export default function StremeSkateGame({
             ? (dailyRef.current?.ghosts ?? []).map((g, i) => ({
                 samples: g.samples,
                 color: GHOST_TINTS[i % GHOST_TINTS.length],
-                name: g.username ? `@${g.username}` : "rival",
+                name: `${g.flair ? `${FLAIR_META[g.flair].icon} ` : ""}${
+                  g.username ? `@${g.username}` : "rival"
+                }`,
               }))
             : ghostsRef.current;
-        engineRef.current?.setGhosts(ghostsOnRef.current ? pool : []);
+        engineRef.current?.setGhosts(pool);
         engineRef.current?.setRainbow(radModeRef.current);
         setRunKind(runKindRef.current);
         setDailyResult(null);
@@ -748,7 +793,7 @@ export default function StremeSkateGame({
     };
   }, []);
 
-  // saved best + sound + ghost preference
+  // saved best + sound preference
   useEffect(() => {
     try {
       const savedBest = Number(localStorage.getItem(BEST_KEY)) || 0;
@@ -757,9 +802,6 @@ export default function StremeSkateGame({
       const savedMuted = localStorage.getItem(MUTED_KEY) === "true";
       setMuted(savedMuted);
       mutedRef.current = savedMuted;
-      const savedGhosts = localStorage.getItem(GHOSTS_KEY) !== "false"; // default ON
-      setGhostsOn(savedGhosts);
-      ghostsOnRef.current = savedGhosts;
     } catch {}
     return () => {
       if (bankTimerRef.current) clearTimeout(bankTimerRef.current);
@@ -778,15 +820,21 @@ export default function StremeSkateGame({
         );
         if (!res.ok) return;
         const data = (await res.json()) as {
-          ghosts: { username: string; samples: number[] }[];
+          ghosts: {
+            username: string;
+            flair?: FlairTier | null;
+            samples: number[];
+          }[];
         };
         if (cancelled) return;
         ghostsRef.current = (data.ghosts || []).map((g, i) => ({
           samples: g.samples,
           color: GHOST_TINTS[i % GHOST_TINTS.length],
-          name: g.username ? `@${g.username}` : "ghost",
+          // crew flair rides on the ghost's name tag — rivals flex in-run
+          name: `${g.flair ? `${FLAIR_META[g.flair].icon} ` : ""}${
+            g.username ? `@${g.username}` : "ghost"
+          }`,
         }));
-        setGhostCount(ghostsRef.current.length);
       } catch {
         // no ghosts available — solo run
       }
@@ -1055,17 +1103,6 @@ export default function StremeSkateGame({
     });
   }, []);
 
-  const toggleGhosts = useCallback(() => {
-    setGhostsOn((prev) => {
-      const next = !prev;
-      ghostsOnRef.current = next;
-      try {
-        localStorage.setItem(GHOSTS_KEY, String(next));
-      } catch {}
-      return next;
-    });
-  }, []);
-
   // 🥚 secret: tap the warplet on the title screen 7× to unlock RAD MODE
   const tapEgg = useCallback(() => {
     eggTapsRef.current += 1;
@@ -1115,6 +1152,14 @@ export default function StremeSkateGame({
     // on the same course today, so the cast is directly comparable
     const isDailyShare =
       mode === "daily" && daily && (dailyResult || daily.me) ? daily : null;
+    // crew flair for the card: this run's submit response, or (sharing later
+    // from the board overlay) whatever the board already shows for us
+    const myFid = fcUserRef.current?.fid ?? DEV_FID ?? undefined;
+    const boardFlair = isDailyShare
+      ? [...isDailyShare.entries, ...isDailyShare.nearby].find(
+          (e) => e.fid === myFid
+        )?.flair
+      : undefined;
     const { castText, shareUrl } = isDailyShare
       ? buildDailyShareIntent({
           score: isDailyShare.me?.score ?? runScore,
@@ -1124,6 +1169,7 @@ export default function StremeSkateGame({
           rank: dailyResult?.rank ?? isDailyShare.me?.rank,
           total: dailyResult?.total ?? isDailyShare.total,
           streak: (dailyResult?.streak ?? isDailyShare.streak)?.count,
+          flair: dailyResult?.flair ?? boardFlair,
         })
       : buildSkateShareIntent({
           score: runScore,
@@ -1132,6 +1178,7 @@ export default function StremeSkateGame({
           rankResult,
           challenge: liveChallenge,
           challengeBeaten,
+          flair: rankResult?.flair,
         });
 
     if (isMiniAppView && isSDKLoaded) {
@@ -1163,6 +1210,11 @@ export default function StremeSkateGame({
   ]);
 
   // ----------------------------------------------------------------- UI
+
+  // own crew flair, as the server resolved it on this run's submit — both
+  // routes compute it from the same fid, so either response is authoritative
+  const myFlair: FlairTier | null =
+    dailyResult?.flair ?? rankResult?.flair ?? null;
 
   const challengeLabel = liveChallenge
     ? `${liveChallenge.score.toLocaleString()}${
@@ -1227,10 +1279,10 @@ export default function StremeSkateGame({
               {distance.toLocaleString()}m
             </div>
             <div
-              className="mt-0.5 font-mono text-[9px] font-bold tracking-[0.18em] text-rose-300/90"
+              className="mt-0.5 inline-flex items-center gap-1 font-mono text-[9px] font-bold tracking-[0.18em] text-rose-300/90"
               style={{ textShadow: "0 0 6px rgba(244,63,94,0.7)" }}
             >
-              ♥ ONE LIFE
+              <Heart size={9} fill="currentColor" /> ONE LIFE
             </div>
             {/* the sun (in-canvas) IS the clock; this is just a compact readout
                 that flashes red as it runs out, plus the +Xs recharge pop */}
@@ -1241,10 +1293,10 @@ export default function StremeSkateGame({
               return (
                 <div className="mt-0.5 flex flex-col items-center">
                   <div
-                    className={`font-mono text-xs font-bold ${low ? "animate-pulse" : ""}`}
+                    className={`inline-flex items-center gap-1 font-mono text-xs font-bold ${low ? "animate-pulse" : ""}`}
                     style={{ color: col, textShadow: `0 0 8px ${col}` }}
                   >
-                    ☀ {timeLeft.toFixed(1)}s
+                    <Sun size={11} /> {timeLeft.toFixed(1)}s
                   </div>
                   {timeBonus && (
                     <div
@@ -1291,13 +1343,13 @@ export default function StremeSkateGame({
               />
             </div>
             {flow && (
-              <span className="font-mono text-[10px] font-bold text-amber-300 animate-pulse">
-                ⚡ FLOW STATE ×2
+              <span className="inline-flex items-center gap-0.5 font-mono text-[10px] font-bold text-amber-300 animate-pulse">
+                <Zap size={10} /> FLOW STATE ×2
               </span>
             )}
             {dailyCounted && (
-              <span className="font-mono text-[9px] font-bold tracking-[0.14em] text-amber-200">
-                ⚡ DAILY · 1 SHOT
+              <span className="inline-flex items-center gap-0.5 font-mono text-[9px] font-bold tracking-[0.14em] text-amber-200">
+                <Zap size={9} /> DAILY · 1 SHOT
               </span>
             )}
           </div>
@@ -1387,11 +1439,12 @@ export default function StremeSkateGame({
                 }}
               />
               <div
-                className="absolute top-1/2 -translate-y-1/2 text-[11px] leading-none"
-                style={{ left: `calc(${Math.min(progress * 100, 100)}% - 7px)` }}
-              >
-                🛹
-              </div>
+                className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-white bg-white/30"
+                style={{
+                  left: `calc(${Math.min(progress * 100, 100)}% - 6px)`,
+                  boxShadow: `0 0 8px ${zone.accent}`,
+                }}
+              />
             </div>
           </div>
 
@@ -1402,10 +1455,18 @@ export default function StremeSkateGame({
               style={{ borderColor: power === "rocket" ? "#fde68a66" : "#67e8f966" }}
             >
               <span
-                className="text-xs font-bold animate-pulse"
+                className="inline-flex items-center gap-1 text-xs font-bold animate-pulse"
                 style={{ color: power === "rocket" ? "#fde68a" : "#67e8f9" }}
               >
-                {power === "rocket" ? "🚀 ROCKET" : "🧲 MAGNET"}
+                {power === "rocket" ? (
+                  <>
+                    <Rocket size={12} /> ROCKET
+                  </>
+                ) : (
+                  <>
+                    <Magnet size={12} /> MAGNET
+                  </>
+                )}
               </span>
             </div>
           )}
@@ -1413,8 +1474,8 @@ export default function StremeSkateGame({
           {/* challenge chip */}
           {challengeLabel && !challengeBeaten && (
             <div className="absolute bottom-9 left-3 rounded-full bg-white/10 backdrop-blur-md px-3 py-1.5 pointer-events-none">
-              <span className="text-xs font-semibold text-white">
-                🎯 Beat {challengeLabel}
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-white">
+                <Target size={12} /> Beat {challengeLabel}
               </span>
             </div>
           )}
@@ -1510,8 +1571,8 @@ export default function StremeSkateGame({
               STREME SKATE
             </h1>
             {radMode && (
-              <div className="mt-1 text-[11px] font-black tracking-[0.25em] text-amber-200">
-                🌈 RAD MODE
+              <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-black tracking-[0.25em] text-amber-200">
+                <Rainbow size={12} /> RAD MODE
               </div>
             )}
           </div>
@@ -1525,56 +1586,76 @@ export default function StremeSkateGame({
           >
             <button
               onClick={() => applyMode("daily")}
-              className={`flex-1 rounded-full px-2 py-1.5 text-xs font-black tracking-wide transition ${
+              className={`flex flex-1 items-center justify-center gap-1 rounded-full px-2 py-1.5 text-xs font-black tracking-wide transition ${
                 mode === "daily"
                   ? "bg-amber-300 text-[#0c0626]"
                   : "text-white/60"
               }`}
             >
-              ⚡ DAILY LINE
+              <Zap size={13} /> DAILY LINE
             </button>
             <button
               onClick={() => applyMode("free")}
-              className={`flex-1 rounded-full px-2 py-1.5 text-xs font-black tracking-wide transition ${
+              className={`flex flex-1 items-center justify-center gap-1 rounded-full px-2 py-1.5 text-xs font-black tracking-wide transition ${
                 mode === "free" ? "bg-cyan-300 text-[#0c0626]" : "text-white/60"
               }`}
             >
-              🛹 FREE SKATE
+              <InfinityIcon size={13} /> FREE SKATE
             </button>
           </div>
 
           {/* stat chips — same column width as everything else */}
           <div className="flex w-72 flex-col items-stretch gap-1.5 text-center empty:hidden">
             {mode === "daily" && daily && (
-              <div className="rounded-full border border-amber-300/40 bg-amber-300/10 px-3 py-1 font-mono text-xs text-amber-100">
-                {daily.name} · resets in {formatTimeLeft(daily.endsAt, nowTs)}
-              </div>
-            )}
-            {mode === "daily" && daily && daily.streak.count >= 2 && (
-              <div className="rounded-full border border-orange-300/40 bg-orange-400/10 px-3 py-1 font-mono text-xs text-orange-200">
-                🔥 {daily.streak.count}-day streak
+              <div className="rounded-full border border-amber-300/40 bg-amber-300/10 px-3 py-1 text-xs text-amber-100">
+                <span className="font-bold">{daily.name}</span>
+                <span className="opacity-70">
+                  {" "}
+                  · resets in {formatTimeLeft(daily.endsAt, nowTs)}
+                </span>
               </div>
             )}
             {mode === "daily" && daily?.attemptUsed && daily.me && (
-              <div className="rounded-full border border-cyan-300/40 bg-cyan-400/15 px-3 py-1 font-mono text-xs text-cyan-100">
-                Today: {daily.me.score.toLocaleString()} · #{daily.me.rank} of{" "}
-                {daily.total}
+              <div className="flex items-center justify-center gap-3 rounded-full border border-cyan-300/40 bg-cyan-400/15 px-3 py-1 text-xs text-cyan-100">
+                <span>
+                  Today <span className="font-bold">#{daily.me.rank}</span>
+                  <span className="opacity-70"> of {daily.total}</span>
+                </span>
+                <span className="font-mono font-semibold">
+                  {daily.me.score.toLocaleString()}
+                </span>
+                {daily.streak.count >= 2 && (
+                  <span className="inline-flex items-center gap-0.5 font-bold text-orange-300">
+                    <Flame size={12} /> {daily.streak.count}d
+                  </span>
+                )}
               </div>
             )}
+            {mode === "daily" &&
+              daily &&
+              !daily.attemptUsed &&
+              daily.streak.count >= 2 && (
+                <div className="inline-flex items-center justify-center gap-1 rounded-full border border-orange-300/40 bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-200">
+                  <Flame size={12} /> {daily.streak.count}-day streak
+                </div>
+              )}
             {mode === "free" && best > 0 && (
-              <div className="rounded-full border border-amber-300/25 bg-white/8 px-3 py-1 font-mono text-xs text-amber-200">
-                🏆 Best {best.toLocaleString()}
+              <div className="inline-flex items-center justify-center gap-1 rounded-full border border-amber-300/25 bg-white/8 px-3 py-1 text-xs text-amber-200">
+                <Trophy size={12} /> Best{" "}
+                <span className="font-mono font-semibold">
+                  {best.toLocaleString()}
+                </span>
               </div>
             )}
             {challengeLabel && (
-              <div className="rounded-full border border-cyan-300/40 bg-cyan-400/15 px-3 py-1 font-mono text-xs text-cyan-100">
-                🎯 Beat {challengeLabel}
+              <div className="inline-flex items-center justify-center gap-1 rounded-full border border-cyan-300/40 bg-cyan-400/15 px-3 py-1 text-xs text-cyan-100">
+                <Target size={12} /> Beat {challengeLabel}
                 {liveChallenge?.day ? " today" : ""}
               </div>
             )}
             {staleDailyDare && (
-              <div className="rounded-full border border-white/15 bg-white/5 px-3 py-1 font-mono text-xs text-white/60">
-                ⏰ That dare expired — fresh line today
+              <div className="inline-flex items-center justify-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/60">
+                <Hourglass size={12} /> That dare expired — fresh line today
               </div>
             )}
           </div>
@@ -1598,11 +1679,11 @@ export default function StremeSkateGame({
                     animation: "skGlow 1.5s ease-in-out infinite",
                   }}
                 >
-                  ▶ PLAY
+                  <Play size={20} fill="currentColor" /> PLAY
                 </div>
                 {countsNext && (
-                  <span className="font-mono text-[10px] font-bold text-amber-200/90">
-                    ⚡ one shot a day — this run counts
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-200/90">
+                    <Zap size={11} /> one shot a day — this run counts
                   </span>
                 )}
               </div>
@@ -1617,26 +1698,16 @@ export default function StremeSkateGame({
             onPointerMove={(e) => e.stopPropagation()}
           >
             <button
-              onClick={toggleGhosts}
-              className={`w-72 rounded-full border px-3.5 py-1.5 text-xs font-bold transition ${
-                ghostsOn
-                  ? "border-cyan-300/50 bg-cyan-400/20 text-cyan-100"
-                  : "border-white/15 bg-white/5 text-white/60"
-              }`}
-            >
-              👻 {ghostsOn ? `Ghosts${ghostCount ? ` ·${ghostCount}` : ""}` : "Solo"}
-            </button>
-            <button
               onClick={() => setShowPicker(true)}
-              className="w-72 rounded-full border border-amber-300/40 bg-amber-300/10 px-3.5 py-1.5 text-xs font-bold text-amber-100"
+              className="inline-flex w-72 items-center justify-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-300/10 px-3.5 py-1.5 text-xs font-bold text-amber-100"
             >
-              {selectedWarplet ? "✨" : "🛹"} Choose your skater
+              <Sparkles size={13} /> Choose your skater
             </button>
             <button
               onClick={openBoard}
-              className="w-72 rounded-full border border-cyan-300/40 bg-white/5 px-3.5 py-1.5 text-xs font-bold text-cyan-100"
+              className="inline-flex w-72 items-center justify-center gap-1.5 rounded-full border border-cyan-300/40 bg-white/5 px-3.5 py-1.5 text-xs font-bold text-cyan-100"
             >
-              🏆 Leaderboard
+              <Trophy size={13} /> Leaderboard
             </button>
           </div>
           </div>
@@ -1651,41 +1722,127 @@ export default function StremeSkateGame({
         >
           <div className="w-full max-w-sm rounded-2xl bg-base-100/95 p-6 shadow-2xl text-center">
             {dailyCounted && daily && (
-              <div className="mb-1 font-mono text-xs font-black tracking-[0.18em] text-amber-500">
-                ⚡ DAILY LINE · {daily.name}
+              <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-600">
+                <Zap size={12} /> Daily Line · {daily.name}
               </div>
             )}
-            {dailyPractice && daily?.me && (
-              <div className="mb-1 font-mono text-xs font-bold tracking-[0.14em] opacity-50">
-                ⚡ TODAY&apos;S RUN: {daily.me.score.toLocaleString()} · #
-                {daily.me.rank}
-              </div>
-            )}
-            <div className="text-sm font-bold uppercase tracking-widest opacity-60">
-              {finishedRun.timedOut ? "⏱ Time up" : "💥 Wipeout"} ·{" "}
-              {finishedRun.distance.toLocaleString()}m
+            <div className="flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-[0.2em] opacity-50">
+              {finishedRun.timedOut ? (
+                <>
+                  <Timer size={13} /> Time up
+                </>
+              ) : (
+                <>
+                  <Skull size={13} /> Wiped out
+                </>
+              )}
             </div>
-            <div className="mt-2 font-mono text-5xl font-bold text-primary">
+            <div className="mt-1 font-mono text-6xl font-black leading-none text-primary">
               {finishedRun.score.toLocaleString()}
             </div>
-            <div className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-0.5 font-mono text-xs text-cyan-500 font-semibold">
-              <span>🛹 {finishedRun.distance.toLocaleString()}m</span>
-              <span>🏆 combo {finishedRun.bestCombo.toLocaleString()}</span>
-              <span>🫧 {finishedRun.bubbles.toLocaleString()}</span>
+            <div className="mt-2 text-sm">
+              {challengeBeaten && liveChallenge ? (
+                <span className="inline-flex items-center gap-1 font-bold text-success">
+                  <Swords size={14} /> Challenge smashed
+                  {liveChallenge.by ? ` — sorry @${liveChallenge.by}` : ""}!
+                </span>
+              ) : isNewBest ? (
+                <span className="inline-flex items-center gap-1 font-bold text-success">
+                  <Sparkles size={14} /> New best run
+                </span>
+              ) : (
+                <span className="opacity-50">
+                  Best: {best.toLocaleString()}
+                </span>
+              )}
             </div>
-            {dailyCounted && dailyResult && (
-              <div className="mt-2 flex flex-wrap justify-center gap-2">
-                <button
-                  className="rounded-full bg-amber-400/15 px-3 py-1 font-mono text-sm font-bold text-amber-600"
-                  onClick={openBoard}
-                >
-                  ⚡ #{dailyResult.rank} of {dailyResult.total} today
-                </button>
-                {dailyResult.streak.count >= 2 && (
-                  <span className="rounded-full bg-orange-400/15 px-3 py-1 font-mono text-sm font-bold text-orange-500">
-                    🔥 {dailyResult.streak.count}-day streak
-                  </span>
+            <div className="mt-4 grid grid-cols-3 divide-x divide-base-content/10 rounded-xl bg-base-200/70 py-2.5">
+              <div>
+                <div className="font-mono text-base font-bold">
+                  {finishedRun.distance.toLocaleString()}m
+                </div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider opacity-45">
+                  distance
+                </div>
+              </div>
+              <div>
+                <div className="font-mono text-base font-bold">
+                  {finishedRun.bestCombo.toLocaleString()}
+                </div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider opacity-45">
+                  best combo
+                </div>
+              </div>
+              <div>
+                <div className="font-mono text-base font-bold">
+                  {finishedRun.bubbles.toLocaleString()}
+                </div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider opacity-45">
+                  bubbles
+                </div>
+              </div>
+            </div>
+            {/* one achievements row: rank, streak, crew flair */}
+            {(dailyCounted ? dailyResult : rankResult) && (
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                {dailyCounted && dailyResult ? (
+                  <button
+                    className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-3 py-1 text-sm font-bold text-amber-600"
+                    onClick={openBoard}
+                  >
+                    <Zap size={13} /> #{dailyResult.rank} today
+                  </button>
+                ) : (
+                  rankResult && (
+                    <button
+                      className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-sm font-bold text-primary"
+                      onClick={openBoard}
+                    >
+                      {/* the all-time rank belongs to your BEST run — say so
+                          when this run isn't it, or the numbers look wrong */}
+                      <Trophy size={13} />{" "}
+                      {rankResult.improved
+                        ? `#${rankResult.rank} all-time`
+                        : `best is #${rankResult.rank} all-time`}
+                    </button>
+                  )
                 )}
+                {dailyCounted &&
+                  dailyResult &&
+                  dailyResult.streak.count >= 2 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-orange-400/15 px-3 py-1 text-sm font-bold text-orange-500">
+                      <Flame size={13} /> {dailyResult.streak.count} days
+                    </span>
+                  )}
+                {myFlair &&
+                  (() => {
+                    const FlairIcon = FLAIR_ICONS[myFlair];
+                    return (
+                      <span
+                        title={FLAIR_META[myFlair].hint}
+                        className={`inline-flex cursor-help items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${FLAIR_META[myFlair].chipClassName}`}
+                      >
+                        <FlairIcon size={13} /> {FLAIR_META[myFlair].label}
+                      </span>
+                    );
+                  })()}
+              </div>
+            )}
+            {/* crew flair upsell — one quiet line at the pride moment, only
+                when this run made the board and the wallet has no flair */}
+            {(dailyCounted ? dailyResult : rankResult) && !myFlair && (
+              <button
+                className="mt-2 inline-flex items-center gap-1 text-xs opacity-60 underline-offset-2 hover:underline hover:opacity-100"
+                onClick={handleBuyStreme}
+              >
+                <Sticker size={12} /> Hold 1M $STREME for crew flair on the
+                board
+              </button>
+            )}
+            {dailyPractice && daily?.me && (
+              <div className="mt-2 text-xs opacity-50">
+                Practice run — your counted score today is{" "}
+                {daily.me.score.toLocaleString()} (#{daily.me.rank})
               </div>
             )}
             {dailyCounted && daily && daily.nearby.length > 0 && (
@@ -1702,8 +1859,22 @@ export default function StremeSkateGame({
                         isMe ? "font-bold text-primary" : "opacity-70"
                       }`}
                     >
-                      <span className="truncate">
-                        {e.username ? `@${e.username}` : `fid ${e.fid}`}
+                      <span className="inline-flex min-w-0 items-center gap-1">
+                        <span className="truncate">
+                          {e.username ? `@${e.username}` : `fid ${e.fid}`}
+                        </span>
+                        {e.flair &&
+                          (() => {
+                            const FlairIcon = FLAIR_ICONS[e.flair];
+                            return (
+                              <span
+                                title={FLAIR_META[e.flair].hint}
+                                className={`shrink-0 cursor-help ${FLAIR_TEXT[e.flair]}`}
+                              >
+                                <FlairIcon size={11} />
+                              </span>
+                            );
+                          })()}
                         {isMe ? " (you)" : ""}
                       </span>
                       <span>{e.score.toLocaleString()}</span>
@@ -1712,39 +1883,27 @@ export default function StremeSkateGame({
                 })}
               </div>
             )}
-            {rankResult && !dailyCounted && (
-              <button
-                className="mt-1 font-mono text-sm font-semibold text-primary underline-offset-2 hover:underline"
-                onClick={openBoard}
-              >
-                🏆 #{rankResult.rank} of {rankResult.total} skaters
-              </button>
-            )}
-            <div className="mt-2 text-sm opacity-70">
-              {challengeBeaten && liveChallenge ? (
-                <span className="font-bold text-success">
-                  🏆 Challenge smashed
-                  {liveChallenge.by ? ` — sorry @${liveChallenge.by}` : ""}!
-                </span>
-              ) : isNewBest ? (
-                <span className="font-bold text-success">🏆 New best run!</span>
-              ) : (
-                <>Best run: {best.toLocaleString()}</>
-              )}
-            </div>
             <div className="mt-5 flex flex-col gap-2">
               <button className="btn btn-primary w-full" onClick={handleShare}>
-                {dailyCounted ? "⚡ Dare the feed" : "Challenge your friends"}
+                {dailyCounted ? (
+                  <>
+                    <Zap size={16} /> Dare the feed
+                  </>
+                ) : (
+                  <>
+                    <Swords size={16} /> Challenge your friends
+                  </>
+                )}
               </button>
               <button className="btn btn-outline w-full" onClick={handleRestart}>
-                ▶ Play again
+                <RotateCcw size={15} /> Play again
               </button>
               <div className="flex gap-2">
                 <button
                   className="btn btn-ghost btn-sm flex-1"
                   onClick={handleBackToMenu}
                 >
-                  🏠 Menu
+                  <Home size={14} /> Menu
                 </button>
                 <button
                   className="btn btn-ghost btn-sm flex-1"
@@ -1854,15 +2013,20 @@ export default function StremeSkateGame({
                     To unlock Warplet skaters:
                   </div>
                   <div className="flex items-center gap-2">
-                    <span>{warplet.ownsWarplet ? "✅" : "⬜️"}</span>
+                    {warplet.ownsWarplet ? (
+                      <CircleCheck size={14} className="text-success" />
+                    ) : (
+                      <Circle size={14} className="opacity-40" />
+                    )}
                     <span>Own a Warplet NFT</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span>
-                      {warplet.streme >= 10_000_000 || warplet.staked >= 10_000_000
-                        ? "✅"
-                        : "⬜️"}
-                    </span>
+                    {warplet.streme >= 10_000_000 ||
+                    warplet.staked >= 10_000_000 ? (
+                      <CircleCheck size={14} className="text-success" />
+                    ) : (
+                      <Circle size={14} className="opacity-40" />
+                    )}
                     <span>
                       Hold 10M $STREME or staked (you:{" "}
                       {Math.max(warplet.streme, warplet.staked).toLocaleString()})
@@ -1873,7 +2037,7 @@ export default function StremeSkateGame({
                       onClick={handleBuyStreme}
                       className="btn btn-primary btn-sm mt-3 w-full"
                     >
-                      💰 Buy $STREME
+                      <Coins size={14} /> Buy $STREME
                     </button>
                   )}
                 </div>
@@ -1907,19 +2071,19 @@ export default function StremeSkateGame({
             <div className="mt-2 flex gap-1 rounded-full bg-base-200 p-1">
               <button
                 onClick={() => setBoardTab("daily")}
-                className={`flex-1 rounded-full py-1 text-xs font-bold ${
+                className={`flex flex-1 items-center justify-center gap-1 rounded-full py-1 text-xs font-bold ${
                   boardTab === "daily" ? "bg-warning text-warning-content" : "opacity-60"
                 }`}
               >
-                ⚡ TODAY
+                <Zap size={12} /> TODAY
               </button>
               <button
                 onClick={() => setBoardTab("alltime")}
-                className={`flex-1 rounded-full py-1 text-xs font-bold ${
+                className={`flex flex-1 items-center justify-center gap-1 rounded-full py-1 text-xs font-bold ${
                   boardTab === "alltime" ? "bg-primary text-primary-content" : "opacity-60"
                 }`}
               >
-                🏆 ALL-TIME
+                <Trophy size={12} /> ALL-TIME
               </button>
             </div>
 
@@ -1951,19 +2115,26 @@ export default function StremeSkateGame({
                     </p>
                   );
                 }
-                const medal = (i: number) =>
-                  i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`;
-                const row = (entry: LeaderboardEntry, label: string) => {
+                const MEDAL_TINTS = [
+                  "text-amber-400",
+                  "text-slate-400",
+                  "text-amber-700",
+                ];
+                const row = (entry: LeaderboardEntry, rank: number) => {
                   const isMe = fcUserRef.current?.fid === entry.fid;
                   return (
                     <li
-                      key={`${label}-${entry.fid}`}
+                      key={`${rank}-${entry.fid}`}
                       className={`flex items-center gap-3 rounded-lg px-2 py-1.5 ${
                         isMe ? "bg-primary/10 ring-1 ring-primary" : ""
                       }`}
                     >
-                      <span className="w-6 text-right font-mono text-sm opacity-60">
-                        {label}
+                      <span className="flex w-6 justify-end font-mono text-sm opacity-60">
+                        {rank <= 3 ? (
+                          <Medal size={15} className={MEDAL_TINTS[rank - 1]} />
+                        ) : (
+                          rank
+                        )}
                       </span>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -1975,10 +2146,24 @@ export default function StremeSkateGame({
                             "/icon-transparent.png";
                         }}
                       />
-                      <span className="flex-1 truncate text-sm font-medium">
-                        {entry.username
-                          ? `@${entry.username}`
-                          : `fid ${entry.fid}`}
+                      <span className="flex min-w-0 flex-1 items-center gap-1 text-sm font-medium">
+                        <span className="truncate">
+                          {entry.username
+                            ? `@${entry.username}`
+                            : `fid ${entry.fid}`}
+                        </span>
+                        {entry.flair &&
+                          (() => {
+                            const FlairIcon = FLAIR_ICONS[entry.flair];
+                            return (
+                              <span
+                                title={FLAIR_META[entry.flair].hint}
+                                className={`shrink-0 cursor-help ${FLAIR_TEXT[entry.flair]}`}
+                              >
+                                <FlairIcon size={13} />
+                              </span>
+                            );
+                          })()}
                       </span>
                       <span className="font-mono text-sm font-semibold text-primary">
                         {entry.score.toLocaleString()}
@@ -1996,13 +2181,13 @@ export default function StremeSkateGame({
                     : [];
                 return (
                   <ul className="flex flex-col gap-1">
-                    {entries.map((e, i) => row(e, medal(i)))}
+                    {entries.map((e, i) => row(e, i + 1))}
                     {nearby.length > 0 && (
                       <>
                         <li className="py-0.5 text-center font-mono text-xs opacity-40">
                           ···
                         </li>
-                        {nearby.map((e) => row(e, String(e.rank)))}
+                        {nearby.map((e) => row(e, e.rank ?? 0))}
                       </>
                     )}
                   </ul>
@@ -2024,8 +2209,8 @@ export default function StremeSkateGame({
                   You: #{daily.me.rank} · {daily.me.score.toLocaleString()}
                 </span>
                 {daily.streak.count >= 2 && (
-                  <span className="text-orange-500">
-                    🔥 {daily.streak.count}d
+                  <span className="inline-flex items-center gap-0.5 text-orange-500">
+                    <Flame size={13} /> {daily.streak.count}d
                   </span>
                 )}
               </div>
@@ -2035,7 +2220,7 @@ export default function StremeSkateGame({
                 className="btn btn-warning btn-sm mt-2 w-full font-bold"
                 onClick={handleShare}
               >
-                ⚡ Dare the feed with your rank
+                <Zap size={14} /> Dare the feed with your rank
               </button>
             )}
             {!isMiniAppView && (
