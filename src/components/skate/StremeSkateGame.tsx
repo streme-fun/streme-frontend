@@ -294,7 +294,7 @@ export default function StremeSkateGame({
 
   const startMusic = useCallback(() => {
     if (!musicRef.current) {
-      const audio = new Audio("/surf/theme.mp3");
+      const audio = new Audio("/skate/theme.mp3");
       audio.loop = true;
       audio.volume = 0.32;
       audio.preload = "auto";
