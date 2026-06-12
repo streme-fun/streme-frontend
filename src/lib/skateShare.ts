@@ -2,6 +2,7 @@ export interface SkateChallenge {
   score: number;
   by?: string;
   rank?: number;
+  day?: string; // a DAILY LINE dare — only live while that day's line is open
 }
 
 export interface SkateRankResult {
@@ -95,5 +96,51 @@ export function buildSkateShareIntent({
   return {
     shareUrl,
     castText: `${opener}\n\nThink you can beat my line?\n\n${shareUrl}`,
+  };
+}
+
+interface BuildDailyShareInput {
+  score: number;
+  day: string; // UTC day key, e.g. "2026-06-12"
+  name: string; // the line's name, e.g. "THURSDAY THRASHER"
+  username?: string;
+  rank?: number;
+  total?: number;
+  streak?: number;
+  baseShareUrl?: string;
+}
+
+/**
+ * Share intent for a counted DAILY LINE run. Unlike the free-skate card this
+ * names the day's line — everyone in the feed is on the SAME course, so the
+ * cast is a direct, comparable dare (the Wordle property), not an announcement.
+ */
+export function buildDailyShareIntent({
+  score,
+  day,
+  name,
+  username,
+  rank,
+  total,
+  streak,
+  baseShareUrl = SKATE_SHARE_URL,
+}: BuildDailyShareInput): SkateShareIntent {
+  const runScore = normalizedScore(score);
+  const by = normalizedUsername(username);
+
+  let opener = `⚡ DAILY LINE · ${name}: ${runScore.toLocaleString()}`;
+  if (rank && total) opener += ` — #${rank} of ${total}`;
+  opener += " 🛹";
+  if (streak && streak >= 2) opener += `\n🔥 ${streak}-day streak`;
+
+  const params = new URLSearchParams({ d: day, s: String(runScore) });
+  if (by) params.set("by", by);
+  if (rank) params.set("r", String(rank));
+  if (streak && streak >= 2) params.set("st", String(streak));
+
+  const shareUrl = `${baseShareUrl}?${params.toString()}`;
+  return {
+    shareUrl,
+    castText: `${opener}\n\nSame line for everyone, one counted shot a day. Beat me before it resets.\n\n${shareUrl}`,
   };
 }
