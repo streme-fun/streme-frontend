@@ -1,3 +1,5 @@
+import { FlairTier } from "./skateFlair";
+
 export interface SkateChallenge {
   score: number;
   by?: string;
@@ -22,6 +24,7 @@ interface BuildSkateShareInput {
   rankResult?: SkateRankResult | null;
   challenge?: SkateChallenge | null;
   challengeBeaten?: boolean;
+  flair?: FlairTier | null; // crew badge — rendered on the OG card only
   baseShareUrl?: string;
 }
 
@@ -61,6 +64,7 @@ export function buildSkateShareIntent({
   rankResult,
   challenge,
   challengeBeaten = false,
+  flair,
   baseShareUrl = SKATE_SHARE_URL,
 }: BuildSkateShareInput): SkateShareIntent {
   const runScore = normalizedScore(score);
@@ -91,6 +95,7 @@ export function buildSkateShareIntent({
   const params = new URLSearchParams({ s: String(cardScore) });
   if (by) params.set("by", by);
   if (rankForCard) params.set("r", String(rankForCard));
+  if (flair) params.set("f", flair);
 
   const shareUrl = `${baseShareUrl}?${params.toString()}`;
   return {
@@ -107,6 +112,7 @@ interface BuildDailyShareInput {
   rank?: number;
   total?: number;
   streak?: number;
+  flair?: FlairTier | null; // crew badge — rendered on the OG card only
   baseShareUrl?: string;
 }
 
@@ -123,6 +129,7 @@ export function buildDailyShareIntent({
   rank,
   total,
   streak,
+  flair,
   baseShareUrl = SKATE_SHARE_URL,
 }: BuildDailyShareInput): SkateShareIntent {
   const runScore = normalizedScore(score);
@@ -137,6 +144,7 @@ export function buildDailyShareIntent({
   if (by) params.set("by", by);
   if (rank) params.set("r", String(rank));
   if (streak && streak >= 2) params.set("st", String(streak));
+  if (flair) params.set("f", flair);
 
   const shareUrl = `${baseShareUrl}?${params.toString()}`;
   return {

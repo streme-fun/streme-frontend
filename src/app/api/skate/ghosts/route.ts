@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, Errors } from "@farcaster/quick-auth";
 import { getGhosts, saveGhost } from "../../../../lib/skateGhosts";
+import { getFlairForFid } from "../../../../lib/skateFlairServer";
 
 const MAX_SCORE = 100_000_000;
 
@@ -73,7 +74,8 @@ export async function POST(request: NextRequest) {
     const username =
       typeof body.username === "string" ? body.username.slice(0, 32) : "";
 
-    await saveGhost({ fid, username, score, samples });
+    const flair = await getFlairForFid(fid);
+    await saveGhost({ fid, username, score, flair, samples });
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Skate ghosts POST error:", error);

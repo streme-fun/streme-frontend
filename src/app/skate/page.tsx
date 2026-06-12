@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import SkatePageClient from "./SkatePageClient";
 import { dailyKey, dailyName, isDailyKey } from "../../lib/skateDaily";
+import { isFlairTier } from "../../lib/skateFlair";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://streme.fun";
 
@@ -15,7 +16,13 @@ const OG_VERSION =
   "dev";
 
 interface Props {
-  searchParams: Promise<{ s?: string; by?: string; r?: string; d?: string }>;
+  searchParams: Promise<{
+    s?: string;
+    by?: string;
+    r?: string;
+    d?: string;
+    f?: string;
+  }>;
 }
 
 function parseChallenge(params: {
@@ -23,6 +30,7 @@ function parseChallenge(params: {
   by?: string;
   r?: string;
   d?: string;
+  f?: string;
 }) {
   const score = Number(params.s);
   if (!Number.isFinite(score) || score <= 0 || score > 100_000_000) {
@@ -40,6 +48,7 @@ function parseChallenge(params: {
     by,
     rank: Number.isInteger(rank) && rank > 0 ? rank : undefined,
     day,
+    flair: isFlairTier(params.f) ? params.f : undefined,
   };
 }
 
@@ -70,6 +79,7 @@ export async function generateMetadata({
     if (challenge.by) imageParams.set("by", challenge.by);
     if (challenge.rank) imageParams.set("r", String(challenge.rank));
     if (challenge.day) imageParams.set("d", challenge.day);
+    if (challenge.flair) imageParams.set("f", challenge.flair);
   }
   imageParams.set("v", OG_VERSION);
   const imageUrl = `${baseUrl}/api/skate/image?${imageParams.toString()}`;
