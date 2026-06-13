@@ -135,10 +135,12 @@ export async function POST(request: NextRequest) {
       { fid, username, pfpUrl, score, combo, flair },
       samples
     );
-    return NextResponse.json(
-      { day: claimedDay, name: dailyName(claimedDay), ...result, flair },
-      { status: result.alreadyPlayed ? 409 : 200 }
-    );
+    return NextResponse.json({
+      day: claimedDay,
+      name: dailyName(claimedDay),
+      ...result,
+      flair,
+    });
   } catch (error) {
     console.error("Skate daily POST error:", error);
     return NextResponse.json(

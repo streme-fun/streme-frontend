@@ -86,7 +86,7 @@ interface DailyStatus {
   name: string;
   seed: number;
   endsAt: number;
-  attemptUsed: boolean;
+  played: boolean;
   me: { rank: number; score: number } | null;
   streak: { count: number; best: number };
   total: number;
@@ -104,7 +104,8 @@ interface DailySubmitResult {
   rank: number;
   total: number;
   streak: { count: number; best: number };
-  alreadyPlayed: boolean;
+  improved: boolean;
+  best: number;
   flair?: FlairTier | null;
 }
 
@@ -311,7 +312,7 @@ export default function StremeSkateGame({
   const [boardTab, setBoardTab] = useState<"daily" | "alltime">("daily");
   const [finishedRun, setFinishedRun] = useState<SkateResult | null>(null);
 
-  // ----- DAILY LINE: one shared seed per UTC day, one counted run each -----
+  // ----- DAILY LINE: one shared seed per UTC day, unlimited runs, best holds -----
   const [mode, setMode] = useState<SkateMode>("free");
   const modeRef = useRef<SkateMode>("free");
   const [daily, setDaily] = useState<DailyStatus | null>(null);
@@ -629,15 +630,10 @@ export default function StremeSkateGame({
       const samples = engineRef.current?.getRecording() ?? [];
 
       if (modeRef.current === "daily" && runKindRef.current === "counted") {
-        // THE counted run of the day — board rank, streak, and the recording
-        // becomes a rival ghost on today's line. Lock the attempt locally
-        // right away so an instant restart can't race the in-flight submit.
+        // a counted run on today's line — unlimited tries within the 24h
+        // window, your BEST score holds the board rank and its recording
+        // becomes the rival ghost. The server keeps-best; we mirror that below.
         const day = dailyRef.current?.day;
-        setDaily((prev) => {
-          const next = prev ? { ...prev, attemptUsed: true } : prev;
-          dailyRef.current = next;
-          return next;
-        });
         authedFetch("/api/skate/daily", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -660,8 +656,8 @@ export default function StremeSkateGame({
                 const next = prev
                   ? {
                       ...prev,
-                      attemptUsed: true,
-                      me: { rank: r.rank, score: result.score },
+                      played: true,
+                      me: { rank: r.rank, score: r.best },
                       streak: r.streak,
                       total: r.total,
                     }
@@ -670,7 +666,7 @@ export default function StremeSkateGame({
                 return next;
               });
             }
-            // refresh the board + rivals either way (409 = raced a double-submit)
+            // refresh the board + rivals (picks up other players' new bests)
             loadDaily();
           })
           .catch((e) => console.error("Daily submit failed:", e));
@@ -971,8 +967,8 @@ export default function StremeSkateGame({
     null
   );
 
-  // Every start is just "play" — on the daily, the FIRST run of the day is
-  // the counted one; anything after is an uncounted lap (no separate buttons)
+  // Every start is just "play" — on the daily, every run counts (unlimited
+  // tries; your best holds the board). "practice" only when we can't submit.
   const stampRunKind = useCallback(() => {
     if (modeRef.current !== "daily") {
       runKindRef.current = "free";
@@ -980,9 +976,7 @@ export default function StremeSkateGame({
     }
     const canSubmit = isMiniAppRef.current || Boolean(DEV_FID);
     runKindRef.current =
-      canSubmit && dailyRef.current && !dailyRef.current.attemptUsed
-        ? "counted"
-        : "practice";
+      canSubmit && dailyRef.current ? "counted" : "practice";
   }, []);
 
   const handlePointerDown = useCallback(
@@ -1615,10 +1609,10 @@ export default function StremeSkateGame({
                 </span>
               </div>
             )}
-            {mode === "daily" && daily?.attemptUsed && daily.me && (
+            {mode === "daily" && daily?.me && (
               <div className="flex items-center justify-center gap-3 rounded-full border border-cyan-300/40 bg-cyan-400/15 px-3 py-1 text-xs text-cyan-100">
                 <span>
-                  Today <span className="font-bold">#{daily.me.rank}</span>
+                  Best <span className="font-bold">#{daily.me.rank}</span>
                   <span className="opacity-70"> of {daily.total}</span>
                 </span>
                 <span className="font-mono font-semibold">
@@ -1633,7 +1627,7 @@ export default function StremeSkateGame({
             )}
             {mode === "daily" &&
               daily &&
-              !daily.attemptUsed &&
+              !daily.me &&
               daily.streak.count >= 2 && (
                 <div className="inline-flex items-center justify-center gap-1 rounded-full border border-orange-300/40 bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-200">
                   <Flame size={12} /> {daily.streak.count}-day streak
@@ -1660,11 +1654,10 @@ export default function StremeSkateGame({
             )}
           </div>
 
-          {/* PLAY (visual — tapping anywhere drops you in). On the daily the
-              first run of the day counts; the pill burns amber to say so. */}
+          {/* PLAY (visual — tapping anywhere drops you in). On the daily every
+              run counts toward your best; the pill burns amber to say so. */}
           {(() => {
-            const countsNext =
-              mode === "daily" && !!daily && !daily.attemptUsed && canCount;
+            const countsNext = mode === "daily" && !!daily && canCount;
             return (
               <div className="flex flex-col items-center gap-1.5">
                 <div
@@ -1683,7 +1676,10 @@ export default function StremeSkateGame({
                 </div>
                 {countsNext && (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-200/90">
-                    <Zap size={11} /> one shot a day — this run counts
+                    <Zap size={11} />{" "}
+                    {daily?.me
+                      ? "beat your best — every run counts today"
+                      : "every run counts — best holds the board"}
                   </span>
                 )}
               </div>
@@ -1839,9 +1835,23 @@ export default function StremeSkateGame({
                 board
               </button>
             )}
+            {dailyCounted && dailyResult && (
+              <div className="mt-2 text-xs opacity-60">
+                {dailyResult.improved ? (
+                  <span className="font-bold text-success">
+                    New daily best — run it back to climb higher
+                  </span>
+                ) : (
+                  <span>
+                    Didn&apos;t top today&apos;s best (
+                    {dailyResult.best.toLocaleString()}) — try again
+                  </span>
+                )}
+              </div>
+            )}
             {dailyPractice && daily?.me && (
               <div className="mt-2 text-xs opacity-50">
-                Practice run — your counted score today is{" "}
+                Practice run — your best today is{" "}
                 {daily.me.score.toLocaleString()} (#{daily.me.rank})
               </div>
             )}

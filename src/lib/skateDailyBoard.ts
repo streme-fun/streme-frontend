@@ -2,9 +2,10 @@ import { Redis } from "@upstash/redis";
 import { prevDailyKey } from "./skateDaily";
 import { FlairTier, isFlairTier } from "./skateFlair";
 
-// DAILY LINE storage — a day-keyed leaderboard where each player gets exactly
-// ONE counted run (board membership IS the used attempt), plus play streaks
-// and the run recordings ("rival ghosts") for racing on the same day's course.
+// DAILY LINE storage — a day-keyed leaderboard where each player may run the
+// course as many times as they like within the 24h window and their BEST score
+// is what stands on the board, plus play streaks and the run recordings
+// ("rival ghosts" — the recording of your best run) for racing today's course.
 // Mirrors src/lib/skateLeaderboard.ts: Redis when KV env vars exist, otherwise
 // an in-memory fallback; dev writes are namespaced away from production.
 
@@ -28,7 +29,8 @@ export interface DailySubmitResult {
   rank: number; // 1-based
   total: number;
   streak: DailyStreak;
-  alreadyPlayed: boolean;
+  improved: boolean; // did this run beat your previous best today?
+  best: number; // your best score now standing on today's board
 }
 
 export interface DailyGhostRecord {
@@ -40,7 +42,7 @@ export interface DailyGhostRecord {
 }
 
 export interface DailyBoardData {
-  attemptUsed: boolean;
+  played: boolean; // already have a score on today's board (best-so-far)
   me: { rank: number; score: number } | null;
   streak: DailyStreak;
   total: number;
@@ -130,8 +132,10 @@ async function getStreak(fid: number): Promise<DailyStreak> {
 // ------------------------------------------------------------------- submit
 
 /**
- * Record the player's ONE counted run for the day. Board membership is the
- * attempt flag: a second submit returns alreadyPlayed without overwriting.
+ * Record one of the player's runs for the day. Tries are unlimited within the
+ * 24h window; only an improvement on their previous best overwrites the board
+ * score, profile, and rival ghost. Either way the play bumps the daily streak
+ * (idempotent per day) and we return the standing of their best score.
  */
 export async function submitDailyRun(
   day: string,
@@ -149,58 +153,56 @@ export async function submitDailyRun(
 
   if (redis) {
     const existing = await redis.zscore(boardKey(day), String(entry.fid));
-    if (existing !== null) {
-      const [rank, total, streak] = await Promise.all([
-        redis.zrevrank(boardKey(day), String(entry.fid)),
-        redis.zcard(boardKey(day)),
-        getStreak(entry.fid),
+    const prevBest = existing === null ? null : Number(existing);
+    const improved = prevBest === null || entry.score > prevBest;
+
+    if (improved) {
+      await redis.zadd(boardKey(day), {
+        score: entry.score,
+        member: String(entry.fid),
+      });
+      await Promise.all([
+        redis.expire(boardKey(day), BOARD_TTL),
+        redis.hset(playerKey(day, entry.fid), {
+          ...entry,
+          flair: entry.flair ?? "",
+          updatedAt: now,
+        }),
+        redis.expire(playerKey(day, entry.fid), BOARD_TTL),
+        ghost.samples.length >= 8
+          ? redis.set(ghostKey(day, entry.fid), JSON.stringify(ghost), {
+              ex: GHOST_TTL,
+            })
+          : Promise.resolve(),
       ]);
-      return { rank: (rank ?? 0) + 1, total, streak, alreadyPlayed: true };
     }
-    await redis.zadd(boardKey(day), {
-      score: entry.score,
-      member: String(entry.fid),
-    });
-    await Promise.all([
-      redis.expire(boardKey(day), BOARD_TTL),
-      redis.hset(playerKey(day, entry.fid), {
-        ...entry,
-        flair: entry.flair ?? "",
-        updatedAt: now,
-      }),
-      redis.expire(playerKey(day, entry.fid), BOARD_TTL),
-      ghost.samples.length >= 8
-        ? redis.set(ghostKey(day, entry.fid), JSON.stringify(ghost), {
-            ex: GHOST_TTL,
-          })
-        : Promise.resolve(),
-    ]);
     const [rank, total, streak] = await Promise.all([
       redis.zrevrank(boardKey(day), String(entry.fid)),
       redis.zcard(boardKey(day)),
       bumpStreak(entry.fid, day),
     ]);
-    return { rank: (rank ?? 0) + 1, total, streak, alreadyPlayed: false };
+    return {
+      rank: (rank ?? 0) + 1,
+      total,
+      streak,
+      improved,
+      best: improved ? entry.score : prevBest ?? entry.score,
+    };
   }
 
   const board = localBoard(day);
-  if (board.has(entry.fid)) {
-    const sorted = [...board.values()].sort((a, b) => b.score - a.score);
-    return {
-      rank: sorted.findIndex((e) => e.fid === entry.fid) + 1,
-      total: sorted.length,
-      streak: await getStreak(entry.fid),
-      alreadyPlayed: true,
-    };
-  }
-  board.set(entry.fid, { ...entry, updatedAt: now });
-  if (ghost.samples.length >= 8) {
-    let g = localGhosts.get(day);
-    if (!g) {
-      g = new Map();
-      localGhosts.set(day, g);
+  const prevBest = board.get(entry.fid)?.score ?? null;
+  const improved = prevBest === null || entry.score > prevBest;
+  if (improved) {
+    board.set(entry.fid, { ...entry, updatedAt: now });
+    if (ghost.samples.length >= 8) {
+      let g = localGhosts.get(day);
+      if (!g) {
+        g = new Map();
+        localGhosts.set(day, g);
+      }
+      g.set(entry.fid, ghost);
     }
-    g.set(entry.fid, ghost);
   }
   const streak = await bumpStreak(entry.fid, day);
   const sorted = [...board.values()].sort((a, b) => b.score - a.score);
@@ -208,7 +210,8 @@ export async function submitDailyRun(
     rank: sorted.findIndex((e) => e.fid === entry.fid) + 1,
     total: sorted.length,
     streak,
-    alreadyPlayed: false,
+    improved,
+    best: improved ? entry.score : prevBest ?? entry.score,
   };
 }
 
@@ -331,7 +334,7 @@ export async function getDailyBoard(
     }
 
     return {
-      attemptUsed: me !== null,
+      played: me !== null,
       me,
       streak: fid ? await getStreak(fid) : { count: 0, best: 0 },
       total,
@@ -373,7 +376,7 @@ export async function getDailyBoard(
     .filter((g): g is DailyGhostRecord => Boolean(g));
 
   return {
-    attemptUsed: me !== null,
+    played: me !== null,
     me,
     streak: fid ? await getStreak(fid) : { count: 0, best: 0 },
     total: sorted.length,

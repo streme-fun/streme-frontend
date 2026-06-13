@@ -149,6 +149,6 @@ export function buildDailyShareIntent({
   const shareUrl = `${baseShareUrl}?${params.toString()}`;
   return {
     shareUrl,
-    castText: `${opener}\n\nSame line for everyone, one counted shot a day. Beat me before it resets.\n\n${shareUrl}`,
+    castText: `${opener}\n\nSame line for everyone — run it all day, best score holds. Beat me before it resets.\n\n${shareUrl}`,
   };
 }

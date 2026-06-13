@@ -67,7 +67,7 @@ export async function generateMetadata({
           challenge.by ? `@${challenge.by}` : "Someone"
         } scored ${challenge.score.toLocaleString()} on the ${dailyName(
           challenge.day
-        )} daily line. Same course for everyone, one counted shot a day — beat it before it resets.`
+        )} daily line. Same course for everyone, run it all day — best score holds. Beat it before it resets.`
       : `Someone${
           challenge.by ? ` (@${challenge.by})` : ""
         } scored ${challenge.score.toLocaleString()} in Streme Skate. Think you can beat it?`

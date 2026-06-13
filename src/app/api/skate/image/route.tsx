@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
                   }}
                 >
                   {day
-                    ? `${by ? `@${by}` : "Someone"} dares you — one shot a day`
+                    ? `${by ? `@${by}` : "Someone"} dares you — best score today wins`
                     : by
                     ? `@${by} dares you to beat it`
                     : "Can you beat this line?"}
