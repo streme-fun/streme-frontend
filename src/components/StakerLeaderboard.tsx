@@ -3,16 +3,10 @@
 import { useState, useEffect } from "react";
 import { Modal } from "./Modal";
 import { toast } from "sonner";
-
-interface TokenStaker {
-  address: string;
-  units: string;
-  percentage: number;
-  isConnected: boolean;
-  fid?: number;
-  username?: string;
-  pfp_url?: string | null;
-}
+import {
+  normalizeTokenStakers,
+  type TokenStaker,
+} from "@/src/lib/tokenStakers";
 
 interface StakerLeaderboardProps {
   stakingPoolAddress: string;
@@ -60,7 +54,7 @@ export function StakerLeaderboard({
         throw new Error(`Failed to fetch stakers: ${response.statusText}`);
       }
 
-      const stakersData: TokenStaker[] = await response.json();
+      const stakersData = normalizeTokenStakers(await response.json());
 
       console.log(`Fetched ${stakersData.length} stakers for token ${tokenAddress}`);
 
