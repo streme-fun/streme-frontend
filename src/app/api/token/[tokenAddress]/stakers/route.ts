@@ -17,7 +17,9 @@ export async function GET(
     const cacheParam = url.searchParams.get('v');
 
     // Build API URL with cache-busting parameter
-    const apiUrl = new URL(`https://api.streme.fun/api/stakers/${tokenAddress}`);
+    const apiUrl = new URL(
+      `https://api.streme.fun/api/token/${tokenAddress}/stakers`
+    );
     if (cacheParam) {
       apiUrl.searchParams.set('v', cacheParam);
     }

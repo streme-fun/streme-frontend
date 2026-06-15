@@ -11,16 +11,10 @@ import sdk from "@farcaster/miniapp-sdk";
 import { useWalletAddressChange } from "@/src/hooks/useWalletSync";
 import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
 import { encodeZapData } from "@/src/lib/abiEncoding";
-
-interface TokenStaker {
-  address: string;
-  units: string;
-  percentage: number;
-  isConnected: boolean;
-  fid?: number;
-  username?: string;
-  pfp_url?: string | null;
-}
+import {
+  normalizeTokenStakers,
+  type TokenStaker,
+} from "@/src/lib/tokenStakers";
 
 interface StakerLeaderboardEmbedProps {
   stakingPoolAddress: string;
@@ -89,13 +83,16 @@ export function StakerLeaderboardEmbed({
         throw new Error(`Failed to fetch stakers: ${response.statusText}`);
       }
 
-      const stakersData: TokenStaker[] = await response.json();
+      const stakersData = normalizeTokenStakers(await response.json());
 
       // Filter out specific excluded address and take top 10
       const filteredStakers = stakersData
         .filter(
           (staker) =>
             staker.address.toLowerCase() !== "0xc749105bc4b4ea6285dbbe2e8221c922bea07a9d"
+        )
+        .sort(
+          (a, b) => Number.parseFloat(b.units) - Number.parseFloat(a.units)
         )
         .slice(0, 10);
 
