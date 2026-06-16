@@ -71,7 +71,8 @@ export interface LaunchedToken {
   };
   staking_pool: string;
   staking_address: string;
-  pool_address: string;
+  pool_address: string | null;
+  pool_key?: string | null;
   username: string;
   pfp_url: string;
   lastTraded: {

@@ -5,6 +5,7 @@ import {
   useTokenLiquidity,
   isLiquidityLow,
 } from "@/src/hooks/useTokenLiquidity";
+import { isAerodromeToken, isUniswapV4Token } from "@/src/lib/tokenUtils";
 
 interface LiquidityWarningProps {
   tokenAddress: string;
@@ -27,14 +28,17 @@ export const LiquidityWarning = ({
   type,
   poolAddress: providedPoolAddress,
 }: LiquidityWarningProps) => {
+  const shouldCheckLiquidity =
+    !isAerodromeToken(type) &&
+    !isUniswapV4Token(type) &&
+    (!pair || pair.toUpperCase() === "WETH");
   const { wethBalance, wethBalanceFormatted, poolAddress, isLoading, error } =
-    useTokenLiquidity(tokenAddress, providedPoolAddress);
+    useTokenLiquidity(
+      shouldCheckLiquidity ? tokenAddress : "",
+      shouldCheckLiquidity ? providedPoolAddress : undefined
+    );
 
-  // Don't show warning for Aerodrome pools or other non-Uniswap pool types
-  if (type && (type.toLowerCase() === "v2aero" || type.toLowerCase() === "v2aeronew")) return null;
-
-  // Don't show warning for non-WETH pairs (ETHx, etc.) since hook only checks WETH
-  if (pair && pair.toUpperCase() !== "WETH") return null;
+  if (!shouldCheckLiquidity) return null;
 
   // Don't show warning if still loading or if there's an error
   if (isLoading || error) return null;
@@ -110,14 +114,17 @@ export const InlineLiquidityWarning = ({
   type,
   poolAddress: providedPoolAddress,
 }: Omit<LiquidityWarningProps, "onDismiss">) => {
+  const shouldCheckLiquidity =
+    !isAerodromeToken(type) &&
+    !isUniswapV4Token(type) &&
+    (!pair || pair.toUpperCase() === "WETH");
   const { wethBalance, wethBalanceFormatted, isLoading, error } =
-    useTokenLiquidity(tokenAddress, providedPoolAddress);
+    useTokenLiquidity(
+      shouldCheckLiquidity ? tokenAddress : "",
+      shouldCheckLiquidity ? providedPoolAddress : undefined
+    );
 
-  // Don't show warning for Aerodrome pools or other non-Uniswap pool types
-  if (type && (type.toLowerCase() === "v2aero" || type.toLowerCase() === "v2aeronew")) return null;
-
-  // Don't show warning for non-WETH pairs (ETHx, etc.) since hook only checks WETH
-  if (pair && pair.toUpperCase() !== "WETH") return null;
+  if (!shouldCheckLiquidity) return null;
 
   if (isLoading || error) return null;
 

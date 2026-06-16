@@ -7,12 +7,13 @@ export interface Token {
   name: string;
   symbol: string;
   img_url: string | null;
-  pool_address: string;
+  pool_address: string | null;
+  pool_key?: string | null;
   cast_hash: string;
   type: string;
   pair: string;
   chain_id: number;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, unknown> | null;
   profileImage: string | null;
   pool_id: string;
   staking_pool: string;

@@ -13,6 +13,7 @@ import { StakerLeaderboard } from "@/src/components/StakerLeaderboard";
 import { StakerLeaderboardEmbed } from "@/src/components/StakerLeaderboardEmbed";
 import { ClaimFeesButton } from "@/src/components/ClaimFeesButton";
 import { useTokenData } from "@/src/contexts/TokenPageContext";
+import { getZapLpType, isUniswapV4Token } from "@/src/lib/tokenUtils";
 
 export function TokenPageContent() {
   const [stakingUpdateTrigger, setStakingUpdateTrigger] = useState(0);
@@ -150,17 +151,25 @@ ${shareUrl}`;
     );
   }
 
-  const embedUrl =
+  const fallbackPoolAddress =
     pageAddress.toLowerCase() ===
     "0x1234567890123456789012345678901234567890".toLowerCase()
-      ? "https://www.geckoterminal.com/base/pools/0x1035ae3f87a91084c6c5084d0615cc6121c5e228?embed=1&info=0&swaps=1&grayscale=0&light_chart=0"
-      : `https://www.geckoterminal.com/base/pools/${token.pool_address}?embed=1&info=0&swaps=1&grayscale=0&light_chart=0`;
-
-  const smallEmbedUrl =
-    pageAddress.toLowerCase() ===
-    "0x1234567890123456789012345678901234567890".toLowerCase()
-      ? "https://www.geckoterminal.com/base/pools/0x1035ae3f87a91084c6c5084d0615cc6121c5e228?embed=1&info=0&swaps=0&grayscale=0&light_chart=0"
-      : `https://www.geckoterminal.com/base/pools/${token.pool_address}?embed=1&info=0&swaps=0&grayscale=0&light_chart=0`;
+      ? "0x1035ae3f87a91084c6c5084d0615cc6121c5e228"
+      : null;
+  const chartPoolAddress =
+    token.pool_address ||
+    (isUniswapV4Token(token.type)
+      ? token.pool_key || token.contract_address
+      : null) ||
+    fallbackPoolAddress;
+  const buildGeckoEmbedUrl = (swaps: boolean) =>
+    chartPoolAddress
+      ? `https://www.geckoterminal.com/base/pools/${chartPoolAddress}?embed=1&info=0&swaps=${
+          swaps ? 1 : 0
+        }&grayscale=0&light_chart=0`
+      : null;
+  const embedUrl = buildGeckoEmbedUrl(true);
+  const smallEmbedUrl = buildGeckoEmbedUrl(false);
 
   return (
     <div className="max-w-[1440px] mx-auto sm:px-6 mt-6 md:px-8 md:mt-0 md:pt-28 pb-12">
@@ -198,14 +207,16 @@ ${shareUrl}`;
           {/* Chart - Always directly below Token Info */}
           <div className="card bg-base-100 border border-black/[.1] dark:border-white/[.1] h-fit">
             <div className="card-body p-0 md:p-4">
-              <iframe
-                data-privy-ignore
-                title="GeckoTerminal Embed"
-                src={isMiniAppView ? smallEmbedUrl : embedUrl}
-                className="w-full h-[500px] lg:h-[800px] rounded-lg"
-                allow="clipboard-write"
-                allowFullScreen
-              />
+              {embedUrl && smallEmbedUrl ? (
+                <iframe
+                  data-privy-ignore
+                  title="GeckoTerminal Embed"
+                  src={isMiniAppView ? smallEmbedUrl : embedUrl}
+                  className="w-full h-[500px] lg:h-[800px] rounded-lg"
+                  allow="clipboard-write"
+                  allowFullScreen
+                />
+              ) : null}
             </div>
           </div>
         </div>
@@ -229,6 +240,9 @@ ${shareUrl}`;
               stakingPool={token.staking_pool}
               symbol={token.symbol}
               tokenAddress={token.contract_address}
+              tokenType={token.type}
+              pair={token.pair}
+              poolAddress={token.pool_address}
               tokenLaunchTime={
                 token.timestamp
                   ? new Date(
@@ -246,11 +260,7 @@ ${shareUrl}`;
               tokenAddress={token.contract_address}
               tokenSymbol={token.symbol}
               stakingAddress={token.staking_address}
-              lpType={
-                token.type === "v2aero" || token.type === "v2aeronew"
-                  ? "aero"
-                  : "uniswap"
-              }
+              lpType={getZapLpType(token.type)}
               onViewAll={() => setIsStakerLeaderboardOpen(true)}
               onStakingChange={handleStakingChange}
               tokenPrice={token.price}
@@ -271,6 +281,9 @@ ${shareUrl}`;
               stakingPool={token.staking_pool}
               symbol={token.symbol}
               tokenAddress={token.contract_address}
+              tokenType={token.type}
+              pair={token.pair}
+              poolAddress={token.pool_address}
               tokenLaunchTime={
                 token.timestamp
                   ? new Date(
@@ -288,6 +301,7 @@ ${shareUrl}`;
               tokenAddress={token.contract_address}
               tokenSymbol={token.symbol}
               stakingAddress={token.staking_address}
+              lpType={getZapLpType(token.type)}
               onViewAll={() => setIsStakerLeaderboardOpen(true)}
               onStakingChange={handleStakingChange}
               isMiniApp={isMiniAppView}

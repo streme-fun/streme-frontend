@@ -21,7 +21,7 @@ interface StakerLeaderboardEmbedProps {
   tokenAddress: string;
   tokenSymbol: string;
   stakingAddress?: string;
-  lpType?: "uniswap" | "aero";
+  lpType?: "uniswap" | "aero" | "uniswap-v4";
   onViewAll: () => void;
   onStakingChange?: () => void;
   isMiniApp?: boolean;
@@ -139,6 +139,10 @@ export function StakerLeaderboardEmbed({
       toast.error("Wallet not connected or staking address missing");
       return;
     }
+    if (lpType === "uniswap-v4") {
+      toast.error("Buy & Stake is not available for this pool type yet");
+      return;
+    }
 
     setIsZapStaking(true);
     const toastId = toast.loading("Buying and Staking amount for #1...");
@@ -207,15 +211,7 @@ export function StakerLeaderboardEmbed({
         address: quoterAddress as `0x${string}`,
         abi: quoterAbi,
         functionName: "quoteExactInputSingle",
-        args: [
-          {
-            tokenIn: WETH,
-            tokenOut: toHex(tokenAddress),
-            amountIn: amountInWei,
-            fee: 10000,
-            sqrtPriceLimitX96: 0n,
-          },
-        ],
+        args,
       })) as [bigint, bigint, number, bigint];
       const amountOut = quoteResult[0];
       const amountOutMin = amountOut - amountOut / 200n; // 0.5% slippage
@@ -546,7 +542,10 @@ export function StakerLeaderboardEmbed({
       )}
 
       {/* Become Top Staker Button */}
-      {stakingAddress && !isUserTopStaker() && effectiveIsConnected && (
+      {stakingAddress &&
+        lpType !== "uniswap-v4" &&
+        !isUserTopStaker() &&
+        effectiveIsConnected && (
         <div className="mt-3 pt-3 border-t border-base-300">
           <div className="text-center">
             <button

@@ -17,7 +17,7 @@ import { ensureTxHash } from "@/src/lib/ensureTxHash";
 import { ZAP_CONTRACT_ADDRESS } from "@/src/lib/contracts";
 import {
   isStakingDisabled,
-  getStakingDisabledMessage,
+  supportsZapStake,
 } from "@/src/lib/tokenUtils";
 import { encodeZapData } from "@/src/lib/abiEncoding";
 
@@ -106,6 +106,10 @@ export function ZapStakeButton({
   const handleZapStake = async () => {
     if (!isValid || !currentAddress || !walletIsConnected) {
       toast.error("Wallet not connected or address missing");
+      return;
+    }
+    if (!supportsZapStake(tokenType) || lpType === "uniswap-v4") {
+      toast.error("Buy & Stake is not available for this pool type yet");
       return;
     }
     setIsLoading(true);
@@ -421,13 +425,16 @@ export function ZapStakeButton({
 
   // Check if staking is disabled for this token type or address
   const stakingDisabled = isStakingDisabled(tokenType, tokenAddress);
-  const disabledMessage = getStakingDisabledMessage(tokenType, tokenAddress);
+  const zapUnsupported =
+    !supportsZapStake(tokenType) || lpType === "uniswap-v4";
 
   return (
     <>
       <button
         onClick={handleZapStake}
-        disabled={disabled || isLoading || !isValid || stakingDisabled}
+        disabled={
+          disabled || isLoading || !isValid || stakingDisabled || zapUnsupported
+        }
         className={className}
       >
         {isLoading ? (
