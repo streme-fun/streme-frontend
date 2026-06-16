@@ -8,6 +8,8 @@ import { MiniAppTutorialModal } from "./MiniAppTutorialModal";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { HowItWorksModal } from "./HowItWorksModal";
 import { useWallet } from "../hooks/useWallet";
+import { ArrowUpRight } from "lucide-react";
+import { WARPLET_GOBBLER_URL } from "../lib/warpletGobbler";
 
 export function Navbar() {
   // Use new simplified wallet hook
@@ -171,6 +173,16 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-6">
+            <a
+              href={WARPLET_GOBBLER_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost gap-2"
+            >
+              Gobbler
+              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+            </a>
+
             <Link href="/pulse" className="btn btn-ghost">
               Pulse
             </Link>
@@ -297,6 +309,17 @@ export function Navbar() {
             >
               Pulse
             </Link>
+
+            <a
+              href={WARPLET_GOBBLER_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost w-full justify-start gap-2"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Gobbler
+              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+            </a>
 
             <Link
               href="/skate"
