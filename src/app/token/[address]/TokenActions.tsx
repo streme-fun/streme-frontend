@@ -24,6 +24,7 @@ import {
   isStakingDisabled,
   supportsZapStake,
 } from "@/src/lib/tokenUtils";
+import { WARPLET_GOBBLER_TOKEN_ADDRESS } from "@/src/lib/warpletGobbler";
 
 // Base USDC contract address
 const USDC_BASE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -54,6 +55,8 @@ export function TokenActions({
   // Use shared token data from context, fall back to prop for compatibility
   const { token: contextToken } = useTokenData();
   const token = contextToken || initialToken;
+  const isWarpletGobblerToken =
+    token?.contract_address?.toLowerCase() === WARPLET_GOBBLER_TOKEN_ADDRESS;
 
   // Use shared token data hook instead of individual state
   const {
@@ -87,6 +90,12 @@ export function TokenActions({
     liquidityAvailable: boolean;
   } | null>(null);
   const [isPriceLoading, setIsPriceLoading] = useState(false);
+
+  useEffect(() => {
+    if (isWarpletGobblerToken && tradeDirection === "sell") {
+      setTradeDirection("buy");
+    }
+  }, [isWarpletGobblerToken, tradeDirection]);
 
   // Use centralized price cache for token prices, separate logic for ETH
   const { price: tokenPrice } = useTokenPrice(token?.contract_address, {
@@ -560,16 +569,34 @@ export function TokenActions({
               Buy
             </button>
             <button
-              onClick={() => setTradeDirection("sell")}
+              onClick={() => {
+                if (!isWarpletGobblerToken) {
+                  setTradeDirection("sell");
+                }
+              }}
+              disabled={isWarpletGobblerToken}
+              title={
+                isWarpletGobblerToken
+                  ? "Selling is temporarily disabled during the auction migration"
+                  : undefined
+              }
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                tradeDirection === "sell"
+                isWarpletGobblerToken
+                  ? "text-base-content/40 cursor-not-allowed opacity-60"
+                  : tradeDirection === "sell"
                   ? "bg-error text-white"
                   : "text-base-content/70 hover:text-base-content hover:bg-base-300 cursor-pointer"
               }`}
             >
-              Sell
+              {isWarpletGobblerToken ? "Sell disabled" : "Sell"}
             </button>
           </div>
+          {isWarpletGobblerToken && (
+            <p className="text-xs text-base-content/60">
+              Selling WARPGOBB is temporarily disabled during the auction
+              migration.
+            </p>
+          )}
 
           {/* Available to Trade */}
           <div className="flex justify-between">
