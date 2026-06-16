@@ -25,6 +25,7 @@ import { useCheckinModal } from "../hooks/useCheckinModal";
 import sdk from "@farcaster/miniapp-sdk";
 import { convertTypesenseTokenToToken, TypesenseToken } from "../lib/typesenseClient";
 import { VoteBanner } from "../components/VoteBanner";
+import { WarpletGobblerPromo } from "../components/WarpletGobblerPromo";
 
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -480,6 +481,8 @@ function App() {
               </div>
             )}
 
+          <WarpletGobblerPromo variant="mini" />
+
           {/* Vote Banner */}
           <VoteBanner />
 
@@ -573,6 +576,8 @@ function App() {
           <div className="block w-full">
             <Hero />
           </div>
+
+          <WarpletGobblerPromo />
 
           {/* Trending Carousel - Above filters */}
           <div className="w-full max-w-[1200px] px-4 mx-auto">

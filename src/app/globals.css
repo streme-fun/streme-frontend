@@ -49,3 +49,24 @@
 .animate-slide-up {
   animation: slide-up 0.3s ease-out;
 }
+
+@keyframes warplet-gobbler-promo-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.warplet-gobbler-promo {
+  animation: warplet-gobbler-promo-in 0.36s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .warplet-gobbler-promo {
+    animation: none;
+  }
+}
