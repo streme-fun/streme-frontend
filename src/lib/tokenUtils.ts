@@ -38,6 +38,27 @@ export const isStakingDisabled = (
   return false;
 };
 
+export const isAerodromeToken = (tokenType?: string): boolean => {
+  const normalizedType = tokenType?.toLowerCase();
+  return normalizedType === "v2aero" || normalizedType === "v2aeronew";
+};
+
+export const isUniswapV4Token = (tokenType?: string): boolean => {
+  return tokenType?.toLowerCase() === "v4uni";
+};
+
+export type ZapLpType = "uniswap" | "aero" | "uniswap-v4";
+
+export const getZapLpType = (tokenType?: string): ZapLpType => {
+  if (isAerodromeToken(tokenType)) return "aero";
+  if (isUniswapV4Token(tokenType)) return "uniswap-v4";
+  return "uniswap";
+};
+
+export const supportsZapStake = (tokenType?: string): boolean => {
+  return !isUniswapV4Token(tokenType);
+};
+
 /**
  * Get user-facing message explaining why staking is disabled
  * @param tokenType - Token type

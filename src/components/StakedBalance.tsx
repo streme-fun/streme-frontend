@@ -10,6 +10,7 @@ import {
   useTokenLiquidity,
   isLiquidityLow,
 } from "@/src/hooks/useTokenLiquidity";
+import { isAerodromeToken, isUniswapV4Token } from "@/src/lib/tokenUtils";
 
 interface StakedBalanceProps {
   stakingAddress: string;
@@ -17,6 +18,9 @@ interface StakedBalanceProps {
   symbol: string;
   tokenAddress: string;
   tokenLaunchTime: string | number | Date;
+  tokenType?: string;
+  pair?: string;
+  poolAddress?: string | null;
 }
 
 interface PoolData {
@@ -33,6 +37,9 @@ export function StakedBalance({
   symbol,
   tokenAddress,
   tokenLaunchTime,
+  tokenType,
+  pair,
+  poolAddress,
 }: StakedBalanceProps) {
   const { address, isConnected } = useWallet();
   const [stakedBalance, setStakedBalance] = useState<bigint>(0n);
@@ -228,9 +235,18 @@ export function StakedBalance({
 
   // Price is now handled by useTokenPrice hook
 
-  // Use shared liquidity check (Uniswap V3 WETH reserves)
-  const { wethBalance } = useTokenLiquidity(tokenAddress);
-  const lowLiquidity = isLiquidityLow(wethBalance, tokenLaunchTime);
+  const shouldCheckLiquidity =
+    !isAerodromeToken(tokenType) &&
+    !isUniswapV4Token(tokenType) &&
+    (!pair || pair.toUpperCase() === "WETH");
+
+  // Use shared liquidity check for V3-style WETH reserve pools only.
+  const { wethBalance } = useTokenLiquidity(
+    shouldCheckLiquidity ? tokenAddress : "",
+    shouldCheckLiquidity ? poolAddress ?? undefined : undefined
+  );
+  const lowLiquidity =
+    shouldCheckLiquidity && isLiquidityLow(wethBalance, tokenLaunchTime);
 
   // Calculate memoized values before early return
   const receivedUsdValue = useMemo(() => {
