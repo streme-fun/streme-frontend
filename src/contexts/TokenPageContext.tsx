@@ -10,6 +10,7 @@ import {
   ReactNode,
 } from "react";
 import { Token } from "@/src/app/types/token";
+import { getGeckoTerminalPoolId } from "@/src/lib/tokenUtils";
 
 interface TokenPageContextType {
   token: Token | null;
@@ -54,16 +55,23 @@ export function TokenPageProvider({
       const poolData = data?.data;
 
       if (poolData) {
+        const attributes = poolData.attributes || {};
+        const parseNumber = (value: unknown): number | undefined => {
+          if (value === null || value === undefined || value === "") {
+            return undefined;
+          }
+          const parsed = parseFloat(String(value));
+          return Number.isFinite(parsed) ? parsed : undefined;
+        };
+
         return {
-          price: parseFloat(poolData.attributes?.base_token_price_usd || "0"),
-          change1h: parseFloat(
-            poolData.attributes?.price_change_percentage?.h1 || "0"
-          ),
-          change24h: parseFloat(
-            poolData.attributes?.price_change_percentage?.h24 || "0"
-          ),
-          volume24h: parseFloat(poolData.attributes?.volume_usd?.h24 || "0"),
-          marketCap: parseFloat(poolData.attributes?.market_cap_usd || "0"),
+          price: parseNumber(attributes.base_token_price_usd),
+          change1h: parseNumber(attributes.price_change_percentage?.h1),
+          change24h: parseNumber(attributes.price_change_percentage?.h24),
+          volume24h: parseNumber(attributes.volume_usd?.h24),
+          marketCap:
+            parseNumber(attributes.market_cap_usd) ??
+            parseNumber(attributes.fdv_usd),
         };
       }
     } catch (error) {
@@ -124,10 +132,9 @@ export function TokenPageProvider({
             // Fetch enhanced market data from GeckoTerminal if available
             let enhancedToken = { ...baseToken };
 
-            if (baseToken.pool_address) {
-              const geckoData = await fetchGeckoTerminalData(
-                baseToken.pool_address
-              );
+            const geckoPoolId = getGeckoTerminalPoolId(baseToken);
+            if (geckoPoolId) {
+              const geckoData = await fetchGeckoTerminalData(geckoPoolId);
               if (geckoData) {
                 enhancedToken = {
                   ...baseToken,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -40,7 +40,8 @@ interface StremeTokenResponse {
   name: string;
   symbol: string;
   img_url: string;
-  pool_address: string;
+  pool_address: string | null;
+  pool_key?: string | null;
   cast_hash: string;
   type: string;
   pair: string;
@@ -112,13 +113,14 @@ export const fetchTrendingTokens = async (): Promise<Token[]> => {
       symbol: apiToken.symbol,
       img_url: apiToken.img_url,
       pool_address: apiToken.pool_address,
+      pool_key: apiToken.pool_key,
       cast_hash: apiToken.cast_hash,
       type: apiToken.type,
       pair: apiToken.pair,
       chain_id: apiToken.chain_id,
       metadata: apiToken.metadata,
       profileImage: null, // Not in API response
-      pool_id: apiToken.pool_address, // Use pool_address as pool_id
+      pool_id: apiToken.pool_address || apiToken.pool_key || "",
       staking_pool: apiToken.staking_pool,
       staking_address: apiToken.staking_address,
       pfp_url: apiToken.pfp_url,
@@ -822,6 +824,30 @@ export function TokenGrid({
 
   const TOKENS_PER_PAGE = 36;
 
+  const mergeTrendingWithLatest = useCallback((trending: Token[]) => {
+    const seenAddresses = new Set(
+      trending.map((token) => token.contract_address?.toLowerCase())
+    );
+    const missingLatest = tokens
+      .filter((token) => {
+        const address = token.contract_address?.toLowerCase();
+        return address && !seenAddresses.has(address);
+      })
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+    const freshMissing = missingLatest.filter((token) =>
+      isTokenNew(token.created_at)
+    );
+    const olderMissing = missingLatest.filter(
+      (token) => !isTokenNew(token.created_at)
+    );
+
+    return [...freshMissing, ...trending, ...olderMissing];
+  }, [tokens]);
+
   // Fetch trending tokens when sortBy is "trending"
   useEffect(() => {
     if (sortBy === "trending") {
@@ -829,11 +855,12 @@ export function TokenGrid({
       const fetchTrending = async () => {
         try {
           const trending = await fetchTrendingTokens();
-          trendingTokensRef.current = trending;
+          const mergedTrending = mergeTrendingWithLatest(trending);
+          trendingTokensRef.current = mergedTrending;
 
           // Show tokens immediately with placeholder data for fast initial render
-          if (trending.length > 0) {
-            const placeholderTokens = trending
+          if (mergedTrending.length > 0) {
+            const placeholderTokens = mergedTrending
               .slice(0, TOKENS_PER_PAGE)
               .map((token) => ({
                 ...token,
@@ -841,11 +868,11 @@ export function TokenGrid({
                 totalStakers: 0, // Placeholder
               }));
             setDisplayedTokens(placeholderTokens);
-            setTotalItemsCount(trending.length);
+            setTotalItemsCount(mergedTrending.length);
 
             // Start enriching the first page in the background
             setIsEnrichingTrending(true);
-            enrichFirstPageTrending(trending.slice(0, TOKENS_PER_PAGE));
+            enrichFirstPageTrending(mergedTrending.slice(0, TOKENS_PER_PAGE));
           }
         } finally {
           setIsFetchingTrending(false);
@@ -859,7 +886,7 @@ export function TokenGrid({
       setIsFetchingTrending(false);
       setIsEnrichingTrending(false);
     }
-  }, [sortBy]);
+  }, [mergeTrendingWithLatest, sortBy]);
 
   // Helper function to enrich first page of trending tokens progressively
   const enrichFirstPageTrending = async (firstPageTokens: Token[]) => {
@@ -1130,6 +1157,27 @@ export function TokenGrid({
           );
           sourceTokens = response.tokens;
           paginationInfo = response.pagination;
+
+          if (sourceTokens.length === 0 && tokens.length > 0) {
+            const fallbackTokens =
+              sortBy === "marketCap"
+                ? [...tokens].sort(
+                    (a, b) => (b.marketCap || 0) - (a.marketCap || 0)
+                  )
+                : sortTokensByDate(
+                    tokens,
+                    sortBy as "newest" | "oldest"
+                  );
+            paginationInfo = {
+              currentPage,
+              totalPages: Math.ceil(fallbackTokens.length / TOKENS_PER_PAGE),
+              totalResults: fallbackTokens.length,
+              hasMore: currentPage * TOKENS_PER_PAGE < fallbackTokens.length,
+            };
+            const startIndex = (currentPage - 1) * TOKENS_PER_PAGE;
+            const endIndex = currentPage * TOKENS_PER_PAGE;
+            sourceTokens = fallbackTokens.slice(startIndex, endIndex);
+          }
         } else {
           // Fallback to tokens prop (shouldn't happen with current SortOption types)
           sourceTokens = tokens;

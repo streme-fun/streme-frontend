@@ -38,6 +38,40 @@ export const isStakingDisabled = (
   return false;
 };
 
+export const isAerodromeToken = (tokenType?: string): boolean => {
+  const normalizedType = tokenType?.toLowerCase();
+  return normalizedType === "v2aero" || normalizedType === "v2aeronew";
+};
+
+export const isUniswapV4Token = (tokenType?: string): boolean => {
+  return tokenType?.toLowerCase() === "v4uni";
+};
+
+export type ZapLpType = "uniswap" | "aero" | "uniswap-v4";
+
+export const getZapLpType = (tokenType?: string): ZapLpType => {
+  if (isAerodromeToken(tokenType)) return "aero";
+  if (isUniswapV4Token(tokenType)) return "uniswap-v4";
+  return "uniswap";
+};
+
+export const supportsZapStake = (tokenType?: string): boolean => {
+  return !isUniswapV4Token(tokenType);
+};
+
+export const getGeckoTerminalPoolId = (token: {
+  type?: string;
+  pool_address?: string | null;
+  pool_key?: string | null;
+  contract_address?: string | null;
+}): string | null => {
+  if (token.pool_address) return token.pool_address;
+  if (isUniswapV4Token(token.type)) {
+    return token.pool_key || token.contract_address || null;
+  }
+  return null;
+};
+
 /**
  * Get user-facing message explaining why staking is disabled
  * @param tokenType - Token type

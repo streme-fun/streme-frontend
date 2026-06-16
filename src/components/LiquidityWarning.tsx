@@ -5,6 +5,7 @@ import {
   useTokenLiquidity,
   isLiquidityLow,
 } from "@/src/hooks/useTokenLiquidity";
+import { isAerodromeToken, isUniswapV4Token } from "@/src/lib/tokenUtils";
 
 interface LiquidityWarningProps {
   tokenAddress: string;
@@ -15,6 +16,7 @@ interface LiquidityWarningProps {
   pair?: string; // Paired token (e.g., "WETH", "ETHx")
   type?: string; // Token pool type (e.g., "v2aero", "v2uni")
   poolAddress?: string; // Liquidity pool address
+  poolKey?: string | null; // Uniswap V4 pool key
 }
 
 export const LiquidityWarning = ({
@@ -26,15 +28,20 @@ export const LiquidityWarning = ({
   pair = "WETH",
   type,
   poolAddress: providedPoolAddress,
+  poolKey,
 }: LiquidityWarningProps) => {
+  const shouldCheckLiquidity =
+    !isAerodromeToken(type) &&
+    !isUniswapV4Token(type) &&
+    !poolKey &&
+    (!pair || pair.toUpperCase() === "WETH");
   const { wethBalance, wethBalanceFormatted, poolAddress, isLoading, error } =
-    useTokenLiquidity(tokenAddress, providedPoolAddress);
+    useTokenLiquidity(
+      shouldCheckLiquidity ? tokenAddress : "",
+      shouldCheckLiquidity ? providedPoolAddress : undefined
+    );
 
-  // Don't show warning for Aerodrome pools or other non-Uniswap pool types
-  if (type && (type.toLowerCase() === "v2aero" || type.toLowerCase() === "v2aeronew")) return null;
-
-  // Don't show warning for non-WETH pairs (ETHx, etc.) since hook only checks WETH
-  if (pair && pair.toUpperCase() !== "WETH") return null;
+  if (!shouldCheckLiquidity) return null;
 
   // Don't show warning if still loading or if there's an error
   if (isLoading || error) return null;
@@ -109,15 +116,20 @@ export const InlineLiquidityWarning = ({
   pair = "WETH",
   type,
   poolAddress: providedPoolAddress,
+  poolKey,
 }: Omit<LiquidityWarningProps, "onDismiss">) => {
+  const shouldCheckLiquidity =
+    !isAerodromeToken(type) &&
+    !isUniswapV4Token(type) &&
+    !poolKey &&
+    (!pair || pair.toUpperCase() === "WETH");
   const { wethBalance, wethBalanceFormatted, isLoading, error } =
-    useTokenLiquidity(tokenAddress, providedPoolAddress);
+    useTokenLiquidity(
+      shouldCheckLiquidity ? tokenAddress : "",
+      shouldCheckLiquidity ? providedPoolAddress : undefined
+    );
 
-  // Don't show warning for Aerodrome pools or other non-Uniswap pool types
-  if (type && (type.toLowerCase() === "v2aero" || type.toLowerCase() === "v2aeronew")) return null;
-
-  // Don't show warning for non-WETH pairs (ETHx, etc.) since hook only checks WETH
-  if (pair && pair.toUpperCase() !== "WETH") return null;
+  if (!shouldCheckLiquidity) return null;
 
   if (isLoading || error) return null;
 
