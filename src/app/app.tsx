@@ -26,6 +26,7 @@ import sdk from "@farcaster/miniapp-sdk";
 import { convertTypesenseTokenToToken, TypesenseToken } from "../lib/typesenseClient";
 import { VoteBanner } from "../components/VoteBanner";
 import { WarpletGobblerPromo } from "../components/WarpletGobblerPromo";
+import { CHECKIN_CONFIG } from "../constants/checkin";
 
 function App() {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -341,6 +342,10 @@ function App() {
 
   // Check checkin status when miniapp first opens (only after wallet is connected)
   useEffect(() => {
+    if (!CHECKIN_CONFIG.EXPERIMENTAL_DAILY_DROP_ENABLED) {
+      return;
+    }
+
     const checkCheckinStatus = async () => {
       if (
         isMiniAppView &&
@@ -547,23 +552,27 @@ function App() {
           onSkip={handleSkipTutorial}
         /> */}
 
-        {/* Checkin Modal */}
-        <CheckinModal
-          isOpen={showCheckinModal}
-          onClose={handleCloseCheckinModal}
-          onCheckin={performCheckin}
-          isLoading={checkinLoading}
-          hasCheckedIn={hasCheckedIn}
-          hasStakedBalance={hasStakedBalance}
-        />
+        {CHECKIN_CONFIG.EXPERIMENTAL_DAILY_DROP_ENABLED && (
+          <>
+            {/* Checkin Modal */}
+            <CheckinModal
+              isOpen={showCheckinModal}
+              onClose={handleCloseCheckinModal}
+              onCheckin={performCheckin}
+              isLoading={checkinLoading}
+              hasCheckedIn={hasCheckedIn}
+              hasStakedBalance={hasStakedBalance}
+            />
 
-        {/* Checkin Success Modal */}
-        <CheckinSuccessModal
-          isOpen={showSuccessModal}
-          onClose={closeSuccessModal}
-          totalCheckins={checkinData?.totalCheckins}
-          currentStreak={checkinData?.currentStreak}
-        />
+            {/* Checkin Success Modal */}
+            <CheckinSuccessModal
+              isOpen={showSuccessModal}
+              onClose={closeSuccessModal}
+              totalCheckins={checkinData?.totalCheckins}
+              currentStreak={checkinData?.currentStreak}
+            />
+          </>
+        )}
       </div>
     );
   }

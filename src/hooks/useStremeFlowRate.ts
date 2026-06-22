@@ -21,7 +21,7 @@ interface AccountTokenSnapshot {
   updatedAtTimestamp: string;
 }
 
-export function useStremeFlowRate() {
+export function useStremeFlowRate(enabled = true) {
   const { address: wagmiAddress } = useAccount();
   const { isMiniAppView, address: fcAddress } = useAppFrameLogic();
   const [flowRate, setFlowRate] = useState<string>("0");
@@ -31,7 +31,7 @@ export function useStremeFlowRate() {
   const effectiveAddress = isMiniAppView ? fcAddress : wagmiAddress;
 
   const fetchFlowRate = async () => {
-    if (!effectiveAddress) {
+    if (!enabled || !effectiveAddress) {
       // No need to log - this is a normal state when not connected
       return;
     }
@@ -180,8 +180,14 @@ export function useStremeFlowRate() {
   };
 
   useEffect(() => {
+    if (!enabled) {
+      setFlowRate("0");
+      setIsLoading(false);
+      return;
+    }
+
     fetchFlowRate();
-  }, [effectiveAddress]);
+  }, [effectiveAddress, enabled]);
 
   // Return the fetch function so it can be called manually
   return { flowRate, isLoading, refetch: fetchFlowRate };

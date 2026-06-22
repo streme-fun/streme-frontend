@@ -34,9 +34,10 @@ export function useCheckinModal({
     hasCheckedIn,
   } = useCheckin();
   
-  const { flowRate } = useStremeFlowRate();
   const { trackModalAutoShown, trackDebugButtonClicked } = useCheckinTracking();
   
+  const isDailyDropEnabled = CHECKIN_CONFIG.EXPERIMENTAL_DAILY_DROP_ENABLED;
+  const { flowRate } = useStremeFlowRate(isDailyDropEnabled);
   const hasStakedBalance = flowRate !== "0" && flowRate !== undefined;
   
   // Custom close handler that remembers dismissal
@@ -47,13 +48,21 @@ export function useCheckinModal({
   
   // Handle debug button click
   const handleDebugButtonClick = useCallback(() => {
+    if (!isDailyDropEnabled) return;
+
     trackDebugButtonClicked(hasStakedBalance);
     openCheckinModal();
-  }, [hasStakedBalance, openCheckinModal, trackDebugButtonClicked]);
+  }, [
+    hasStakedBalance,
+    isDailyDropEnabled,
+    openCheckinModal,
+    trackDebugButtonClicked,
+  ]);
   
   // Auto-show checkin modal for eligible users
   useEffect(() => {
     const shouldAutoShow = 
+      isDailyDropEnabled &&
       isMiniAppView &&
       isConnected &&
       isOnCorrectNetwork &&
@@ -73,6 +82,7 @@ export function useCheckinModal({
     }
   }, [
     isMiniAppView,
+    isDailyDropEnabled,
     isConnected,
     isOnCorrectNetwork,
     hasCheckedIn,
@@ -90,9 +100,9 @@ export function useCheckinModal({
     checkinData,
     checkinError,
     checkinLoading,
-    showSuccessModal,
-    showCheckinModal,
-    hasCheckedIn,
+    showSuccessModal: isDailyDropEnabled && showSuccessModal,
+    showCheckinModal: isDailyDropEnabled && showCheckinModal,
+    hasCheckedIn: isDailyDropEnabled ? hasCheckedIn : true,
     hasStakedBalance,
     
     // Actions
