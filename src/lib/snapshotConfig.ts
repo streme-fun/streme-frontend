@@ -3,7 +3,7 @@
 
 export const SNAPSHOT_CONFIG = {
   /** Set to true to show the vote banner in the mini app */
-  enabled: true,
+  enabled: false,
 
   /** Snapshot space (e.g. "superfluid.eth") */
   space: "superfluid.eth",
