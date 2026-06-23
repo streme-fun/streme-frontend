@@ -1,6 +1,7 @@
 // Checkin-related constants
 
 export const CHECKIN_CONFIG = {
+  EXPERIMENTAL_DAILY_DROP_ENABLED: false,
   AUTO_SHOW_DELAY: 1500, // ms
   DROP_AMOUNT: 1000, // staked STREME
 } as const;

@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import sdk from "@farcaster/miniapp-sdk";
 import { toast } from "sonner";
+import { CHECKIN_CONFIG } from "../constants/checkin";
 
 export interface CheckinData {
   success: boolean;
@@ -38,6 +39,19 @@ export function useCheckin() {
   });
 
   const performCheckin = useCallback(async () => {
+    if (!CHECKIN_CONFIG.EXPERIMENTAL_DAILY_DROP_ENABLED) {
+      const errorMessage = "Experimental daily drop is disabled";
+      setState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage,
+        hasAttempted: true,
+        showCheckinModal: false,
+        showSuccessModal: false,
+      }));
+      throw new Error(errorMessage);
+    }
+
     setState((prev) => ({
       ...prev,
       isLoading: true,
@@ -108,6 +122,8 @@ export function useCheckin() {
 
   // Auto-checkin on mount
   const autoCheckin = useCallback(async () => {
+    if (!CHECKIN_CONFIG.EXPERIMENTAL_DAILY_DROP_ENABLED) return;
+
     // Only auto-checkin if we haven't already attempted
     if (!state.hasAttempted && !state.isLoading) {
       try {
@@ -136,6 +152,8 @@ export function useCheckin() {
   }, []);
 
   const openCheckinModal = useCallback(() => {
+    if (!CHECKIN_CONFIG.EXPERIMENTAL_DAILY_DROP_ENABLED) return;
+
     setState((prev) => ({ ...prev, showCheckinModal: true }));
   }, []);
 
@@ -149,6 +167,8 @@ export function useCheckin() {
   }, []);
 
   const showSuccessModalDebug = useCallback(() => {
+    if (!CHECKIN_CONFIG.EXPERIMENTAL_DAILY_DROP_ENABLED) return;
+
     const fakeCheckinData: CheckinData = {
       success: true,
       fid: 446697,
