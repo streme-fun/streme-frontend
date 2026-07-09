@@ -8,7 +8,7 @@ import {
   buildBuyTxForToken,
   buildConnectPoolTxForToken,
   buildStakeTxForToken,
-  buildStreamTx,
+  buildStreamTxForToken,
   buildUnstakeTxForToken,
 } from "@/src/lib/agent/actions";
 
@@ -30,6 +30,13 @@ export async function POST(
 
   const str = (key: string): string =>
     typeof body[key] === "string" ? (body[key] as string) : "";
+  // Optional self-declared attribution; sanitized inside the builders
+  // (violations throw AgentInputError → 400 below).
+  const agentId =
+    typeof body.agentId === "string" ? (body.agentId as string) : undefined;
+  // Optional watermark source (plan U6): only the Floor UI's copy-trade
+  // marker is accepted — anything else keeps the default ("agent").
+  const source = body.source === "floor-ui" ? ("floor-ui" as const) : undefined;
 
   try {
     let result;
@@ -41,12 +48,16 @@ export async function POST(
           stake: body.stake === true,
           slippageBps:
             typeof body.slippageBps === "number" ? body.slippageBps : undefined,
+          agentId,
+          source,
         });
         break;
       case "stake":
         result = await buildStakeTxForToken({
           tokenAddress: str("tokenAddress"),
           amount: str("amount"),
+          agentId,
+          source,
         });
         break;
       case "unstake":
@@ -54,18 +65,24 @@ export async function POST(
           tokenAddress: str("tokenAddress"),
           to: str("to"),
           amount: str("amount"),
+          agentId,
+          source,
         });
         break;
       case "connect-pool":
         result = await buildConnectPoolTxForToken({
           tokenAddress: str("tokenAddress"),
+          agentId,
+          source,
         });
         break;
       case "stream":
-        result = buildStreamTx({
+        result = await buildStreamTxForToken({
           tokenAddress: str("tokenAddress"),
           receiver: str("receiver"),
           tokensPerDay: str("tokensPerDay"),
+          agentId,
+          source,
         });
         break;
       default:
