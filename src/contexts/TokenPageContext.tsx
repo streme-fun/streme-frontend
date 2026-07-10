@@ -29,6 +29,30 @@ interface TokenPageProviderProps {
   tokenAddress: string;
 }
 
+function getGeckoTerminalPoolIdentifier(token: Token): string | null {
+  if (token.pool_address) return token.pool_address;
+
+  // Uniswap v4 Streme tokens do not have a pool_address in the API yet, but
+  // GeckoTerminal accepts the v4 pool key for both embeds and pool data.
+  if (token.type?.toLowerCase() === "v4uni") {
+    return token.pool_key || token.contract_address || null;
+  }
+
+  return null;
+}
+
+function needsMarketDataEnhancement(token: Token | null): boolean {
+  if (!token) return false;
+  if (!getGeckoTerminalPoolIdentifier(token)) return false;
+
+  return (
+    token.price == null ||
+    token.volume24h == null ||
+    token.marketCap == null ||
+    token.change24h == null
+  );
+}
+
 export function TokenPageProvider({
   children,
   initialToken,
@@ -63,7 +87,11 @@ export function TokenPageProvider({
             poolData.attributes?.price_change_percentage?.h24 || "0"
           ),
           volume24h: parseFloat(poolData.attributes?.volume_usd?.h24 || "0"),
-          marketCap: parseFloat(poolData.attributes?.market_cap_usd || "0"),
+          marketCap: parseFloat(
+            poolData.attributes?.market_cap_usd ||
+              poolData.attributes?.fdv_usd ||
+              "0"
+          ),
         };
       }
     } catch (error) {
@@ -113,29 +141,36 @@ export function TokenPageProvider({
           }
 
           // Check if token data has meaningfully changed
+          const shouldEnhanceMissingMarketData =
+            needsMarketDataEnhancement(token);
+          const previousPrice = token?.price || 0;
           const hasChanged =
             !token ||
             baseToken.staking_pool !== token.staking_pool ||
             baseToken.staking_address !== token.staking_address ||
-            Math.abs((baseToken.price || 0) - (token.price || 0)) >
-              (token.price || 0) * 0.01; // 1% price change threshold
+            shouldEnhanceMissingMarketData ||
+            Math.abs((baseToken.price || 0) - previousPrice) >
+              previousPrice * 0.01; // 1% price change threshold
 
           if (hasChanged || force) {
-            // Fetch enhanced market data from GeckoTerminal if available
+            // Fetch enhanced market data from GeckoTerminal if available.
+            // v4uni tokens may only have a pool_key, not pool_address.
             let enhancedToken = { ...baseToken };
+            const geckoPoolIdentifier =
+              getGeckoTerminalPoolIdentifier(baseToken);
 
-            if (baseToken.pool_address) {
+            if (geckoPoolIdentifier) {
               const geckoData = await fetchGeckoTerminalData(
-                baseToken.pool_address
+                geckoPoolIdentifier
               );
               if (geckoData) {
                 enhancedToken = {
                   ...baseToken,
-                  price: geckoData.price ?? baseToken.price,
+                  price: geckoData.price || baseToken.price,
                   change1h: geckoData.change1h ?? baseToken.change1h,
                   change24h: geckoData.change24h ?? baseToken.change24h,
-                  volume24h: geckoData.volume24h ?? baseToken.volume24h,
-                  marketCap: geckoData.marketCap ?? baseToken.marketCap,
+                  volume24h: geckoData.volume24h || baseToken.volume24h,
+                  marketCap: geckoData.marketCap || baseToken.marketCap,
                 };
               }
             }
@@ -180,12 +215,13 @@ export function TokenPageProvider({
   const fetchTokenRef = useRef(fetchToken);
   fetchTokenRef.current = fetchToken;
 
-  // Initial fetch effect - only runs when tokenAddress changes or when we have no token
+  // Initial fetch effect - only runs when tokenAddress changes, when we have no
+  // token, or when the server payload is missing market data that GeckoTerminal
+  // can fill (common for v4uni tokens with only pool_key set).
   useEffect(() => {
     if (!tokenAddress) return;
 
-    // Only do initial fetch if we don't have token data
-    if (!token) {
+    if (!token || needsMarketDataEnhancement(token)) {
       fetchTokenRef.current();
     }
   }, [tokenAddress, token]);
